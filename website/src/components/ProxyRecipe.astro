@@ -11,12 +11,19 @@ import { loadExport } from '../data/export.ts';
 interface Props {
 	kind: 'caddy' | 'traefik' | 'nginx';
 	target?: 'app' | 'api';
+	/* The recipe for network conditions (specs/124): the address the proxy saw, and the project's proxy key. */
+	addresses?: boolean;
 }
-const { kind, target = 'app' } = Astro.props;
+const { kind, target = 'app', addresses = false } = Astro.props;
 
 const behindProxy = loadExport().behindProxy;
-const recipes =
-	target === 'api' ? behindProxy.api.recipes : behindProxy.recipes;
+const recipes = addresses
+	? target === 'api'
+		? behindProxy.addresses.api
+		: behindProxy.addresses.app
+	: target === 'api'
+		? behindProxy.api.recipes
+		: behindProxy.recipes;
 const recipe = recipes.find((r) => r.kind === kind);
 if (!recipe) {
 	throw new Error(

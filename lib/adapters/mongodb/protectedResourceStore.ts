@@ -126,6 +126,27 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		return resourceOf(result);
 	}
 
+	async noteProxyAddress(
+		namespace: string,
+		identifier: string,
+		fields: Partial<
+			Pick<ProtectedResource, 'proxyAddressProvenAt' | 'proxyAddressForgedAt'>
+		>
+	): Promise<void> {
+		const set: Record<string, Date> = {};
+		if (fields.proxyAddressProvenAt) {
+			set.proxyAddressProvenAt = fields.proxyAddressProvenAt;
+		}
+		if (fields.proxyAddressForgedAt) {
+			set.proxyAddressForgedAt = fields.proxyAddressForgedAt;
+		}
+		if (Object.keys(set).length === 0) return;
+		await this.collection.updateOne(
+			{ _id: declarationId(namespace, identifier) },
+			{ $set: set }
+		);
+	}
+
 	async destroy(namespace: string, identifier: string): Promise<void> {
 		await this.collection.deleteOne({
 			_id: declarationId(namespace, identifier)

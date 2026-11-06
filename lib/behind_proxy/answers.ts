@@ -16,6 +16,9 @@ export type AnswerReason =
 	| 'signing_in'
 	| 'signed_in'
 	| 'signed_out'
+	/* The proxy self-test page (specs/124), and a fresh sign-in that came back older than asked. */
+	| 'address_test'
+	| 'sign_in_not_fresh'
 	/* The API check (specs/123 contracts/api-check.md). */
 	| ApiReason;
 
@@ -34,7 +37,14 @@ export type ApiReason =
 	| 'missing_forwarded'
 	| 'unsafe_value'
 	| 'rate_limited'
-	| 'server_error';
+	| 'server_error'
+	/* Access conditions on the API (specs/124 contracts/check.md). */
+	| 'no_person'
+	| 'cannot_sign_in'
+	| 'not_in_group'
+	| 'attribute_mismatch'
+	| 'not_from_network'
+	| 'outside_hours';
 
 export function answer(
 	status: number,

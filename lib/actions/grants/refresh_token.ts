@@ -154,7 +154,11 @@ export const handler = async function refreshTokenHandler(
 		grantId: refreshToken.payload.grantId,
 		gty: refreshToken.payload.gty,
 		sessionUid: refreshToken.payload.sessionUid,
-		sid: refreshToken.payload.sid
+		sid: refreshToken.payload.sid,
+		/* The original sign-in, not this refresh: a refresh is not a person signing in again. */
+		authTime: refreshToken.payload.authTime,
+		acr: refreshToken.payload.acr,
+		amr: refreshToken.payload.amr
 	});
 
 	if (client.tlsClientCertificateBoundAccessTokens && cert) {

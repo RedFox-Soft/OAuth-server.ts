@@ -1,4 +1,4 @@
-import type { Outcome, PathRule, Reason } from 'lib/behind_proxy/decide.ts';
+import type { Outcome, PlainWho, Reason } from 'lib/behind_proxy/decide.ts';
 
 /*
  * The decision table of specs/122 quickstart §2, in one place so the shared decision and the live check are driven
@@ -24,7 +24,9 @@ export interface TableGroups {
 	admins: string;
 }
 
-export function decisionRules(groups: TableGroups): PathRule[] {
+export function decisionRules(
+	groups: TableGroups
+): { path: string; who: PlainWho }[] {
 	return [
 		{ path: '/', who: { kind: 'groups', groupIds: [groups.staff] } },
 		{ path: '/admin', who: { kind: 'groups', groupIds: [groups.admins] } },

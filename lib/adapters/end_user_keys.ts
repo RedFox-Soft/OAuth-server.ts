@@ -207,6 +207,38 @@ export function searchOf(search: string): EndUserSearch {
 	};
 }
 
+/*
+ * Where an attribute a condition names lives in a person's record (specs/124 FR-014): the enterprise profile, the
+ * title, or a claim an administrator set. Null for a name no condition may use, which then matches nobody.
+ */
+const ENTERPRISE_ATTRIBUTES = new Set([
+	'department',
+	'division',
+	'organization',
+	'costCenter',
+	'employeeNumber'
+]);
+
+export function attributePathOf(name: string): string[] | null {
+	if (ENTERPRISE_ATTRIBUTES.has(name)) return ['profile', 'enterprise', name];
+	if (name === 'title') return ['profile', 'title'];
+	if (name.startsWith('claim:') && name.length > 'claim:'.length) {
+		return ['claims', name.slice('claim:'.length)];
+	}
+	return null;
+}
+
+function valueAt(record: unknown, path: readonly string[]): unknown {
+	let at: unknown = record;
+	for (const key of path) {
+		if (typeof at !== 'object' || at === null || !Object.hasOwn(at, key)) {
+			return undefined;
+		}
+		at = (at as Record<string, unknown>)[key];
+	}
+	return at;
+}
+
 /* Whether a record satisfies the console's filters — the in-memory store's reading of them. */
 export function matchesConsoleFilter(
 	user: User,
@@ -241,6 +273,13 @@ export function matchesConsoleFilter(
 		(typeof user.provisionedBy !== 'string') !== filter.local
 	)
 		return false;
+	if (filter.attribute !== undefined) {
+		const path = attributePathOf(filter.attribute.name);
+		const value = path ? valueAt(user, path) : undefined;
+		if (typeof value !== 'string' || !filter.attribute.values.includes(value)) {
+			return false;
+		}
+	}
 	return true;
 }
 

@@ -323,6 +323,26 @@ export const DocsExportSchema = z.object({
 					})
 				)
 				.length(3)
+		}),
+		/* The recipes for network conditions (specs/124), for an app and for an API, and the proven proxies. */
+		addresses: z.object({
+			app: z
+				.array(
+					z.object({
+						kind: z.enum(['caddy', 'traefik', 'nginx']),
+						text: z.string().min(1)
+					})
+				)
+				.length(3),
+			api: z
+				.array(
+					z.object({
+						kind: z.enum(['caddy', 'traefik', 'nginx']),
+						text: z.string().min(1)
+					})
+				)
+				.length(3),
+			supported: z.array(z.enum(['caddy', 'traefik', 'nginx']))
 		})
 	}),
 	/* The hourly attack report (specs/114), from the declaration the server counts and builds by. */

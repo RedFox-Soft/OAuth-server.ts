@@ -166,6 +166,7 @@ import type { Language } from '../i18n/languages.js';
 import { lookup } from '../i18n/languages.js';
 import { formatDate, formatMinutesAgo } from '../i18n/format.js';
 import { text } from '../i18n/message.js';
+import { isBehindProxyClient } from '../behind_proxy/client.js';
 import { uiLocalesRanges } from '../i18n/resolve.js';
 import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
 import { passwordTooShort, SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
@@ -1021,6 +1022,47 @@ async function unverifiedAtSignIn(
 }
 
 /* The client that began an interaction — the only trustworthy route to a bucket. */
+/*
+ * Why the login page appears to a person who is already signed in (specs/124 FR-022): an app behind the proxy asked
+ * for a recent sign-in to open a page. Named by the app's host, taken from the callback the sign-in returns to.
+ */
+function freshSignInNotice(interaction: Interaction): string | undefined {
+	const clientId = clientIdOf(interaction);
+	if (!isBehindProxyClient(clientId)) return undefined;
+	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
+	if (params.max_age === undefined) return undefined;
+	const reasons = interaction.payload.prompt?.reasons ?? [];
+	if (!reasons.includes('max_age')) return undefined;
+	let host: string;
+	try {
+		host = new URL(String(params.redirect_uri)).host;
+	} catch {
+		return undefined;
+	}
+	return text(SIGN_IN_TEXTS[languageOf(interaction)].notices.freshSignIn, {
+		host
+	});
+}
+
+/* The parameters that ask an upstream provider for a fresh sign-in, when this one was asked for a fresh sign-in. */
+function freshSignInParams(interaction: Interaction): Record<string, string> {
+	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
+	const reasons = interaction.payload.prompt?.reasons ?? [];
+	const prompts =
+		typeof params.prompt === 'string' ? params.prompt.split(' ') : [];
+	const out: Record<string, string> = {};
+	if (prompts.includes('login') || reasons.includes('max_age')) {
+		out.prompt = 'login';
+	}
+	if (
+		typeof params.max_age === 'string' ||
+		typeof params.max_age === 'number'
+	) {
+		out.max_age = String(params.max_age);
+	}
+	return out;
+}
+
 function clientIdOf(interaction: Interaction): string | undefined {
 	return interaction.payload.params?.client_id;
 }
@@ -1206,7 +1248,9 @@ export const ui = new Elysia()
 			 */
 			const clientId = clientIdOf(interaction);
 			return loginServer(uid, {
-				notice: resolveNotice(query.notice, languageOf(interaction)),
+				notice:
+					resolveNotice(query.notice, languageOf(interaction)) ??
+					freshSignInNotice(interaction),
 				/*
 				 * Back from a provider that was cancelled or refused: the notice says so, and the provider may be one
 				 * of those folded away (specs/105), so the fold opens. The notice does not name the provider, so it
@@ -1711,6 +1755,20 @@ export const ui = new Elysia()
 				...(keeping ? { keepFor: keeping.id } : {})
 			});
 
+			/*
+			 * A sign-in demanded fresh — `prompt=login`, or a `max_age` the session is older than — is asked of the
+			 * provider fresh too (specs/124 FR-021): otherwise its own session answers at once, and a person who has not
+			 * signed in for hours would count as having just done so.
+			 */
+			const fresh = freshSignInParams(interaction);
+			const kept = keeping ? keepRequest(keeping) : undefined;
+			const extra =
+				Object.keys(fresh).length > 0
+					? {
+							scopes: kept?.scopes ?? [],
+							params: { ...(kept?.params ?? {}), ...fresh }
+						}
+					: kept;
 			return Response.redirect(
 				/* The callback the upstream returns to belongs to this bucket, and is the address its
 				 * provider record was registered with. */
@@ -1719,7 +1777,7 @@ export const ui = new Elysia()
 					metadata,
 					secrets,
 					await issuingBucket(bucketId),
-					keeping ? keepRequest(keeping) : undefined
+					extra
 				),
 				303
 			);

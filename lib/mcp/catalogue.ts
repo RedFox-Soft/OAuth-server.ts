@@ -28,7 +28,8 @@ import {
 	UpdateEndUserBody,
 	ResetPasswordBody,
 	LockEndUserBody,
-	UserListQuery
+	UserListQuery,
+	AttributeMatchesQuery
 } from '../admin/users-end/schema.js';
 import {
 	CreateProviderBody,
@@ -443,6 +444,19 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			"A page of the end-user accounts held in one project, ordered by email, as `{ users, totalResults }`. `q` finds people whose email or username starts with it, in any letter case, or whose id is exactly it. Narrow with `status` (active, deactivated, locked), `managedBy` (`console` for people administrators manage, or a provisioning connection's id), `verified` and `authenticator` (yes or no). Page with `startIndex` (1-based) and `count` (1–200, default 50). Each user carries their groups; `passwordSet` says whether a password anyone chose opens the account, when known. Read one person in full with project_user_get."
+	},
+	{
+		tool: 'project_user_attribute_count',
+		method: 'GET',
+		path: '/admin/api/projects/:id/attribute-matches',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: AttributeMatchesQuery,
+		pathParams: ['id'],
+		summary:
+			'How many people of a project an attribute condition would let through: `attribute` is department, division, organization, costCenter, employeeNumber, title or claim:<key> (a claim an administrator sets; claims an outside sign-in provider copies in cannot be used), and `value` one or more values, any of which matches exactly. Answers `{ count }`. A condition nobody matches cannot be saved on an app or an API.'
 	},
 	{
 		tool: 'project_user_get',
@@ -898,6 +912,19 @@ const catalogue = [
 			"The signing keys of a project that has an address of its own, each with its state — published (verifies, may be promoted once promotableAt has passed; signedUntil when it signed before a promotion replaced it), signing (one per algorithm), or retired (still verifies until removableAt). No key material is returned; the public keys are at the project's jwks_uri. A project served at the root signs with the instance keys (jwks_list)."
 	},
 	{
+		tool: 'project_proxy_key_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/proxy-keys',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"The proxy keys of a project (at most two): each key's id and when it was issued. The operator's proxy sends one with every check so that the people's addresses it reports are believed by network conditions on the project's apps and APIs. The keys themselves are never returned; issuing one is console-only (Connect), because the key is shown once to whoever issues it."
+	},
+	{
 		tool: 'audit_list',
 		method: 'GET',
 		path: '/admin/api/audit',
@@ -1006,7 +1033,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
 		summary:
-			"Change a declared resource's name, scopes, scope descriptions, token format or lifetime, who checks its tokens, or its tools table. `scopeDescriptions` replaces the whole map; changing `scopes` without it drops the descriptions of removed scopes, and a scope a tool row still needs cannot be removed. `checkedBy` is `server` or `proxy` (the operator's reverse proxy checks each request's token before passing it on). `tools` replaces the whole tools table the proxy applies to an MCP server: `rows` (each a tool `name` and every one of this API's `scopes` it needs), `otherTools` (`refuse` or `token`: a tool no row lists) and `withoutMethod` (`refuse` or `token`: a client that does not say which tool it calls); with no rows every tool needs only a valid token. High-consequence when it sets `checkedBy` or `tools`, which change who reaches the API: describe it and confirm before running. The identifier itself cannot be amended: it is the audience of every token already issued, so replacing it is a delete and a fresh declaration.",
+			"Change a declared resource's name, scopes, scope descriptions, token format or lifetime, who checks its tokens, or its tools table. `scopeDescriptions` replaces the whole map; changing `scopes` without it drops the descriptions of removed scopes, and a scope a tool row still needs cannot be removed. `checkedBy` is `server` or `proxy` (the operator's reverse proxy checks each request's token before passing it on). `tools` replaces the whole tools table the proxy applies to an MCP server: `rows` (each a tool `name` and every one of this API's `scopes` it needs), `otherTools` (`refuse` or `token`: a tool no row lists) and `withoutMethod` (`refuse` or `token`: a client that does not say which tool it calls); with no rows every tool needs only a valid token. `tools.access` says who may call the API at all, before the table, for an API the proxy checks: `conditions`, at most one of each kind — group (`groups`, project group ids), attribute, network and time as on an app's rule — and `timeZone` for a time condition; a token that stands for no person (an application's own token, a pairwise client's, one issued before sign-in times were recorded) fails group and attribute conditions, and the answer's `warnings` names those applications. High-consequence when it sets `checkedBy` or `tools`, which change who reaches the API: describe it and confirm before running. The identifier itself cannot be amended: it is the audience of every token already issued, so replacing it is a delete and a fresh declaration.",
 		highWhenSets: ['checkedBy', 'tools']
 	},
 	{
@@ -1868,10 +1895,13 @@ const catalogue = [
 		bodySchema: UpdateBehindProxyAppBody,
 		querySchema: null,
 		pathParams: ['id', 'appId'],
-		/* Who may open which path, and which host the rules guard: either can let a stranger in. */
-		highWhenSets: ['rules', 'address'],
+		/*
+		 * Who may open which path, which host the rules guard, and the clock their hours are read in (specs/124): each
+		 * can let a stranger in.
+		 */
+		highWhenSets: ['rules', 'address', 'timeZone'],
 		summary:
-			"Rename an app behind a proxy, change its address or proxy kind, or replace its rules. rules replaces the whole list and must keep exactly one rule for /; each path is a plain path such as /admin (no ?, #, *, %, ; or backslash, compared ignoring letter case), at most 50 rules. A rule's who is groups (with project group ids), project (everyone in the project), public (no sign-in; subtree: true covers every path beneath) or none. The most specific rule decides a request."
+			"Rename an app behind a proxy, change its address or proxy kind, replace its rules, or set its timeZone (an IANA name such as Europe/Moscow, or null). rules replaces the whole list and must keep exactly one rule for /; each path is a plain path such as /admin (no ?, #, *, %, ; or backslash, compared ignoring letter case), at most 50 rules. A rule's who is groups (with project group ids), project (everyone in the project), public (no sign-in; subtree: true covers every path beneath) or none. The most specific rule decides who; a groups or project rule may also carry conditions, at most one of each kind, and the conditions of every path above it apply too: network (`only` and `not`, lists of addresses or CIDR ranges, at most 100 together; saving one is refused with 409 proxy_address_unproven until the project's proxy has sent its proxy key and a public address), time (`windows`, each `days` 0=Monday..6 and `start`/`end` minutes from midnight on the quarter hour, end before start running past midnight; needs timeZone), attribute (`attribute` department, division, organization, costCenter, employeeNumber, title or claim:<key>, and `values`; refused with 409 attribute_matches_nobody when nobody has it) and fresh (`maxAgeMinutes` 5-1440: ask to sign in again when the sign-in is older)."
 	},
 	{
 		tool: 'behind_proxy_app_delete',
@@ -2169,6 +2199,21 @@ const catalogue = [
 			'Revoke a key of a project that may be compromised. The body must name the key again — { "confirm": "<kid>" } — or nothing happens. Unlike retiring, there is no day of grace: the key leaves the key set at once and every token it signed stops verifying on this instance now and on every other within the key cache bound, so people may have to sign in again. When the key is the one signing, the same act puts another key in its place: the oldest published key of its algorithm past its promotableAt, or else a newly generated key that signs at once (`replacementGenerated: true`), in which case relying parties holding a cached key set may reject new tokens until they refresh it. Answers `replacement` with the key now signing. Refused for a key already revoked (409); a hidden or unknown key is 404. High-consequence: describe it and confirm before running.'
 	},
 
+	{
+		tool: 'project_proxy_key_withdraw',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/proxy-keys/:keyId',
+		action: 'bucket.proxykey.withdraw',
+		/* A proxy still sending this key stops having addresses believed: every network condition then refuses. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'keyId'],
+		summary:
+			"Withdraw one of a project's proxy keys. A proxy still sending it no longer has people's addresses believed, so every network condition on the project's apps and APIs refuses its requests until it sends the other key; other servers stop accepting it within half a minute. Unknown key: 404. High-consequence: describe it and confirm before running."
+	},
+
 	/* ------------------------------------------------ writes: settings (3) */
 	{
 		tool: 'settings_update',
@@ -2379,6 +2424,13 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		absence: 'withheld',
 		reason:
 			"Deleting an administrators' application ends every administrator's sign-in to that tool at once. Console-only, beside registering it."
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/projects/:id/proxy-keys',
+		absence: 'withheld',
+		reason:
+			"Issuing a project's proxy key returns the key, which must never reach an agent. Issue it in the console (the app's or API's Connect page) and put it in the proxy's configuration."
 	},
 	{
 		method: 'POST',

@@ -199,6 +199,20 @@ groups:
         verdict: us
         why: 'With ZITADEL the API or MCP server carries the token check and its rules in its own code. Here your proxy asks the authorization server, and the rule for each tool is a table in the console.'
         note: 'The Go example says "This will handle the OAuth 2.0 introspection request including authentication using JWT with Private Key using our Go SDK."'
+      - dimension: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
+        us:
+          {
+            status: yes,
+            text: 'A rule for a path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from listed address ranges, opening hours in a chosen time zone, an attribute such as the department, and for an app a sign-in no older than N minutes. Conditions add up down the paths. The proxy passes the address it saw and shows a key of the project, so a browser cannot choose its own address. Members of chosen groups can be required for an API too. Edited and checked in the console, on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'No check endpoint for a proxy. Actions v2 call a service you run when a ZITADEL API is called, and that service can stop the call. The docs name IP blocking as a use case.'
+          }
+        verdict: us
+        why: 'With ZITADEL a condition is a service you write and run, called by an Action. Here it is a field on the rule for a path or an API, and your proxy has it checked.'
+        note: 'The Actions v2 guide lists the use case "Implement IP blocking or rate limiting based on API usage patterns," and says "interruptOnError" must be true for a target to interrupt the execution.'
       - dimension: Managed hosting
         us:
           {

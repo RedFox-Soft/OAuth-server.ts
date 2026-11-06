@@ -4,7 +4,11 @@ import { sameHost } from './address.js';
 import { apiMetadataUrlOf } from './api_address.js';
 import { addressedApi, type AddressedApi } from './api_find.js';
 import { answer, type ApiReason } from './answers.js';
+import { getProtectedResourceStore } from '../adapters/index.js';
+import { accessRefusal } from './api_person.js';
 import { readBearer, type BearerRefusal } from './bearer.js';
+import { believedAddress } from './believed_address.js';
+import { noteAddress } from './usage.js';
 import { decideTool, decodeMcpName, hasControlCharacter } from './tools.js';
 import {
 	chargeApp,
@@ -157,6 +161,38 @@ async function evaluate({
 			clientId: presented.clientId
 		});
 		return refused('unsafe_value');
+	}
+	/*
+	 * Who may call the API at all (specs/124 contracts/check.md), before the tools table: the person behind the
+	 * token, then where and when. The address is believed only from a proxy that shows the project's key, and is
+	 * only compared.
+	 */
+	const believed = await believedAddress(request, bucket._id);
+	noteAddress(
+		{
+			key: `api:${addressed.checkId}`,
+			write: (seen) =>
+				getProtectedResourceStore().noteProxyAddress(
+					api.namespace,
+					api.identifier,
+					{
+						...(seen.provenAt ? { proxyAddressProvenAt: seen.provenAt } : {}),
+						...(seen.forgedAt ? { proxyAddressForgedAt: seen.forgedAt } : {})
+					}
+				)
+		},
+		believed.flags
+	);
+	const accessRefused = await accessRefusal(
+		api,
+		presented.accountId,
+		believed.address
+	);
+	if (accessRefused) {
+		emitDecision(addressed, 'refuse', accessRefused, {
+			clientId: presented.clientId
+		});
+		return refused(accessRefused);
 	}
 	/*
 	 * The tools table (research R6). The headers mirror a body the proxy never sees, so they decide only for a

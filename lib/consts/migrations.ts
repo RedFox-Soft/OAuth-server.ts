@@ -1768,6 +1768,26 @@ const planConnectedServicesLimit: Migration = {
 	}
 };
 
+/*
+ * A fence, not a change (specs/124 research R3). Conditions on apps behind a proxy and on APIs checked at the proxy
+ * are stored where a release that predates them would read past them, so an older release must not start against a
+ * database that may hold them: recording this migration makes the startup gate of every older release see a
+ * database that is ahead, and refuse it. Both halves do nothing; the record is the whole effect.
+ */
+const FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than conditions at the proxy refuses to start against a database that may hold conditions it could not enforce.';
+
+const proxyConditionsFence: Migration = {
+	id: '2026-11-06-proxy-conditions-fence',
+	description:
+		'Mark the database as holding access conditions at the proxy, so that an older release refuses to start against it rather than ignoring them',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: FENCE_REASON },
+	postgres: { noop: true, reason: FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1780,5 +1800,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	projectsRecordPlan,
 	adminSignUpRequiresVerification,
 	clientAddressSource,
-	planConnectedServicesLimit
+	planConnectedServicesLimit,
+	proxyConditionsFence
 ];

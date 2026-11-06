@@ -10,6 +10,8 @@ import { languageOfRequest } from '../i18n/request.js';
 import { sameHost } from './address.js';
 import { answer, withReason } from './answers.js';
 import { signAssertion } from './assertion.js';
+import { believedAddress, type Believed } from './believed_address.js';
+import { minuteOfWeek, nextOpeningOfAll } from './clock.js';
 import {
 	canonicalPath,
 	decide,
@@ -17,7 +19,13 @@ import {
 	type Decision,
 	type Reason
 } from './decide.js';
-import { deniedPage } from './pages.js';
+import {
+	addressPage,
+	closedPage,
+	deniedPage,
+	networkDeniedPage,
+	type AddressCause
+} from './pages.js';
 import {
 	chargeApp,
 	chargeUnknown,
@@ -40,7 +48,12 @@ import {
 	standingOf,
 	type Standing
 } from './session.js';
-import { noteAllowed, noteAsked, noteMismatchedHost } from './usage.js';
+import {
+	noteAddress,
+	noteAllowed,
+	noteAsked,
+	noteMismatchedHost
+} from './usage.js';
 
 /*
  * The check a reverse proxy makes before passing a request to an app behind it (specs/122,
@@ -62,6 +75,11 @@ const FORWARDED_URI = 'x-forwarded-uri';
 const FORWARDED_METHOD = 'x-forwarded-method';
 
 const CALLBACK_PATH = '/_foxauth/callback';
+/* The proxy self-test (specs/124 research R6): the requester's own address as this check believed it. */
+const ADDRESS_PATH = '/_foxauth/address';
+/* What `/_foxauth/start` accepts for a fresh sign-in, in seconds: the bounds of the condition (FR-002). */
+const MIN_MAX_AGE = 300;
+const MAX_MAX_AGE = 86_400;
 const RESERVED = /^\/_foxauth(?:\/|$)/i;
 
 /* Identity headers, sent empty when no person is named, so an app never reads a value a client put there. */
@@ -158,21 +176,56 @@ function queryOf(rawPath: string): URLSearchParams {
  * one of them is one of them here too. Where only a status may be answered (nginx's check), nothing is done: the
  * proxy's error page calls again without `mode=status`, and that call does it.
  */
+function causeOf(believed: Believed): AddressCause | null {
+	const { flags } = believed;
+	if (believed.address !== null) return null;
+	if (!flags.keyPresent) return 'noKey';
+	if (!flags.keyValid) return 'wrongKey';
+	if (!flags.single) return 'several';
+	return 'notPublic';
+}
+
+/* A `max_age` the start path accepts: whole seconds within the condition's bounds, or nothing. */
+function maxAgeOf(value: string | null): number | undefined {
+	if (value === null || !/^[0-9]{1,6}$/.test(value)) return undefined;
+	const seconds = Number(value);
+	return seconds >= MIN_MAX_AGE && seconds <= MAX_MAX_AGE ? seconds : undefined;
+}
+
 async function reserved(
 	ctx: SignInContext,
 	path: string,
 	rawPath: string,
-	statusOnly: boolean
+	statusOnly: boolean,
+	believed: Believed
 ): Promise<Response> {
 	if (statusOnly) return answer(403, 'reserved_path', {}, 'reserved_path');
 	const query = queryOf(rawPath);
 	switch (path) {
-		case START_PATH:
+		case START_PATH: {
+			const maxAge = maxAgeOf(query.get('max_age'));
 			return startSignIn(
 				ctx,
 				returnToOf(query.get('rd'), ctx.app.address),
 				'signing_in',
-				query.get('prompt') === 'login' ? { prompt: 'login' } : {}
+				{
+					...(query.get('prompt') === 'login'
+						? { prompt: 'login' as const }
+						: {}),
+					...(maxAge === undefined ? {} : { maxAge })
+				}
+			);
+		}
+		case ADDRESS_PATH:
+			return withReason(
+				addressPage({
+					host: new URL(ctx.app.address).host,
+					address: believed.address,
+					cause: causeOf(believed),
+					reported: believed.reported,
+					language: languageOfRequest(ctx.request).language
+				}),
+				'address_test'
 			);
 		case CALLBACK_PATH:
 			return completeSignIn(ctx, query);
@@ -236,14 +289,54 @@ async function allowed(
 	});
 }
 
+/*
+ * Refused by where or when (specs/124 FR-028): decided before any session, so the page names no one and offers no
+ * other account. The time page says when the path opens again, in the app's own zone.
+ */
+function conditionPage(
+	ctx: SignInContext,
+	decision: Decision,
+	person: Person | null
+): Response {
+	const { request, app } = ctx;
+	const language = languageOfRequest(
+		request,
+		person ? [person.standing.localeRanges] : []
+	).language;
+	const host = new URL(app.address).host;
+	const zone = app.timeZone ?? null;
+	if (decision.reason === 'not_from_network') {
+		return withReason(
+			networkDeniedPage({ host, reason: decision.reason, language, zone }),
+			decision.reason
+		);
+	}
+	const windowSets = (decision.conditions ?? []).flatMap((judged) =>
+		judged.condition.kind === 'time' ? [judged.condition.windows] : []
+	);
+	const opening =
+		zone && windowSets.length > 0
+			? nextOpeningOfAll(windowSets, minuteOfWeek(Date.now(), zone))
+			: null;
+	return withReason(
+		closedPage({ host, reason: decision.reason, language, zone, opening }),
+		decision.reason
+	);
+}
+
 function refused(
 	ctx: SignInContext,
-	reason: Reason,
+	decision: Decision,
 	person: Person | null,
 	navigation: boolean,
 	statusOnly: boolean
 ): Response {
-	if (!person || !navigation || statusOnly) return denied(reason);
+	const { reason } = decision;
+	if (!navigation || statusOnly) return denied(reason);
+	if (reason === 'not_from_network' || reason === 'outside_hours') {
+		return conditionPage(ctx, decision, person);
+	}
+	if (!person) return denied(reason);
 	const { request, app } = ctx;
 	const language = languageOfRequest(request, [
 		person.standing.localeRanges
@@ -254,6 +347,7 @@ function refused(
 			email: person.standing.email,
 			reason,
 			otherAccountHref: `${SIGN_OUT_PATH}?then=start`,
+			zone: app.timeZone ?? null,
 			language
 		}),
 		reason
@@ -300,13 +394,29 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 	}
 
 	noteAsked(app);
+	/*
+	 * The person's address, when the proxy proves it wrote it (specs/124 FR-006). Only compared with conditions:
+	 * never the caller of this check, a rate-limit key, a log line or an event.
+	 */
+	const believed = await believedAddress(request, bucket._id);
+	noteAddress(
+		{
+			key: `app:${app._id}`,
+			write: (seen) =>
+				getBehindProxyAppStore().noteUsage(app._id, {
+					...(seen.provenAt ? { addressProvenAt: seen.provenAt } : {}),
+					...(seen.forgedAt ? { addressForgedAt: seen.forgedAt } : {})
+				})
+		},
+		believed.flags
+	);
 
 	const ctx: SignInContext = { bucket, app, request };
 	const method = forwardedMethod.toUpperCase();
 	const statusOnly = new URL(request.url).searchParams.get('mode') === 'status';
 	const canonical = canonicalPath(rawPath);
 	if ('path' in canonical && RESERVED.test(canonical.path)) {
-		return reserved(ctx, canonical.path, rawPath, statusOnly);
+		return reserved(ctx, canonical.path, rawPath, statusOnly, believed);
 	}
 
 	const person = await personOf(ctx);
@@ -317,9 +427,14 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 		person: person
 			? {
 					canSignIn: person.standing.canSignIn,
-					groupIds: person.standing.groupIds
+					groupIds: person.standing.groupIds,
+					attributes: person.standing.attributes,
+					signedInAt: person.standing.signedInAt
 				}
-			: null
+			: null,
+		address: believed.address,
+		at: Date.now(),
+		timeZone: app.timeZone ?? null
 	});
 	const accountId = person?.standing.accountId ?? null;
 	const navigation = isNavigation(method, request);
@@ -351,14 +466,17 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 			return startSignIn(
 				ctx,
 				returnToOf(rawPath, app.address),
-				decision.reason
+				decision.reason,
+				decision.maxAgeSeconds === undefined
+					? {}
+					: { maxAge: decision.maxAgeSeconds }
 			);
 		}
 		return answer(401, decision.reason, {
 			'WWW-Authenticate': `FoxAuth realm="${app.address}"`
 		});
 	}
-	return refused(ctx, decision.reason, person, navigation, statusOnly);
+	return refused(ctx, decision, person, navigation, statusOnly);
 }
 
 /* Where only a status may be answered, a refusal for flooding is a `403`, which nginx turns into its error page. */

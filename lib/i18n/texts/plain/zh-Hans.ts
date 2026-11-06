@@ -157,6 +157,34 @@ export const zhHans: PlainTexts = {
 			body: '请重新打开该应用以重新开始。',
 			tryAgain: '重新登录',
 			reason: '原因：{reason}，时间：{time}'
+		},
+		/* 代理处的访问条件（specs/124）：在登录之前因网络或时间被拒绝。 */
+		network: {
+			title: '无法从此网络打开 {host}',
+			body: '如果您的团队使用 VPN，请连接后重新加载此页面。',
+			reason: '原因：{reason}，时间：{time}'
+		},
+		closed: {
+			title: '{host} 当前不开放',
+			opens: '将于{when}（{zone}）重新开放，{inTime}。',
+			never: '当前没有设置开放时间。',
+			reason: '原因：{reason}，时间：{time}'
+		},
+		notConfirmed: {
+			title: '无法确认您登录 {host}',
+			body: '此页面要求近期登录，而返回的登录时间较早。',
+			tryAgain: '重新登录',
+			reason: '原因：{reason}，时间：{time}'
+		},
+		address: {
+			title: '{host} 看到的您的地址',
+			seen: '检查看到您的地址为 {address}。',
+			unknown: '检查不知道您的地址：{cause}。',
+			causeNoKey: '代理没有出示代理密钥',
+			causeWrongKey: '代理出示的密钥不属于此项目',
+			causeSeveral: '代理没有发送由其自身写入的单个地址',
+			causeNotPublic:
+				'代理报告的地址 {address} 属于私有网络，它可能位于负载均衡器之后'
 		}
 	}
 };

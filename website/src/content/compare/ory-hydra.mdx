@@ -230,6 +230,20 @@ groups:
         verdict: us
         why: 'Oathkeeper checks tokens and scopes per URL, but it is a second product to deploy, and every MCP call is a POST to the same URL, so its rules cannot tell one tool from another. FoxAuth reads the tool from the MCP headers and ships with the authorization server.'
         note: 'The Oathkeeper authenticator page says the jwt authenticator''s "`required_scope` ([]string) validates the scope of the JWT"; an access rule''s match has "url" and "methods".'
+      - dimension: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
+        us:
+          {
+            status: yes,
+            text: 'A rule for a path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from listed address ranges, opening hours in a chosen time zone, an attribute such as the department, and for an app a sign-in no older than N minutes. Conditions add up down the paths. The proxy passes the address it saw and shows a key of the project, so a browser cannot choose its own address. Members of chosen groups can be required for an API too. Edited and checked in the console, on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'Not in Hydra. Ory Oathkeeper, a separate Ory product, gives each access rule one authorizer: allow, deny, a check in Ory Keto, or a call to a remote service. None of them has a built-in condition on address, hours or the age of a sign-in.'
+          }
+        verdict: us
+        why: 'With Ory a condition on address or hours at the proxy is a service you write, called by Oathkeeper, a second product. Here it is a field on the rule in the console.'
+        note: 'The Oathkeeper authorizer page lists `allow`, `deny`, `keto_engine_acp_ory`, `remote` and `remote_json`. The remote_json authorizer "makes a HTTP POST request to a remote endpoint with a JSON body."'
       - dimension: Licence
         us:
           {

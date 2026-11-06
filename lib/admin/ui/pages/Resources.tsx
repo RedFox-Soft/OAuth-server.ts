@@ -37,6 +37,7 @@ import {
 import type { ToolsTableView } from '../../../behind_proxy/tools.js';
 import { ProxyConnect } from './resources/ProxyConnect.js';
 import { ToolsDrawer } from './resources/ToolsDrawer.js';
+import type { AddressesView } from './behind-proxy/appView.js';
 
 /*
  * A bucket's APIs — its declared protected resources: the audiences this server will mint tokens for on
@@ -86,6 +87,8 @@ interface ResourceView {
 	/* Whether the API's own server checks its tokens (spec 107) or the operator's proxy asks this project (specs/123). */
 	checkedBy: CheckedBy;
 	tools?: ToolsTableView;
+	/* What the proxy's checks showed about the addresses it passes (specs/124); only when the proxy checks. */
+	addresses?: AddressesView;
 	/* What the API itself must serve and check, as the server states it (spec 107). */
 	connection?: {
 		issuer: string;
@@ -793,7 +796,8 @@ export function Resources({
 													},
 													{
 														key: 'tools',
-														label: 'Tools…',
+														label:
+															row.checkedBy === 'proxy' ? 'Access…' : 'Tools…',
 														group: 'edit',
 														onClick: () => setToolsOf(row)
 													},
@@ -824,8 +828,11 @@ export function Resources({
 				{connecting?.connection &&
 					(connecting.connection.check ? (
 						<ProxyConnect
+							bucketId={bucketId}
 							identifier={connecting.identifier}
 							check={connecting.connection.check}
+							addresses={connecting.addresses}
+							onRefresh={() => void load()}
 						/>
 					) : (
 						<ResourceConnectionDetails connection={connecting.connection} />
@@ -834,11 +841,13 @@ export function Resources({
 
 			{toolsOf && (
 				<ToolsDrawer
+					bucketId={bucketId}
 					url={`${base}/${encodeURIComponent(toolsOf.identifier)}`}
 					name={toolsOf.name}
 					scopes={toolsOf.scopes}
 					tools={toolsOf.tools}
 					checkedBy={toolsOf.checkedBy}
+					addresses={toolsOf.addresses}
 					onClose={() => setToolsOf(null)}
 					onSaved={() => {
 						setToolsOf(null);

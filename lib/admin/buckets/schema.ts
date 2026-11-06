@@ -183,3 +183,6 @@ export const DeleteBucketQuery = t.Object({
 	cascade: t.Optional(t.Literal('endusers')),
 	expect: t.Optional(t.Numeric({ minimum: 0 }))
 });
+
+/* Issuing a proxy key takes nothing: the server draws the key (specs/124 research R5). */
+export const IssueProxyKeyBody = t.Object({}, { additionalProperties: false });

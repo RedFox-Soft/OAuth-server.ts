@@ -7,6 +7,7 @@ import { isUniqueViolation } from './sqlState.js';
 import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
+	attributePathOf,
 	clampPage,
 	FIELD_OF_KEY,
 	searchOf,
@@ -138,6 +139,14 @@ function consoleConditionsFor(
 		all = filter.local
 			? handle`${all} AND jsonb_typeof(doc->'provisionedBy') IS DISTINCT FROM 'string'`
 			: handle`${all} AND jsonb_typeof(doc->'provisionedBy') = 'string'`;
+	}
+	if (filter.attribute !== undefined) {
+		const path = attributePathOf(filter.attribute.name);
+		/* Only a stored string equal to a value matches, as in the other stores; the path is bound, never spliced. */
+		all = path
+			? handle`${all} AND jsonb_typeof(doc #> ${handle.array(path, 'text')}) = 'string'
+				AND doc #>> ${handle.array(path, 'text')} = ANY(${handle.array([...filter.attribute.values], 'text')})`
+			: handle`${all} AND FALSE`;
 	}
 	return all;
 }

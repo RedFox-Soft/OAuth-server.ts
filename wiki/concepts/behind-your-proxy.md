@@ -195,6 +195,8 @@ resolving `..` gives different answers is refused too, because applications disa
   closed side.
 - Kinds of rule: a list of groups, everyone in the project, public, or nobody. A person must also pass `canSignIn`.
   A deleted group admits nobody.
+- Since spec 124 a groups or project rule may carry conditions (stored as `who.kind: 'conditional'`), and the
+  conditions of every path above accumulate. The order and the address rules are in [[conditions-at-your-proxy]].
 
 ## Rate limit and caller
 
@@ -260,6 +262,7 @@ awaited, and a failure is captured, not answered (`usage.ts:21-102`).
 ## Related
 
 - [[token-checks-at-your-proxy]] — the same check for an API's bearer tokens and MCP tools (spec 123).
+- [[conditions-at-your-proxy]] — network, hours, attribute and fresh sign-in on top of the rules (spec 124).
 - [[project-is-an-issuer]] — the host-from-`Host` rule this endpoint is the one exception to.
 - [[cookie-path-scoping]] — why the set and the expiry share one attribute writer.
 - [[connected-apps-page]], [[scim-provisioning]] — the other two synthesized, never-stored clients.

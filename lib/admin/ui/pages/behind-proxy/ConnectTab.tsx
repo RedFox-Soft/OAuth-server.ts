@@ -15,6 +15,7 @@ import {
 	recipeFor,
 	type ProxyKind
 } from '../../../../behind_proxy/recipes.js';
+import { ProxyAddresses } from './ProxyAddresses.js';
 import {
 	hostOfAddress,
 	PROXY_LABELS,
@@ -313,6 +314,16 @@ export function ConnectTab({
 					</pre>
 				</Flex>
 			</Card>
+
+			<ProxyAddresses
+				bucketId={bucketId}
+				addresses={app.addresses}
+				proxyKind={app.proxyKind}
+				verifyUrl={app.verifyUrl}
+				address={app.address}
+				target="app"
+				onRefresh={onRefresh}
+			/>
 
 			<Card
 				size="small"

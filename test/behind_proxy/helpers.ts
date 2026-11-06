@@ -376,12 +376,22 @@ export interface AtCallback {
 export async function reachCallback(
 	target: { slug: string; app: Pick<AppView, 'id' | 'address'> },
 	who: Pick<Member, 'email'>,
-	options: { from?: string; browser?: Browser; jar?: AppJar } = {}
+	options: {
+		from?: string;
+		browser?: Browser;
+		jar?: AppJar;
+		/* What a proxy on the conditions recipe adds to every check (specs/124): its key and the address. */
+		headers?: Record<string, string>;
+	} = {}
 ): Promise<AtCallback> {
 	const jar = options.jar ?? new AppJar();
 	const browser = options.browser ?? new Browser();
 	const started = jar.absorb(
-		await checkApp(target, { uri: options.from ?? '/', cookie: jar.header })
+		await checkApp(target, {
+			uri: options.from ?? '/',
+			cookie: jar.header,
+			headers: options.headers
+		})
 	);
 	if (started.status !== 302) {
 		throw new Error(
@@ -417,11 +427,13 @@ export async function reachCallback(
 export function relayCallback(
 	target: { slug: string; app: Pick<AppView, 'id' | 'address'> },
 	callback: URL,
-	cookie: string
+	cookie: string,
+	headers?: Record<string, string>
 ): Promise<Response> {
 	return checkApp(target, {
 		uri: `${callback.pathname}${callback.search}`,
-		cookie
+		cookie,
+		headers
 	});
 }
 
@@ -429,11 +441,16 @@ export function relayCallback(
 export async function signInThrough(
 	target: { slug: string; app: Pick<AppView, 'id' | 'address'> },
 	who: Pick<Member, 'email'>,
-	options: { from?: string; browser?: Browser; jar?: AppJar } = {}
+	options: {
+		from?: string;
+		browser?: Browser;
+		jar?: AppJar;
+		headers?: Record<string, string>;
+	} = {}
 ): Promise<SignedIn> {
 	const { callback, jar, browser } = await reachCallback(target, who, options);
 	const completed = jar.absorb(
-		await relayCallback(target, callback, jar.header)
+		await relayCallback(target, callback, jar.header, options.headers)
 	);
 	if (completed.status !== 302) {
 		throw new Error(

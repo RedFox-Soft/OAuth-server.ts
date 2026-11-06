@@ -51,7 +51,16 @@ import { assertApiRoom } from '../../plans/enforce.js';
 import { DEFAULT_BUCKET_ID } from '../consts.js';
 import { isAddressable } from '../auth/bucketAddress.js';
 import { apiCheckUrlOf } from '../../behind_proxy/api_address.js';
+import { checkIdOf } from '../../behind_proxy/check_id.js';
+import { lastAddressFlagsOf } from '../../behind_proxy/usage.js';
 import { orphanedBy, validateToolsTable } from '../../resources/tools_table.js';
+import {
+	apiConditionsOf,
+	assertConditionsUsable,
+	conditionsFrom,
+	personConditionWarnings,
+	timeZoneFrom
+} from '../conditions.js';
 import type { VouchingStatus } from '../../resources/vouching.js';
 
 /*
@@ -236,20 +245,48 @@ function resourceView(
 	{ bucketId, ...rest }: ProtectedResource,
 	issuer: string,
 	bucket: UserBucket
-): Omit<ProtectedResource, 'bucketId' | 'checkedBy'> & {
+): Omit<
+	ProtectedResource,
+	'bucketId' | 'checkedBy' | 'proxyAddressProvenAt' | 'proxyAddressForgedAt'
+> & {
 	projectId: string;
 	checkedBy: 'server' | 'proxy';
 	connection: ResourceConnection;
+	addresses?: ReturnType<typeof addressesOfApi>;
 } {
+	const {
+		proxyAddressProvenAt: _proven,
+		proxyAddressForgedAt: _forged,
+		...shown
+	} = rest;
 	return {
-		...rest,
+		...shown,
 		checkedBy: rest.checkedBy ?? 'server',
 		projectId: bucketId,
+		...(rest.checkedBy === 'proxy' ? { addresses: addressesOfApi(rest) } : {}),
 		connection: resourceConnection(
 			rest,
 			issuer,
 			rest.checkedBy === 'proxy' ? apiCheckUrlOf(bucket, rest.identifier) : null
 		)
+	};
+}
+
+/*
+ * What the proxy's checks showed about the addresses it passes (specs/124 research R6), for the API's Connect.
+ * An API has no proxy kind of its own, so which recipes support network conditions is the console's to say.
+ */
+function addressesOfApi(
+	api: Pick<
+		ProtectedResource,
+		'identifier' | 'proxyAddressProvenAt' | 'proxyAddressForgedAt'
+	>
+) {
+	return {
+		provenAt: api.proxyAddressProvenAt?.toISOString() ?? null,
+		forgedAt: api.proxyAddressForgedAt?.toISOString() ?? null,
+		last: lastAddressFlagsOf(`api:${checkIdOf(api.identifier)}`),
+		networkConditionsSupported: true
 	};
 }
 
@@ -456,10 +493,70 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			if (scopeDescriptions && !attributes.includes('scopeDescriptions')) {
 				attributes.push('scopeDescriptions');
 			}
-			const tools =
+			let tools =
 				body.tools === undefined
 					? undefined
-					: acceptedTools(body.tools, effectiveScopes);
+					: acceptedTools(
+							{
+								rows: body.tools.rows,
+								otherTools: body.tools.otherTools,
+								withoutMethod: body.tools.withoutMethod
+							},
+							effectiveScopes
+						);
+			const access = body.tools?.access;
+			let warnings:
+				{ machineClients: string[]; pairwiseClients: string[] } | undefined;
+			if (tools && access) {
+				/* Conditions at the proxy are the proxy's to apply; on a server-checked API they would decide nothing. */
+				if ((body.checkedBy ?? existing.checkedBy ?? 'server') !== 'proxy') {
+					throw new AdminError(
+						422,
+						'access conditions apply only to an API whose tokens your proxy checks',
+						{ field: 'tools' }
+					);
+				}
+				const conditions = await conditionsFrom(
+					bucket,
+					access.conditions,
+					existing.name,
+					'tools'
+				);
+				const timeZone =
+					access.timeZone === undefined || access.timeZone === null
+						? null
+						: timeZoneFrom(access.timeZone, 'tools');
+				if (timeZone === null && conditions.some((c) => c.kind === 'time')) {
+					throw new AdminError(
+						422,
+						'a time condition needs the time zone its hours are read in',
+						{ field: 'tools' }
+					);
+				}
+				await assertConditionsUsable(
+					bucket,
+					existing.tools?.access?.conditions ?? [],
+					conditions,
+					{
+						provenAt: existing.proxyAddressProvenAt,
+						forgedAt: existing.proxyAddressForgedAt
+					},
+					existing.name,
+					'tools'
+				);
+				tools = {
+					...tools,
+					access: {
+						conditions: apiConditionsOf(conditions),
+						...(timeZone === null ? {} : { timeZone })
+					}
+				};
+				if (
+					conditions.some((c) => c.kind === 'group' || c.kind === 'attribute')
+				) {
+					warnings = await personConditionWarnings(bucket._id);
+				}
+			}
 			if (scopes !== undefined && body.tools === undefined) {
 				const orphan = orphanedBy(existing.tools, effectiveScopes);
 				if (orphan) {
@@ -488,19 +585,20 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 						: {})
 			});
 
+			const { tools: _edgeTools, ...unchanged } = body;
 			const updated = await getProtectedResourceStore().update(
 				namespace,
 				identifier,
 				{
-					...body,
+					...unchanged,
 					...(scopes === undefined ? {} : { scopes }),
 					...(scopeDescriptions === undefined ? {} : { scopeDescriptions }),
 					...(tools === undefined ? {} : { tools })
 				}
 			);
-			return (
-				updated && resourceView(updated, await tokensIssuer(bucket), bucket)
-			);
+			const view =
+				updated && resourceView(updated, await tokensIssuer(bucket), bucket);
+			return view && warnings ? { ...view, warnings } : view;
 		},
 		{ body: UpdateResourceBody }
 	)

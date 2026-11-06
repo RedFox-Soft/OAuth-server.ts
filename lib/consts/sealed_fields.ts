@@ -179,6 +179,11 @@ export const DECLARED_PLAINTEXT: readonly { field: string; reason: string }[] =
 			field: 'markerDigest',
 			reason:
 				'a digest of the browser marker of a sign-in in progress (BehindProxySignIn): already irreversible, and gone in ten minutes'
+		},
+		{
+			field: 'digest',
+			reason:
+				"the SHA-256 of a project's proxy key (specs/124 research R5): a digest of 256 random bits, already irreversible, and only ever compared"
 		}
 	];
 

@@ -18,6 +18,9 @@ const FIRST_TIMES = [
 	'firstAllowedAt'
 ] as const;
 
+/* Written as given, each time: the latest observation is the one that counts. */
+const LATEST = ['lastAskedAt', 'addressProvenAt', 'addressForgedAt'] as const;
+
 /*
  * Apps behind a proxy. One address per bucket is the unique index on `(doc->>'bucketId', doc->>'address')` the
  * inventory declares, so a duplicate is a constraint violation refused even under a concurrent write — on the
@@ -112,7 +115,10 @@ export class BehindProxyAppStore implements BehindProxyAppStoreInstance {
 			if (at) firsts[field] = at;
 		}
 		const last: Record<string, Date> = {};
-		if (fields.lastAskedAt) last.lastAskedAt = fields.lastAskedAt;
+		for (const field of LATEST) {
+			const at = fields[field];
+			if (at) last[field] = at;
+		}
 		if (Object.keys(firsts).length + Object.keys(last).length === 0) return;
 		const handle = sql();
 		await handle`

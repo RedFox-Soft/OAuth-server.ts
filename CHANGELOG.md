@@ -21,6 +21,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   request, the project checks the bearer token as the API would and serves the API's metadata, and the API receives
   `X-Auth-Subject`, `X-Auth-Client` and `X-Auth-Scope`. For an MCP server, a Tools table names the scopes each tool
   needs; a missing one is refused with `insufficient_scope`. Tokens bound to a key are refused at the proxy.
+- **Conditions at your proxy: network, hours, attribute, fresh sign-in** (spec 124, issue #57 part 3). A path of an
+  app behind your proxy, or an API checked there, can add "and only if" conditions: only from or not from address
+  ranges, opening hours in a time zone, an administrator- or SCIM-set attribute, groups for an API, and for an app a
+  sign-in no older than N minutes. Conditions accumulate down the paths and are decided before sign-in where they can
+  be. The person's address is believed only from a proxy that shows a project proxy key (new console-only route; at
+  most two keys) and passes one `X-Forwarded-For` address, and is only compared. Access tokens now carry `auth_time`,
+  `acr` and `amr`; an API condition about the person refuses machine tokens, pairwise clients' tokens and JWTs issued
+  before this release. **Rolling back below this release is not possible**: a fence migration makes an older release
+  refuse to start, and during a rolling deploy older processes answer errors for apps and APIs with conditions until
+  replaced. Free on every plan.
 
 ### Fixed
 

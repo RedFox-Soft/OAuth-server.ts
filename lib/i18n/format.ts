@@ -95,3 +95,63 @@ export function formatList(
 export function formatNumber(language: Language, value: number): string {
 	return numberFormat(language).format(value);
 }
+
+const zonedFormats = new Map<string, Intl.DateTimeFormat>();
+
+/*
+ * A moment in an app's own time zone (specs/124): a page that says when an app opens again must say "now" in the
+ * same clock, not in UTC. Falls back to UTC for a zone no runtime knows, which the admin routes never store.
+ */
+export function formatDateTimeIn(
+	language: Language,
+	ms: number,
+	zone: string | null
+): string {
+	if (!zone) return formatDateTime(language, ms);
+	const key = `${language}|${zone}`;
+	let format = zonedFormats.get(key);
+	if (!format) {
+		try {
+			format = new Intl.DateTimeFormat(FORMAT_LOCALE[language], {
+				dateStyle: 'medium',
+				timeStyle: 'short',
+				timeZone: zone
+			});
+		} catch {
+			return formatDateTime(language, ms);
+		}
+		zonedFormats.set(key, format);
+	}
+	return format.format(ms);
+}
+
+const weekdayFormat = cached(
+	(language) =>
+		new Intl.DateTimeFormat(FORMAT_LOCALE[language], {
+			weekday: 'long',
+			hour: '2-digit',
+			minute: '2-digit',
+			hourCycle: 'h23',
+			timeZone: 'UTC'
+		})
+);
+
+/* A day of the week (0 = Monday) and a minute of that day, as "Monday 08:00" reads in the page's language. */
+export function formatWeekdayTime(
+	language: Language,
+	day: number,
+	minute: number
+): string {
+	/* 2024-01-01 was a Monday: a fixed week whose days and clock carry no zone or season. */
+	const ms = Date.UTC(2024, 0, 1 + day, Math.floor(minute / 60), minute % 60);
+	return weekdayFormat(language).format(ms);
+}
+
+/* "in 2 hours", "in 45 minutes": how far ahead something is, rounded to what a person plans by. */
+export function formatIn(language: Language, minutes: number): string {
+	if (minutes < 120) return relativeFormat(language).format(minutes, 'minute');
+	if (minutes < 48 * 60) {
+		return relativeFormat(language).format(Math.round(minutes / 60), 'hour');
+	}
+	return relativeFormat(language).format(Math.round(minutes / 1440), 'day');
+}

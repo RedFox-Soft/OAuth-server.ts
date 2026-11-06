@@ -19,7 +19,14 @@ export const BehindProxySessionPayload = t.Object({
 	bucketId: t.String(),
 	/* Epoch seconds. */
 	createdAt: t.Number(),
-	exp: t.Number()
+	exp: t.Number(),
+	/*
+	 * When and how the person signed in, from the code this session was made from (specs/124 FR-020): what a fresh
+	 * sign-in condition is judged on. Absent on a session made before conditions, which then fails such a condition.
+	 */
+	authTime: t.Optional(t.Number()),
+	acr: t.Optional(t.String()),
+	amr: t.Optional(t.Array(t.String()))
 });
 export type BehindProxySessionPayload = Static<
 	typeof BehindProxySessionPayload
@@ -38,6 +45,11 @@ export const BehindProxySignInPayload = t.Object({
 	/* SHA-256 of the `__Host-foxauth-signin-<appId>` cookie value. */
 	markerDigest: t.String(),
 	used: t.Boolean(),
-	exp: t.Number()
+	exp: t.Number(),
+	/*
+	 * The oldest sign-in the path that sent the person here accepts, in seconds (specs/124 FR-021): the callback
+	 * refuses a sign-in older than this rather than starting the same sign-in again.
+	 */
+	maxAge: t.Optional(t.Number())
 });
 export type BehindProxySignInPayload = Static<typeof BehindProxySignInPayload>;

@@ -82,7 +82,9 @@ export const en = {
 		federationLink:
 			'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.',
 		mailLimited:
-			'Too many emails were requested from your network in the last hour. Please try again later.'
+			'Too many emails were requested from your network in the last hour. Please try again later.',
+		/* An app behind a proxy that asks for a recent sign-in (specs/124 FR-022). */
+		freshSignIn: '{host} asks you to sign in again to open this page.'
 	},
 
 	errors: {

@@ -224,7 +224,15 @@ export const jwt = {
 			iss,
 			aud,
 			...(x5t || jkt ? { cnf } : undefined),
-			...groupsMembersOf(payload)
+			...groupsMembersOf(payload),
+			/* RFC 9068 §2.2.1: when and how the person signed in, for a token issued after an interactive sign-in. */
+			...(typeof payload.authTime === 'number'
+				? { auth_time: payload.authTime }
+				: {}),
+			...(typeof payload.acr === 'string' ? { acr: payload.acr } : {}),
+			...(Array.isArray(payload.amr) && payload.amr.length > 0
+				? { amr: payload.amr }
+				: {})
 		};
 
 		const structuredToken = { payload: tokenPayload };

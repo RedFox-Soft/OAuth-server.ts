@@ -17,6 +17,9 @@ const FIRST_TIMES = [
 	'firstAllowedAt'
 ] as const;
 
+/* Written as given, each time: the latest observation is the one that counts. */
+const LATEST = ['lastAskedAt', 'addressProvenAt', 'addressForgedAt'] as const;
+
 function recordOf(found: unknown): BehindProxyApp | null {
 	return found
 		? documentOf(STORE_AREAS.behindProxyApps, BehindProxyApp, found)
@@ -114,7 +117,10 @@ export class BehindProxyAppStore implements BehindProxyAppStoreInstance {
 			const at = fields[field];
 			if (at) set[field] = { $ifNull: [`$${field}`, at] };
 		}
-		if (fields.lastAskedAt) set.lastAskedAt = fields.lastAskedAt;
+		for (const field of LATEST) {
+			const at = fields[field];
+			if (at) set[field] = at;
+		}
 		if (Object.keys(set).length === 0) return;
 		await this.collection.updateOne({ _id: id }, [{ $set: set }]);
 	}

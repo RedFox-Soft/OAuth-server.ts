@@ -7,7 +7,8 @@ import {
 	recipeFor,
 	type ProxyKind
 } from '../../../../behind_proxy/recipes.js';
-import { PROXY_LABELS } from '../behind-proxy/appView.js';
+import { PROXY_LABELS, type AddressesView } from '../behind-proxy/appView.js';
+import { ProxyAddresses } from '../behind-proxy/ProxyAddresses.js';
 
 /* Keyed by the shared list, so a header the check starts answering cannot go unexplained here. */
 const RECEIVES: Readonly<
@@ -45,11 +46,17 @@ function Copyable({ value }: { value: string }) {
  * this mode are stated here because this is where someone decides whether the mode is enough for them.
  */
 export function ProxyConnect({
+	bucketId,
 	identifier,
-	check
+	check,
+	addresses,
+	onRefresh
 }: {
+	bucketId: string;
 	identifier: string;
 	check: { verifyUrl: string; metadataUrl: string };
+	addresses: AddressesView | undefined;
+	onRefresh: () => void;
 }) {
 	const feedback = useFeedback();
 	const [kind, setKind] = useState<ProxyKind>('caddy');
@@ -80,7 +87,7 @@ export function ProxyConnect({
 				type="warning"
 				showIcon
 				title="Anyone who can sign in to this project can get a token for this API."
-				description="Limiting it to some groups is not part of this mode. To limit which tools a token may call, use Tools…"
+				description="To limit who may call it — some groups, an attribute, a network, some hours — and which tools a token may call, use Access…"
 			/>
 
 			<Flex
@@ -200,6 +207,17 @@ export function ProxyConnect({
 				title="Clients that run in a browser"
 				description="Refusals from the check carry no CORS headers, so a browser-based client on another origin cannot read why it was refused. If you have such clients, have your proxy add CORS headers to error responses too. Preflight requests are let through without a token."
 			/>
+			{addresses && (
+				<ProxyAddresses
+					bucketId={bucketId}
+					addresses={addresses}
+					proxyKind="caddy"
+					verifyUrl={check.verifyUrl}
+					address={identifier}
+					target="api"
+					onRefresh={onRefresh}
+				/>
+			)}
 		</Flex>
 	);
 }

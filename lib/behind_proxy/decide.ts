@@ -3,24 +3,50 @@
  *
  * One function decides for both the live check and the console's access check, so the two can never disagree
  * about the same person, request and rules (FR-011). It is bundled into the console, which is why it imports
- * nothing: no `node:*`, no settings, no adapters.
+ * nothing but the pure modules beside it: no `node:*`, no settings, no adapters.
  */
 
+import { loosenedConditions, type Loosened } from './condition_widening.js';
+import {
+	APP_ORDER,
+	evaluate,
+	inOrder,
+	type Condition,
+	type ConditionKind,
+	type ConditionResult,
+	type Facts
+} from './conditions.js';
+
+export type BaseWho =
+	{ kind: 'groups'; groupIds: string[] } | { kind: 'project' };
+
+/*
+ * A rule with conditions (specs/124 research R3) wraps the "who" it narrows. The wrapper is its own kind so that a
+ * release that predates conditions refuses the rule outright instead of reading the inner "who" and ignoring them.
+ */
 export type Who =
-	| { kind: 'groups'; groupIds: string[] }
-	| { kind: 'project' }
+	| BaseWho
 	| { kind: 'public'; subtree: boolean }
-	| { kind: 'none' };
+	| { kind: 'none' }
+	| { kind: 'conditional'; who: BaseWho; conditions: Condition[] };
+
+/* "Who" as a person picks it in the console, before any condition wraps it. */
+export type PlainWho = Exclude<Who, { kind: 'conditional' }>;
 
 export interface PathRule {
 	path: string;
 	who: Who;
 }
 
-/* A person as the decision needs them: whether the project lets them sign in, and their groups now. */
+/*
+ * A person as the decision needs them: whether the project lets them sign in, their groups now, and — for
+ * conditions — their attributes and when they signed in (epoch seconds).
+ */
 export interface Person {
 	canSignIn: boolean;
 	groupIds: readonly string[];
+	attributes?: Readonly<Record<string, string>>;
+	signedInAt?: number | null;
 }
 
 export type Outcome = 'allow' | 'sign_in' | 'deny';
@@ -36,7 +62,19 @@ export type Reason =
 	| 'missing_forwarded'
 	| 'not_found'
 	| 'unsafe_value'
-	| 'rate_limited';
+	| 'rate_limited'
+	| 'not_from_network'
+	| 'outside_hours'
+	| 'attribute_mismatch'
+	| 'sign_in_again';
+
+export interface ConditionOutcome {
+	kind: ConditionKind;
+	/* The path of the rule the condition belongs to. */
+	from: string;
+	result: ConditionResult;
+	condition: Condition;
+}
 
 export interface Decision {
 	outcome: Outcome;
@@ -45,6 +83,29 @@ export interface Decision {
 	rule: string | null;
 	/* The path as it was understood, or null when it could not be. */
 	path: string | null;
+	/* Every condition that applies to the path, in decision order; empty when none does. */
+	conditions?: ConditionOutcome[];
+	/* For a fresh sign-in: the oldest sign-in the path accepts, in seconds. */
+	maxAgeSeconds?: number;
+}
+
+/* The "who" a rule decides with, its conditions set aside. */
+export function baseWho(who: Who): Exclude<Who, { kind: 'conditional' }> {
+	return who.kind === 'conditional' ? who.who : who;
+}
+
+export function conditionsOf(who: Who): Condition[] {
+	return who.kind === 'conditional' ? who.conditions : [];
+}
+
+/* A rule's "who" with its conditions, wrapped only when there are any. */
+export function withConditions(
+	who: PlainWho,
+	conditions: readonly Condition[]
+): Who {
+	if (conditions.length === 0) return who;
+	if (who.kind !== 'groups' && who.kind !== 'project') return who;
+	return { kind: 'conditional', who, conditions: [...conditions] };
 }
 
 export type Ambiguity =
@@ -211,14 +272,69 @@ export interface DecideInput {
 	rawPath: string;
 	/* Null when the request carries no usable session. */
 	person: Person | null;
+	/* The person's address the check believed (specs/124 FR-006), or null when it believed none. */
+	address?: string | null;
+	/* Epoch milliseconds the request is decided at. */
+	at?: number | null;
+	/* The app's time zone. */
+	timeZone?: string | null;
+	/* The console's "Check access": an input it was not given is unknown, and every condition is judged. */
+	explain?: boolean;
 }
 
-export function decide({
-	rules,
-	method,
-	rawPath,
-	person
-}: DecideInput): Decision {
+/*
+ * The conditions that apply to `path`: those of every non-public rule covering it, from the root down
+ * (specs/124 FR-003). "Who" is still decided by the longest rule alone; conditions accumulate, so a path can only add
+ * to what its parents ask.
+ */
+export function gatherConditions(
+	rules: readonly PathRule[],
+	path: string
+): { from: string; condition: Condition }[] {
+	return rules
+		.map((rule) => ({ ...rule, path: withoutTrailingSlash(rule.path) }))
+		.filter((rule) => covers(rule.path, path, false))
+		.sort((a, b) => segmentsOf(a.path) - segmentsOf(b.path))
+		.flatMap((rule) =>
+			conditionsOf(rule.who).map((condition) => ({
+				from: rule.path,
+				condition
+			}))
+		);
+}
+
+function judge(
+	rules: readonly PathRule[],
+	path: string,
+	input: DecideInput
+): ConditionOutcome[] {
+	const facts: Facts = {
+		address: input.address ?? null,
+		at: input.at ?? null,
+		timeZone: input.timeZone ?? null,
+		person: input.person,
+		explain: input.explain ?? false
+	};
+	return inOrder(gatherConditions(rules, path), APP_ORDER).map(
+		({ from, condition }) => ({
+			kind: condition.kind,
+			from,
+			result: evaluate(condition, facts),
+			condition
+		})
+	);
+}
+
+/*
+ * Whether a condition of `kind` stops the request. In the console an unknown result does not: "Check access" then
+ * answers "allowed if all of these hold".
+ */
+function failed(judged: readonly ConditionOutcome[], kind: ConditionKind) {
+	return judged.some((c) => c.kind === kind && c.result === 'fail');
+}
+
+export function decide(input: DecideInput): Decision {
+	const { rules, method, rawPath, person } = input;
 	const canonical = canonicalPath(rawPath);
 	if ('ambiguous' in canonical) {
 		return {
@@ -233,22 +349,53 @@ export function decide({
 	if (!rule) {
 		return { outcome: 'deny', reason: 'rule_no_one', rule: null, path };
 	}
-	const decided = (outcome: Outcome, reason: Reason): Decision => ({
+	const who = baseWho(rule.who);
+	/* Public paths take no conditions (FR-003), and a no-one rule needs none to refuse. */
+	const judged =
+		who.kind === 'public' || who.kind === 'none'
+			? []
+			: judge(rules, path, input);
+	const decided = (
+		outcome: Outcome,
+		reason: Reason,
+		extra: Pick<Decision, 'maxAgeSeconds'> = {}
+	): Decision => ({
 		outcome,
 		reason,
 		rule: rule.path,
-		path
+		path,
+		conditions: judged,
+		...extra
 	});
-	const { who } = rule;
 	if (who.kind === 'public') return decided('allow', 'public');
 	if (who.kind === 'none') return decided('deny', 'rule_no_one');
+	/* Where and when come before any session, so a refusal by them never asks for a password first (R2). */
+	if (failed(judged, 'network')) return decided('deny', 'not_from_network');
+	if (failed(judged, 'time')) return decided('deny', 'outside_hours');
 	if (!person) return decided('sign_in', 'no_session');
 	if (!person.canSignIn) return decided('deny', 'cannot_sign_in');
-	if (who.kind === 'project') return decided('allow', 'allowed');
-	const admitted = who.groupIds.some((id) => person.groupIds.includes(id));
-	return admitted
-		? decided('allow', 'allowed')
-		: decided('deny', 'not_in_group');
+	if (
+		who.kind === 'groups' &&
+		!who.groupIds.some((id) => person.groupIds.includes(id))
+	) {
+		return decided('deny', 'not_in_group');
+	}
+	if (failed(judged, 'attribute')) return decided('deny', 'attribute_mismatch');
+	/* Last: sending someone to sign in again is pointless if anything above would still refuse them (S10). */
+	const stale = judged.filter(
+		(c) => c.condition.kind === 'fresh' && c.result === 'fail'
+	);
+	if (stale.length > 0) {
+		const minutes = Math.min(
+			...judged.flatMap((c) =>
+				c.condition.kind === 'fresh' ? [c.condition.maxAgeMinutes] : []
+			)
+		);
+		return decided('sign_in', 'sign_in_again', {
+			maxAgeSeconds: minutes * 60
+		});
+	}
+	return decided('allow', 'allowed');
 }
 
 export interface Widening {
@@ -256,10 +403,14 @@ export interface Widening {
 	path: string;
 	from: Who | null;
 	to: Who | null;
+	/* Conditions of the path that no longer hold as strictly (specs/124 research R11). */
+	loosened?: Loosened[];
 }
 
 /* Whether `to` admits someone `from` did not. A rule-less request is denied, so it admits no one. */
-function widens(from: Who | null, to: Who | null): boolean {
+function widens(fromRule: Who | null, toRule: Who | null): boolean {
+	const from = fromRule && baseWho(fromRule);
+	const to = toRule && baseWho(toRule);
 	if (!to || to.kind === 'none') return false;
 	if (!from || from.kind === 'none') {
 		return to.kind !== 'groups' || to.groupIds.length > 0;
@@ -280,8 +431,10 @@ const PROBE_METHODS = ['GET', 'POST'] as const;
  */
 export function widenings(
 	before: readonly PathRule[],
-	after: readonly PathRule[]
+	after: readonly PathRule[],
+	zones: { before?: string | null; after?: string | null } = {}
 ): Widening[] {
+	const sameZone = (zones.before ?? null) === (zones.after ?? null);
 	const paths = [
 		...new Set(
 			[...before, ...after].map((rule) => withoutTrailingSlash(rule.path))
@@ -290,12 +443,14 @@ export function widenings(
 	const found: Widening[] = [];
 	for (const path of paths) {
 		for (const probe of [path, path === '/' ? '/*' : `${path}/*`]) {
-			const change = wideningAt(before, after, probe);
+			const change = wideningAt(before, after, probe, sameZone);
 			/* The same change already listed for a path above this one says it for this one too. */
 			const listed = found.some(
 				(w) =>
 					sameWho(w.from, change?.from ?? null) &&
 					sameWho(w.to, change?.to ?? null) &&
+					JSON.stringify(w.loosened ?? []) ===
+						JSON.stringify(change?.loosened ?? []) &&
 					covers(baseOf(w.path), baseOf(probe), true)
 			);
 			if (change && !listed) found.push({ path: probe, ...change });
@@ -308,15 +463,32 @@ function baseOf(probe: string): string {
 	return probe.endsWith('/*') ? probe.slice(0, -2) || '/' : probe;
 }
 
+function conditionable(who: Who | null): boolean {
+	const base = who && baseWho(who);
+	return base?.kind === 'groups' || base?.kind === 'project';
+}
+
 function wideningAt(
 	before: readonly PathRule[],
 	after: readonly PathRule[],
-	path: string
-): { from: Who | null; to: Who | null } | null {
+	path: string,
+	sameZone: boolean
+): Omit<Widening, 'path'> | null {
 	for (const method of PROBE_METHODS) {
 		const from = ruleFor(before, path, method)?.who ?? null;
 		const to = ruleFor(after, path, method)?.who ?? null;
-		if (widens(from, to)) return { from, to };
+		/* Conditions matter only where both decide by "who": a public or no-one path is the "who" change itself. */
+		const loosened =
+			conditionable(from) && conditionable(to)
+				? loosenedConditions(
+						gatherConditions(before, baseOf(path)).map((c) => c.condition),
+						gatherConditions(after, baseOf(path)).map((c) => c.condition),
+						sameZone
+					)
+				: [];
+		if (widens(from, to) || loosened.length > 0) {
+			return { from, to, ...(loosened.length > 0 ? { loosened } : {}) };
+		}
 	}
 	return null;
 }

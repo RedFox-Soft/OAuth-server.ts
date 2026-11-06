@@ -1,7 +1,7 @@
 ---
 title: 在代理处保护 MCP 服务器
 description: 让 Caddy、Traefik 或 nginx 代理请 FoxAuth 检查每个令牌以及每个工具需要的权限，MCP 服务器无需任何授权代码。
-source: 4e3dbf6acecf
+source: 8076afdfc0b7
 sidebar:
   order: 8
 ---
@@ -170,6 +170,8 @@ nginx 的 `auth_request` 只理解三种回答：允许、`401` 和 `403`。遇�
 3. 让你的智能体宿主连接你的 MCP 服务器。它会读取这份文档，在项目中让用户登录，然后带着令牌回来。同样的调用现在会到达你的服务器，并带上 `X-Auth-*` 请求头。
 
 不需要开启任何开关，所有方案都可以使用。
+
+如果只想让某些用户组调用该 API，或只允许来自你的网络、只在你设定的时间内调用，请参阅[在代理处添加条件](/zh-cn/docs/get-started/add-conditions-at-your-proxy/)。
 
 <Aside type="tip">
 	用户在浏览器中打开的、没有自带登录的 Web 应用，放到代理后面的方式不同。请看[在

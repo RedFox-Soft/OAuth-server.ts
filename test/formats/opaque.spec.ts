@@ -135,7 +135,11 @@ describe('opaque storage', () => {
 			'x5t#S256': s256,
 			jkt: s256,
 			sessionUid,
-			expiresWithSession
+			expiresWithSession,
+			/* When and how the person signed in (specs/124 FR-019). */
+			authTime,
+			acr,
+			amr
 		});
 	});
 

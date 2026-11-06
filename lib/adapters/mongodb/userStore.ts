@@ -5,6 +5,7 @@ import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
+	attributePathOf,
 	clampPage,
 	FIELD_OF_KEY,
 	searchOf,
@@ -104,6 +105,29 @@ function consoleClauses(filter: EndUserFilter): Record<string, unknown>[] {
 				? { $not: { $type: 'string' } }
 				: { $type: 'string' }
 		});
+	if (filter.attribute !== undefined) {
+		const path = attributePathOf(filter.attribute.name);
+		/*
+		 * A claim's key may hold a dot, which a dotted path would read as nesting, so the leaf is reached with
+		 * `$getField` one segment at a time. Only a stored string equal to a value matches, as in the other stores.
+		 */
+		const leaf = (path ?? []).reduce<unknown>(
+			(input, field) => ({ $getField: { field, input } }),
+			'$$ROOT'
+		);
+		clauses.push(
+			path
+				? {
+						$expr: {
+							$and: [
+								{ $eq: [{ $type: leaf }, 'string'] },
+								{ $in: [leaf, [...filter.attribute.values]] }
+							]
+						}
+					}
+				: { _id: { $in: [] } }
+		);
+	}
 	return clauses;
 }
 

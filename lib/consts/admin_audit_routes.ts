@@ -692,6 +692,22 @@ const routes = [
 		targetType: 'UserBucket'
 	},
 	/*
+	 * A project's proxy keys (specs/124): the target is the project, as for its signing keys; the key's id rides
+	 * beside it. The key itself is never in the trail.
+	 */
+	{
+		action: 'bucket.proxykey.issue',
+		method: 'POST',
+		path: '/admin/api/projects/:id/proxy-keys',
+		targetType: 'UserBucket'
+	},
+	{
+		action: 'bucket.proxykey.withdraw',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/proxy-keys/:keyId',
+		targetType: 'UserBucket'
+	},
+	/*
 	 * Severing one account's upstream identity. An end-user target, so it carries `targetScope` — the fifth
 	 * row to do so, for the same reason as the other four: these users live in per-bucket storage, and a bare
 	 * user id resolves to nobody, not even to an email, without knowing which bucket to look in.

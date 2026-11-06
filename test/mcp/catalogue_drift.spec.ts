@@ -146,6 +146,8 @@ describe('MCP tool catalogue', () => {
 			'PATCH /admin/api/administrators/applications/:clientId',
 			'POST /admin/api/administrators/applications/:clientId/secret',
 			'DELETE /admin/api/administrators/applications/:clientId',
+			/* A secret shown once to whoever issues it (specs/124). */
+			'POST /admin/api/projects/:id/proxy-keys',
 			/* Key material and an attestation only a person can make (specs/116). */
 			'POST /admin/api/keyring',
 			'POST /admin/api/keyring/backup-confirmation',
@@ -219,6 +221,8 @@ describe('MCP tool catalogue', () => {
 			/* The team it leaves loses a population of people, with no step of its own. */
 			'project_owner_change',
 			'project_plan_set',
+			/* A proxy still sending the key has every network condition refuse it (specs/124). */
+			'project_proxy_key_withdraw',
 			/* Gives a switched-off population its sign-in, sessions and tokens back (specs/090). */
 			'project_restore',
 			/* Makes a local user read-only to every administrator, for good. */

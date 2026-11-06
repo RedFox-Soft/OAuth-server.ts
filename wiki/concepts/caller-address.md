@@ -89,6 +89,14 @@ header is believed only on a connection from a proxy the choice trusts (`isTrust
   `lib/shared/egress.ts`, which now calls it. [[attack-reports]] (spec 114) uses the same predicate to decide
   which addresses may be reported.
 
+## The proxy check's person address (spec 124)
+
+The check for an app or an API behind the operator's proxy still treats the proxy as its caller
+(`checkCallerOf`, `lib/behind_proxy/rate_limit.ts`). Spec 124 adds a second, separate address: the **person's**,
+read from `X-Forwarded-For` only when the check carries a valid project proxy key and the header holds exactly one
+strict address (`believedAddress`). That address is only compared with a network condition's ranges. It never becomes
+`callerAddressOf`, a rate-limit key, an attack report, a log line or an event field. See [[conditions-at-your-proxy]].
+
 ## One answer per request, without `server`
 
 - **Where it is computed.** The first statement of the first `onRequest` hook

@@ -34,6 +34,12 @@ export type Presented =
 			/* The token's `scope`, as it carries it. */
 			scope: string;
 			scopes: ReadonlySet<string>;
+			/*
+			 * The person the token stands for, by their account id in the API's project, or null for a token that
+			 * stands for no one this check can name (specs/124 research R12). Never derived from `subject`, which
+			 * is the pairwise value for a pairwise client and the client itself for a machine.
+			 */
+			accountId: string | null;
 	  }
 	| { ok: false; reason: BearerRefusal };
 
@@ -112,7 +118,34 @@ async function fromJwt(token: string, api: Api): Promise<Presented> {
 	if (typeof clientId !== 'string' || typeof sub !== 'string') {
 		return refused('invalid_token');
 	}
-	return { ok: true, subject: sub, clientId, ...scopesOf(payload.scope) };
+	return {
+		ok: true,
+		subject: sub,
+		clientId,
+		...scopesOf(payload.scope),
+		accountId: await personOfJwt(payload, sub, clientId)
+	};
+}
+
+/*
+ * Whether a self-contained token stands for a person, and which (research R12). Its `sub` is the account only when
+ * the token was issued after a person's interactive sign-in — it then carries `auth_time` — and the client's subjects
+ * are not pairwise, which no reverse lookup could undo; a machine token's `sub` is its client id. Anything else is no
+ * person, so a condition about the person refuses it rather than reading someone into it.
+ */
+async function personOfJwt(
+	payload: Record<string, unknown>,
+	sub: string,
+	clientId: string
+): Promise<string | null> {
+	if (typeof payload.auth_time !== 'number' || sub === clientId) return null;
+	let client;
+	try {
+		client = await Client.find(clientId);
+	} catch {
+		return null;
+	}
+	return client.subjectType === 'pairwise' ? null : sub;
 }
 
 /*
@@ -175,7 +208,12 @@ async function fromRecord(token: string, api: Api): Promise<Presented> {
 		ok: true,
 		subject,
 		clientId: payload.clientId,
-		...scopesOf(payload.scope)
+		...scopesOf(payload.scope),
+		/* A machine token is a record of its own kind, and never stands for a person. */
+		accountId:
+			record instanceof AccessToken && payload.accountId
+				? payload.accountId
+				: null
 	};
 }
 

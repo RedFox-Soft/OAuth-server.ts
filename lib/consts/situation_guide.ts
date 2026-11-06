@@ -1285,7 +1285,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Make sure the app is reachable only through your proxy. A request that reaches it another way skips the check.',
 			'Your app does not change. It can read who the person is from the X-Auth-* headers.',
 			'The Connect step gives the configuration for Caddy, Traefik or nginx, ready to paste.',
-			'Each path can be open to the members of chosen groups, to everyone in the project, to anyone, or to no one.',
+			'Each path can be open to the members of chosen groups, to everyone in the project, to anyone, or to no one, and can add conditions: a network, some hours, an attribute, a recent sign-in.',
 			'There is nothing to switch on, and it is on every plan.'
 		],
 		prompt: prompt(
@@ -1377,16 +1377,171 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		action: { kind: 'form', target: { area: 'apis', query: { declare: '1' } } },
 		goodToKnow: [
 			'When you declare the API, answer “Who checks tokens?” with “Your proxy”. Its Connect gives the configuration for Caddy, Traefik or nginx, ready to paste.',
-			'Tools… on the API’s row says which scopes each tool needs. A client that lacks one is told exactly which scopes to ask for.',
+			'Access… on the API’s row says which scopes each tool needs, and who may call the API at all: some groups, an attribute, a network, some hours. A client that lacks a scope is told exactly which scopes to ask for.',
 			'The project publishes the description agents look for (the protected resource metadata), so your MCP server serves nothing for sign-in.',
 			'A revoked token keeps working at the proxy until it expires, unless the API issues opaque tokens. Keep the lifetime short.',
 			'Tokens bound to a key (DPoP or a certificate) are refused at the proxy, because the proxy cannot check the key.',
-			'Make sure your MCP server is reachable only through your proxy. Anyone who can sign in to the project can get a token for it. It is on every plan.'
+			'Make sure your MCP server is reachable only through your proxy. Without a condition, anyone who can sign in to the project can get a token for it. It is on every plan.'
 		],
 		prompt: prompt(
 			'Check tokens for my MCP server at https://mcp.example.com/mcp in my reverse proxy (work out Caddy, Traefik or nginx from my configuration), so the server needs no auth code.\nDeclare it in FoxAuth as an API whose tokens the proxy checks (checkedBy proxy), with its scopes. Then set its tools table: each tool and the scopes it needs. Add the configuration its Connect gives to my proxy.',
 			'resource_declare with checkedBy proxy, then resource_update with tools',
 			'Make sure the MCP server is reachable only through the proxy, so nobody can reach it without the check.'
+		)
+	},
+	{
+		id: 'proxynetwork',
+		tab: 'product',
+		title: 'Let people in only from your office network',
+		sentence:
+			'Add a condition to a path of an app behind your proxy: only from the addresses you list. Someone elsewhere is turned away before they are asked to sign in.',
+		protocol: 'Forward auth · X-Forwarded-For',
+		lanes: lanes('browser', 'proxy', 'proxied', 'fox'),
+		steps: [
+			step(
+				'browser',
+				'proxy',
+				'Opens the app',
+				'The person opens your app from a café. The request reaches your proxy first.'
+			),
+			step(
+				'proxy',
+				'fox',
+				'Asks, with the address',
+				'Your proxy asks the project and passes the address it saw, with the project’s proxy key.'
+			),
+			step(
+				'fox',
+				'browser',
+				'Not from this network',
+				'The address is not one you listed, so the project says no, before any sign-in.',
+				'refusal'
+			),
+			step(
+				'browser',
+				'proxy',
+				'Opens it at the office',
+				'At the office the same request comes from an address you listed.'
+			),
+			step(
+				'fox',
+				'proxy',
+				'Yes, this is Anna',
+				'The project checks the address and the rest of your rules, and answers yes.'
+			),
+			step(
+				'proxy',
+				'proxied',
+				'With X-Auth-* headers',
+				'Your proxy lets the request through to your app.'
+			)
+		],
+		problem: {
+			at: 'proxied',
+			mark: 'open',
+			caption: 'A stolen password works from anywhere.'
+		},
+		fixCaption: 'Only your network gets in.',
+		sees: {
+			kind: 'none',
+			lines: [
+				'From elsewhere: a page saying the app cannot be opened from this network',
+				'From the office: the app, as before'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'form',
+			target: { area: 'applications', query: { situation: 'behindProxy' } }
+		},
+		goodToKnow: [
+			'Your proxy must pass the address it saw and show the project’s proxy key. The app’s Connect page gives the lines to add, and a test that a browser cannot choose its own address.',
+			'A network condition cannot be saved until a check has arrived with the key and a public address, so one save cannot lock everyone out.',
+			'Conditions add up down the paths: a condition on / applies to every path under it.',
+			'A VPN or a residential proxy can still get around a list. It slows an attacker down; it does not stop one.',
+			'The FoxAuth console is never behind these conditions. It is on every plan.'
+		],
+		prompt: prompt(
+			'Let people open my app behind the proxy only from my office network, 203.0.113.0/24.\nIssue the project’s proxy key in the console, add the lines the app’s Connect page gives to my proxy, then add a network condition to the rule for /.',
+			'behind_proxy_app_update with rules[].conditions',
+			'Issue the proxy key in the console: an agent never receives it.'
+		)
+	},
+	{
+		id: 'proxyfresh',
+		tab: 'product',
+		title: 'Ask for a fresh sign-in before admin pages',
+		sentence:
+			'Add a condition to a path such as /admin: ask to sign in again when the sign-in is older than you allow. A sign-in from yesterday no longer opens it.',
+		protocol: 'Forward auth · OpenID Connect max_age',
+		lanes: lanes('browser', 'proxy', 'proxied', 'fox'),
+		steps: [
+			step(
+				'browser',
+				'proxy',
+				'Opens /admin',
+				'The person signed in this morning and now opens /admin.'
+			),
+			step(
+				'proxy',
+				'fox',
+				'Asks the project',
+				'Your proxy asks the project about the request.'
+			),
+			step(
+				'fox',
+				'browser',
+				'Sign in again',
+				'The sign-in is older than /admin allows, so the project sends the browser to sign in again and says why.',
+				'redirect'
+			),
+			step(
+				'browser',
+				'fox',
+				'Signs in',
+				'The person signs in again; with an authenticator app, the project asks for a code too.'
+			),
+			step(
+				'fox',
+				'proxy',
+				'Yes, a fresh sign-in',
+				'Back on /admin the sign-in is recent, and the project answers yes.'
+			),
+			step(
+				'proxy',
+				'proxied',
+				'With X-Auth-* headers',
+				'Your proxy lets the request through to the admin page.'
+			)
+		],
+		problem: {
+			at: 'proxied',
+			mark: 'password',
+			caption: 'A sign-in from yesterday opens the admin pages.'
+		},
+		fixCaption: 'Admin pages ask for a recent sign-in.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'The sign-in page, saying the app asks for a fresh sign-in',
+				'Then the page they opened'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'form',
+			target: { area: 'applications', query: { situation: 'behindProxy' } }
+		},
+		goodToKnow: [
+			'Choose 15 minutes, an hour, 8 hours or a day. Pages that load data in the background, such as dashboards, stop working until the person reloads, so use it on admin paths.',
+			'If the project asks for an authenticator app at sign-in, signing in again asks for a code too.',
+			'A person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides.',
+			'It is on every plan.'
+		],
+		prompt: prompt(
+			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old.\nAdd a fresh sign-in condition to the rule for /admin.',
+			'behind_proxy_app_update with rules[].conditions',
+			'Use it on admin paths: a dashboard that loads data in the background stops until it is reloaded.'
 		)
 	},
 	{

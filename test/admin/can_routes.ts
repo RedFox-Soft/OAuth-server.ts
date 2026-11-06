@@ -613,6 +613,28 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		path: `${BUCKET}/keys/:kid/promote`
 	},
 	{ on: 'bucket', flag: 'edit', method: 'DELETE', path: `${BUCKET}/keys/:kid` },
+	/* How many people an attribute condition lets through (specs/124): read with the project's people. */
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/attribute-matches`
+	},
+	/* A project's proxy keys (specs/124): changed with the project, and read only by those who may change them. */
+	{ on: 'bucket', flag: 'edit', method: 'GET', path: `${BUCKET}/proxy-keys` },
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'POST',
+		path: `${BUCKET}/proxy-keys`,
+		body: {}
+	},
+	{
+		on: 'bucket',
+		flag: 'edit',
+		method: 'DELETE',
+		path: `${BUCKET}/proxy-keys/:keyId`
+	},
 	{
 		on: 'bucket',
 		flag: 'edit',

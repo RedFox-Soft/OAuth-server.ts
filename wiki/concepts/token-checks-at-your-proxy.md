@@ -4,7 +4,7 @@ title: 'Token checks at your proxy: an API or MCP server with no authorization c
 tags: [architecture, contract, gotcha, oauth, mcp]
 sources: [oauth-server-codebase]
 created: 2026-11-05
-updated: 2026-11-05
+updated: 2026-11-06
 ---
 
 # Token checks at your proxy
@@ -124,8 +124,9 @@ The limiter is spec 122's, keyed `api:<checkId>` (`api_check.ts:92`).
   unless the proxy adds CORS headers to errors. The check does not guess the API's CORS policy.
 - **`resources/read` and `prompts/get` are not covered** by the table, and agreement between header and body is the
   MCP server's to enforce.
-- **Group or claim conditions are not part of this mode.** Anyone who can sign in to the project can get a token
-  for the API. Spec 4 is planned for conditions.
+- **Group, attribute, network and time conditions** came with spec 124 (`tools.access`, decided before the table;
+  see [[conditions-at-your-proxy]]). Without one, anyone who can sign in to the project can get a token for the API.
+  A JWT counts as a person only when it carries `auth_time`, which tokens issued before spec 124 do not.
 - **Existence of a check id leaks to a probe without `X-Forwarded-Host`.** Such a check answers `missing_forwarded`
   for an existing id and `not_found` for an unknown one, the same order as for apps. The id is a digest of a public
   identifier, so nothing secret is revealed.
@@ -136,3 +137,4 @@ The limiter is spec 122's, keyed `api:<checkId>` (`api_check.ts:92`).
 - [[mcp-server-authorization]] — declared APIs, their audiences and what an API checks itself.
 - [[admin-mcp-control-plane]] — the `highWhenSets` gate on `resource_update`.
 - [[caller-address]] — why the proxy's forwarded address is never the caller.
+- [[conditions-at-your-proxy]] — who may call the API at all (spec 124).

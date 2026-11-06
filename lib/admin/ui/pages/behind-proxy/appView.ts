@@ -22,6 +22,37 @@ export interface AppView {
 	lastAskedAt: string | null;
 	mismatchedHosts: string[];
 	signUpsOpen: boolean;
+	/* The zone the app's time conditions read the clock in (specs/124). */
+	timeZone: string | null;
+	/* What the proxy's checks showed about the addresses it passes (specs/124 research R6). */
+	addresses: AddressesView;
+}
+
+export interface AddressesView {
+	provenAt: string | null;
+	forgedAt: string | null;
+	last: {
+		keyPresent: boolean;
+		keyValid: boolean;
+		addressPresent: boolean;
+		single: boolean;
+		isPublic: boolean;
+		cloudflare: boolean;
+		probe: boolean;
+	} | null;
+	networkConditionsSupported: boolean;
+}
+
+/*
+ * Whether a network condition may be saved now: the proxy proved it passes people's addresses, and no forged address
+ * reached the check since (the server's own gate, `assertConditionsUsable`).
+ */
+export function addressesProven(addresses: AddressesView | undefined): boolean {
+	if (!addresses?.provenAt) return false;
+	return (
+		!addresses.forgedAt ||
+		Date.parse(addresses.forgedAt) < Date.parse(addresses.provenAt)
+	);
 }
 
 export function behindProxyApi(bucketId: string, appId?: string): string {
@@ -78,6 +109,8 @@ export function whoText(
 				: 'Anyone, no sign-in';
 		case 'none':
 			return 'No one';
+		case 'conditional':
+			return whoText(who.who, nameOf);
 	}
 }
 

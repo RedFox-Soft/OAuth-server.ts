@@ -14,9 +14,25 @@ import {
 	canonicalAddress,
 	type AddressProblem
 } from '../../behind_proxy/address.js';
-import { canonicalPath } from '../../behind_proxy/decide.js';
+import type { Condition } from '../../behind_proxy/conditions.js';
+import {
+	baseWho,
+	canonicalPath,
+	conditionsOf
+} from '../../behind_proxy/decide.js';
+import {
+	appConditionsOf,
+	assertConditionsUsable,
+	conditionsFrom,
+	timeZoneFrom,
+	type ConditionInput
+} from '../conditions.js';
+import { ADDRESSES_SUPPORTED } from '../../behind_proxy/recipes.js';
 import { appSessions } from '../../behind_proxy/records.js';
-import { mismatchedHostsOf } from '../../behind_proxy/usage.js';
+import {
+	lastAddressFlagsOf,
+	mismatchedHostsOf
+} from '../../behind_proxy/usage.js';
 import { issuerFor } from '../../configs/issuer.js';
 import nanoid from '../../helpers/nanoid.js';
 import { signUpsPaused } from '../../plans/signups.js';
@@ -40,6 +56,7 @@ export type WhoInput =
 export interface RuleInput {
 	path: string;
 	who: WhoInput;
+	conditions?: ConditionInput[];
 }
 
 export interface CreateAppInput {
@@ -54,6 +71,7 @@ export interface UpdateAppInput {
 	address?: string;
 	proxyKind?: BehindProxyApp['proxyKind'];
 	rules?: RuleInput[];
+	timeZone?: string | null;
 }
 
 const MAX_RULES = 50;
@@ -151,6 +169,17 @@ function rulePathOf(input: string): string {
 	return canonical.path;
 }
 
+/* A rule's path in the words the console shows it in, for a refusal. */
+function placeOf(path: string): string {
+	return path === ROOT ? '/ (everything)' : `${path} and below`;
+}
+
+function conditionsByPath(
+	rules: readonly BehindProxyRule[]
+): Map<string, Condition[]> {
+	return new Map(rules.map((rule) => [rule.path, conditionsOf(rule.who)]));
+}
+
 function byPath(a: BehindProxyRule, b: BehindProxyRule): number {
 	if (a.path === b.path) return 0;
 	return a.path < b.path ? -1 : 1;
@@ -172,7 +201,24 @@ async function rulesOf(
 			throw refuse(`path ${path} has more than one rule`, 'rules');
 		}
 		seen.add(key);
-		rules.push({ path, who: await whoOf(bucket, rule.who) });
+		const who = await whoOf(bucket, rule.who);
+		const conditions = await conditionsFrom(
+			bucket,
+			rule.conditions ?? [],
+			placeOf(path),
+			'rules'
+		);
+		const own = appConditionsOf(conditions);
+		if (own.length === 0) {
+			rules.push({ path, who });
+		} else if (who.kind === 'groups' || who.kind === 'project') {
+			rules.push({ path, who: { kind: 'conditional', who, conditions: own } });
+		} else {
+			throw refuse(
+				`${placeOf(path)}: conditions apply only to a path people sign in to; a public or no-one path takes none`,
+				'rules'
+			);
+		}
 	}
 	if (!seen.has(ROOT)) {
 		throw refuse('the rule for / must remain', 'rules');
@@ -183,7 +229,7 @@ async function rulesOf(
 async function whoOf(
 	bucket: UserBucket,
 	who: WhoInput
-): Promise<BehindProxyWho> {
+): Promise<Exclude<BehindProxyWho, { kind: 'conditional' }>> {
 	switch (who.kind) {
 		case 'groups':
 			return {
@@ -253,7 +299,7 @@ export async function updateApp(
 	input: UpdateAppInput,
 	record: () => Promise<unknown>
 ): Promise<BehindProxyApp> {
-	await loadApp(bucket, id);
+	const current = await loadApp(bucket, id);
 	const patch: BehindProxyAppPatch = {};
 	if (input.name !== undefined) patch.name = nameOf(input.name);
 	if (input.address !== undefined) {
@@ -262,6 +308,39 @@ export async function updateApp(
 	if (input.proxyKind !== undefined) patch.proxyKind = input.proxyKind;
 	if (input.rules !== undefined) {
 		patch.rules = await rulesOf(bucket, input.rules);
+	}
+	if (input.timeZone !== undefined) {
+		patch.timeZone = timeZoneFrom(input.timeZone, 'timeZone');
+	}
+	const rules = patch.rules ?? current.rules;
+	const zone =
+		patch.timeZone === undefined ? (current.timeZone ?? null) : patch.timeZone;
+	if (
+		zone === null &&
+		rules.some((rule) =>
+			conditionsOf(rule.who).some((condition) => condition.kind === 'time')
+		)
+	) {
+		throw refuse(
+			'a time condition needs the time zone its hours are read in',
+			'timeZone'
+		);
+	}
+	if (patch.rules) {
+		const before = conditionsByPath(current.rules);
+		for (const rule of patch.rules) {
+			await assertConditionsUsable(
+				bucket,
+				before.get(rule.path) ?? [],
+				conditionsOf(rule.who),
+				{
+					provenAt: current.addressProvenAt,
+					forgedAt: current.addressForgedAt
+				},
+				placeOf(rule.path),
+				'rules'
+			);
+		}
 	}
 
 	await record();
@@ -325,9 +404,10 @@ export async function viewApps(
 	const groupIds = [
 		...new Set(
 			apps.flatMap((app) =>
-				app.rules.flatMap((rule) =>
-					rule.who.kind === 'groups' ? rule.who.groupIds : []
-				)
+				app.rules.flatMap((rule) => {
+					const who = baseWho(rule.who);
+					return who.kind === 'groups' ? who.groupIds : [];
+				})
 			)
 		)
 	];
@@ -345,19 +425,25 @@ export async function viewApps(
 		name: app.name,
 		address: app.address,
 		proxyKind: app.proxyKind,
-		rules: [...app.rules].sort(byPath).map(({ path, who }) => ({
-			path,
-			who:
-				who.kind === 'groups'
-					? {
-							kind: 'groups' as const,
-							groups: who.groupIds.map((id) => ({
-								id,
-								name: names.get(id) ?? null
-							}))
-						}
-					: who
-		})),
+		rules: [...app.rules].sort(byPath).map(({ path, who: stored }) => {
+			const who = baseWho(stored);
+			const conditions = conditionsOf(stored);
+			return {
+				path,
+				who:
+					who.kind === 'groups'
+						? {
+								kind: 'groups' as const,
+								groups: who.groupIds.map((id) => ({
+									id,
+									name: names.get(id) ?? null
+								}))
+							}
+						: who,
+				...(conditions.length > 0 ? { conditions } : {})
+			};
+		}),
+		timeZone: app.timeZone ?? null,
 		verifyUrl: verifyUrlOf(bucket, app._id),
 		checklist: {
 			createdAt: app.createdAt.toISOString(),
@@ -368,6 +454,13 @@ export async function viewApps(
 		lastAskedAt: iso(app.lastAskedAt),
 		/* The hosts the proxy recently reported for the app that were not its address, kept in memory only. */
 		mismatchedHosts: mismatchedHostsOf(app._id),
+		/* What the proxy's checks showed about the addresses it passes (specs/124 research R6), for Connect's step 5. */
+		addresses: {
+			provenAt: iso(app.addressProvenAt),
+			forgedAt: iso(app.addressForgedAt),
+			last: lastAddressFlagsOf(`app:${app._id}`),
+			networkConditionsSupported: ADDRESSES_SUPPORTED[app.proxyKind]
+		},
 		signUpsOpen
 	}));
 }

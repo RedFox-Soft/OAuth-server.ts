@@ -208,6 +208,11 @@ export interface EndUserFilter {
 	local?: boolean;
 	/* A member of this bucket group (specs/089): the search box over one group's members. */
 	memberOf?: string;
+	/*
+	 * An attribute equal to one of `values` (specs/124 FR-014): `name` is one of the profile attributes a condition
+	 * may name, or `claim:<key>`. Only a stored string matches.
+	 */
+	attribute?: { name: string; values: readonly string[] };
 }
 
 /*
@@ -1440,6 +1445,87 @@ export const ScopeDescription = t.Object({
 export type ScopeDescription = Static<typeof ScopeDescription>;
 
 /*
+ * A condition on an app's rule or an API's access (specs/124 data-model.md): "and only if", added to what the rule
+ * or a valid token already allows. Every object is closed, so a release that does not know a kind refuses the record
+ * rather than reading past it (research R3).
+ */
+const closed = { additionalProperties: false } as const;
+export const TimeWindowSchema = t.Object(
+	{
+		days: t.Array(t.Integer({ minimum: 0, maximum: 6 }), {
+			minItems: 1,
+			maxItems: 7,
+			uniqueItems: true
+		}),
+		start: t.Integer({ minimum: 0, maximum: 1425, multipleOf: 15 }),
+		end: t.Integer({ minimum: 0, maximum: 1425, multipleOf: 15 })
+	},
+	closed
+);
+const NetworkConditionSchema = t.Object(
+	{
+		kind: t.Literal('network'),
+		only: t.Array(t.String({ maxLength: 60 }), { maxItems: 100 }),
+		not: t.Array(t.String({ maxLength: 60 }), { maxItems: 100 })
+	},
+	closed
+);
+const TimeConditionSchema = t.Object(
+	{
+		kind: t.Literal('time'),
+		windows: t.Array(TimeWindowSchema, { minItems: 1, maxItems: 7 })
+	},
+	closed
+);
+const AttributeConditionSchema = t.Object(
+	{
+		kind: t.Literal('attribute'),
+		attribute: t.String({ minLength: 1, maxLength: 70 }),
+		values: t.Array(t.String({ minLength: 1, maxLength: 200 }), {
+			minItems: 1,
+			maxItems: 50
+		})
+	},
+	closed
+);
+const FreshConditionSchema = t.Object(
+	{
+		kind: t.Literal('fresh'),
+		maxAgeMinutes: t.Integer({ minimum: 5, maximum: 1440 })
+	},
+	closed
+);
+const GroupConditionSchema = t.Object(
+	{
+		kind: t.Literal('group'),
+		groupIds: t.Array(t.String(), { minItems: 1, maxItems: 50 })
+	},
+	closed
+);
+/* What a rule of an app may carry: no group condition, because an app's groups live in its "who". */
+export const AppConditionSchema = t.Union([
+	NetworkConditionSchema,
+	TimeConditionSchema,
+	AttributeConditionSchema,
+	FreshConditionSchema
+]);
+/* What an API's access may carry: no fresh sign-in, because an API has no session of its own. */
+export const ApiConditionSchema = t.Union([
+	GroupConditionSchema,
+	AttributeConditionSchema,
+	NetworkConditionSchema,
+	TimeConditionSchema
+]);
+export const ApiAccess = t.Object(
+	{
+		conditions: t.Array(ApiConditionSchema, { minItems: 1, maxItems: 4 }),
+		timeZone: t.Optional(t.String({ maxLength: 64 }))
+	},
+	closed
+);
+export type ApiAccess = Static<typeof ApiAccess>;
+
+/*
  * An API's tools table (specs/123): each listed MCP tool needs every scope of its row; a tool the table does not
  * list, and a client too old to say which method it calls, are refused unless the administrator chose otherwise.
  */
@@ -1452,7 +1538,9 @@ export const ToolsTable = t.Object(
 			)
 		),
 		otherTools: t.Union([t.Literal('refuse'), t.Literal('token')]),
-		withoutMethod: t.Union([t.Literal('refuse'), t.Literal('token')])
+		withoutMethod: t.Union([t.Literal('refuse'), t.Literal('token')]),
+		/* Who may call the API at all (specs/124), decided before the table. */
+		access: t.Optional(ApiAccess)
 	},
 	{ additionalProperties: false }
 );
@@ -1505,6 +1593,9 @@ export const ProtectedResource = t.Object({
 	checkedBy: t.Optional(t.Union([t.Literal('server'), t.Literal('proxy')])),
 	/* Which scopes each MCP tool needs when the proxy checks the tokens; absent or with no rows, none beyond a valid token. */
 	tools: t.Optional(ToolsTable),
+	/* As an app's `addressProvenAt` and `addressForgedAt` (specs/124 research R6). */
+	proxyAddressProvenAt: t.Optional(t.Date()),
+	proxyAddressForgedAt: t.Optional(t.Date()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -1553,6 +1644,17 @@ export interface ProtectedResourceStoreInstance {
 	): Promise<ProtectedResource | null>;
 	destroy(namespace: string, identifier: string): Promise<void>;
 	destroyByBucket(bucketId: string): Promise<number>;
+	/*
+	 * What the proxy's checks showed about the addresses they pass (specs/124 research R6). Sets only the dates given
+	 * and leaves `updatedAt` alone: it is the check's observation, not an administrator's change.
+	 */
+	noteProxyAddress(
+		namespace: string,
+		identifier: string,
+		fields: Partial<
+			Pick<ProtectedResource, 'proxyAddressProvenAt' | 'proxyAddressForgedAt'>
+		>
+	): Promise<void>;
 	/*
 	 * Moves every declaration of a bucket from one namespace to another, all or nothing — what a bucket's
 	 * first address of its own does to the declarations it made at the root. Answers the
@@ -1888,7 +1990,25 @@ export const BehindProxyWho = t.Union([
 	}),
 	t.Object({ kind: t.Literal('project') }),
 	t.Object({ kind: t.Literal('public'), subtree: t.Boolean() }),
-	t.Object({ kind: t.Literal('none') })
+	t.Object({ kind: t.Literal('none') }),
+	/*
+	 * A rule with conditions (specs/124): the "who" it narrows and its own conditions, as a kind of its own so a
+	 * release that predates conditions refuses the record instead of reading the inner "who" (research R3).
+	 */
+	t.Object(
+		{
+			kind: t.Literal('conditional'),
+			who: t.Union([
+				t.Object({
+					kind: t.Literal('groups'),
+					groupIds: t.Array(t.String(), { minItems: 1, maxItems: 50 })
+				}),
+				t.Object({ kind: t.Literal('project') })
+			]),
+			conditions: t.Array(AppConditionSchema, { minItems: 1, maxItems: 4 })
+		},
+		{ additionalProperties: false }
+	)
 ]);
 export type BehindProxyWho = Static<typeof BehindProxyWho>;
 
@@ -1916,10 +2036,18 @@ export const BehindProxyApp = t.Object({
 		t.Literal('nginx')
 	]),
 	rules: t.Array(BehindProxyRule, { maxItems: 50 }),
+	/* The IANA zone the app's time conditions and refusal pages read the clock in (specs/124). */
+	timeZone: t.Optional(t.String({ maxLength: 64 })),
 	firstAskedAt: t.Optional(t.Date()),
 	firstSignInAt: t.Optional(t.Date()),
 	firstAllowedAt: t.Optional(t.Date()),
 	lastAskedAt: t.Optional(t.Date()),
+	/*
+	 * When the proxy last proved it passes people's addresses, and when the console's probe address last reached the
+	 * check — the proxy passing a browser's own value on (specs/124 research R6). Latest values, at most once a minute.
+	 */
+	addressProvenAt: t.Optional(t.Date()),
+	addressForgedAt: t.Optional(t.Date()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -1928,7 +2056,10 @@ export type BehindProxyApp = Static<typeof BehindProxyApp>;
 /* What an administrator changes. `rules` is replaced as a whole; `updatedAt` is the store's to set. */
 export type BehindProxyAppPatch = Partial<
 	Pick<BehindProxyApp, 'name' | 'address' | 'proxyKind' | 'rules'>
->;
+> & {
+	/* Null removes it. */
+	timeZone?: string | null;
+};
 
 /*
  * The checklist's dates, as a check or a sign-in reports them. Each `first*` is written only where none is
@@ -1937,7 +2068,12 @@ export type BehindProxyAppPatch = Partial<
 export type BehindProxyAppUsage = Partial<
 	Pick<
 		BehindProxyApp,
-		'firstAskedAt' | 'firstSignInAt' | 'firstAllowedAt' | 'lastAskedAt'
+		| 'firstAskedAt'
+		| 'firstSignInAt'
+		| 'firstAllowedAt'
+		| 'lastAskedAt'
+		| 'addressProvenAt'
+		| 'addressForgedAt'
 	>
 >;
 
@@ -2458,6 +2594,20 @@ export const UserBucket = t.Object({
 	 * `update`, because every transition of it is a race a compare-and-set has to decide.
 	 */
 	deletion: t.Optional(BucketDeletion),
+	/*
+	 * The keys the operator's proxy shows to have its reports of people's addresses believed (specs/124 research
+	 * R5): at most two, so one can replace the other. Only a digest is kept — the key is only ever compared — and
+	 * no view of the project carries this field.
+	 */
+	proxyKeys: t.Optional(
+		t.Array(
+			t.Object(
+				{ id: t.String(), digest: t.String(), createdAt: t.Date() },
+				{ additionalProperties: false }
+			),
+			{ maxItems: 2 }
+		)
+	),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -2545,6 +2695,7 @@ export interface UserBucketStoreInstance {
 				| 'hostLastSeenAt'
 				| 'signInOrder'
 				| 'connectedServices'
+				| 'proxyKeys'
 			>
 		>
 	): Promise<UserBucket | null>;

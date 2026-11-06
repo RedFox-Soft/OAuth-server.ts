@@ -190,6 +190,20 @@ groups:
         verdict: us
         why: "Both can check a bearer token at your proxy. authentik expects a token issued for its proxy provider and decides by the application's policies; FoxAuth checks the tokens issued for your API itself, and the scopes each tool needs."
         note: 'The header authentication page says "The token must be a JWT token issued for the proxy provider" and "Access control uses the policies bound to the application being accessed."'
+      - dimension: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
+        us:
+          {
+            status: yes,
+            text: 'A rule for a path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from listed address ranges, opening hours in a chosen time zone, an attribute such as the department, and for an app a sign-in no older than N minutes. Conditions add up down the paths. The proxy passes the address it saw and shows a key of the project, so a browser cannot choose its own address. Members of chosen groups can be required for an API too. Edited and checked in the console, on every plan.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Policies bound to the application decide access at the outpost. A GeoIP policy allows or denies by country or ASN and can detect impossible travel. A Reputation policy reacts to failed logins. Address ranges and other checks are Python in an Expression policy. The proxy provider documents no rule per path.'
+          }
+        verdict: different
+        why: 'authentik reads more about an address with no code: country, ASN, travel and reputation. FoxAuth needs no code for address ranges, hours, an attribute or a fresh sign-in, and sets them on the rule for each path or API.'
+        note: 'The GeoIP policy page says "Use a GeoIP policy when you want to make access decisions based on where a request appears to come from." The expression reference shows how to "check if an IP Address is within a subnet".'
       - dimension: Licence
         us:
           {

@@ -163,3 +163,24 @@ export const ALLOWED_USER_LIST_PARAMS: ReadonlySet<string> = new Set(
 export const LockEndUserBody = t.Object({
 	reason: t.String({ minLength: 1, maxLength: 500 })
 });
+
+/*
+ * How many people of the project an attribute condition would let through (specs/124 FR-014). `value` repeats, one
+ * per value of the condition; a person matches when the attribute equals any of them.
+ */
+export const AttributeMatchesQuery = t.Object(
+	{
+		/* Without either, nobody is named and the count is 0. */
+		attribute: t.Optional(t.String({ minLength: 1, maxLength: 70 })),
+		value: t.Optional(
+			t.Union([
+				t.String({ minLength: 1, maxLength: 200 }),
+				t.Array(t.String({ minLength: 1, maxLength: 200 }), {
+					minItems: 1,
+					maxItems: 50
+				})
+			])
+		)
+	},
+	{ additionalProperties: false }
+);

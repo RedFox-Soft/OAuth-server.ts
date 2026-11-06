@@ -3,11 +3,13 @@ import crypto from 'node:crypto';
 import QuickLRU from 'quick-lru';
 
 import { getUserStore } from '../adapters/index.js';
+import type { User } from '../adapters/types.js';
 import { groupIdsOfUser, groupNamesOf } from '../bucket_groups/service.js';
 import { ttl } from '../configs/liveTime.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import epochTime from '../helpers/epoch_time.js';
 import { storedLocaleRanges } from '../i18n/resolve.js';
+import { attributesOfRecord } from './conditions.js';
 import { appSessions, saveAppSession } from './records.js';
 
 /*
@@ -73,9 +75,17 @@ export interface AppScope {
 }
 
 /* A new session; answers the cookie value, which is stored nowhere but in the browser. */
+export interface SignedInHow {
+	/* Epoch seconds. */
+	authTime?: number;
+	acr?: string;
+	amr?: string[];
+}
+
 export async function createAppSession(
 	scope: AppScope,
-	accountId: string
+	accountId: string,
+	how: SignedInHow = {}
 ): Promise<string> {
 	const value = randomValue();
 	const now = epochTime();
@@ -87,7 +97,10 @@ export async function createAppSession(
 			appId: scope.appId,
 			bucketId: scope.bucketId,
 			createdAt: now,
-			exp: now + ttl.Session
+			exp: now + ttl.Session,
+			...(how.authTime === undefined ? {} : { authTime: how.authTime }),
+			...(how.acr === undefined ? {} : { acr: how.acr }),
+			...(how.amr === undefined ? {} : { amr: how.amr })
 		},
 		ttl.Session
 	);
@@ -97,6 +110,8 @@ export async function createAppSession(
 export interface AppSession {
 	id: string;
 	accountId: string;
+	/* Epoch seconds the person signed in; null for a session made before conditions. */
+	authTime: number | null;
 }
 
 /*
@@ -116,7 +131,11 @@ export async function readAppSession(
 	if (record.appId !== scope.appId || record.bucketId !== scope.bucketId) {
 		return null;
 	}
-	return { id, accountId: record.accountId };
+	return {
+		id,
+		accountId: record.accountId,
+		authTime: record.authTime ?? null
+	};
 }
 
 export async function endAppSession(id: string): Promise<void> {
@@ -133,6 +152,10 @@ export interface Standing {
 	groupNames: string[];
 	/* The person's stored language, for the denial page. */
 	localeRanges: string[];
+	/* What an attribute condition may name (specs/124 FR-014): string values only, keyed by attribute name. */
+	attributes: Record<string, string>;
+	/* When the person signed in (epoch seconds), from the sign-in this session came from; null for an older one. */
+	signedInAt: number | null;
 }
 
 /*
@@ -145,6 +168,17 @@ const STANDING_SECONDS = 60;
 const standings = new QuickLRU<string, { standing: Standing; at: number }>({
 	maxSize: 10_000
 });
+
+/*
+ * The values an attribute condition may name (specs/124 FR-014): what an administrator or a provisioning connection
+ * sets on the person — the enterprise profile, the title, and claims an administrator wrote — as strings only. A
+ * claim the person's outside provider copies in is excluded by the condition, not here.
+ */
+export function attributesOf(
+	user: Pick<User, 'profile' | 'claims'>
+): Record<string, string> {
+	return attributesOfRecord(user);
+}
 
 /* Null when the person no longer exists in the project. */
 export async function standingOf(
@@ -170,7 +204,9 @@ export async function standingOf(
 		email: user.email,
 		groupIds: [...groupIds].sort(),
 		groupNames,
-		localeRanges: storedLocaleRanges(user)
+		localeRanges: storedLocaleRanges(user),
+		attributes: attributesOf(user),
+		signedInAt: session.authTime
 	};
 	standings.set(session.id, { standing, at: now });
 	return standing;

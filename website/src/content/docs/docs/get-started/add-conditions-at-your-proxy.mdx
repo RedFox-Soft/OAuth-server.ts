@@ -1,0 +1,165 @@
+---
+title: Add conditions at your proxy
+description: 'Let people into an app or an API behind your proxy only from your network, only in working hours, only from a department, or only after a recent sign-in.'
+sidebar:
+  order: 9
+---
+
+import { Aside } from '@astrojs/starlight/components';
+import ProxyRecipe from '../../../../components/ProxyRecipe.astro';
+
+An app behind your proxy decides who may open each path. An API whose tokens your proxy checks decides which tools a
+token may call. Both pages are here: [Put sign-in in front of a web app](/docs/get-started/put-sign-in-in-front-of-a-web-app/)
+and [Protect an MCP server at your proxy](/docs/get-started/protect-an-mcp-server-at-your-proxy/). This page adds
+conditions on top of that.
+
+A condition says "and only if". It never lets anyone in who was not let in before. It can only narrow access.
+
+## What conditions there are {#kinds}
+
+| Condition                | What it checks                                                  | For        |
+| ------------------------ | --------------------------------------------------------------- | ---------- |
+| **From where**           | the address is in one of your ranges, or in none of them        | apps, APIs |
+| **When**                 | the moment is inside your hours, in a time zone you choose      | apps, APIs |
+| **Attribute**            | the person's department, title or another field is one of yours | apps, APIs |
+| **Groups**               | the person is in one of your groups                             | APIs       |
+| **Ask to sign in again** | the person signed in no more than N minutes ago                 | apps       |
+
+An app's groups are already in its rule for each path, so groups are a condition only for an API.
+
+Values inside one condition combine with "or": "from the office or from the VPN". Different conditions combine with
+"and": "from the office, and in working hours". A rule holds at most one condition of each kind.
+
+## How conditions apply to paths {#paths}
+
+The longest matching path still decides who may open it. Conditions add up down the paths: the conditions of `/`
+apply to every path, and a condition on `/admin` applies to `/admin` and everything under it, on top of those of `/`.
+A path can add a condition. It cannot drop one from a path above it. Public paths take no conditions.
+
+The project decides in a fixed order:
+
+1. **From where** and **When**, before anyone signs in. Someone in the wrong place or at the wrong hour is turned away
+   without being asked for a password.
+2. Whether the person has signed in, may sign in, and is in the rule's groups.
+3. **Attribute**.
+4. **Ask to sign in again**, last. Nobody is sent to sign in only to be refused afterwards.
+
+## From where: let your proxy pass the address {#from-where}
+
+The address of the person is something only your proxy knows. A browser can write any address in a header, so the
+project believes an address only when your proxy proves it wrote it.
+
+1. On the app's or the API's **Connect** page, open **Your proxy passes people's addresses** and choose **Issue a
+   proxy key**. Copy the key. It is shown once. A project has at most two keys, so you can replace one without a
+   moment when your proxy is refused.
+2. Add the lines from the configuration on that page to your proxy. They overwrite `X-Forwarded-For` with the address
+   the connection came from, and add the key. For Caddy, set `FOXAUTH_PROXY_KEY` in the environment Caddy runs in. For
+   nginx, put the key where the configuration says `<FOXAUTH_PROXY_KEY>`.
+3. Run the test the page gives. It sends a forged address through your proxy. The step must not turn red.
+
+A network condition cannot be saved until a check has arrived with the key and a public address. So one save cannot
+lock everyone out.
+
+### Caddy {#caddy}
+
+<ProxyRecipe
+	kind="caddy"
+	addresses
+/>
+
+### nginx {#nginx}
+
+<ProxyRecipe
+	kind="nginx"
+	addresses
+/>
+
+The key and the address are set in each of the three places that call the check.
+
+### Traefik {#traefik}
+
+<ProxyRecipe
+	kind="traefik"
+	addresses
+/>
+
+<Aside type="note">
+	Traefik cannot add a header to its check by itself, so the key travels in two
+	`headers` middlewares: one adds it before the check and one clears it after,
+	so your app never receives it.
+</Aside>
+
+### What the project believes {#believed}
+
+- Exactly one address, written plainly. Two addresses, a port, brackets or an unusual spelling make the address
+  unknown.
+- An unknown address fails every network condition, "only from" and "not from" alike.
+- A private address, such as one of a load balancer or a container network, is unknown for "not from". The Connect
+  page says when your proxy reports one.
+- A CDN in front of your proxy is not supported, except Cloudflare when your proxy accepts connections only from
+  Cloudflare's addresses.
+- The address is only compared with your ranges. It is not logged and not kept.
+
+A VPN or a residential proxy can still get around a list of ranges. A network condition slows an attacker down. It
+does not stop one.
+
+For an API, the address is the machine that calls it. Hosted assistants call from their own cloud, not from the
+person's network.
+
+## When: opening hours {#when}
+
+Choose the days and the hours, in steps of 15 minutes, and the time zone they are read in. The time zone is set once
+for the app or the API. Hours that end before they start run past midnight: "Fri 22:00 to 06:00" is Friday night into
+Saturday morning.
+
+Someone who arrives outside the hours sees when the app opens again, in its time zone.
+
+## Attribute {#attribute}
+
+Choose an attribute and its values. The attributes are those an administrator or a directory sets on a person:
+department, division, organization, cost center, employee number, title, or a claim an administrator sets. Claims a
+person's outside sign-in provider supplies, such as their name or picture, cannot be chosen: the person can change
+them.
+
+The console shows how many people in the project match. A condition nobody matches cannot be saved.
+
+## Ask to sign in again {#fresh}
+
+Choose 15 minutes, an hour, 8 hours, a day, or your own value from 5 minutes. When the person's sign-in is older, the
+browser is sent to sign in again, and the sign-in page says why. A request that is not a page gets `401`.
+
+- Pages that load data in the background, such as dashboards, stop working until the person reloads. Use this on
+  admin paths, not on the whole app.
+- If the project asks for an authenticator app at sign-in, signing in again asks for a code too.
+- A person who signs in through an outside provider is asked to sign in there again. How fresh that sign-in is, the
+  provider decides.
+
+## Groups and attributes for an API {#api}
+
+Choose **Access…** on the API's row. Its first section, **Who can call it**, holds the API's conditions. They apply
+before the tools table.
+
+A condition about the person needs a token that stands for a person. These do not, and are refused:
+
+- a token an application got for itself, with no person;
+- a token for an application that gives people a different identifier in each application (pairwise);
+- a self-contained token issued before this release, which does not say when the person signed in.
+
+When you save, the console names the applications whose tokens will be turned away. A person who is locked or
+deactivated is refused at once. A person removed from a group is refused within a minute.
+
+## Check before you save {#check}
+
+**Check access** on the app's Access tab takes an address in the app, a person, a network address, a moment and how
+long ago the person signed in. It lists every condition in the order the project decides them, each with ✓, ✗ or ?.
+An input you leave empty shows "?".
+
+A change that lets more people in asks first and lists what loosens, path by path. A change that only narrows saves at
+once. The FoxAuth console itself is never behind these conditions, so a rule cannot lock you out of it.
+
+## Upgrading and rolling back {#rollback}
+
+The first release with conditions marks the database so that an older release refuses to start against it. An older
+release could not enforce conditions, so it must not run. You cannot roll back below this release. During a rolling
+deploy, an older process still running answers an error for an app or an API with conditions until it is replaced. It
+never lets a request through.

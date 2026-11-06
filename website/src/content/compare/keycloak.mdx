@@ -296,6 +296,20 @@ groups:
         verdict: us
         why: 'With Keycloak the MCP server checks its tokens in its own code, or a separate proxy checks the signature and audience only. Here the authorization server answers your proxy, the scopes each tool needs included.'
         note: 'The Keycloak MCP guide says "An MCP server MUST validate that tokens presented to them were specifically issued for their use." OAuth2 Proxy''s --skip-jwt-bearer-tokens "will skip requests that have verified JWT bearer tokens".'
+      - dimension: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
+        us:
+          {
+            status: yes,
+            text: 'A rule for a path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from listed address ranges, opening hours in a chosen time zone, an attribute such as the department, and for an app a sign-in no older than N minutes. Conditions add up down the paths. The proxy passes the address it saw and shows a key of the project, so a browser cannot choose its own address. Members of chosen groups can be required for an API too. Edited and checked in the console, on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy. In Authorization Services a time-based policy sets hours and dates, and a JavaScript policy deployed to the server can read the client's IP address. A policy enforcer in your app applies them. In the sign-in flow a condition can check a user attribute, and an authentication level's Max Age can ask for a fresh sign-in."
+          }
+        verdict: us
+        why: 'Keycloak has most of these conditions, but in two separate places, and your app runs a policy enforcer for the time and address rules. Here they sit on one rule for a path or an API, and your proxy has them checked.'
+        note: 'The Authorization Services guide says "You can use this type of policy to define time conditions for your permissions." The administration guide says "The option Max Age in the condition determines how long (how much seconds) the subsequent authentication level is valid."'
   - label: Licence and cost
     rows:
       - dimension: Licence

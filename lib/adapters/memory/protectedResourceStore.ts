@@ -90,6 +90,23 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		this.resources.delete(declarationId(namespace, identifier));
 	}
 
+	async noteProxyAddress(
+		namespace: string,
+		identifier: string,
+		fields: Partial<
+			Pick<ProtectedResource, 'proxyAddressProvenAt' | 'proxyAddressForgedAt'>
+		>
+	): Promise<void> {
+		const resource = this.resources.get(declarationId(namespace, identifier));
+		if (!resource) return;
+		if (fields.proxyAddressProvenAt) {
+			resource.proxyAddressProvenAt = new Date(fields.proxyAddressProvenAt);
+		}
+		if (fields.proxyAddressForgedAt) {
+			resource.proxyAddressForgedAt = new Date(fields.proxyAddressForgedAt);
+		}
+	}
+
 	/*
 	 * Returns how many went, because the deleting handler reports it. A cascade that said
 	 * nothing would leave an operator unable to tell a bucket with no resources from one whose

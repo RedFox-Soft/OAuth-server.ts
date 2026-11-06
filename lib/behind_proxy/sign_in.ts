@@ -15,7 +15,7 @@ import { Grant } from '../models/grant.js';
 import { redirect, withReason, type AnswerReason } from './answers.js';
 import { behindProxyCallbackUri, behindProxyClientId } from './client.js';
 import { hasControlCharacter } from './decide.js';
-import { signInFailedPage } from './pages.js';
+import { notConfirmedPage, signInFailedPage } from './pages.js';
 import { pendingSignIns, savePendingSignIn } from './records.js';
 import {
 	cookieHeader,
@@ -27,7 +27,8 @@ import {
 	markerCookieName,
 	randomValue,
 	readAppSession,
-	sessionCookieName
+	sessionCookieName,
+	type SignedInHow
 } from './session.js';
 import { ttl } from '../configs/liveTime.js';
 import { noteSignedIn } from './usage.js';
@@ -49,6 +50,8 @@ export interface SignInContext {
 const SIGN_IN_SECONDS = 10 * 60;
 
 export const START_PATH = '/_foxauth/start';
+/* The clocks of the sign-in and of this check may differ a little; a minute of either way is not a sign-in older. */
+const FRESHNESS_SKEW_SECONDS = 60;
 export const SIGN_OUT_PATH = '/_foxauth/sign_out';
 const RESERVED_PREFIX = /^\/_foxauth(?:[/?#]|$)/i;
 const MAX_RETURN_LENGTH = 2048;
@@ -86,7 +89,7 @@ export async function startSignIn(
 	{ bucket, app }: SignInContext,
 	returnTo: string,
 	reason: AnswerReason,
-	options: { prompt?: 'login' } = {}
+	options: { prompt?: 'login'; maxAge?: number } = {}
 ): Promise<Response> {
 	const state = randomValue();
 	const marker = randomValue();
@@ -100,7 +103,8 @@ export async function startSignIn(
 			codeVerifier: verifier,
 			markerDigest: digestOf(marker),
 			used: false,
-			exp: epochTime() + SIGN_IN_SECONDS
+			exp: epochTime() + SIGN_IN_SECONDS,
+			...(options.maxAge === undefined ? {} : { maxAge: options.maxAge })
 		},
 		SIGN_IN_SECONDS
 	);
@@ -114,6 +118,9 @@ export async function startSignIn(
 		code_challenge_method: 'S256'
 	});
 	if (options.prompt) params.set('prompt', options.prompt);
+	if (options.maxAge !== undefined) {
+		params.set('max_age', String(options.maxAge));
+	}
 	return redirect(
 		`${issuerFor(bucket)}${routeNames.authorization}?${params.toString()}`,
 		reason,
@@ -171,12 +178,41 @@ export async function completeSignIn(
 	if (query.has('error') || !code) {
 		return failed(ctx, shownError(query.get('error')));
 	}
-	const accountId = await redeem(ctx, code, pending.codeVerifier);
-	if (!accountId) return failed(ctx, 'sign_in_failed');
+	const redeemed = await redeem(ctx, code, pending.codeVerifier);
+	if (!redeemed) return failed(ctx, 'sign_in_failed');
+	/*
+	 * A path that asked for a recent sign-in is satisfied by the sign-in time the code carries, never by what the
+	 * request says (specs/124 FR-021). One older than asked shows a page to try again rather than starting the same
+	 * sign-in in a loop.
+	 */
+	if (pending.maxAge !== undefined) {
+		const { authTime } = redeemed.how;
+		if (
+			authTime === undefined ||
+			epochTime() - authTime > pending.maxAge + FRESHNESS_SKEW_SECONDS
+		) {
+			return withReason(
+				notConfirmedPage({
+					host: new URL(app.address).host,
+					reason: 'sign_in_not_fresh',
+					startHref: `${START_PATH}?max_age=${String(pending.maxAge)}&rd=${encodeURIComponent(pending.returnTo)}`,
+					language: languageOfRequest(request).language
+				}),
+				'sign_in_not_fresh'
+			);
+		}
+	}
+	/* The session this sign-in replaces goes, so the older sign-in it carried opens nothing any more. */
+	const previous = await readAppSession(
+		{ appId: app._id, bucketId: bucket._id },
+		cookieOf(request, sessionCookieName(app._id))
+	);
+	if (previous) await endAppSession(previous.id);
 
 	const value = await createAppSession(
 		{ appId: app._id, bucketId: bucket._id },
-		accountId
+		redeemed.accountId,
+		redeemed.how
 	);
 	noteSignedIn(app);
 	return redirect(`${app.address}${pending.returnTo}`, 'signed_in', [
@@ -196,7 +232,7 @@ async function redeem(
 	{ bucket, app }: SignInContext,
 	value: string,
 	verifier: string
-): Promise<string | undefined> {
+): Promise<{ accountId: string; how: SignedInHow } | undefined> {
 	const clientId = behindProxyClientId(bucket._id);
 	const code = await AuthorizationCode.tryFind(value, {
 		ignoreExpiration: true
@@ -239,7 +275,17 @@ async function redeem(
 		method: 'GET',
 		clientId
 	});
-	return account.accountId;
+	/* When and how the person signed in travel on the code, and a fresh sign-in condition is judged on them. */
+	return {
+		accountId: account.accountId,
+		how: {
+			...(typeof payload.authTime === 'number'
+				? { authTime: payload.authTime }
+				: {}),
+			...(typeof payload.acr === 'string' ? { acr: payload.acr } : {}),
+			...(Array.isArray(payload.amr) ? { amr: [...payload.amr] } : {})
+		}
+	};
 }
 
 /*

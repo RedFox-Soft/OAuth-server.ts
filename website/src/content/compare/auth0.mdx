@@ -293,6 +293,20 @@ groups:
         verdict: us
         why: "With Auth0 the token check and the rule for each tool live in the MCP server's own code. Here the proxy asks the authorization server, and the rule for each tool is a table in the console."
         note: 'The Auth0 guide says "Your MCP server verifies this token" and defines the scopes `tool:whoami` and `tool:greet`.'
+      - dimension: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
+        us:
+          {
+            status: yes,
+            text: 'A rule for a path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from listed address ranges, opening hours in a chosen time zone, an attribute such as the department, and for an app a sign-in no older than N minutes. Conditions add up down the paths. The proxy passes the address it saw and shows a key of the project, so a browser cannot choose its own address. Members of chosen groups can be required for an API too. Edited and checked in the console, on every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy. Conditions are code in a post-login Action. The Action can read the request's address, its GeoIP country and time zone, and the user's app_metadata, and it can deny the sign-in. It runs when a person signs in, not at your proxy."
+          }
+        verdict: us
+        why: 'With Auth0 each condition is code you write in an Action, checked at sign-in. Here a condition is a field on the rule for a path or an API, and your proxy has it checked on every request.'
+        note: 'The post-login event object documents `event.request.ip` as "The originating IP address of the request." The API object says `api.access.deny(reason)` will "Mark the current login attempt as denied."'
   - label: Licence and cost
     rows:
       - dimension: Licence

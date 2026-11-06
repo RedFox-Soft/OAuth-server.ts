@@ -164,6 +164,34 @@ export const en = {
 			body: 'Open the app again to start over.',
 			tryAgain: 'Sign in again',
 			reason: 'Reason: {reason}, at {time}'
+		},
+		/* Conditions at the proxy (specs/124): refused by network or time, before any sign-in. */
+		network: {
+			title: "You can't open {host} from this network",
+			body: 'If your team uses a VPN, connect to it and reload this page.',
+			reason: 'Reason: {reason}, at {time}'
+		},
+		closed: {
+			title: '{host} is closed now',
+			opens: 'It opens again on {when} ({zone}), {inTime}.',
+			never: 'It has no opening hours at the moment.',
+			reason: 'Reason: {reason}, at {time}'
+		},
+		notConfirmed: {
+			title: "We couldn't confirm your sign-in to {host}",
+			body: 'This page asks for a recent sign-in, and the one that came back was older.',
+			tryAgain: 'Sign in again',
+			reason: 'Reason: {reason}, at {time}'
+		},
+		address: {
+			title: 'Your address, as {host} sees it',
+			seen: 'The check sees your address as {address}.',
+			unknown: 'The check does not know your address: {cause}.',
+			causeNoKey: 'the proxy did not show its proxy key',
+			causeWrongKey: 'the proxy showed a key this project does not have',
+			causeSeveral: 'the proxy sent no single address it wrote itself',
+			causeNotPublic:
+				'the proxy reported {address}, an address of a private network, so it probably sits behind a load balancer'
 		}
 	}
 } as const;

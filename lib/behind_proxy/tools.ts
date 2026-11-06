@@ -1,11 +1,14 @@
 /*
- * What an API's tools table decides about one request (specs/123 research R6, R13). Pure and import-free: the check
+ * What an API's tools table decides about one request (specs/123 research R6, R13). Pure, importing only the pure modules beside it: the check
  * and the console's Tools drawer read the same function, so what the drawer says a table does is what it does.
  *
  * The decision rests on the MCP 2026-07-28 request headers, which mirror the JSON-RPC body: `Mcp-Method` names the
  * method and `Mcp-Name` the tool. The proxy never sees the body, so a header is only as true as the server's own
  * check that it matches the body, which that revision makes a MUST and earlier ones never asked for.
  */
+
+import { loosenedConditions } from './condition_widening.js';
+import type { Condition, ConditionKind } from './conditions.js';
 
 export type Choice = 'refuse' | 'token';
 
@@ -18,7 +21,20 @@ export interface ToolsTableView {
 	readonly rows: readonly ToolRow[];
 	readonly otherTools: Choice;
 	readonly withoutMethod: Choice;
+	/* Who may call the API at all (specs/124). */
+	readonly access?: {
+		readonly conditions: readonly Condition[];
+		readonly timeZone?: string;
+	};
 }
+
+const KIND_WORDS: Record<ConditionKind, string> = {
+	group: 'the groups that may call it',
+	attribute: 'the attribute a caller must have',
+	network: 'the networks it may be called from',
+	time: 'the hours it may be called in',
+	fresh: 'how recently a caller signed in'
+};
 
 export type ToolRefusal =
 	'bad_mcp_header' | 'old_client' | 'tool_unnamed' | 'tool_not_listed';
@@ -130,6 +146,21 @@ export function decideTool(request: ToolRequest): ToolDecision {
  * confirmation. A narrowing says nothing: it needs no confirmation, only a save.
  */
 export function toolWidenings(
+	before: ToolsTableView | undefined,
+	after: ToolsTableView | undefined
+): string[] {
+	const access = loosenedConditions(
+		before?.access?.conditions ?? [],
+		after?.access?.conditions ?? [],
+		(before?.access?.timeZone ?? null) === (after?.access?.timeZone ?? null)
+	).map(
+		({ kind }) =>
+			`Callers are no longer limited as strictly by ${KIND_WORDS[kind]}.`
+	);
+	return [...access, ...rowWidenings(before, after)];
+}
+
+function rowWidenings(
 	before: ToolsTableView | undefined,
 	after: ToolsTableView | undefined
 ): string[] {

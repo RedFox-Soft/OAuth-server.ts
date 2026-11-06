@@ -135,7 +135,10 @@ export const handler = async function deviceCodeHandler(
 		grantId: code.payload.grantId,
 		gty,
 		sessionUid: code.payload.sessionUid,
-		sid: code.payload.sid
+		sid: code.payload.sid,
+		authTime: code.payload.authTime,
+		acr: code.payload.acr,
+		amr: code.payload.amr
 	});
 
 	if (oidc.client.tlsClientCertificateBoundAccessTokens && cert) {

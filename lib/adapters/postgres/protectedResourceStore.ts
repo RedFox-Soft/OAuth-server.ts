@@ -118,6 +118,28 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		return this.resourceOf(rows[0]);
 	}
 
+	async noteProxyAddress(
+		namespace: string,
+		identifier: string,
+		fields: Partial<
+			Pick<ProtectedResource, 'proxyAddressProvenAt' | 'proxyAddressForgedAt'>
+		>
+	): Promise<void> {
+		const set: Record<string, Date> = {};
+		if (fields.proxyAddressProvenAt) {
+			set.proxyAddressProvenAt = fields.proxyAddressProvenAt;
+		}
+		if (fields.proxyAddressForgedAt) {
+			set.proxyAddressForgedAt = fields.proxyAddressForgedAt;
+		}
+		if (Object.keys(set).length === 0) return;
+		const handle = sql();
+		await handle`
+			UPDATE ${handle(this.area)} SET doc = doc || ${set}
+			WHERE id = ${declarationId(namespace, identifier)}
+		`;
+	}
+
 	async destroy(namespace: string, identifier: string): Promise<void> {
 		const handle = sql();
 		await handle`

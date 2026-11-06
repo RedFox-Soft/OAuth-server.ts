@@ -77,6 +77,7 @@ import {
 import {
 	API_IDENTITY_HEADERS,
 	IDENTITY_HEADERS,
+	ADDRESSES_SUPPORTED,
 	PROXY_KINDS,
 	recipeFor,
 	type ProxyKind,
@@ -203,6 +204,15 @@ export interface DocsExport {
 			readonly example: RecipeValues;
 			readonly identityHeaders: readonly string[];
 			readonly recipes: readonly { kind: ProxyKind; text: string }[];
+		};
+		/*
+		 * The recipes for network conditions (specs/124): the same, with the address the proxy saw and the project's
+		 * proxy key, for an app and for an API; and which proxies are proven to carry them.
+		 */
+		readonly addresses: {
+			readonly app: readonly { kind: ProxyKind; text: string }[];
+			readonly api: readonly { kind: ProxyKind; text: string }[];
+			readonly supported: readonly ProxyKind[];
 		};
 	};
 	/* What the hourly attack report carries (specs/114), from the declaration the server counts and builds by. */
@@ -415,6 +425,23 @@ export function buildDocsExport(stamp: DocsExportStamp): DocsExport {
 						'<checkId>'
 					)
 				}))
+			},
+			addresses: {
+				app: PROXY_KINDS.map((kind) => ({
+					kind,
+					text: recipeFor(kind, {
+						...RECIPE_EXAMPLE,
+						addresses: true
+					}).replaceAll('%3CappId%3E', '<appId>')
+				})),
+				api: PROXY_KINDS.map((kind) => ({
+					kind,
+					text: recipeFor(kind, {
+						...API_RECIPE_EXAMPLE,
+						addresses: true
+					}).replaceAll('%3CcheckId%3E', '<checkId>')
+				})),
+				supported: PROXY_KINDS.filter((kind) => ADDRESSES_SUPPORTED[kind])
 			}
 		},
 		attackReports: {

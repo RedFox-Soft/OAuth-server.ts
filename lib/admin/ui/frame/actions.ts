@@ -63,6 +63,17 @@ export const ACTIONS = {
 		cancelText: 'Keep editing'
 	},
 
+	/*
+	 * A project's proxy key (specs/124): issuing one shows it once and changes nothing a proxy relies on; withdrawing
+	 * one turns away every request under a network condition from a proxy still sending it.
+	 */
+	'bucket.proxyKey.issue': { class: 'C0' },
+	'bucket.proxyKey.withdraw': {
+		class: 'C2',
+		title: (t) => `Withdraw the proxy key issued ${t}?`,
+		okText: 'Withdraw key'
+	},
+
 	'bucket.create': { class: 'C0' },
 	'bucket.edit': { class: 'C0' },
 	'bucket.move': { class: 'C4' },

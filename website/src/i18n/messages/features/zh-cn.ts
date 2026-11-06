@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '504999d92190';
+export const source = 'ddfb17a9acb5';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -205,6 +205,10 @@ export default {
 				proxyApi: {
 					title: '在你的代理处检查令牌和每个工具的权限',
 					body: '把 MCP 服务器或其他 API 放在 Caddy、Traefik 或 nginx 后面。对于每个请求，代理都会请项目检查 bearer 令牌：签名、签发者、受众和有效期。对于 MCP 服务器，控制台中的一张表指定每个工具需要哪些权限（scope），缺少权限的客户端会被准确告知需要申请哪些权限。受保护资源元数据由项目自己发布，所以代理后面的服务器不需要任何授权代码。也不需要开启任何开关。'
+				},
+				proxyConditions: {
+					title: '在你的代理处设置条件：网络、时间、属性、近期登录',
+					body: '代理后应用的某个路径，或由代理检查令牌的 API，可以添加条件：只允许或不允许来自你的地址范围、按你选择的时区设置开放时间、部门等属性、API 的用户组，以及应用的“登录不超过 N 分钟”。条件只会收紧访问，并沿路径向下累加。代理会连同项目的密钥一起传递它看到的地址，因此浏览器无法自选地址。控制台在保存前可以检查示例，并在任何放宽访问的更改之前请求确认。'
 				},
 				clientIdMetadataDocument: {
 					title: '客户端身份文档',

@@ -218,6 +218,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'hostLastSeenAt'
 				| 'signInOrder'
 				| 'connectedServices'
+				| 'proxyKeys'
 			>
 		>
 	): Promise<UserBucket | null> {

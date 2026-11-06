@@ -1,7 +1,7 @@
 ---
 title: 在 Web 应用前加上登录
 description: 用你的 Caddy、Traefik 或 nginx 代理和一个 FoxAuth 项目，保护没有自带登录的 Web 应用，例如 Grafana，无需改动应用。
-source: 86b4894f141e
+source: 62a1b23c8c46
 sidebar:
   order: 7
 ---
@@ -112,6 +112,8 @@ Connect 会显示四个步骤，并标出每一步第一次发生的时间：
 - 任何人都不行。
 
 由匹配的最长路径决定，所以规则的顺序无关紧要。`/admin` 的规则同样适用于 `/admin/users` 和 `/Admin/users`。如果一次保存会让更多人能打开任何路径，控制台会列出这些放宽之处并请你确认。同一标签页上的访问检查会告诉你，某个人现在以及保存之后能否打开指定地址。
+
+路径还可以要求更多：只允许来自你的网络、只在你设定的时间内、只允许某个部门，或要求近期登录。请参阅[在代理处添加条件](/zh-cn/docs/get-started/add-conditions-at-your-proxy/)。
 
 <Aside type="tip">
 	在代理后面运行 FoxAuth 本身是另一项任务，见 [Behind a reverse

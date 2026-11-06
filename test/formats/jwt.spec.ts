@@ -784,6 +784,10 @@ describe('jwt format', () => {
 			jti,
 			scope,
 			sub: accountId,
+			/* RFC 9068 §2.2.1: when and how the person signed in (specs/124 FR-019). */
+			auth_time: authTime,
+			acr,
+			amr,
 			cnf: {
 				'x5t#S256': s256,
 				jkt: s256
@@ -814,6 +818,9 @@ describe('jwt format', () => {
 			jti,
 			scope,
 			sub: 'pairwise-sub',
+			auth_time: authTime,
+			acr,
+			amr,
 			cnf: {
 				'x5t#S256': s256,
 				jkt: s256

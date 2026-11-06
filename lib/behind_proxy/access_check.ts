@@ -1,10 +1,12 @@
 import { canSignIn } from '../end_users/can_sign_in.js';
+import { attributesOfRecord, type Condition } from './conditions.js';
 import {
 	decide,
+	withConditions,
 	type Decision,
 	type PathRule,
 	type Person,
-	type Who
+	type PlainWho
 } from './decide.js';
 
 /*
@@ -27,6 +29,8 @@ export type WhoView =
 export interface RuleView {
 	path: string;
 	who: WhoView;
+	/* The rule's own conditions (specs/124); the ones of the paths above it apply too. */
+	conditions?: Condition[];
 }
 
 /* A person as the admin routes answer them (`GET …/users/:uid`): their standing and their groups. */
@@ -34,16 +38,24 @@ export interface PersonView {
 	active: boolean;
 	lockedLocally?: unknown;
 	groups?: readonly { id: string }[];
+	profile?: {
+		title?: unknown;
+		enterprise?: Readonly<Record<string, unknown>>;
+	};
+	claims?: Readonly<Record<string, unknown>>;
 }
 
-export function whoOfView(who: WhoView): Who {
+export function whoOfView(who: WhoView): PlainWho {
 	return who.kind === 'groups'
 		? { kind: 'groups', groupIds: who.groups.map((group) => group.id) }
 		: who;
 }
 
 export function rulesOfView(rules: readonly RuleView[]): PathRule[] {
-	return rules.map((rule) => ({ path: rule.path, who: whoOfView(rule.who) }));
+	return rules.map((rule) => ({
+		path: rule.path,
+		who: withConditions(whoOfView(rule.who), rule.conditions ?? [])
+	}));
 }
 
 /* Null for "not signed in". */
@@ -51,7 +63,8 @@ export function personOfView(view: PersonView | null): Person | null {
 	if (!view) return null;
 	return {
 		canSignIn: canSignIn(view),
-		groupIds: (view.groups ?? []).map((group) => group.id).sort()
+		groupIds: (view.groups ?? []).map((group) => group.id).sort(),
+		attributes: attributesOfRecord(view)
 	};
 }
 
@@ -86,13 +99,33 @@ export interface AccessCheckInput {
 	/* A full address from the browser, or a path. */
 	address: string;
 	person: Person | null;
+	/* What conditions are judged on (specs/124); a null input is one the administrator did not give. */
+	from?: string | null;
+	at?: number | null;
+	timeZone?: string | null;
 }
 
+/*
+ * Every condition is judged, and an input not given is "unknown" rather than a failure: the answer is then "allowed
+ * if these hold", with the rest of the decision exactly as the proxy's check makes it.
+ */
 export function checkAccess({
 	rules,
 	method,
 	address,
-	person
+	person,
+	from = null,
+	at = null,
+	timeZone = null
 }: AccessCheckInput): Decision {
-	return decide({ rules, method, rawPath: targetOf(address).rawPath, person });
+	return decide({
+		rules,
+		method,
+		rawPath: targetOf(address).rawPath,
+		person,
+		address: from,
+		at,
+		timeZone,
+		explain: true
+	});
 }

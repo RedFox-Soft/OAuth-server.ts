@@ -140,7 +140,10 @@ export const handler = async function cibaHandler(
 		grantId: request.payload.grantId,
 		gty,
 		sessionUid: request.payload.sessionUid,
-		sid: request.payload.sid
+		sid: request.payload.sid,
+		authTime: request.payload.authTime,
+		acr: request.payload.acr,
+		amr: request.payload.amr
 	});
 
 	if (oidc.client.tlsClientCertificateBoundAccessTokens && cert) {

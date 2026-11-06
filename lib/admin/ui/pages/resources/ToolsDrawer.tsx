@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
 	Alert,
 	Button,
@@ -20,6 +20,17 @@ import {
 	type Choice,
 	type ToolsTableView
 } from '../../../../behind_proxy/tools.js';
+import {
+	API_ORDER,
+	type Condition
+} from '../../../../behind_proxy/conditions.js';
+import { ConditionsEditor } from '../behind-proxy/ConditionsEditor.js';
+import {
+	addressesProven,
+	type AddressesView
+} from '../behind-proxy/appView.js';
+import { KIND_LABELS } from '../behind-proxy/conditionsText.js';
+import { groupsApi, type GroupView } from '../groups/groupShared.js';
 
 interface ToolsForm {
 	rows: { name: string; scopes: string[] }[];
@@ -44,14 +55,17 @@ function formOf(tools: ToolsTableView | undefined): ToolsForm {
  * prompts, and for a body the proxy never sees.
  */
 export function ToolsDrawer({
+	bucketId,
 	url,
 	name,
 	scopes,
 	tools,
 	checkedBy,
+	addresses,
 	onClose,
 	onSaved
 }: {
+	bucketId: string;
 	/* The API's own admin address, `…/resources/:resourceId`. */
 	url: string;
 	name: string;
@@ -59,6 +73,8 @@ export function ToolsDrawer({
 	scopes: readonly string[];
 	tools: ToolsTableView | undefined;
 	checkedBy: 'server' | 'proxy';
+	/* What the proxy's checks showed about the addresses it passes; a network condition waits for its proof. */
+	addresses: AddressesView | undefined;
 	onClose: () => void;
 	onSaved: () => void;
 }) {
@@ -70,6 +86,24 @@ export function ToolsDrawer({
 	const rows = Form.useWatch('rows', form) as ToolsForm['rows'] | undefined;
 	const empty = (rows ?? tools?.rows ?? []).length === 0;
 	const scopeOptions = scopes.map((scope) => ({ value: scope, label: scope }));
+	/* Who may call the API at all (specs/124 FR-025): only where the proxy checks its tokens. */
+	const byProxy = checkedBy === 'proxy';
+	const [conditions, setConditions] = useState<Condition[]>(() =>
+		(tools?.access?.conditions ?? []).map((c) => ({ ...c }))
+	);
+	const [zone, setZone] = useState<string | null>(
+		tools?.access?.timeZone ?? null
+	);
+	const [groups, setGroups] = useState<GroupView[]>([]);
+	const [warnings, setWarnings] = useState<string[]>([]);
+	useEffect(() => {
+		if (!byProxy) return;
+		void request<{ groups: GroupView[] }>('GET', groupsApi(bucketId)).then(
+			(result) => {
+				if (result.ok) setGroups(result.data.groups);
+			}
+		);
+	}, [bucketId, byProxy]);
 
 	async function save(values: ToolsForm) {
 		const after: ToolsTableView = {
@@ -78,7 +112,15 @@ export function ToolsDrawer({
 				scopes: row.scopes
 			})),
 			otherTools: values.otherTools,
-			withoutMethod: values.withoutMethod
+			withoutMethod: values.withoutMethod,
+			...(byProxy && conditions.length > 0
+				? {
+						access: {
+							conditions,
+							...(zone ? { timeZone: zone } : {})
+						}
+					}
+				: {})
 		};
 		const widenings = toolWidenings(tools, after);
 		if (widenings.length > 0) {
@@ -90,13 +132,44 @@ export function ToolsDrawer({
 		}
 		setSaving(true);
 		try {
-			const result = await request('PATCH', url, { tools: after });
+			/* The edge names a group condition's groups `groups`, as an app's rule does. */
+			const body = after.access
+				? {
+						...after,
+						access: {
+							...after.access,
+							conditions: after.access.conditions.map((c) =>
+								c.kind === 'group' ? { kind: 'group', groups: c.groupIds } : c
+							)
+						}
+					}
+				: after;
+			const result = await request<{
+				warnings?: { machineClients: string[]; pairwiseClients: string[] };
+			}>('PATCH', url, { tools: body });
 			if (!result.ok) {
 				if (result.status >= 500) feedback.failed(result);
 				else setRefusal(result.error.message);
 				return;
 			}
-			feedback.done(`Tools for ${name} saved.`);
+			const found = result.data.warnings;
+			const lines = [
+				...(found?.machineClients.length
+					? [
+							`Tokens issued to an application alone carry no person, so these are now turned away: ${found.machineClients.join(', ')}.`
+						]
+					: []),
+				...(found?.pairwiseClients.length
+					? [
+							`These applications give people per-application identifiers, which the check cannot trace to a person, so their tokens are turned away: ${found.pairwiseClients.join(', ')}.`
+						]
+					: [])
+			];
+			feedback.done(`Access to ${name} saved.`);
+			if (lines.length > 0) {
+				setWarnings(lines);
+				return;
+			}
 			onSaved();
 		} finally {
 			setSaving(false);
@@ -107,7 +180,7 @@ export function ToolsDrawer({
 		<Drawer
 			open
 			size="large"
-			title={`Tools: ${name}`}
+			title={byProxy ? `Access at your proxy: ${name}` : `Tools: ${name}`}
 			onClose={onClose}
 			extra={
 				<Button
@@ -130,6 +203,56 @@ export function ToolsDrawer({
 						title="Your server checks this API's tokens"
 						description="Only your proxy applies this table. It takes effect once the API is set to be checked by your proxy."
 					/>
+				)}
+				{warnings.length > 0 && (
+					<Alert
+						type="warning"
+						showIcon
+						title="Saved. Some callers are now turned away"
+						description={warnings.join(' ')}
+						action={
+							<Button
+								size="small"
+								onClick={onSaved}
+							>
+								Close
+							</Button>
+						}
+					/>
+				)}
+				{byProxy && (
+					<>
+						<Typography.Title level={5}>Who can call it</Typography.Title>
+						<ConditionsEditor
+							conditions={conditions}
+							kinds={API_ORDER}
+							timeZone={zone}
+							onTimeZone={setZone}
+							groups={groups.map((g) => ({
+								id: g.id,
+								displayName: g.displayName
+							}))}
+							countUrl={`/admin/api/projects/${encodeURIComponent(bucketId)}/attribute-matches`}
+							disabled={false}
+							unavailable={
+								addressesProven(addresses)
+									? {}
+									: {
+											network: `${KIND_LABELS.network} is available once your proxy shows it passes people's addresses: finish "Your proxy passes people's addresses" in this API's Connect first.`
+										}
+							}
+							onChange={(next) => {
+								setRefusal(null);
+								setConditions(next);
+							}}
+						/>
+						<Typography.Text type="secondary">
+							With no condition, anyone who can sign in to this project can get
+							a token for this API. A network condition is about the machine
+							that calls the API: hosted assistants call from their own cloud,
+							not from the person&apos;s network.
+						</Typography.Text>
+					</>
 				)}
 				{refusal && (
 					<Alert

@@ -1,5 +1,7 @@
 import { t } from 'elysia';
 
+import { ApiConditionBody, TimeZoneBody } from '../behind-proxy/schema.js';
+
 /*
  * Bodies for the protected-resource routes.
  *
@@ -52,7 +54,17 @@ const ToolsTableBody = t.Object(
 			{ maxItems: 200 }
 		),
 		otherTools: t.Union([t.Literal('refuse'), t.Literal('token')]),
-		withoutMethod: t.Union([t.Literal('refuse'), t.Literal('token')])
+		withoutMethod: t.Union([t.Literal('refuse'), t.Literal('token')]),
+		/* Who may call the API at all (specs/124), decided before the table. */
+		access: t.Optional(
+			t.Object(
+				{
+					conditions: t.Array(ApiConditionBody, { minItems: 1, maxItems: 4 }),
+					timeZone: t.Optional(TimeZoneBody)
+				},
+				{ additionalProperties: false }
+			)
+		)
 	},
 	{ additionalProperties: false }
 );

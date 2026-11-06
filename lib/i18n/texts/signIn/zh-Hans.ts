@@ -66,7 +66,8 @@ export const zhHans: SignInTexts = {
 		verifyUnsent: '我们无法发送验证邮件。请稍后重试。',
 		federationLink:
 			'此电子邮件地址在此处已有账户。请使用该账户的密码登录一次，以将其关联到您的身份提供商。',
-		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。'
+		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。',
+		freshSignIn: '{host} 要求您重新登录以打开此页面。'
 	},
 
 	errors: {

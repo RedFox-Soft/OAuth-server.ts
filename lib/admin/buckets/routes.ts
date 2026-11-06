@@ -625,10 +625,13 @@ function countOf(n: number, noun: string): string {
  * every published read rather than the ones somebody thought to check.
  */
 function presentBucket<
-	T extends Pick<UserBucket, '_id' | 'federation' | 'deletion' | 'ownerGroupId'>
+	T extends Pick<
+		UserBucket,
+		'_id' | 'federation' | 'deletion' | 'ownerGroupId' | 'proxyKeys'
+	>
 >(
 	bucket: T
-): Omit<T, 'ownerGroupId'> & {
+): Omit<T, 'ownerGroupId' | 'proxyKeys'> & {
 	ownerTeamId: string;
 	reserved?: 'administrators';
 } {
@@ -641,7 +644,12 @@ function presentBucket<
 			? { ...bucket, reserved: 'administrators' as const }
 			: bucket;
 	/* The edge calls the owning group a team (specs/100); storage keeps `ownerGroupId`. */
-	const { ownerGroupId, ...shown } = withoutPurgeClaim(marked);
+	/* The proxy keys' digests are only ever compared by the check; no view of the project carries them (specs/124). */
+	const {
+		ownerGroupId,
+		proxyKeys: _proxyKeys,
+		...shown
+	} = withoutPurgeClaim(marked);
 	const project = { ...shown, ownerTeamId: ownerGroupId };
 	if (!project.federation.length) return project;
 	return { ...project, federation: presentAll(bucket) };

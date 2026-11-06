@@ -19,6 +19,7 @@ import { connectedServiceAdminRoutes } from './connected-services/routes.js';
 import { endUserRoutes } from './users-end/routes.js';
 import { outsideServerRoutes } from './outside-servers/routes.js';
 import { behindProxyRoutes } from './behind-proxy/routes.js';
+import { proxyKeyRoutes } from './buckets/proxy_keys.js';
 import { administratorApplicationRoutes } from './administrator-applications/routes.js';
 import { provisioningRoutes } from './provisioning/routes.js';
 import { provisioningHoldRoutes } from './provisioning/holds.js';
@@ -151,3 +152,5 @@ adminApiRoutes.use(keyringRoutes);
 adminApiRoutes.use(connectedServiceAdminRoutes);
 // Apps behind a proxy (specs/122), for the same reason.
 adminApiRoutes.use(behindProxyRoutes);
+// A project's proxy keys (specs/124), for the same reason.
+adminApiRoutes.use(proxyKeyRoutes);

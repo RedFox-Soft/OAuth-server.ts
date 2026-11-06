@@ -4,6 +4,7 @@ import { getBehindProxyAppStore } from '../adapters/index.js';
 import type { BehindProxyApp, BehindProxyAppUsage } from '../adapters/types.js';
 import { BEHIND_PROXY_CHECK_ROUTE } from '../consts/behind_proxy.js';
 import { captureFault } from '../error_store/capture.js';
+import { forged, proves, type AddressFlags } from './believed_address.js';
 import { hasControlCharacter } from './decide.js';
 
 /*
@@ -144,6 +145,59 @@ export function mismatchedHostsOf(appId: string): string[] {
 		.filter(([, at]) => at >= since)
 		.reverse()
 		.map(([host]) => host);
+}
+
+/*
+ * What the last check showed about the addresses the proxy passes (specs/124 research R6), for the Connect page's
+ * step 5: the flags only, never the address, kept a quarter of an hour in this server's memory. Whether the proxy has
+ * proved it overwrites the address — and whether the console's probe got through — is written to the record, at most
+ * once a minute per server, because saving a network condition is refused without it on every server.
+ */
+const lastFlags = new QuickLRU<string, { flags: AddressFlags; at: number }>({
+	maxSize: 20_000
+});
+const addressWrites = new QuickLRU<string, number>({ maxSize: 50_000 });
+
+export interface AddressTarget {
+	/* `app:<id>` or `api:<checkId>`, the key of the flags and the throttle. */
+	key: string;
+	/* Writes what the check proved or saw forged; never awaited. */
+	write: (fields: { provenAt?: Date; forgedAt?: Date }) => Promise<void>;
+}
+
+export function noteAddress(target: AddressTarget, flags: AddressFlags): void {
+	const now = Date.now();
+	lastFlags.set(target.key, { flags, at: now });
+	const kind = proves(flags) ? 'proven' : forged(flags) ? 'forged' : null;
+	if (!kind) return;
+	const throttle = `${kind}:${target.key}`;
+	const last = addressWrites.get(throttle);
+	if (last !== undefined && now - last < ASKED_RESOLUTION_MS) return;
+	addressWrites.set(throttle, now);
+	const at = new Date(now);
+	const written = target
+		.write(kind === 'proven' ? { provenAt: at } : { forgedAt: at })
+		.catch((error: unknown) => {
+			addressWrites.delete(throttle);
+			captureFault({
+				surface: 'oauth',
+				route: BEHIND_PROXY_CHECK_ROUTE,
+				method: 'GET',
+				// The check was answered; this is the class of the fault, not the answer's status.
+				status: 500,
+				errorCode: 'behind_proxy_use_not_recorded',
+				error,
+				headers: new Headers()
+			});
+		});
+	pending.add(written);
+	void written.finally(() => pending.delete(written));
+}
+
+export function lastAddressFlagsOf(key: string): AddressFlags | null {
+	const seen = lastFlags.get(key);
+	if (!seen || Date.now() - seen.at > MISMATCH_MS) return null;
+	return seen.flags;
 }
 
 /* Test-only: resolves once every write started so far has settled, so a case reads what it caused. */

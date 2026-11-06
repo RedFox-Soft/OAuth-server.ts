@@ -14,6 +14,18 @@ export type ProxyKind = 'caddy' | 'traefik' | 'nginx';
 
 export const PROXY_KINDS: readonly ProxyKind[] = ['caddy', 'traefik', 'nginx'];
 
+/*
+ * Whether a proxy's recipe is proven to overwrite `X-Forwarded-For` and to keep the proxy key from the app behind it,
+ * so network conditions can be offered on it (specs/124 FR-009). Each was proven against a real Caddy 2, nginx 1.27
+ * and Traefik v3 on 2026-11-06 (quickstart §5): a forged address never reached the check and the key never reached
+ * the app. A proxy added later starts at false until it is proven the same way.
+ */
+export const ADDRESSES_SUPPORTED: Readonly<Record<ProxyKind, boolean>> = {
+	caddy: true,
+	nginx: true,
+	traefik: true
+};
+
 /* What the check answers on success and the app receives. */
 export const IDENTITY_HEADERS = [
 	'X-Auth-User',
@@ -41,6 +53,75 @@ export interface RecipeValues {
 	appAddress: string;
 	/* An app people sign in to (specs/122), or an API whose tokens the proxy checks (specs/123). */
 	target?: 'app' | 'api';
+	/*
+	 * The recipe for network conditions (specs/124 research R7): the proxy overwrites `X-Forwarded-For` with the
+	 * address its connection came from and shows the project's proxy key, in every place it calls the check. The key
+	 * is a placeholder; its value is shown once, apart from the recipe.
+	 */
+	addresses?: boolean;
+}
+
+/* What the recipe writes where the key goes; Caddy reads it from the environment instead. */
+export const PROXY_KEY_PLACEHOLDER = '<FOXAUTH_PROXY_KEY>';
+
+function caddyAddressLines(values: RecipeValues): string {
+	return values.addresses
+		? `
+			header_up X-Forwarded-For {remote_host}
+			header_up X-FoxAuth-Proxy-Key {$FOXAUTH_PROXY_KEY}`
+		: '';
+}
+
+/* The app never sees a header that looks like the key, even one a client invented. */
+function caddyKeyStrip(values: RecipeValues): string {
+	return values.addresses
+		? `
+		request_header -X-FoxAuth-Proxy-Key`
+		: '';
+}
+
+function nginxKeyStrip(values: RecipeValues): string {
+	return values.addresses
+		? `
+		proxy_set_header X-FoxAuth-Proxy-Key "";`
+		: '';
+}
+
+function nginxAddressLines(values: RecipeValues): string {
+	return values.addresses
+		? `
+		proxy_set_header X-Forwarded-For $remote_addr;
+		proxy_set_header X-FoxAuth-Proxy-Key "${PROXY_KEY_PLACEHOLDER}";`
+		: '';
+}
+
+/*
+ * Traefik's forwardAuth cannot add a header of its own, so the key rides a `headers` middleware placed before it and
+ * is cleared by a second one after it, before the request reaches the app. With `trustForwardHeader: false` Traefik
+ * itself writes `X-Forwarded-For` from the connection.
+ */
+function traefikKeyMiddlewares(values: RecipeValues): string {
+	return values.addresses
+		? `
+    foxauth-key:
+      headers:
+        customRequestHeaders:
+          X-FoxAuth-Proxy-Key: "${PROXY_KEY_PLACEHOLDER}"
+    foxauth-key-drop:
+      headers:
+        customRequestHeaders:
+          X-FoxAuth-Proxy-Key: ""`
+		: '';
+}
+
+function traefikChain(values: RecipeValues): string {
+	return values.addresses
+		? `
+        - foxauth-key
+        - foxauth
+        - foxauth-key-drop`
+		: `
+        - foxauth`;
 }
 
 /* Where the app itself listens; the operator replaces it. */
@@ -88,10 +169,10 @@ function caddy(values: RecipeValues): string {
 	const { verifyOrigin, verifyPath, appHostPort } = parts(values);
 	return `${appHostPort} {
 	route {
-		request_header -X-Auth-*
+		request_header -X-Auth-*${caddyKeyStrip(values)}
 		forward_auth ${verifyOrigin} {
 			uri ${verifyPath}
-			header_up Host {upstream_hostport}
+			header_up Host {upstream_hostport}${caddyAddressLines(values)}
 			copy_headers ${IDENTITY_HEADERS.join(' ')}
 		}
 		reverse_proxy ${UPSTREAM.replace('http://', '')}
@@ -113,14 +194,13 @@ function traefik(values: RecipeValues): string {
         address: "${values.verifyUrl}"
         trustForwardHeader: false
         authResponseHeadersRegex: "^X-Auth-"
-        preserveLocationHeader: true
+        preserveLocationHeader: true${traefikKeyMiddlewares(values)}
   routers:
     app:
       rule: "Host(\`${appHost}\`)"
       entryPoints:
         - websecure
-      middlewares:
-        - foxauth
+      middlewares:${traefikChain(values)}
       service: app
       tls: {}
   services:
@@ -149,7 +229,7 @@ function nginx(values: RecipeValues): string {
 		proxy_set_header Host ${verifyHost};
 		proxy_ssl_server_name on;
 		proxy_pass_request_body off;
-		proxy_set_header Content-Length "";`;
+		proxy_set_header Content-Length "";${nginxAddressLines(values)}`;
 	const relay = `rewrite ^ ${verifyPath}? break;
 		proxy_pass ${verifyOrigin};
 		proxy_redirect off;
@@ -172,7 +252,7 @@ function nginx(values: RecipeValues): string {
 		error_page 401 403 = @foxauth;
 
 		${passed}
-		proxy_set_header Host $host;
+		proxy_set_header Host $host;${nginxKeyStrip(values)}
 		proxy_pass ${UPSTREAM};
 	}
 
@@ -206,10 +286,10 @@ function apiCaddy(values: RecipeValues): string {
 	const { verifyOrigin, verifyPath, appHostPort } = parts(values);
 	return `${appHostPort} {
 	route {
-		request_header -X-Auth-*
+		request_header -X-Auth-*${caddyKeyStrip(values)}
 		forward_auth ${verifyOrigin} {
 			uri ${verifyPath}
-			header_up Host {upstream_hostport}
+			header_up Host {upstream_hostport}${caddyAddressLines(values)}
 			copy_headers ${API_IDENTITY_HEADERS.join(' ')}
 		}
 		reverse_proxy ${UPSTREAM.replace('http://', '')}
@@ -227,14 +307,13 @@ function apiTraefik(values: RecipeValues): string {
       forwardAuth:
         address: "${values.verifyUrl}"
         trustForwardHeader: false
-        authResponseHeadersRegex: "^X-Auth-"
+        authResponseHeadersRegex: "^X-Auth-"${traefikKeyMiddlewares(values)}
   routers:
     api:
       rule: "Host(\`${appHost}\`)"
       entryPoints:
         - websecure
-      middlewares:
-        - foxauth
+      middlewares:${traefikChain(values)}
       service: api
       tls: {}
   services:
@@ -278,7 +357,7 @@ server {
 		add_header WWW-Authenticate $foxauth_scope_challenge always;
 
 		${passed}
-		proxy_set_header Host $host;
+		proxy_set_header Host $host;${nginxKeyStrip(values)}
 		proxy_pass ${UPSTREAM};
 	}
 
@@ -291,7 +370,7 @@ server {
 		proxy_set_header Host ${verifyHost};
 		proxy_ssl_server_name on;
 		proxy_pass_request_body off;
-		proxy_set_header Content-Length "";
+		proxy_set_header Content-Length "";${nginxAddressLines(values)}
 	}
 }
 `;

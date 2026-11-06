@@ -89,7 +89,8 @@ describe('admin audit route classification', () => {
 		 * plan and moving a project to another plan (specs/102) + sending a test message from the mail
 		 * settings + registering, changing, rotating and deleting an application of the administrators' project
 		 * (specs/109) + generating a keyring, confirming its backup in the console and confirming it at first-run
-		 * setup (specs/116) + creating, changing and removing an app behind a proxy (specs/122). A count that drifted
+		 * setup (specs/116) + creating, changing and removing an app behind a proxy (specs/122) + issuing and
+		 * withdrawing a project's proxy key (specs/124). A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
@@ -98,8 +99,8 @@ describe('admin audit route classification', () => {
 		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(107);
-		expect(mounted).toHaveLength(110);
+		expect(auditedAdminRoutes).toHaveLength(109);
+		expect(mounted).toHaveLength(112);
 	});
 
 	it('declares each route pattern only once', () => {

@@ -87,7 +87,11 @@ export type AdminErrorCode =
 	| 'sign_in_provider_mismatch'
 	| 'sign_in_provider_taken'
 	| 'sign_in_provider_unlinkable'
-	| 'linked_to_service';
+	| 'linked_to_service'
+	/* Conditions at the proxy (specs/124). */
+	| 'proxy_key_limit'
+	| 'proxy_address_unproven'
+	| 'attribute_matches_nobody';
 
 export class AdminError extends Error {
 	/*

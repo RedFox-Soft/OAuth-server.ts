@@ -14,8 +14,11 @@ import {
 	resolveAdmin
 } from '../auth/rbac.js';
 import { loadBucketForUsers } from '../buckets/access.js';
+import { isSelectableAttribute } from '../../behind_proxy/conditions.js';
+import { attributeMatches } from '../conditions.js';
 import {
 	ALLOWED_USER_LIST_PARAMS,
+	AttributeMatchesQuery,
 	BulkUsersBody,
 	ChangeEndUserEmailBody,
 	CreateEndUserBody,
@@ -291,6 +294,34 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			return { users: await withGroups(params.id, users), totalResults };
 		},
 		{ query: UserListQuery }
+	)
+	/*
+	 * How many people of the project an attribute condition would let through (specs/124 FR-014): what the console
+	 * shows beside the condition, so an attribute nobody holds is seen before it closes an app to everyone.
+	 */
+	.get(
+		'/admin/api/projects/:id/attribute-matches',
+		async ({ admin, params, query }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const { attribute, value } = query;
+			/* No attribute or no value names nobody: a condition with none would let no one through. */
+			if (attribute === undefined || value === undefined) return { count: 0 };
+			if (!isSelectableAttribute(attribute)) {
+				throw new AdminError(
+					400,
+					`${attribute} cannot be used in a condition`,
+					{
+						field: 'attribute'
+					}
+				);
+			}
+			const values = [value].flat();
+			return {
+				count: await attributeMatches(bucket, attribute, values)
+			};
+		},
+		{ query: AttributeMatchesQuery }
 	)
 	/*
 	 * One person: the list's row, and — when they are locked — the email of the administrator who locked

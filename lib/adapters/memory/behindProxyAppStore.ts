@@ -13,6 +13,9 @@ const FIRST_TIMES = [
 	'firstAllowedAt'
 ] as const;
 
+/* Written as given, each time: the latest observation is the one that counts. */
+const LATEST = ['lastAskedAt', 'addressProvenAt', 'addressForgedAt'] as const;
+
 /*
  * In-memory apps behind a proxy. The address check runs with no `await` between the read and the write, so the
  * one-address-per-bucket rule the datastores' unique index gives is observable in the default test run.
@@ -94,6 +97,9 @@ export class BehindProxyAppStore implements BehindProxyAppStoreInstance {
 			const at = fields[field];
 			if (at && !stored[field]) stored[field] = new Date(at);
 		}
-		if (fields.lastAskedAt) stored.lastAskedAt = new Date(fields.lastAskedAt);
+		for (const field of LATEST) {
+			const at = fields[field];
+			if (at) stored[field] = new Date(at);
+		}
 	}
 }
