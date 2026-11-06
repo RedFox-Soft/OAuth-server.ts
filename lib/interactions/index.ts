@@ -85,6 +85,7 @@ import {
 } from 'lib/consts/param_list.js';
 import presence from 'lib/helpers/validate_presence.js';
 import constantEquals from 'lib/helpers/constant_equals.js';
+import { unusablePassword } from 'lib/helpers/unusable_password.js';
 import {
 	AlreadyUsedError,
 	ExpiredError,
@@ -1355,6 +1356,11 @@ export const ui = new Elysia()
 			const userStore = getUserStore(bucketId);
 			const user = await userStore.findByEmail(body.username);
 			if (!user) {
+				/*
+				 * Verified against a hash no one can type, so a missing account costs the same argon2 work as a
+				 * wrong password: answering sooner would tell which addresses exist, however alike the pages.
+				 */
+				await Bun.password.verify(body.password, await unusablePassword());
 				noteAttack(request, 'signin_failures');
 				return refuse();
 			}

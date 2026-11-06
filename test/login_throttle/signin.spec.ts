@@ -392,6 +392,23 @@ describe('password door brute-force throttle', () => {
 			}
 		});
 
+		it('spends one password verification on an address that has no account, as on one that has', async () => {
+			const registered = unique('timed-known');
+			const unknown = unique('timed-unknown');
+			await seedUser(passwordBucketId, registered);
+
+			// An argon2 verify is tens of milliseconds; a refusal that skips it for a missing account answers
+			// that much sooner, and the difference says which addresses exist however alike the pages are.
+			const verify = spyOn(Bun.password, 'verify');
+			try {
+				await attempt('throttle-password-app', registered, WRONG);
+				await attempt('throttle-password-app', unknown, WRONG);
+				expect(verify).toHaveBeenCalledTimes(2);
+			} finally {
+				verify.mockRestore();
+			}
+		});
+
 		it('counts failures for an address that has no account', async () => {
 			const email = unique('ghost');
 

@@ -4,7 +4,7 @@ title: 'Sign-in brute-force throttle'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-10-15
+updated: 2026-11-06
 graph:
   node_type: concept
   relationships:
@@ -55,6 +55,13 @@ The one place the two diverge is ownership, and it is forced:
 A counter must exist for an address that resolves to nothing, or the throttle's behaviour becomes an
 account-existence oracle. An account-owned area cannot express that, which is why these are two areas
 and not one. See [[deletion-and-revocation]] for the ownership table this joins.
+
+**A missing account costs a hash too** (corrected 2026-11-06). The refusal for an address with no account
+returned before any argon2 work, so it answered tens of milliseconds sooner than a wrong password and the
+timing named the addresses that exist, however identical the pages. It now verifies the guess against
+`unusablePassword()` (`lib/helpers/unusable_password.ts`), the per-process hash no one can type, before
+refusing (`lib/interactions/index.ts`, the `!user` branch). `test/login_throttle/signin.spec.ts` counts one
+verification for each kind of address.
 
 ## Two horizons, and confusing them silently removes the escalation
 

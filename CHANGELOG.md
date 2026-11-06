@@ -37,6 +37,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 - **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof` (spec 121). It was read as no proof at
   all, so the token and PAR endpoints issued an unbound token to a client that meant to bind one, and the IPSIE SL1
   profile refused it as missing.
+- **Sign-in timing no longer tells which accounts exist.** A password sent for an address with no account was refused
+  before any password hashing, so it answered measurably sooner than a wrong password. It is now checked against a
+  hash no one can type first, and both refusals cost the same.
 
 ## [1.5.0] - 2026-11-05
 
