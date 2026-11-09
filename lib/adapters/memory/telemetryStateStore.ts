@@ -73,6 +73,17 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		if (deliveredAt) state.lastAttackDeliveredAt = deliveredAt.toISOString();
 	}
 
+	async raiseAttackerListBuiltAt(builtAt: string): Promise<void> {
+		const state = this.state;
+		if (!state) return;
+		if (
+			state.attackerListBuiltAt === undefined ||
+			state.attackerListBuiltAt < builtAt
+		) {
+			state.attackerListBuiltAt = builtAt;
+		}
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		return this.state ? structuredClone(this.state) : null;
 	}

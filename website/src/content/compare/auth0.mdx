@@ -20,6 +20,8 @@ sources:
   - https://auth0.com/docs/secure/call-apis-on-users-behalf/token-vault/access-token-exchange-with-token-vault
   - https://auth0.com/docs/quickstart/webapp/nginx-plus
   - https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server
+  - https://auth0.com/docs/secure/attack-protection/suspicious-ip-throttling
+  - https://auth0.com/docs/secure/multi-factor-authentication/adaptive-mfa
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -307,6 +309,20 @@ groups:
         verdict: us
         why: 'With Auth0 each condition is code you write in an Action, checked at sign-in. Here a condition is a field on the rule for a path or an API, and your proxy has it checked on every request.'
         note: 'The post-login event object documents `event.request.ip` as "The originating IP address of the request." The API object says `api.access.deny(reason)` will "Mark the current login attempt as denied."'
+      - dimension: Refusing password sign-ins from known password-guessing addresses
+        us:
+          {
+            status: flag,
+            text: "Behind attackerList.enabled, off by default, on every plan. Each server downloads FoxTrust's signed list of addresses seen guessing passwords, today about 3,000 from third-party sources. Each project chooses Nothing, Count only (the default) or Refuse password sign-in, which refuses a listed address once it has failed 3 passwords on the server within an hour. A person who types the right password first signs in. A project can exempt up to 100 networks, each until a date if you like."
+          }
+        them:
+          {
+            status: yes,
+            text: "Suspicious IP Throttling, on by default for new tenants, blocks an address that tries many accounts: by default after 100 failed logins a day from one address, answered with HTTP 429. It has an IP AllowList of up to 100 entries and a monitoring-only mode. Adaptive MFA flags an untrusted IP from Auth0's own traffic data and asks for MFA rather than refusing; it needs an Enterprise plan with the Adaptive MFA add-on."
+          }
+        verdict: different
+        why: 'Auth0 throttles on its own, on by default, and its IP reputation leads to MFA on Enterprise. FoxAuth uses a published list that each project opts into, counts before it refuses, and gives a refused person a line to send you.'
+        note: 'The Suspicious IP Throttling page offers the response "Limit high-velocity traffic targeting too many accounts". The Adaptive MFA page describes an IP address "known to be associated with suspicious behavior".'
   - label: Licence and cost
     rows:
       - dimension: Licence

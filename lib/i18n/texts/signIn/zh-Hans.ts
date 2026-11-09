@@ -28,7 +28,16 @@ export const zhHans: SignInTexts = {
 		resendLink: '重新发送链接',
 		providersDivider: '或',
 		moreProviders: '更多登录方式',
-		signInWith: '使用{provider}登录'
+		signInWith: '使用{provider}登录',
+		listRefusal: {
+			title: '此网络暂时无法使用密码登录',
+			happened:
+				'此网络的地址最近被用于猜测密码，因此本服务目前不接受来自该地址的密码。',
+			whatNow:
+				'您可以换一个网络再试，例如用移动数据代替 Wi-Fi，或使用本页上的其他登录方式。',
+			support: '如果此情况持续发生，请将下面这一行发送给本服务的管理人员：',
+			dispute: '请 FoxTrust 复核此地址'
+		}
 	},
 
 	registration: {

@@ -20,6 +20,7 @@ import { endUserRoutes } from './users-end/routes.js';
 import { outsideServerRoutes } from './outside-servers/routes.js';
 import { behindProxyRoutes } from './behind-proxy/routes.js';
 import { proxyKeyRoutes } from './buckets/proxy_keys.js';
+import { passwordGuessingRoutes } from './buckets/password_guessing.js';
 import { administratorApplicationRoutes } from './administrator-applications/routes.js';
 import { provisioningRoutes } from './provisioning/routes.js';
 import { provisioningHoldRoutes } from './provisioning/holds.js';
@@ -30,6 +31,7 @@ import { planRoutes } from './plans/routes.js';
 import { sentrySettingsRoutes } from './settings/sentry/routes.js';
 import { telemetrySettingsRoutes } from './settings/telemetry/routes.js';
 import { attackReportsSettingsRoutes } from './settings/attack_reports/routes.js';
+import { attackerListSettingsRoutes } from './settings/attacker_list/routes.js';
 import { clientAddressSettingsRoutes } from './settings/client_address/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
 import { bucketKeyRoutes } from './bucket_keys/routes.js';
@@ -144,6 +146,7 @@ adminApiRoutes.use(administratorApplicationRoutes);
 adminApiRoutes.use(telemetrySettingsRoutes);
 // The attack reporting card (specs/114), for the same reason.
 adminApiRoutes.use(attackReportsSettingsRoutes);
+adminApiRoutes.use(attackerListSettingsRoutes);
 // The caller address check (specs/115), for the same reason.
 adminApiRoutes.use(clientAddressSettingsRoutes);
 // Encryption at rest (specs/116), for the same reason.
@@ -154,3 +157,4 @@ adminApiRoutes.use(connectedServiceAdminRoutes);
 adminApiRoutes.use(behindProxyRoutes);
 // A project's proxy keys (specs/124), for the same reason.
 adminApiRoutes.use(proxyKeyRoutes);
+adminApiRoutes.use(passwordGuessingRoutes);

@@ -116,9 +116,11 @@ export async function loginServer(
 		switcher?: SwitcherProps;
 		accent?: PaintedAccent;
 		face?: SignInFace;
+		/* The attacker list's refusal (specs/125); pass `passwordLogin: false` with it. */
+		listRefusal?: { line: string; disputeUrl: string | null };
 	} = {}
 ) {
-	const { errorMessage, switcher } = options;
+	const { errorMessage, switcher, listRefusal } = options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
@@ -154,7 +156,8 @@ export async function loginServer(
 			providersOpen,
 			logoSrc,
 			switcher,
-			face
+			face,
+			...(listRefusal ? { listRefusal } : {})
 		},
 		<LoginPage
 			uid={uid}
@@ -169,13 +172,14 @@ export async function loginServer(
 			logoSrc={logoSrc}
 			switcher={switcher}
 			face={face}
+			listRefusal={listRefusal}
 		/>,
 		language,
 		options.accent
 	);
-	// A notice is not a failure: only the error re-render answers 400.
+	// A notice is not a failure: only the error re-render and the attacker list's refusal (specs/125) answer 400.
 	return htmlResponse(html, {
-		status: errorMessage ? 400 : 200,
+		status: errorMessage || listRefusal ? 400 : 200,
 		handOffTo: options.handOffTo,
 		language
 	});

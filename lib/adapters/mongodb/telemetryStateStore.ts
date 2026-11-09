@@ -131,6 +131,19 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		);
 	}
 
+	async raiseAttackerListBuiltAt(builtAt: string): Promise<void> {
+		await this.collection().updateOne(
+			{
+				_id: this.stateId,
+				$or: [
+					{ attackerListBuiltAt: { $exists: false } },
+					{ attackerListBuiltAt: { $lt: builtAt } }
+				]
+			},
+			{ $set: { attackerListBuiltAt: builtAt } }
+		);
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		const found = await this.collection().findOne({ _id: this.stateId });
 		if (!found) return null;

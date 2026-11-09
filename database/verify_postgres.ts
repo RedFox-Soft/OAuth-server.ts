@@ -18,6 +18,7 @@ import { verifyAdminSessionsByUser } from './verify_admin_sessions.js';
 import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
 import { verifyTelemetry } from './verify_telemetry.js';
+import { verifyAttackerListCounts } from './verify_attacker_list.js';
 import { verifySealing } from './verify_sealing.js';
 import { verifyConnectedAccounts } from './verify_connected_accounts.js';
 import {
@@ -1131,6 +1132,9 @@ await verifyActivity(
 
 /* The usage-reporting state (specs/113): one identifier, one claim per day, counts that add up. */
 await verifyTelemetry(() => new TelemetryStateStore(), check);
+
+/* The attacker list's sign-in counters (specs/125): records per project, day and process, read by the bucket index. */
+await verifyAttackerListCounts(adapter('PasswordGuessingTally'), check);
 
 /* The encryption pass's store and the keyring state (specs/116): each leaf compare-and-set where it is stored. */
 {

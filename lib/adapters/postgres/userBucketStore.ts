@@ -224,6 +224,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'signInOrder'
 				| 'connectedServices'
 				| 'proxyKeys'
+				| 'passwordGuessing'
 			>
 		>
 	): Promise<UserBucket | null> {

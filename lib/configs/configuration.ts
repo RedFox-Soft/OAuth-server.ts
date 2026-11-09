@@ -610,6 +610,17 @@ function checkDependantFeatures(config: ConfigurationInput) {
 		);
 	}
 
+	/*
+	 * The list is built from what instances report, so taking it while reporting nothing is refused. The
+	 * console turns this switch off with attack reporting in one save (its `dependsOn`); an agent turning
+	 * reporting off is told to turn the list off as well.
+	 */
+	if (config['attackerList.enabled'] && !config['attackReports.enabled']) {
+		throw new TypeError(
+			'attackerList is only available in conjunction with attackReports: the list is built from what instances report, so turn on attack reporting first, or turn the list off with it'
+		);
+	}
+
 	checkDpopNonces(config);
 }
 

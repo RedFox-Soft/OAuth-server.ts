@@ -37,6 +37,7 @@ import { InitialAccessTokenPayload } from 'lib/models/initial_access_token.js';
 import { InteractionPayload } from 'lib/models/interaction.js';
 import { LoginThrottlePayload } from 'lib/login_throttle/types.js';
 import { MailRequestTallyPayload } from 'lib/mail_limit/types.js';
+import { PasswordGuessingTallyPayload } from 'lib/attacker_list/types.js';
 import {
 	PasswordResetChallengePayload,
 	PasswordResetThrottlePayload
@@ -80,6 +81,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	Interaction: InteractionPayload,
 	LoginThrottle: LoginThrottlePayload,
 	MailRequestTally: MailRequestTallyPayload,
+	PasswordGuessingTally: PasswordGuessingTallyPayload,
 	PasswordResetChallenge: PasswordResetChallengePayload,
 	PasswordResetThrottle: PasswordResetThrottlePayload,
 	PushedAuthorizationRequest: PushedAuthorizationRequestPayload,

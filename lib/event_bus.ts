@@ -150,6 +150,8 @@ export type ServerEvents = ModelEvents &
 			{ method: string; path: string; class: string; origin: string }
 		];
 		login_throttled: [{ bucketId: string }];
+		/* A password sign-in refused because of FoxTrust's attacker list (specs/125); never the address. */
+		password_guessing_refused: [{ bucketId: string }];
 		settings_applied: [{ keys: readonly string[] }];
 		'admin.login.error': [{ reason: string }];
 		'federation.link.conflict': [{ providerId: string; connectionId: string }];

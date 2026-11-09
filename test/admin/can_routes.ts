@@ -79,6 +79,13 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 
 	{ on: 'bucket', flag: 'read', method: 'GET', path: BUCKET },
 	{ on: 'bucket', flag: 'read', method: 'GET', path: `${BUCKET}/summary` },
+	/* What the project does with FoxTrust's attacker list and its numbers (specs/125): read with the project. */
+	{
+		on: 'bucket',
+		flag: 'read',
+		method: 'GET',
+		path: `${BUCKET}/password-guessing`
+	},
 	/* A project's plan is an instance-level decision (specs/102): a super administrator's, whoever owns the project. */
 	{
 		on: 'bucket',

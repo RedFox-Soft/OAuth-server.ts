@@ -127,6 +127,7 @@ const groups = [
 		{ ...security.totp, spec: rfc('6238') },
 		{ ...security.pairwise },
 		{ ...security.bruteForce },
+		{ ...security.attackerList, flag: 'attackerList.enabled' },
 		{ ...security.rateLimit, flag: 'rateLimit.enabled' },
 		{ ...security.cors, flag: 'cors.enabled' },
 		{ ...security.headers },

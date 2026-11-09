@@ -151,6 +151,33 @@ export const UpdateBucketBody = t.Object({
 	 */
 	totpRequired: t.Optional(t.Boolean()),
 	/*
+	 * What a password sign-in from an address on FoxTrust's attacker list meets (specs/125): `nothing`, `count` or
+	 * `refuse`, and networks never checked against the list, each optionally until a date. Choosing `refuse` is a
+	 * tightening and goes through the preview below; it is refused on the administrators' project.
+	 */
+	passwordGuessing: t.Optional(
+		t.Object(
+			{
+				mode: t.Union([
+					t.Literal('nothing'),
+					t.Literal('count'),
+					t.Literal('refuse')
+				]),
+				exempt: t.Array(
+					t.Object(
+						{
+							network: t.String({ minLength: 1, maxLength: 60 }),
+							until: t.Optional(t.String({ format: 'date-time' }))
+						},
+						{ additionalProperties: false }
+					),
+					{ maxItems: 100 }
+				)
+			},
+			{ additionalProperties: false }
+		)
+	),
+	/*
 	 * Consent to the preview (specs/083). A change that tightens who can get in — passwords off, verification
 	 * or an authenticator required, sign-up opened on a bucket served at the root — answers 409 with what it
 	 * would do to whom, counted, and is applied only when repeated with `confirm` and those counts as
@@ -162,7 +189,9 @@ export const UpdateBucketBody = t.Object({
 			withoutEnabledLink: t.Optional(PreviewCount),
 			unverified: t.Optional(PreviewCount),
 			passwordWithoutAuthenticator: t.Optional(PreviewCount),
-			applications: t.Optional(PreviewCount)
+			applications: t.Optional(PreviewCount),
+			listedAttempts: t.Optional(PreviewCount),
+			listedRightPassword: t.Optional(PreviewCount)
 		})
 	)
 });
@@ -186,3 +215,35 @@ export const DeleteBucketQuery = t.Object({
 
 /* Issuing a proxy key takes nothing: the server draws the key (specs/124 research R5). */
 export const IssueProxyKeyBody = t.Object({}, { additionalProperties: false });
+
+/*
+ * A project's figures and choice for FoxTrust's attacker list (specs/125 contracts/admin-api.md). `yourAddress` is the
+ * requesting administrator's own address, for the console's "Your address now"; nothing here is an address from the
+ * list or one the server saw.
+ */
+export const PasswordGuessingResponse = t.Object({
+	mode: t.Union([
+		t.Literal('nothing'),
+		t.Literal('count'),
+		t.Literal('refuse')
+	]),
+	modeIsDefault: t.Boolean(),
+	exempt: t.Array(
+		t.Object({ network: t.String(), until: t.Optional(t.String()) })
+	),
+	list: t.Union([
+		t.Literal('off'),
+		t.Literal('not-yet'),
+		t.Literal('current'),
+		t.Literal('out-of-date'),
+		t.Literal('unknown-format')
+	]),
+	days: t.Number(),
+	counts: t.Object({
+		listedAttempts: t.Number(),
+		listedRightPassword: t.Number(),
+		refused: t.Number()
+	}),
+	refuseAvailable: t.Boolean(),
+	yourAddress: t.Union([t.String(), t.Null()])
+});

@@ -76,6 +76,7 @@ import { startKeepAlive } from './connected_services/keep_alive.js';
 import { startTelemetry } from './telemetry/scheduler.js';
 import { reportingState } from './telemetry/status.js';
 import { startAttackReports } from './attack_reports/scheduler.js';
+import { startAttackerList } from './attacker_list/scheduler.js';
 import { attackReportsState } from './attack_reports/status.js';
 import { selectBackend } from './adapters/selectBackend.js';
 
@@ -366,6 +367,11 @@ if (process.env.NODE_ENV !== 'test') {
 					'Settings → Integrations. Every field: https://foxauth.dev/docs/reference/attack-reports/'
 			);
 		}
+		/*
+		 * FoxTrust's attacker list (specs/125), under the same guards: it is taken only where reports are sent, and
+		 * an in-memory instance sends none. The tick does nothing while the list is off.
+		 */
+		startAttackerList();
 	}
 }
 

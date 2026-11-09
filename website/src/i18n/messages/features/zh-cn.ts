@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'ddfb17a9acb5';
+export const source = 'f0c5d31b12ca';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -148,6 +148,10 @@ export default {
 				bruteForce: {
 					title: '登录暴力破解节流',
 					body: '按身份持久化失败计数，锁定时间逐级递增。因节流而被拒绝，看上去与密码错误完全一样。'
+				},
+				attackerList: {
+					title: '来自 FoxTrust 的已知猜测密码地址',
+					body: '服务器每小时下载 FoxTrust 签名的地址列表，其中是被发现猜测密码的地址；服务器会验证签名，并且最多使用该列表 3 小时。每个项目自行选择如何处理来自这些地址的密码登录：什么都不做、只计数，或者在该地址一小时内在本服务器上也输错 3 次密码后拒绝它。第一次就输入正确密码的人仍然可以登录；被拒绝的人会得到一行要发给你的文字，你可以据此放行他的网络。FoxTrust 永远不会知道谁在登录。'
 				},
 				rateLimit: {
 					title: '按来源限流',

@@ -93,4 +93,34 @@ export async function verifyTelemetry(
 		both?.lastAttackDeliveredAt === at.toISOString(),
 		JSON.stringify(both)
 	);
+
+	/*
+	 * The build time of FoxTrust's attacker list (specs/125): only ever raised, by one statement, so a slow process
+	 * can never lower it and an older signed list stays refused after a restart. Built from the run's time, far in
+	 * the future, so each run's values exceed every earlier run's.
+	 */
+	const base = Date.UTC(2900, 0, 1) + Date.now();
+	const offered = Array.from({ length: 8 }, (_, i) =>
+		new Date(base + i * 1000).toISOString()
+	);
+	await Promise.all(
+		[...offered]
+			.reverse()
+			.map((builtAt) => makeStore().raiseAttackerListBuiltAt(builtAt))
+	);
+	const raised = (await makeStore().read())?.attackerListBuiltAt;
+	check(
+		'eight processes raising the list build time at once leave the latest',
+		raised === offered[7],
+		String(raised)
+	);
+	await makeStore().raiseAttackerListBuiltAt(offered[0]);
+	check(
+		'an earlier list build time never lowers the stored one',
+		(await makeStore().read())?.attackerListBuiltAt === offered[7]
+	);
+	check(
+		'raising the list build time leaves the reports in the document untouched',
+		(await makeStore().read())?.lastAttackReport === later
+	);
 }

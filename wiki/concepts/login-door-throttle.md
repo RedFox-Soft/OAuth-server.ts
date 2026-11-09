@@ -4,7 +4,7 @@ title: 'Sign-in brute-force throttle'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-11-06
+updated: 2026-11-09
 graph:
   node_type: concept
   relationships:
@@ -139,7 +139,10 @@ there and is tracked separately.
 
 - **The refusal is an expression, not a string.** All four turn-aways in the handler call one local
   `refuse()`, so "a throttled attempt is indistinguishable from a wrong password" holds structurally
-  rather than by four copies of the same wording staying in step.
+  rather than by four copies of the same wording staying in step. Since spec 125 (2026-11-09) a second refusal sits
+  in front of the throttle: FoxTrust's attacker list, decided by the caller's address alone, before the throttle and
+  the account lookup. A list-refused attempt never reaches `recordAttempt`, so it is not counted against the email
+  ([[shared-attacker-list]]).
 - **No error is thrown.** The refusal renders a page, so unlike [[per-origin-rate-limiting]] this
   needs no handler branch, no `allow_redirect` decision, and no exclusion from the `server_error`
   channel. It emits `login_throttled` with the project's id (`bucketId`) and nothing else.

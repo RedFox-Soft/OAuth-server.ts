@@ -36,11 +36,18 @@ export function LoginPage({
 	logoSrc = DEFAULT_LOGO,
 	embedded = false,
 	switcher,
-	face
+	face,
+	listRefusal
 }: {
 	uid: string;
 	errorMessage?: string;
 	notice?: string;
+	/*
+	 * This network's address is on FoxTrust's list and has just failed passwords here (specs/125): the refusal takes
+	 * the password form's place, and the caller passes `passwordLogin: false` so the form and its links go with it
+	 * while other ways to sign in stay. `line` is the person's own support line; `disputeUrl` comes from the list.
+	 */
+	listRefusal?: { line: string; disputeUrl: string | null };
 	/* Defaulted so the component renders the password page for any caller that says nothing. */
 	passwordLogin?: boolean;
 	registrationOpen?: boolean;
@@ -215,6 +222,53 @@ export function LoginPage({
 								{errorMessage}
 							</span>
 						</div>
+					</div>
+				)}
+				{listRefusal && (
+					<div
+						role="alert"
+						style={{
+							marginBottom: 24,
+							padding: '12px 16px',
+							borderRadius: '6px',
+							border: `1px solid ${foxVar('warn-border')}`,
+							backgroundColor: foxVar('warn-bg'),
+							color: foxVar('text'),
+							fontSize: '14px'
+						}}
+					>
+						<p style={{ margin: '0 0 8px', fontWeight: 600 }}>
+							<ExclamationCircleOutlined
+								aria-hidden="true"
+								style={{ color: foxVar('warn-icon'), marginRight: 8 }}
+							/>
+							{T.login.listRefusal.title}
+						</p>
+						<p style={{ margin: '0 0 8px' }}>{T.login.listRefusal.happened}</p>
+						<p style={{ margin: '0 0 8px' }}>{T.login.listRefusal.whatNow}</p>
+						<p style={{ margin: '0 0 4px' }}>{T.login.listRefusal.support}</p>
+						<code
+							style={{
+								display: 'block',
+								overflowWrap: 'anywhere',
+								margin: '0 0 8px',
+								padding: '4px 8px',
+								borderRadius: 4,
+								border: `1px solid ${foxVar('code-border')}`,
+								backgroundColor: foxVar('box')
+							}}
+						>
+							{listRefusal.line}
+						</code>
+						{listRefusal.disputeUrl && (
+							<a
+								href={listRefusal.disputeUrl}
+								rel="noopener noreferrer"
+								style={{ color: foxVar('link') }}
+							>
+								{T.login.listRefusal.dispute}
+							</a>
+						)}
 					</div>
 				)}
 				{!passwordLogin && providerBlock}

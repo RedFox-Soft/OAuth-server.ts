@@ -119,6 +119,7 @@ export const MODEL_AREAS = [
 	'Interaction',
 	'LoginThrottle',
 	'MailRequestTally',
+	'PasswordGuessingTally',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
 	'PushedAuthorizationRequest',
@@ -504,6 +505,21 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned(
 			'addressed by the computed id `${address}:${hourStartEpochSeconds}`, never swept; holds a network address for at most two hours'
 		)
+	),
+	/*
+	 * Per project, day and process, how many password sign-ins came from addresses on FoxTrust's attacker list,
+	 * how many of those had the right password and how many were refused (specs/125). Numbers only: no address,
+	 * account or email. Owns nothing and is left to expire with the 8-day window it serves; a deleted project's
+	 * records go with the window rather than with the project, since they name no one. Listed by project through
+	 * `findByIndexed`, so a project's figure is never a scan.
+	 */
+	modelArea(
+		'PasswordGuessingTally',
+		EXPIRES_AT,
+		unowned(
+			'addressed by the computed id `${bucketId}:${day}:${processId}`, read by its bucket index, expires after 8 days; holds no address, account or email'
+		),
+		[{ key: { 'payload.bucketId': 1 } }]
 	),
 	/*
 	 * The self-service password reset's two areas. The challenge is account-owned rather than merely

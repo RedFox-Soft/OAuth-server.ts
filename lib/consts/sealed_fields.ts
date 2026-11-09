@@ -132,6 +132,11 @@ export const DECLARED_PLAINTEXT: readonly { field: string; reason: string }[] =
 				'encrypting it gains almost nothing against a database copy, which already holds every account, and a lost key would change the sub every relying party knows a person by, for ever (specs/116 Clarifications)'
 		},
 		{
+			field: 'passwordGuessing',
+			reason:
+				"a project's choice about FoxTrust's attacker list and its exempt networks (specs/125): configuration, not a credential, despite the name"
+		},
+		{
 			field: 'clientSecretDigest',
 			reason: 'a digest: already irreversible'
 		},

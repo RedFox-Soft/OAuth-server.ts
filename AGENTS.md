@@ -257,6 +257,12 @@ Each rule is the part that is easy to break. Read the named page before changing
   in `lib/consts/attack_report_fields.ts`; an attack is counted by one synchronous `noteAttack` beside the
   refusal, only when a credential was presented, and its address never goes to a log line or a bus event.
   → `instance-telemetry.md`, `attack-reports.md`
+- **FoxTrust's attacker list** — the list is downloaded and verified per process against the pinned keys in
+  `lib/consts/attacker_list.ts`, its build time only ever raised, and it fails open: missing, stale or unverifiable
+  refuses nobody. It is asked only at the password door, only about `callerAddressOf`'s address, never a trusted
+  proxy's, a Cloudflare edge's or an unattributed one; a refusal it causes is never a `noteAttack`, never reaches the
+  per-email throttle, and leaves the address only on the refused person's own page. The administrators' project
+  cannot refuse. → `shared-attacker-list.md`
 - **Interaction screens** — a page is either the antd shell (inside an interaction) or plain and
   self-contained (opened from an email, no script); which one is not a style choice. Every word on them
   lives in `lib/i18n/texts/`, in all three languages in the same change, and a value inserted into a

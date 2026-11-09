@@ -23,6 +23,7 @@ import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
 import type { BucketSummary, BucketView } from '../bucketView.js';
 import { SignInPreview } from './SignInPreview.js';
+import { PasswordGuessingCard } from './PasswordGuessingCard.js';
 
 /* The five settings that decide how people get into a bucket. */
 interface Policy {
@@ -495,6 +496,12 @@ export function SignInTab({
 					{!baseline.totpRequired && draft.totpRequired && countsUnavailable}
 				</Setting>
 			</Card>
+
+			<PasswordGuessingCard
+				bucketId={bucket._id}
+				bucketName={bucket.name}
+				editable={editable}
+			/>
 
 			<Card title="Sign-up">
 				<Setting

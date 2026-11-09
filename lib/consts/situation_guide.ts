@@ -29,7 +29,9 @@ export type GuideFlag =
 	| 'dpop'
 	| 'ipsieSl1'
 	| 'clientIdMetadataDocument'
-	| 'plans';
+	| 'plans'
+	| 'attackReports'
+	| 'attackerList';
 
 /* The ApplicationConfig key each switch is read from. */
 export const GUIDE_FLAG_SETTINGS: Readonly<Record<GuideFlag, string>> = {
@@ -47,7 +49,9 @@ export const GUIDE_FLAG_SETTINGS: Readonly<Record<GuideFlag, string>> = {
 	dpop: 'dpop.enabled',
 	ipsieSl1: 'ipsieSl1.enabled',
 	clientIdMetadataDocument: 'clientIdMetadataDocument.enabled',
-	plans: 'plans.enabled'
+	plans: 'plans.enabled',
+	attackReports: 'attackReports.enabled',
+	attackerList: 'attackerList.enabled'
 };
 
 /*
@@ -80,7 +84,9 @@ export const GUIDE_FLAG_PANES: Readonly<Record<GuideFlag, GuideSettingsPane>> =
 		dpop: 'request-security',
 		ipsieSl1: 'request-security',
 		clientIdMetadataDocument: 'endpoints',
-		plans: 'plans'
+		plans: 'plans',
+		attackReports: 'integrations',
+		attackerList: 'integrations'
 	};
 
 /* `changeAddress` is the project's own `can.changeAddress`: narrower than `edit` (lib/admin/auth/can.ts). */
@@ -355,6 +361,8 @@ const LANES = {
 	security: { label: 'Security team', kind: 'person', part: 'team' },
 	dev: { label: 'Another developer’s app', kind: 'outside', part: 'laptop' },
 	thief: { label: 'Someone with a copy', kind: 'outside', part: 'thief' },
+	guesser: { label: 'Password guesser', kind: 'outside', part: 'thief' },
+	foxtrust: { label: 'FoxTrust', kind: 'outside', part: 'cloud' },
 	browser: { label: 'Person’s browser', kind: 'person', part: 'browser' },
 	proxy: { label: 'Your proxy', kind: 'proxy', part: 'proxy' },
 	proxied: { label: 'Your app', kind: 'api', part: 'server' }
@@ -1666,6 +1674,81 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Turn on the second factor (TOTP) in my FoxAuth project.',
 			'project_update (second factor)',
 			'Tell me how many users have not set it up yet.'
+		)
+	},
+	{
+		id: 'knownguessers',
+		tab: 'product',
+		title: 'Stop password guessing from known addresses',
+		sentence:
+			'Use FoxTrust’s list of addresses seen guessing passwords. An address on it gets three wrong passwords here, and then its password sign-ins are refused.',
+		protocol: 'Signed IP reputation list (FoxTrust)',
+		lanes: lanes('foxtrust', 'guesser', 'fox', 'person'),
+		steps: [
+			step(
+				'foxtrust',
+				'fox',
+				'Signed list',
+				'Every hour your server downloads FoxTrust’s list of addresses seen guessing passwords, and checks its signature.'
+			),
+			step(
+				'guesser',
+				'fox',
+				'Guesses passwords',
+				'An address on the list tries passwords against many accounts. Its first three wrong passwords are checked as usual.'
+			),
+			step(
+				'fox',
+				'guesser',
+				'Not from this network',
+				'After three failures in an hour, the project refuses its next password without checking it, for as long as it keeps trying.',
+				'refusal'
+			),
+			step(
+				'person',
+				'fox',
+				'Right password',
+				'Someone else on a listed address, such as a shared Wi-Fi, types their own password right the first time.'
+			),
+			step(
+				'fox',
+				'fox',
+				'Signed in',
+				'They sign in as before, and your app gets its tokens.',
+				'token'
+			)
+		],
+		problem: {
+			at: 'guesser',
+			mark: 'password',
+			caption: 'One address tries thousands of passwords.'
+		},
+		fixCaption: 'Known guessers get three tries, not thousands.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'From a listed address after three wrong passwords: "Password sign-in is not available from this network", what to do now, and a line to send you',
+				'With the right password at the first try: signed in, as before',
+				'The other ways to sign in stay on the page'
+			]
+		},
+		needs: { flags: ['attackReports', 'attackerList'], role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open Sign-in',
+			target: { area: 'sign-in' }
+		},
+		goodToKnow: [
+			'A super administrator turns the list on in Settings → Integrations, under Attack reporting. It needs attack reporting on, because the list is built from what servers report.',
+			'Each project starts at Count only. Nothing changes for anyone, and the Sign-in tab shows the numbers for 7 days. Choose Refuse password sign-in when they say it is safe.',
+			'A refused person sees a line to send you, with their address in it. Add that address under "Never check these networks", and they can sign in at once.',
+			'FoxTrust never learns who signs in. A list more than 3 hours old is not used, so nobody is refused because of it.',
+			'Only password sign-in is affected. Sign-in through an identity provider, password reset and sign-up are not. It is on every plan.'
+		],
+		prompt: prompt(
+			'Protect password sign-in in my FoxAuth project from addresses FoxTrust has seen guessing passwords.\nCheck that FoxTrust’s list is on and current, read the project’s numbers for the last 7 days, and tell me how many sign-ins from listed addresses had the right password. If I agree, set the project to refuse password sign-in from listed addresses.',
+			'project_password_guessing_get, then project_update with passwordGuessing',
+			'Turning the list on is an instance setting for a super administrator: attackerList.enabled, which needs attackReports.enabled.'
 		)
 	},
 	{

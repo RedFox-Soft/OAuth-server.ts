@@ -1092,6 +1092,23 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		description:
 			'Once an hour this server sends FoxTrust the IP addresses that attacked it in the hour before: password guessing at the sign-in page, wrong client secrets, wrong SCIM or MCP credentials, floods past the rate limit, mass password-reset or sign-up requests, and scanners asking for files such as /.env. Each address goes with how many times it did each of these and nothing else: no account, password, path, header or body. An address is sent only after it crosses a threshold an honest visitor does not reach, only if it is a public internet address, and an IPv6 address only as its /64 network. FoxTrust combines the reports of many servers into a list of attacking addresses, which protects every server, a legitimate interest in network and information security (GDPR Recital 49). The exact last report is shown below, and every field is listed at foxauth.dev/docs/reference/attack-reports. On by default and independent of usage reporting. Turn it off while you test your own server, so your testing address is not reported.'
 	},
+	{
+		key: 'attackerList.enabled',
+		domain: 'integrations',
+		group: 'Attack reporting',
+		label: "Use FoxTrust's list of known password-guessing addresses",
+		summary:
+			'Download, every hour, the addresses FoxTrust saw guessing passwords, so projects can refuse them',
+		type: 'boolean',
+		/*
+		 * In the Attack reporting group with `dependsOn`, so the console cannot offer it while reporting is
+		 * off and turns it off with reporting: the list is built from what instances report, and
+		 * validateConfiguration refuses the combination anyway.
+		 */
+		dependsOn: 'attackReports.enabled',
+		description:
+			"Every hour each server process downloads FoxTrust's signed list of addresses seen guessing passwords in the last 7 days and checks its signature before using it. Each project then chooses, on its Sign-in tab, what happens when a password sign-in comes from one of those addresses: nothing, counting only (the default), or refusing it once that address has also failed passwords on this server. Federated sign-in, password reset, sign-up and every token endpoint are never affected. The download sends FoxTrust nothing about this server except, while usage reporting is on, its FoxAuth version. A list that cannot be downloaded or is more than 3 hours old is not used, so nobody is refused because of it. Off by default; needs attack reporting, because the list is built from what servers report."
+	},
 
 	{
 		key: 'sentry.enabled',

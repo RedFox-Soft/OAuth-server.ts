@@ -220,6 +220,14 @@ import { signUpsPaused } from '../plans/signups.js';
 import { CREATE_PROMPT_REASON } from '../consts/prompt_create.js';
 import { callerAddressOf } from '../helpers/caller_address.js';
 import { noteAttack } from '../attack_reports/tally.js';
+import {
+	guessingAtDoor,
+	noteGuessingFailure,
+	noteGuessingRefusal,
+	refusalLine,
+	type GuessingAtDoor
+} from '../attacker_list/at_sign_in.js';
+import { noteListed } from '../attacker_list/counters.js';
 import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
 
 /*
@@ -948,6 +956,26 @@ function createRequested(interaction: Interaction): boolean {
  * a client that belongs to no bucket, so a federated-only bucket reached through a declared resource had its password,
  * reset and registration doors judged by the default bucket's policy and left open.
  */
+/*
+ * The login page's options for an address the attacker list refuses: the password form and its links go, the other
+ * ways to sign in stay, and the refusal carries the person's own support line (specs/125 contracts/sign-in.md).
+ */
+function listRefusalOf(guessing: GuessingAtDoor):
+	| {
+			passwordLogin: false;
+			listRefusal: { line: string; disputeUrl: string | null };
+	  }
+	| Record<string, never> {
+	if (guessing.decision !== 'refuse' || guessing.shown === null) return {};
+	return {
+		passwordLogin: false,
+		listRefusal: {
+			line: refusalLine(guessing.shown),
+			disputeUrl: guessing.dispute
+		}
+	};
+}
+
 async function passwordDoorClosed(
 	interaction: Interaction,
 	uid: string
@@ -1240,7 +1268,7 @@ export const ui = new Elysia()
 	 */
 	.get(
 		'ui/:uid/login',
-		async ({ params: { uid }, query, interaction, signsInto }) => {
+		async ({ params: { uid }, query, interaction, signsInto, request }) => {
 			/*
 			 * The bucket is resolved on the GET as well as the POST, exactly as the registration route already
 			 * does: what this page offers — a password form, provider buttons, or only the latter — is a
@@ -1248,6 +1276,19 @@ export const ui = new Elysia()
 			 * as an invitation.
 			 */
 			const clientId = clientIdOf(interaction);
+			const options = await loginOptionsForClient(
+				clientId,
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
+			);
+			/*
+			 * An address the attacker list refuses here sees the refusal instead of a form it could not use (specs/125).
+			 * Nothing is counted on a page view: only an attempt is an attempt.
+			 */
+			const guessing = guessingAtDoor(
+				request,
+				await getBucketStore().find(signsInto)
+			);
 			return loginServer(uid, {
 				notice:
 					resolveNotice(query.notice, languageOf(interaction)) ??
@@ -1265,11 +1306,8 @@ export const ui = new Elysia()
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'login'),
 				...(await signInLook(interaction, signsInto)),
-				...(await loginOptionsForClient(
-					clientId,
-					resourceOf(interaction),
-					await addressedBucketOf(interaction)
-				))
+				...options,
+				...listRefusalOf(guessing)
 			});
 		},
 		{ query: t.Object({ notice: t.Optional(t.String()) }) }
@@ -1296,8 +1334,9 @@ export const ui = new Elysia()
 			const branded = await signInLook(interaction, bucketId);
 
 			/*
-			 * The one refusal this door gives. Every path that turns a sign-in away shares this expression
-			 * rather than repeating its wording, which is what keeps them byte-identical: an unknown
+			 * The one refusal this door gives about an account; the attacker list's refusal below is decided by
+			 * the address alone (specs/125). Every path that turns a sign-in away for something about the account
+			 * shares this expression rather than repeating its wording, which is what keeps them byte-identical: an unknown
 			 * address, a wrong password, a deactivated account and a throttled attempt must be
 			 * indistinguishable, and a copy of the string is a copy that can drift.
 			 */
@@ -1320,6 +1359,31 @@ export const ui = new Elysia()
 				});
 
 			/*
+			 * FoxTrust's attacker list (specs/125), decided by the caller's address before the throttle, the account
+			 * lookup and any verification. It is the second refusal this door gives, and the only one decided by the
+			 * address rather than the account: it never reads the account, so it is identical for any email typed
+			 * and says nothing about which accounts exist. It is not an attack report (a person refused by mistake
+			 * would otherwise keep their own address listed), and it never reaches the per-email throttle, so an
+			 * attacker on the list cannot lock an account owner out either.
+			 */
+			const guessingBucket = await getBucketStore().find(bucketId);
+			const guessing = guessingAtDoor(request, guessingBucket);
+			if (guessing.decision === 'refuse') {
+				noteGuessingRefusal(guessing);
+				noteListed(bucketId, 'refused');
+				eventBus.emit('password_guessing_refused', { bucketId });
+				return loginServer(uid, {
+					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'login'),
+					...branded,
+					...loginOptions,
+					...listRefusalOf(guessing)
+				});
+			}
+			if (guessing.decision === 'count') noteListed(bucketId, 'attempt');
+
+			/*
 			 * Before the account lookup and before any verification, so a refused attempt costs neither —
 			 * which is what stops this door doubling as a CPU-exhaustion vector, since every guess against
 			 * a known address used to buy a full password hash. Placed after passwordDoorClosed because a
@@ -1332,6 +1396,7 @@ export const ui = new Elysia()
 				 * under attack, not a log they could read names out of. */
 				eventBus.emit('login_throttled', { bucketId });
 				noteAttack(request, 'signin_failures');
+				noteGuessingFailure(request, guessingBucket);
 				return refuse();
 			}
 
@@ -1350,6 +1415,7 @@ export const ui = new Elysia()
 			) {
 				eventBus.emit('login_throttled', { bucketId });
 				noteAttack(request, 'signin_failures');
+				noteGuessingFailure(request, guessingBucket);
 				return refuse();
 			}
 
@@ -1362,6 +1428,7 @@ export const ui = new Elysia()
 				 */
 				await Bun.password.verify(body.password, await unusablePassword());
 				noteAttack(request, 'signin_failures');
+				noteGuessingFailure(request, guessingBucket);
 				return refuse();
 			}
 			const validPassword = await Bun.password.verify(
@@ -1370,6 +1437,7 @@ export const ui = new Elysia()
 			);
 			if (!validPassword) {
 				noteAttack(request, 'signin_failures');
+				noteGuessingFailure(request, guessingBucket);
 				return refuse();
 			}
 			/*
@@ -1379,6 +1447,7 @@ export const ui = new Elysia()
 			 * by position rather than by remembering to repeat it.
 			 */
 			await clearFailures(bucketId, body.username);
+			if (guessing.decision === 'count') noteListed(bucketId, 'rightPassword');
 			if (!canSignIn(user)) {
 				return refuse();
 			}

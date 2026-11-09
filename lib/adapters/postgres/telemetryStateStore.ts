@@ -116,6 +116,16 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		`;
 	}
 
+	async raiseAttackerListBuiltAt(builtAt: string): Promise<void> {
+		const handle = sql();
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(doc, '{attackerListBuiltAt}', to_jsonb(${builtAt}::text))
+			WHERE id = ${this.stateId}
+			  AND (doc->>'attackerListBuiltAt' IS NULL OR doc->>'attackerListBuiltAt' < ${builtAt})
+		`;
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		const handle = sql();
 		const rows = await handle`

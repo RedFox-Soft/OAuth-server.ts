@@ -478,6 +478,11 @@ export const ACTIONS = {
 
 	// The save bar asks its own question when a change is risky (settings/SaveBar.tsx).
 	'settings.save': { class: 'C0' },
+	'settings.attackReportsOff': {
+		class: 'C2',
+		title: () => 'Turn off attack reporting?',
+		okText: 'Turn off'
+	},
 	'settings.discard': {
 		class: 'C1',
 		title: (t) => `Discard ${t}?`,

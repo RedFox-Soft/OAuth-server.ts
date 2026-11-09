@@ -20,6 +20,10 @@ import { SmtpCard } from '../settings/SmtpCard.js';
 import { SentryCard } from '../settings/SentryCard.js';
 import { TelemetryCard } from '../settings/TelemetryCard.js';
 import { AttackReportsCard } from '../settings/AttackReportsCard.js';
+import {
+	AttackerListCard,
+	type AttackerListView
+} from '../settings/AttackerListCard.js';
 import { CallerAddressCard } from '../settings/CallerAddressCard.js';
 import { PlansCard } from '../settings/PlansCard.js';
 import { Sl1ReadinessCard } from '../settings/Sl1ReadinessCard.js';
@@ -27,6 +31,7 @@ import { useLeaveGuard } from '../frame/router.js';
 import { PageHeader } from '../frame/PageHeader.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
+import { useConfirm } from '../frame/confirm.js';
 import { useMe } from '../frame/me.js';
 import { LoadFailed, NoMatch } from '../frame/states.js';
 
@@ -63,6 +68,7 @@ export function Settings() {
 	const [failed, setFailed] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const feedback = useFeedback();
+	const confirm = useConfirm();
 	const { reload: reloadMe } = useMe();
 	const [pane, setPane] = useState<SettingDomain | null>(null);
 	const [query, setQuery] = useState('');
@@ -135,8 +141,37 @@ export function Settings() {
 		setValues((prev) => cascadeOff(catalog, prev, primary.key));
 	}
 
+	/*
+	 * Turning attack reporting off turns FoxTrust's list off with it (specs/125: the list is built from what servers
+	 * report), so the projects counting or refusing with it are named in numbers before anything is saved.
+	 */
+	async function listLossAccepted(): Promise<boolean> {
+		if (
+			!dirty.includes('attackReports.enabled') ||
+			values['attackReports.enabled'] !== false ||
+			baseline['attackerList.enabled'] !== true
+		) {
+			return true;
+		}
+		const status = await request<AttackerListView>(
+			'GET',
+			'/admin/api/settings/attacker-list'
+		);
+		const using = status.ok ? status.data.projectsUsing : null;
+		return confirm('settings.attackReportsOff', {
+			target: 'attack reporting',
+			consequences: [
+				"FoxTrust's list of password-guessing addresses is turned off with it.",
+				using
+					? `${String(using.count)} projects count with the list and ${String(using.refuse)} of them refuse with it; they stop until the list is on again.`
+					: 'Every project counting or refusing with the list stops until it is on again.'
+			]
+		});
+	}
+
 	async function save() {
 		if (dirty.length === 0) return;
+		if (!(await listLossAccepted())) return;
 		setSaving(true);
 		try {
 			const body: Values = {};
@@ -312,6 +347,11 @@ export function Settings() {
 						{!searching && pane === 'integrations' && (
 							<AttackReportsCard
 								key={`attack-reports-${String(baseline['attackReports.enabled'])}`}
+							/>
+						)}
+						{!searching && pane === 'integrations' && (
+							<AttackerListCard
+								key={`attacker-list-${String(baseline['attackerList.enabled'])}`}
 							/>
 						)}
 						{!searching && pane === 'integrations' && <SmtpCard />}

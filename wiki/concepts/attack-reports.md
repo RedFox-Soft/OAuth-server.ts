@@ -4,7 +4,7 @@ title: 'Attack reports: the addresses that attacked an instance, hourly, to FoxT
 tags: [architecture, security, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-29
-updated: 2026-10-29
+updated: 2026-11-09
 ---
 
 # Attack reports: the addresses that attacked an instance, hourly, to FoxTrust
@@ -28,7 +28,9 @@ and state document. Who a request came from is [[caller-address]].
 ## Where each attack is counted
 
 One synchronous call, `noteAttack(request, type, probe?)` (`lib/attack_reports/tally.ts:65`), beside a refusal
-the server already makes:
+the server already makes. One refusal is deliberately not counted (spec 125, 2026-11-09): a password sign-in refused
+because of FoxTrust's attacker list, which would otherwise let people refused by mistake keep their own address
+listed ([[shared-attacker-list]]):
 
 | Type | Threshold | Site |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '2a5ae921adcf';
+export const source = '6fffc1f9dca9';
 
 export default {
 	questions: {
@@ -719,6 +719,52 @@ export default {
 			goodToKnow: [
 				'任何身份验证器应用都可以。',
 				'如果有人丢了手机，管理员可以在该用户的页面上清除其第二因素。'
+			],
+			actionLabel: '打开 Sign-in'
+		},
+		knownguessers: {
+			title: '阻止已知地址猜测密码',
+			sentence:
+				'使用 FoxTrust 的列表，其中是被发现猜测密码的地址。列表中的地址在这里可以输错三次密码，之后它的密码登录会被拒绝。',
+			protocol: '签名的 IP 信誉列表（FoxTrust）',
+			problemCaption: '一个地址尝试成千上万个密码。',
+			fixCaption: '已知的猜测者只有三次机会。',
+			lanes: {
+				foxtrust: 'FoxTrust',
+				guesser: '猜测密码者',
+				fox: 'FoxAuth',
+				person: '用户'
+			},
+			steps: [
+				{
+					label: '签名的列表',
+					text: '你的服务器每小时从 FoxTrust 下载被发现猜测密码的地址列表，并验证其签名。'
+				},
+				{
+					label: '猜测密码',
+					text: '列表中的一个地址对许多账户尝试密码。它的前三个错误密码照常检查。'
+				},
+				{
+					label: '不是这个网络',
+					text: '一小时内失败三次后，项目会拒绝它的下一个密码，并且不检查它。只要该地址继续尝试，就一直如此。'
+				},
+				{
+					label: '正确的密码',
+					text: '另一个人使用列表中的地址，例如共享的 Wi-Fi，第一次就输入了自己正确的密码。'
+				},
+				{ label: '已登录', text: '他和以前一样登录，你的应用拿到令牌。' }
+			],
+			sees: [
+				'来自列表中的地址、输错三次密码之后：“此网络暂时无法使用密码登录”、现在可以怎么做，以及一行要发给你的文字',
+				'第一次就输入正确密码：和以前一样登录',
+				'页面上的其他登录方式保持不变'
+			],
+			goodToKnow: [
+				'由超级管理员在 Settings → Integrations 的 Attack reporting 下开启该列表。需要先开启攻击报告，因为列表是根据各服务器报告的内容生成的。',
+				'每个项目一开始都是 Count only。对任何人都没有变化，Sign-in 标签页显示 7 天的数字。当数字表明安全时，再选择 Refuse password sign-in。',
+				'被拒绝的人会看到一行要发给你的文字，其中有他的地址。把这个地址添加到 Never check these networks，他就能立即登录。',
+				'FoxTrust 永远不会知道谁在登录。超过 3 小时的列表不会被使用，因此不会有人因它被拒绝。',
+				'只影响密码登录。通过身份提供商登录、重置密码和注册都不受影响。所有套餐都提供此功能。'
 			],
 			actionLabel: '打开 Sign-in'
 		},

@@ -39,7 +39,22 @@ export const en = {
 		/* Opens the providers folded away on a page with many of them (specs/105). */
 		moreProviders: 'More sign-in options',
 		// The provider's own name from the built-in catalogue, never the name an administrator gave it.
-		signInWith: 'Sign in with {provider}'
+		signInWith: 'Sign in with {provider}',
+		/*
+		 * In place of the password form when this network's address is on FoxTrust's list and has just failed
+		 * passwords here (specs/125). Says what to do now; the support line and the dispute link follow as their
+		 * own elements, never as values inside these sentences.
+		 */
+		listRefusal: {
+			title: 'Password sign-in is not available from this network',
+			happened:
+				"This network's address was recently used to guess passwords, so this service is not accepting passwords from it right now.",
+			whatNow:
+				'You can try again from another network, for example mobile data instead of Wi-Fi, or use one of the other ways to sign in on this page.',
+			support:
+				'If this keeps happening, send this line to the people who run this service:',
+			dispute: 'Ask FoxTrust to review this address'
+		}
 	},
 
 	registration: {

@@ -107,7 +107,9 @@ export const REPORTED_SETTINGS: readonly string[] = [
 	'registrationManagement.rotateRegistrationAccessToken',
 	'conformIdTokenClaims',
 	/* Whether this server feeds the attack reports; the receiver cannot otherwise tell "no attacks" from "off". */
-	'attackReports.enabled'
+	'attackReports.enabled',
+	/* How many instances take the list back is the measure of whether it is worth building. */
+	'attackerList.enabled'
 ];
 
 export const UNREPORTED_SETTINGS: Readonly<Record<string, string>> = {

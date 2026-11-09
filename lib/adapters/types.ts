@@ -703,7 +703,12 @@ export const TelemetryState = t.Object({
 	 * and is read only by super administrators.
 	 */
 	lastAttackReport: t.Optional(t.String()),
-	lastAttackDeliveredAt: t.Optional(t.String())
+	lastAttackDeliveredAt: t.Optional(t.String()),
+	/*
+	 * The `builtAt` of the last FoxTrust attacker list any process of this instance accepted (specs/125). Kept so
+	 * an older signed list is refused after a restart too; only ever raised.
+	 */
+	attackerListBuiltAt: t.Optional(t.String())
 });
 export type TelemetryState = Static<typeof TelemetryState>;
 
@@ -731,6 +736,11 @@ export interface TelemetryStateStoreInstance {
 	recordSend(reportJson: string, deliveredAt: Date | null): Promise<void>;
 	/* The same for an attack report; the usage report's fields are left as they are. */
 	recordAttackSend(reportJson: string, deliveredAt: Date | null): Promise<void>;
+	/*
+	 * Sets `attackerListBuiltAt` only when it is absent or earlier, in one atomic statement, so a slow process
+	 * can never lower it. Called after instanceId(), which guarantees the document exists.
+	 */
+	raiseAttackerListBuiltAt(builtAt: string): Promise<void>;
 	read(): Promise<TelemetryState | null>;
 }
 
@@ -2451,6 +2461,37 @@ export const BucketDeletion = t.Object({
 });
 export type BucketDeletion = Static<typeof BucketDeletion>;
 
+/*
+ * A project's answer to FoxTrust's attacker list (specs/125). `exempt` holds networks never checked against the list,
+ * each canonical (lib/behind_proxy/net.ts) and optionally ending at `until`.
+ */
+export const PasswordGuessingMode = t.Union([
+	t.Literal('nothing'),
+	t.Literal('count'),
+	t.Literal('refuse')
+]);
+export type PasswordGuessingMode = Static<typeof PasswordGuessingMode>;
+
+export const PasswordGuessingExemption = t.Object(
+	{
+		network: t.String({ minLength: 1, maxLength: 60 }),
+		until: t.Optional(t.String({ format: 'date-time' }))
+	},
+	{ additionalProperties: false }
+);
+export type PasswordGuessingExemption = Static<
+	typeof PasswordGuessingExemption
+>;
+
+export const PasswordGuessingSetting = t.Object(
+	{
+		mode: PasswordGuessingMode,
+		exempt: t.Array(PasswordGuessingExemption, { maxItems: 100 })
+	},
+	{ additionalProperties: false }
+);
+export type PasswordGuessingSetting = Static<typeof PasswordGuessingSetting>;
+
 export const UserBucket = t.Object({
 	_id: t.String(),
 	name: t.String(),
@@ -2608,6 +2649,12 @@ export const UserBucket = t.Object({
 			{ maxItems: 2 }
 		)
 	),
+	/*
+	 * What a password sign-in from an address on FoxTrust's attacker list meets in this project (specs/125). Absent
+	 * means counting only, so a project predating the field is counted, never refused. Older releases ignore it,
+	 * which stops refusals: failing open is the safe side for a deny list.
+	 */
+	passwordGuessing: t.Optional(PasswordGuessingSetting),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -2696,6 +2743,7 @@ export interface UserBucketStoreInstance {
 				| 'signInOrder'
 				| 'connectedServices'
 				| 'proxyKeys'
+				| 'passwordGuessing'
 			>
 		>
 	): Promise<UserBucket | null>;

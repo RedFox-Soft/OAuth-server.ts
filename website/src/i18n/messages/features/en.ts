@@ -152,6 +152,10 @@ export default {
 					title: 'Sign-in brute-force throttle',
 					body: 'Persisted per-identity failure counters with escalating lockouts. A throttled refusal looks exactly like a wrong password.'
 				},
+				attackerList: {
+					title: 'Known password-guessing addresses, from FoxTrust',
+					body: "Every hour the server downloads FoxTrust's signed list of addresses seen guessing passwords, checks the signature, and uses the list for at most 3 hours. Each project chooses what happens to password sign-ins from those addresses: nothing, counting only, or refusing an address once it has also failed 3 passwords on this server within an hour. A person who types the right password first still signs in, and a refused person gets a line to send you, so you can let their network through. FoxTrust never learns who signs in."
+				},
 				rateLimit: {
 					title: 'Per-origin rate limiting',
 					body: 'Tiered by route class and on by default, with the trusted-proxy hop configurable.'

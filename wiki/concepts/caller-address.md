@@ -4,7 +4,7 @@ title: 'The caller address and the per-caller mail limit'
 tags: [architecture, security, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-28
-updated: 2026-11-05
+updated: 2026-11-09
 ---
 
 # The caller address and the per-caller mail limit
@@ -18,6 +18,11 @@ Since spec 122 (2026-11-05) one caller narrows its answer. The check a proxy mak
 always called by the proxy, and a trusted proxy's `X-Forwarded-For` names the person it is asking about. So
 `checkCallerOf` replaces an address resolved from that header with the connection it arrived on
 (`lib/behind_proxy/rate_limit.ts:59-70`; [[behind-your-proxy]]).
+
+Since spec 125 (2026-11-09) the password door also asks FoxTrust's attacker list about the caller's address. It never
+asks about a trusted proxy's, a Cloudflare edge's, an unattributed or a non-public address (`listedCandidate`,
+`lib/attacker_list/at_sign_in.ts`), so a server whose address source is wrong refuses nobody rather than everybody
+([[shared-attacker-list]]).
 
 ## The defect it replaced
 

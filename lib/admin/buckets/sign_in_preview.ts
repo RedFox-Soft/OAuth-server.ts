@@ -1,5 +1,10 @@
 import { adapter, getUserStore } from '../../adapters/index.js';
-import type { EndUserTally, UserBucket } from '../../adapters/types.js';
+import type {
+	EndUserTally,
+	PasswordGuessingSetting,
+	UserBucket
+} from '../../adapters/types.js';
+import { countsFor } from '../../attacker_list/counters.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
 import {
@@ -22,7 +27,11 @@ import {
  */
 
 export type SignInChange =
-	'passwordsOff' | 'verificationOn' | 'authenticatorOn' | 'signUpOpen';
+	| 'passwordsOff'
+	| 'verificationOn'
+	| 'authenticatorOn'
+	| 'signUpOpen'
+	| 'guessingRefuseOn';
 
 export interface SignInPreview {
 	consequences: string[];
@@ -35,6 +44,7 @@ interface SignInPatch {
 	registrationOpen?: boolean;
 	emailVerificationRequired?: boolean;
 	totpRequired?: boolean;
+	passwordGuessing?: Pick<PasswordGuessingSetting, 'mode'>;
 }
 
 export interface SignInCounts extends EndUserTally {
@@ -90,6 +100,17 @@ export async function signInPreview(
 	if (turnsOn('totpRequired') && passwordsAfter)
 		changes.push('authenticatorOn');
 	if (turnsOn('registrationOpen') && atTheRoot) changes.push('signUpOpen');
+	/*
+	 * Refusing sign-ins from listed addresses (specs/125): shared addresses are on shared lists, so the numbers of the
+	 * last 7 days — how many came from listed addresses and how many of those had the right password — are what the
+	 * administrator consents to.
+	 */
+	if (
+		patch.passwordGuessing?.mode === 'refuse' &&
+		(bucket.passwordGuessing?.mode ?? 'count') !== 'refuse'
+	) {
+		changes.push('guessingRefuseOn');
+	}
 	if (changes.length === 0) return null;
 
 	const counts = await signInCounts(bucket);
@@ -141,6 +162,15 @@ export async function signInPreview(
 					`${plural(counts.passwordWithoutAuthenticator, `password ${people}`)} ${counts.passwordWithoutAuthenticator === 1 ? 'has' : 'have'} no authenticator yet; they set one up at their next sign-in.`
 				);
 				break;
+			case 'guessingRefuseOn': {
+				const listed = await countsFor(bucket._id);
+				expect.listedAttempts = listed.listedAttempts;
+				expect.listedRightPassword = listed.listedRightPassword;
+				consequences.push(
+					`In the last 7 days ${plural(listed.listedAttempts, 'password sign-in')} came from addresses on FoxTrust's list, ${String(listed.listedRightPassword)} of them with the right password; from now on such an address is refused once it has failed 3 passwords here within an hour, or at once when FoxTrust corroborates it.`
+				);
+				break;
+			}
 			case 'signUpOpen':
 				consequences.push(
 					consoleBucket

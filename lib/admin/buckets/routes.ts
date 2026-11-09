@@ -27,7 +27,11 @@ import {
 	type BucketDependents,
 	type BucketFacts
 } from '../auth/can.js';
-import type { BucketAddressWrite, UserBucket } from '../../adapters/types.js';
+import type {
+	BucketAddressWrite,
+	PasswordGuessingSetting,
+	UserBucket
+} from '../../adapters/types.js';
 import { isUniqueValueTaken } from '../../adapters/conflicts.js';
 import { presentAll } from '../federation/service.js';
 import {
@@ -111,6 +115,11 @@ import {
 	sourceGroupOf
 } from '../ownership/destination.js';
 import { planViewOf, plansShownTo } from '../../plans/view.js';
+import {
+	formatAddress,
+	formatRange,
+	parseRange
+} from '../../behind_proxy/net.js';
 import { connectCallbackUri } from '../../connected_services/catalogue.js';
 
 /*
@@ -754,6 +763,42 @@ function withAddressGuidance<
 }
 
 /*
+ * A project's answer to FoxTrust's attacker list, checked and canonical before it is previewed, recorded or written
+ * (specs/125). Refusing on the administrators' project could lock out every administrator, and the console is the
+ * only way back, so that one choice is refused there. A network is stored as `parseRange` reads it, a single address
+ * without its full-width prefix, so the console shows what was meant rather than what was typed.
+ */
+function acceptedPasswordGuessing(
+	bucketId: string,
+	setting: PasswordGuessingSetting
+): PasswordGuessingSetting {
+	if (bucketId === ADMIN_BUCKET_ID && setting.mode === 'refuse') {
+		throw new AdminError(
+			422,
+			"Refusing password sign-in is not available for the administrators' project: it could lock every administrator out.",
+			{ field: 'passwordGuessing.mode' }
+		);
+	}
+	const exempt = setting.exempt.map((entry, i) => {
+		const range = parseRange(entry.network.trim());
+		if ('error' in range) {
+			throw new AdminError(422, `not an address or range: ${entry.network}`, {
+				field: `passwordGuessing.exempt[${String(i)}].network`
+			});
+		}
+		const full = range.version === 4 ? 32 : 128;
+		const network =
+			range.bits === full
+				? formatAddress({ version: range.version, value: range.base })
+				: formatRange(range);
+		return entry.until === undefined
+			? { network }
+			: { network, until: entry.until };
+	});
+	return { mode: setting.mode, exempt };
+}
+
+/*
  * A second factor on a bucket that accepts no passwords is inert, not wrong: the requirement governs
  * the password door, and there is no password door. Recording the intended posture before opening one
  * is a reasonable order to do things in, so this says so rather than refusing — a 422 here would make
@@ -1163,6 +1208,12 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			}
 			if (params.id === ADMIN_BUCKET_ID) {
 				await assertAdminBucketChange(ctx, bucket, changes);
+			}
+			if (changes.passwordGuessing) {
+				changes.passwordGuessing = acceptedPasswordGuessing(
+					params.id,
+					changes.passwordGuessing
+				);
 			}
 			/*
 			 * After every refusal, so a preview is never offered for a change that would be refused anyway; and

@@ -886,6 +886,19 @@ const catalogue = [
 			'Whether this server reports the addresses that attack it to FoxTrust each hour, why not if it does not, when a report was last delivered, and the exact report last sent (or, before the first, an example with no real address). Turned on and off with settings_update (`attackReports.enabled`).'
 	},
 	{
+		tool: 'attacker_list_status_get',
+		method: 'GET',
+		path: '/admin/api/settings/attacker-list',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"The state of FoxTrust's list of addresses seen guessing passwords in the server process that answers: whether it is on, `state` (off, not-yet, current, out-of-date, unknown-format), the list held (version, build time, validity, number of addresses), the last check and acceptance, the last persisting problem, and how many projects count or refuse with it. Never an address. Turned on and off with settings_update (`attackerList.enabled`, which needs `attackReports.enabled`); each project chooses what it does with the list through project_update (`passwordGuessing`)."
+	},
+	{
 		tool: 'jwks_list',
 		method: 'GET',
 		path: '/admin/api/jwks',
@@ -923,6 +936,19 @@ const catalogue = [
 		pathParams: ['id'],
 		summary:
 			"The proxy keys of a project (at most two): each key's id and when it was issued. The operator's proxy sends one with every check so that the people's addresses it reports are believed by network conditions on the project's apps and APIs. The keys themselves are never returned; issuing one is console-only (Connect), because the key is shown once to whoever issues it."
+	},
+	{
+		tool: 'project_password_guessing_get',
+		method: 'GET',
+		path: '/admin/api/projects/:id/password-guessing',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"What a project does with password sign-ins from addresses on FoxTrust's list of addresses seen guessing passwords: `mode` (nothing, count — the default — or refuse), its exempt networks, the list's state in the answering server process, and for the last 7 days how many password sign-ins came from listed addresses, how many of those had the right password and how many were refused. Never an address from the list; `yourAddress` is the caller's own. Changed with project_update (`passwordGuessing`)."
 	},
 	{
 		tool: 'audit_list',
@@ -1389,7 +1415,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy."
+			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy. `passwordGuessing` sets what a password sign-in from an address on FoxTrust's list of addresses seen guessing passwords meets — `mode` nothing, count (the default) or refuse, and `exempt` networks never checked (each a single address or range, optionally `until` a date-time, at most 100). Choosing refuse previews like the tightenings above, with the last 7 days' numbers (`listedAttempts`, `listedRightPassword`) as `expect`, and is refused on the administrators' project."
 	},
 
 	/* ----------------------------------------------- writes: end-users (10) */

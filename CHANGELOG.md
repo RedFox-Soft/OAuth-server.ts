@@ -32,6 +32,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   refuse to start, and during a rolling deploy older processes answer errors for apps and APIs with conditions until
   replaced. Free on every plan.
 
+- **Refusing password sign-ins from known password-guessing addresses** (spec 125). A super administrator can turn
+  on FoxTrust's signed list of addresses seen guessing passwords (Settings → Integrations, with attack reporting on).
+  Each server process downloads it hourly, checks the signature against a built-in key and refuses an older or
+  expired list; a missing or stale list refuses nobody. Each project chooses, on its Sign-in tab, nothing, count only
+  (the default, with 7-day numbers) or refuse: a listed address is refused once it has failed 3 passwords here within
+  an hour, or at once when FoxTrust corroborates it, and stays refused while it keeps trying. The refused person sees
+  why, what to do, and a line with their own address to send to the operator, who can exempt networks; the address is
+  never logged. Only password sign-in is affected, never on the administrators' project. Re-run `db:setup` or `db:setup:pg` to provision
+  the new `PasswordGuessingTally` area. Rolling back to an older release stops the refusals.
+
 ### Fixed
 
 - **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof` (spec 121). It was read as no proof at

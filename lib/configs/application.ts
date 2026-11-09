@@ -1125,7 +1125,22 @@ export const ApplicationConfig = {
 	 *   information security (GDPR Recital 49). A setting of its own, independent of usage reporting, and
 	 *   the only switch: there is no environment variable. Turning it off discards what was counted.
 	 */
-	'attackReports.enabled': true
+	'attackReports.enabled': true,
+	/*
+	 * attackerList.enabled
+	 *
+	 * title: FoxTrust's list of addresses seen guessing passwords, applied at password sign-in
+	 *
+	 * description: Each server process downloads FoxTrust's signed list every hour (specs/125) and keeps it
+	 *   in memory. Each project then chooses what happens to a password sign-in from a listed address:
+	 *   nothing, counting only, or refusal once the address has also failed passwords here.
+	 *
+	 * Off by default. Usable only with attackReports.enabled, because the list is built from what instances
+	 *   report (validateConfiguration refuses the combination). The only switch: there is no environment
+	 *   variable, and the publication and its keys are constants (lib/consts/attacker_list.ts). A list that is
+	 *   missing or out of date refuses nobody.
+	 */
+	'attackerList.enabled': false
 	/*
 	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
 	 *
