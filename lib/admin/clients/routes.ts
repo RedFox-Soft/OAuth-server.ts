@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import { uriPathParams } from 'lib/plugins/uri_path_params.js';
 import { adapter } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
 import {
@@ -90,6 +91,7 @@ function scopeOf(bucket: UserBucket) {
 
 export const clientRoutes = new Elysia({ name: 'admin-clients' })
 	.use(resolveAdmin)
+	.use(uriPathParams('clientId'))
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;

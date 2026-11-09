@@ -41,6 +41,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   before any password hashing, so it answered measurably sooner than a wrong password. It is now checked against a
   hash no one can type first, and both refusals cost the same.
 
+### Security
+
+- **Elysia 1.4.31 and `@elysiajs/static` 1.4.12**, which close upstream advisories on encoded path routing,
+  authorization and signed-cookie handling, and on serving `.env` and `.git` files. An API or a client whose
+  identifier is a URL is still addressed by it, exactly, in the console, over MCP and at `/reg`.
+
 ## [1.5.0] - 2026-11-05
 
 Signing in through a project's provider can also connect the person's account at a service linked to it, and a

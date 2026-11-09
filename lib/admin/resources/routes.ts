@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import { uriPathParams } from 'lib/plugins/uri_path_params.js';
 
 import {
 	getBucketStore,
@@ -330,6 +331,7 @@ function scopeOf(bucket: UserBucket, namespace: string) {
 
 export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	.use(resolveAdmin)
+	.use(uriPathParams('resourceId'))
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;

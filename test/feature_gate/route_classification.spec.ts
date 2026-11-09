@@ -223,6 +223,7 @@ describe('route classification', () => {
 			'GET /.well-known/oauth-protected-resource/:bucket/scim/v2',
 			'GET /.well-known/security.txt',
 			'GET /jwks',
+			'GET /public',
 			'GET /public/*',
 			/*
 			 * Readiness is metered where liveness is not, and the difference is the whole reason the two

@@ -350,3 +350,4 @@ this server is naming the required scopes in a challenge — which `/mcp` now do
 - [[team-ownership]] — what a project's owning team decides, which a declared resource inherits
 - [[project-is-the-only-container]] — why a declaration stores `bucketId`, and the upgrade that moved the retired project's `projectId` to it
 - [[client-identity-from-database]] — the adapter-every-call rule the resource registry follows, and the memo whose staleness is why the registry has none
+- [[uri-path-parameters]] — why a declared resource is addressed in the console by its raw path segment, so `/` and `%2F` stay different resources

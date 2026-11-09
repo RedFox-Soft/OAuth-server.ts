@@ -26,6 +26,7 @@ import { InitialAccessToken } from 'lib/models/initial_access_token.js';
 import { RegistrationAccessToken } from 'lib/models/registration_access_token.js';
 import { eventBus } from 'lib/event_bus.js';
 import { routeNames } from 'lib/consts/param_list.js';
+import { uriPathParams } from 'lib/plugins/uri_path_params.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { servingBucketIdOf } from 'lib/admin/auth/bucketAddress.js';
 import { storedBucketOf } from 'lib/admin/auth/resolveBucket.js';
@@ -472,6 +473,7 @@ const errors = {
 };
 
 export const registration = new Elysia()
+	.use(uriPathParams('clientId'))
 	.post(routeNames.registration, create, {
 		body: OptionalBody,
 		response: { 201: RegistrationResponse, ...errors }

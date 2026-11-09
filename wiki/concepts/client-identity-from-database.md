@@ -165,5 +165,6 @@ Storage is reached through `adapter('Client')`; the former `Client.adapter` gett
 - [[account-resolution]] — maps a client id to the project a subject is resolved from.
 - [[feature-flag-gating]] — the registration endpoints that create clients are flag-gated.
 - [[pairwise-identifier-salt]] — a pairwise client's sector identifier, read from this record, is the first input to the pseudonym every relying party keys its accounts on.
+- [[uri-path-parameters]] — a client_id that is a URL reaches `/reg/:clientId` and the console routes decoded from its raw path segment
 
 Verified against [[oauth-server-codebase]] at commit `2125ad0`.

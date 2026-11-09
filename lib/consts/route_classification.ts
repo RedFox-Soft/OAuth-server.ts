@@ -586,6 +586,8 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'GET', path: '/.well-known/security.txt', rate: 'public' },
 	{ method: 'GET', path: routeNames.mcp_metadata, rate: 'public' },
 	{ method: 'GET', path: routeNames.jwks, rate: 'public' },
+	/* @elysiajs/static 1.4.12 mounts the bare directory beside its wildcard. */
+	{ method: 'GET', path: '/public', rate: 'public' },
 	{ method: 'GET', path: '/public/*', rate: 'public' },
 	{ method: 'GET', path: SCIM_METADATA_ROUTE, rate: 'public' },
 	/*

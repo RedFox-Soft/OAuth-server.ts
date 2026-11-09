@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia';
+import { uriPathParams } from 'lib/plugins/uri_path_params.js';
 import { getBucketGroupStore, getUserStore } from '../../adapters/index.js';
 import {
 	MAX_END_USER_PAGE,
@@ -266,6 +267,7 @@ const BULK_ACTIONS: Readonly<Record<BulkAct, AuditAction>> = {
 
 export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	.use(resolveAdmin)
+	.use(uriPathParams('clientId'))
 	.onError(({ error, set }) => {
 		if (error instanceof AdminError) {
 			set.status = error.status;
