@@ -209,8 +209,8 @@ describe('bringing existing accounts under the requirement (US4)', () => {
 
 		await raise(false);
 		const lowered = await signIn(email);
-		// Straight through: no code demanded of an enrolled account in a bucket that does not ask.
-		expect(lowered.res.setCookie ?? '').toContain(SESSION_COOKIE_PREFIX);
+		// Still asked for: a person who holds a factor types its code whatever the bucket requires (specs/126).
+		expect(lowered.res.location).toBe(`/ui/${lowered.uid}/totp`);
 
 		// The enrolment survived the round trip.
 		const user = await getUserStore(bucketId).findByEmail(email);

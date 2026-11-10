@@ -80,7 +80,12 @@ export const en = {
 		manualKey: 'Or enter this key manually:',
 		codeRequired: 'Please enter your code!',
 		confirm: 'Confirm',
-		verify: 'Verify'
+		verify: 'Verify',
+		/* After an administrator removed the person's authenticator (specs/126): the new one is proved by mail first. */
+		mailedHeading: 'Check your email',
+		mailedHint:
+			'Your authenticator app was removed from your account. We sent you a link: open it in this browser within 10 minutes to set up a new one.',
+		mailedResend: 'Send a new link'
 	},
 
 	notices: {

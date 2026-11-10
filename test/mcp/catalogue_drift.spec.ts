@@ -235,6 +235,8 @@ describe('MCP tool catalogue', () => {
 			/* Hands the account's recovery to whoever holds the new mailbox. */
 			'project_user_email_change',
 			'project_user_password_reset',
+			/* Takes away a second factor the person relies on: the help-desk route around one (specs/126). */
+			'project_user_totp_clear',
 			/* Re-admits an account an administrator locked as compromised. */
 			'project_user_unlock',
 			/* Ends a customer's provisioning and revokes its tokens at once. */

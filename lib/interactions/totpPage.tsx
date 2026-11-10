@@ -27,7 +27,11 @@ import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 
 export interface TotpPageProps {
 	uid: string;
-	mode: 'verify' | 'enroll';
+	/*
+	 * `mailed`: an administrator removed this person's authenticator, so a new one is proved by a mailed link before any
+	 * secret is shown (specs/126 research R8). No form: the link leads back here.
+	 */
+	mode: 'verify' | 'enroll' | 'mailed';
 	errorMessage?: string;
 	/* Enrol mode only. The QR's value; carries the secret. */
 	otpauthUri?: string;
@@ -78,6 +82,41 @@ export function TotpPage({
 	const T = SIGN_IN_TEXTS[useLanguage()];
 	const enrolling = mode === 'enroll';
 	const action = buildUIPath(uid, enrolling ? 'totp/enroll' : 'totp');
+
+	if (mode === 'mailed') {
+		return (
+			<Flex
+				justify="center"
+				style={{
+					display: 'flex',
+					height: '100vh',
+					alignItems: 'center',
+					backgroundColor: foxVar('page')
+				}}
+			>
+				<Card
+					style={{
+						width: 400,
+						maxWidth: '100%',
+						padding: 24,
+						borderRadius: 12,
+						boxShadow: `0 2px 8px ${foxVar('shadow')}`
+					}}
+				>
+					<SignInMasthead
+						face={face}
+						logoSrc={logoSrc}
+						heading={T.totp.mailedHeading}
+					/>
+					<Typography.Paragraph>{T.totp.mailedHint}</Typography.Paragraph>
+					<Button href={`${buildUIPath(uid, 'totp/enroll')}?resend=1`}>
+						{T.totp.mailedResend}
+					</Button>
+					{switcher && <LanguageSwitch {...switcher} />}
+				</Card>
+			</Flex>
+		);
+	}
 
 	return (
 		<Flex

@@ -1,4 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import {
+	useEffect,
+	useState,
+	useSyncExternalStore,
+	type ReactNode
+} from 'react';
 import {
 	Alert,
 	Button,
@@ -42,6 +47,19 @@ interface Attention {
 	action: ReactNode;
 }
 
+function subscribeToStorage(onChange: () => void): () => void {
+	window.addEventListener('storage', onChange);
+	return () => window.removeEventListener('storage', onChange);
+}
+
+function readDismissal(key: string): boolean {
+	try {
+		return window.localStorage.getItem(key) === '1';
+	} catch {
+		return false;
+	}
+}
+
 function plural(n: number, one: string, many: string): string {
 	return `${String(n)} ${n === 1 ? one : many}`;
 }
@@ -74,6 +92,23 @@ export function BucketOverview({
 	 * US6), and a static token about to expire (specs/088). The list is short; a caller who may not read it gets
 	 * neither item, and the summary still says a hold exists.
 	 */
+	const noticeKey = `foxauth.twoStepNotice.${bucket._id}`;
+	// Hidden on the server and in a browser that keeps nothing, so the first paint and the hydration agree.
+	const storedDismissal = useSyncExternalStore(
+		subscribeToStorage,
+		() => readDismissal(noticeKey),
+		() => true
+	);
+	const [dismissedNow, setDismissedNow] = useState(false);
+	const twoStepNoticeDismissed = storedDismissal || dismissedNow;
+	function dismissTwoStepNotice() {
+		setDismissedNow(true);
+		try {
+			window.localStorage.setItem(noticeKey, '1');
+		} catch {
+			// A browser that keeps nothing shows the notice again next time; nothing else depends on it.
+		}
+	}
 	const [connections, setConnections] = useState<
 		{
 			id: string;
@@ -107,6 +142,43 @@ export function BucketOverview({
 
 	/* In the order of FR-003: what stops people first, what only looks odd last. */
 	const attention: Attention[] = [];
+	/*
+	 * Since specs/126 a person who set up an authenticator app is asked for it at every password sign-in, so people who
+	 * set one up while the project required one, and are no longer asked, are asked again after the upgrade. Said once,
+	 * until the viewer dismisses it; the dismissal is this browser's convenience, never the project's state.
+	 */
+	const enrolled =
+		summary && !bucket.totpRequired && bucket.passwordLogin
+			? summary.users - summary.withoutAuthenticator
+			: 0;
+	if (enrolled > 0 && !twoStepNoticeDismissed) {
+		attention.push({
+			key: 'two-step',
+			type: 'info',
+			title: `${plural(enrolled, 'person has', 'people have')} an authenticator app. Since this version they are asked for a code at every password sign-in, even though this project does not require one.`,
+			action: (
+				<Flex gap={8}>
+					<Button
+						size="small"
+						onClick={() =>
+							void navigate(
+								`${bucketHref(bucket._id, 'users')}?authenticator=yes`
+							)
+						}
+					>
+						See them
+					</Button>
+					<Button
+						size="small"
+						type="text"
+						onClick={dismissTwoStepNotice}
+					>
+						Dismiss
+					</Button>
+				</Flex>
+			)
+		});
+	}
 	if (summary && summary.held > 0) {
 		attention.push({
 			key: 'held',

@@ -128,5 +128,62 @@ export const zhHans: AccountTexts = {
 	linkChangedApp: '{app}已不能再使用{service}。',
 	linkChangedAccess:
 		'{app}已无权访问您在此处的账号。请重新登录该应用以授予访问权限。',
-	linkChangedAccount: '该{service}账号已不再连接。'
+	linkChangedAccount: '该{service}账号已不再连接。',
+	securityLink: '两步验证',
+	securityTitle: '两步验证',
+	securityOff: '未开启。用密码登录{service}只需要密码。',
+	securityExplain:
+		'开启后，输入密码之后还需要输入手机上身份验证器应用中的 6 位验证码。即使有人知道了您的密码，也无法登录。',
+	securityNeeds:
+		'您需要在手机上安装一个身份验证器应用，例如 Google Authenticator、Microsoft Authenticator 或 1Password，以及您的邮箱 {email}。',
+	securityLostPhone:
+		'如果您丢失了手机，在{service}的运营人员将其从您的账号中移除之前，您将无法登录。',
+	securityStart: '开启两步验证',
+	securitySentTitle: '请查看您的邮箱',
+	securitySent:
+		'我们已向 {email} 发送了一个链接。请在 10 分钟内用此浏览器打开它以继续。',
+	securityResend: '发送新链接',
+	securityAddTitle: '将{service}添加到您的身份验证器应用',
+	securityScan: '请用您的身份验证器应用扫描此二维码。',
+	securityQrLabel: '身份验证器应用的二维码',
+	securityKey: '无法扫描？请在应用中输入此密钥：',
+	securityOpenApp: '正在用这部手机？在身份验证器应用中打开',
+	securitySpare: '提示：也用另一台设备扫描，留作备用。',
+	securityCodeLabel: '身份验证器应用中的验证码',
+	securityTurnOn: '开启',
+	securityWrongCode: '该验证码无效。请输入应用当前显示的验证码。',
+	securityOnTitle: '两步验证已开启',
+	securityOnSince: '自 {date} 起开启。',
+	securityOnEvery:
+		'每次用密码登录{service}时，您还需要输入身份验证器应用中的验证码。这适用于您用{service}账号登录的所有应用。',
+	securityProvider:
+		'通过{provider}登录时不会要求此验证码；该登录由{provider}自身保护。',
+	securityReplace: '换用另一部手机',
+	securityTurnOff: '关闭',
+	securityRequired: '{service}要求所有人输入验证码，因此无法关闭。',
+	securityOffConfirmTitle: '关闭两步验证？',
+	securityOffConfirm: '登录{service}将只需要您的密码。',
+	securityNoPassword:
+		'您是通过身份提供方登录的，而不是在此处使用密码。它自己的第二重验证会保护您。',
+	securityUnavailable: '{service}的运营人员尚未在此处提供两步验证。',
+	securitySignInWithPassword:
+		'要进行设置，请用密码登录，而不是通过身份提供方登录。',
+	securityDoneOn: '两步验证已开启。我们已向 {email} 发送了确认邮件。',
+	securityDoneChanged: '新的身份验证器应用已设置好。旧应用中的验证码不再有效。',
+	securityDoneOff: '两步验证已关闭。',
+	securityThrottled: '您已请求了多封邮件。请稍后再试。',
+	securityMailFailed: '我们无法发送邮件。请稍后再试。',
+	securityLinkInvalid:
+		'此链接在这里无效。请在您开始操作的浏览器中、10 分钟内打开最新的那个链接。',
+	securityChanged: '在您操作期间情况发生了变化。请重新开始。',
+	disownTitle: '要从 {email} 移除两步验证吗？',
+	disownEffect:
+		'这将移除刚刚设置的身份验证器应用，并让您的账号在所有设备上退出登录。然后请修改密码。',
+	disownButton: '移除',
+	disownDoneTitle: '两步验证已移除',
+	disownDone:
+		'您的账号已在所有设备上退出登录。请立即修改密码：在{service}的登录页面上选择“{forgot}”。',
+	disownNothingTitle: '未作任何更改',
+	disownNothing:
+		'此链接已失效。如果是其他人在您的账号上设置了两步验证，请联系{service}的运营人员。'
 };

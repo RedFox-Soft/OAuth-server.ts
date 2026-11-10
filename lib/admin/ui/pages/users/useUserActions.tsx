@@ -68,13 +68,13 @@ export function useUserActions(bucketId: string) {
 				const agreed = await confirm('user.totp.reset', {
 					target: user.email,
 					consequences: [
-						'Their current authenticator stops working immediately.',
-						'They are signed out everywhere.',
-						'They set up a new one at their next sign-in.'
+						'Their authenticator app stops working immediately, and they are signed out everywhere.',
+						'Until they set up a new one, their password alone signs them in. Anyone who knows it can sign in too.',
+						'A new one needs a link we email them. We also email them that this one was removed.'
 					]
 				});
 				if (!agreed || !(await send('DELETE', user, '/totp'))) return false;
-				feedback.done(`Authenticator of ${user.email} reset.`);
+				feedback.done(`Authenticator app of ${user.email} removed.`);
 				return true;
 			},
 

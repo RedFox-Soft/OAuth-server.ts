@@ -36,6 +36,8 @@ import type { TeamInvitationThrottlePayload } from '../admin/groups/invite_bound
 import type {
 	TotpAttemptPayload,
 	TotpEnrollmentPayload,
+	TotpLinkPayload,
+	TotpLinkThrottlePayload,
 	TotpSpentStepPayload
 } from '../totp/types.js';
 import type { UpstreamSessionPayload } from '../upstream_signals/types.js';
@@ -91,6 +93,8 @@ export interface ModelPayloadByName {
 	TeamInvitationThrottle: TeamInvitationThrottlePayload;
 	TotpAttempt: TotpAttemptPayload;
 	TotpEnrollment: TotpEnrollmentPayload;
+	TotpLink: TotpLinkPayload;
+	TotpLinkThrottle: TotpLinkThrottlePayload;
 	TotpSpentStep: TotpSpentStepPayload;
 	UpstreamSession: UpstreamSessionPayload;
 	VerificationChallenge: VerificationChallengePayload;

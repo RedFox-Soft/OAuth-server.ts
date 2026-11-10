@@ -62,7 +62,11 @@ export const zhHans: SignInTexts = {
 		manualKey: '或者手动输入此密钥：',
 		codeRequired: '请输入验证码！',
 		confirm: '确认',
-		verify: '验证'
+		verify: '验证',
+		mailedHeading: '请查看您的邮箱',
+		mailedHint:
+			'身份验证器应用已从您的账号中移除。我们已向您发送了一个链接：请在 10 分钟内用此浏览器打开它，以设置新的身份验证器应用。',
+		mailedResend: '发送新链接'
 	},
 
 	notices: {

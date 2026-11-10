@@ -153,5 +153,71 @@ export const en = {
 	linkChangedApp: '{app} may no longer use {service}.',
 	linkChangedAccess:
 		'{app} no longer has access to your account here. Sign in to it again to give it access.',
-	linkChangedAccount: 'That {service} account is no longer connected.'
+	linkChangedAccount: 'That {service} account is no longer connected.',
+	/*
+	 * The person's own two-step verification (specs/126). People read "a code from an authenticator app"; "TOTP" never
+	 * appears here. A value — an address, a date, a provider's name — is always a value, never part of a sentence.
+	 */
+	securityLink: 'Two-step verification',
+	securityTitle: 'Two-step verification',
+	securityOff:
+		'Off. Signing in to {service} with your password needs only the password.',
+	securityExplain:
+		'Turn it on, and after your password you also type a 6-digit code from an authenticator app on your phone. Someone who learns your password still cannot sign in.',
+	securityNeeds:
+		'You will need an authenticator app on your phone, for example Google Authenticator, Microsoft Authenticator or 1Password, and your email, {email}.',
+	securityLostPhone:
+		'If you lose your phone, you cannot sign in until the people who run {service} remove it from your account.',
+	securityStart: 'Turn on two-step verification',
+	securitySentTitle: 'Check your email',
+	securitySent:
+		'We sent a link to {email}. Open it in this browser within 10 minutes to continue.',
+	securityResend: 'Send a new link',
+	securityAddTitle: 'Add {service} to your authenticator app',
+	securityScan: 'Scan this code with your authenticator app.',
+	securityQrLabel: 'QR code for your authenticator app',
+	securityKey: 'Cannot scan it? Type this key in the app:',
+	securityOpenApp: 'On this phone? Open it in your authenticator app',
+	securitySpare: 'Tip: scan it with a second device too, to keep a spare.',
+	securityCodeLabel: 'Code from the authenticator app',
+	securityTurnOn: 'Turn on',
+	securityWrongCode: 'That code did not work. Type the code the app shows now.',
+	securityOnTitle: 'Two-step verification is on',
+	securityOnSince: 'On since {date}.',
+	securityOnEvery:
+		'Every time you sign in to {service} with your password, you also type a code from your authenticator app. That is in every app where you sign in with your {service} account.',
+	securityProvider:
+		'Signing in with {provider} does not ask for this code; {provider} protects that sign-in itself.',
+	securityReplace: 'Use a different phone',
+	securityTurnOff: 'Turn off',
+	securityRequired:
+		'{service} asks everyone for a code, so it cannot be turned off.',
+	securityOffConfirmTitle: 'Turn off two-step verification?',
+	securityOffConfirm: 'Signing in to {service} will need only your password.',
+	securityNoPassword:
+		'You sign in through a provider, not with a password here. Its own second factor protects you.',
+	securityUnavailable:
+		'The people who run {service} have not made two-step verification available here.',
+	securitySignInWithPassword:
+		'To set this up, sign in with your password, not through a provider.',
+	securityDoneOn:
+		'Two-step verification is on. We sent a confirmation to {email}.',
+	securityDoneChanged:
+		'Your new authenticator app is set up. Codes from the old one no longer work.',
+	securityDoneOff: 'Two-step verification is off.',
+	securityThrottled: 'You have asked for several emails. Try again later.',
+	securityMailFailed: 'We could not send the email. Try again later.',
+	securityLinkInvalid:
+		'This link does not work here. Open the newest link in the browser where you started, within 10 minutes.',
+	securityChanged: 'Something changed while you were doing this. Start again.',
+	disownTitle: 'Remove two-step verification from {email}?',
+	disownEffect:
+		'This removes the authenticator app that was just set up and signs your account out everywhere. Then change your password.',
+	disownButton: 'Remove it',
+	disownDoneTitle: 'Two-step verification was removed',
+	disownDone:
+		'Your account is signed out everywhere. Change your password now: on the {service} sign-in page, choose "{forgot}".',
+	disownNothingTitle: 'Nothing was changed',
+	disownNothing:
+		'This link no longer works. If someone else set up two-step verification on your account, ask the people who run {service}.'
 } as const;

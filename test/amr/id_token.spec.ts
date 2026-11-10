@@ -2,7 +2,11 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import { Type } from '@sinclair/typebox';
 import bootstrap from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
-import { getBucketStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
+import {
+	getBucketStore,
+	getUserStore,
+	resetAdminMemoryStores
+} from 'lib/adapters/index.ts';
 import { shaped } from 'test/shape.ts';
 import {
 	Browser,
@@ -105,9 +109,16 @@ describe('the authentication methods an ID token reports', () => {
 		const email = await seedUser(switchBucketId, { enrolled: true });
 		const browser = new Browser();
 		await signIn(browser, request('amr-switch-app'), email, { second: true });
-		// A second factor is demanded by the bucket, not by enrolment, so this is the only way one
-		// session sees a two-factor sign-in followed by a password-only one.
+		/*
+		 * A held factor is asked for whatever the bucket requires (specs/126), so the only way one session sees a
+		 * two-factor sign-in followed by a password-only one is the bucket lowered and the factor gone in between —
+		 * taken off without ending the session, as turning it off on one's own page does.
+		 */
 		await getBucketStore().update(switchBucketId, { totpRequired: false });
+		const account = await getUserStore(switchBucketId).findByEmail(email);
+		await getUserStore(switchBucketId).update(account?._id ?? '', {
+			totp: undefined
+		});
 		const again = request('amr-switch-app', { prompt: 'login' });
 
 		const code = await signIn(browser, again, email);

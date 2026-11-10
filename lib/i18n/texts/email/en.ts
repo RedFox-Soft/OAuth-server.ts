@@ -63,5 +63,55 @@ export const en = {
 		serviceRemovedIntro:
 			'{bucket} no longer offers {service}, so your {service} account {label} was disconnected. Applications you allowed to use it no longer can.',
 		button: 'Open your connected accounts'
+	},
+	/*
+	 * A person's own two-step verification (specs/126). Each message has its own subject, because a link mail and the
+	 * confirmation that follows it can arrive a minute apart. Never a code, a key or another mail's link.
+	 */
+	twoStep: {
+		linkEnrolSubject: 'Set up two-step verification for {service}',
+		linkReplaceSubject:
+			'Move two-step verification for {service} to a different phone',
+		linkReenrolSubject: 'Set up a new authenticator app for {service}',
+		linkHeading: 'Confirm it is you',
+		linkEnrolIntro:
+			'Someone, hopefully you, started setting up two-step verification for your {service} account, {email}. Open this link in the same browser within 10 minutes to continue.',
+		linkReplaceIntro:
+			'Someone, hopefully you, started moving two-step verification for your {service} account, {email}, to a different phone. Open this link in the same browser within 10 minutes to continue.',
+		linkReenrolIntro:
+			'To finish signing in to {service} as {email}, set up a new authenticator app. Open this link in the same browser within 10 minutes to continue.',
+		linkWarning:
+			'If this was not you, change your password. Never forward this link.',
+		linkButton: 'Continue',
+		onSubject: 'Two-step verification was turned on for your {service} account',
+		onIntro:
+			'Two-step verification was turned on for your {service} account, {email}, on {date}. From now on, every time you sign in to {service} with your password, you also type a code from your authenticator app.',
+		changedSubject: 'Two-step verification was moved to a different phone',
+		changedIntro:
+			'Two-step verification for your {service} account, {email}, was moved to a different authenticator app on {date}. Codes from the old one no longer work.',
+		disownLine:
+			'If this was not you, remove it with this link within 72 hours, then change your password:',
+		disownButton: 'This was not me',
+		offSubject:
+			'Two-step verification was turned off for your {service} account',
+		offIntro:
+			'Two-step verification was turned off for your {service} account, {email}, on {date}. Signing in now needs only your password.',
+		offWarning:
+			'If this was not you, change your password and tell the people who run {service}.',
+		removedSubject:
+			'Two-step verification was removed from your {service} account',
+		removedIntro:
+			'The people who run {service} removed the authenticator app from your account, {email}, on {date}. Signing in now needs only your password.',
+		removedAgainSelf:
+			'To turn two-step verification on again, open your account page:',
+		removedAgainRequired:
+			'{service} asks everyone for a code, so you will set up a new authenticator app at your next sign-in, after a link we email you.',
+		removedWarning: 'If you did not ask for this, tell them.',
+		guessSubject: 'Someone signed in with your {service} password',
+		guessIntro:
+			'Someone signed in to {service} with your password, {email}, and then could not give the code from your authenticator app. Your account is safe for now, but your password is not secret any more.',
+		guessAdvice:
+			'Change your password: on the {service} sign-in page, choose "{forgot}".',
+		pageButton: 'Open two-step verification'
 	}
 } as const;

@@ -96,6 +96,9 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_services,
 	routeNames.account_services_callback,
 	routeNames.account_services_link,
+	routeNames.account_security,
+	routeNames.account_security_link,
+	routeNames.account_security_disown,
 	BEHIND_PROXY_CHECK_BASE
 ];
 
@@ -323,6 +326,15 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: routeNames.account_services_link },
 	{ method: 'POST', path: routeNames.account_services_link },
 	/*
+	 * The person's own two-step verification (specs/126), unconditional for the same reason: a person must always be
+	 * able to change or remove a factor they set up, and the "This wasn't me" link must work whatever is switched off.
+	 */
+	{ method: 'GET', path: routeNames.account_security },
+	{ method: 'POST', path: routeNames.account_security },
+	{ method: 'GET', path: routeNames.account_security_link },
+	{ method: 'GET', path: routeNames.account_security_disown },
+	{ method: 'POST', path: routeNames.account_security_disown },
+	/*
 	 * The check a proxy makes for an app behind it (specs/122 R4). No instance switch: the endpoint does nothing
 	 * until a project declares an app, and a switch would only add a setting that protects nothing.
 	 */
@@ -548,6 +560,9 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'POST', path: '/ui/:uid/forgot-password', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp/enroll', rate: 'strict' },
+	// The person's own page checks a code and sends mail (specs/126), and the disown link removes a factor.
+	{ method: 'POST', path: routeNames.account_security, rate: 'strict' },
+	{ method: 'POST', path: routeNames.account_security_disown, rate: 'strict' },
 	{ method: 'POST', path: '/verify-email/code', rate: 'strict' },
 	{ method: 'POST', path: '/verify-email/resend', rate: 'strict' },
 	{ method: 'POST', path: '/reset-password', rate: 'strict' },

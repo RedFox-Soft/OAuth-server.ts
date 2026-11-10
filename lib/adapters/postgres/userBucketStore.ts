@@ -225,6 +225,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'connectedServices'
 				| 'proxyKeys'
 				| 'passwordGuessing'
+				| 'totpSelfService'
 			>
 		>
 	): Promise<UserBucket | null> {

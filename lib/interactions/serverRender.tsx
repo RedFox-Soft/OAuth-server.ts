@@ -232,7 +232,7 @@ export async function registrationServer(
 export async function totpServer(
 	uid: string,
 	options: {
-		mode: 'verify' | 'enroll';
+		mode: 'verify' | 'enroll' | 'mailed';
 		errorMessage?: string;
 		otpauthUri?: string;
 		secretText?: string;
@@ -257,7 +257,7 @@ export async function totpServer(
 	 */
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
-		mode === 'enroll' ? T.titles.totpEnroll : T.titles.totpVerify,
+		mode === 'verify' ? T.titles.totpVerify : T.titles.totpEnroll,
 		{
 			uid,
 			mode,

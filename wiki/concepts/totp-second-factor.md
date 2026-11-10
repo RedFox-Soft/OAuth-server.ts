@@ -158,10 +158,14 @@ reasoning is the narrower half: there is no *registered* value meaning "two fact
 the shipped default is an absolute URI of this project's own and why an operator is expected to
 rename it to whatever their relying parties already expect.
 
-One consequence belongs here rather than there, because it is a property of this feature: the demand
-for a second factor is a **project** flag, so an end user with an authenticator enrolled in a project
-that does not require one signs in with a password and reports the single-factor context. A relying
-party that *requires* multi-factor is refused for that person.
+**A held factor is always asked for** (since 2026-11-10, spec 126). The login POST stages the code step when
+the project requires a factor *or* the account holds one (`lib/interactions/index.ts`, the second-factor fork).
+Until then the demand was a project flag only, so a person enrolled while a project required it, and then
+lowered, signed in with the password alone and reported the single-factor context. A factor that is not asked for
+protects nothing and makes the person believe it does (Zitadel CVE-2026-85056 is that bug). It is also what lets a
+relying party that requires multi-factor be met for such a person, through an ordinary re-sign-in, with no change to
+the interaction policy. The password-door throttle still takes only the project's `totpRequired`: it runs before the
+account is looked up, and a per-account answer would tell a guesser which accounts hold a factor.
 
 Federated sign-in is never gated. The upstream provider owns its own factor policy, mirroring the
 existing split where `passwordLogin` governs password doors and federation is enabled per provider. The
@@ -169,7 +173,37 @@ console's own project follows the same rule since it accepts providers (spec 080
 "require an authenticator" setting says it applies to password sign-in only.
 
 A password reset neither clears nor bypasses an enrolment: a reset proves an address, and the next
-sign-in still asks for a code.
+sign-in still asks for a code. Two exceptions: it clears both code-failure windows, and it removes a factor set
+up before the address was ever proven ([[self-service-password-reset]]).
+
+## A person's own factor (spec 126)
+
+People turn two-step verification on themselves on `/account/security`, beside the other account pages
+(`lib/account_page/security_routes.ts`; flow logic in `lib/totp/self_service.ts`). The project setting
+`totpSelfService` (absent means on) allows it; it is in effect only with password sign-in and mail, and refused on
+the administrators' project.
+
+- **Proof a password thief lacks.** Starting needs a fresh *password* sign-in (`amr` has `pwd`, at most 15 minutes):
+  a provider sign-in does not count, because whoever holds the provider account may hold the mailbox too. Then a
+  link mailed to the account, stored as a digest in `TotpLink`, works once, for 10 minutes, and only for its
+  **holder** — `account:<session uid>` on the page — so it cannot be read aloud to someone posing as support. No
+  secret exists before the link is followed: following it is what creates the `TotpEnrollment` offer, keyed by the
+  same holder. Only the newest link of an account works (`TotpLinkThrottle.latestLink`); one a minute, five a day.
+- **Replacing and turning off** need a fresh *code*: a session whose `acr` is the multi-factor value, `amr` has
+  `otp`, at most 15 minutes old. A replacement writes only while the factor it replaces is still in place.
+- **Every change is mailed**, to a confirmed address only, and logged as `enduser.totp.enrol|replace|remove|disown`
+  with the person as actor. The mail about a new factor carries a "This was not me" link (`TotpLink` purpose
+  `disown`, 72 hours) that removes *that* factor and ends all access: self-service binds the account to whoever proves
+  the password and the mailbox first, and this is the owner's way back when a thief read the mailbox once.
+- **After an administrator's removal** the account carries `totpProofRequired`, and the next factor anywhere —
+  including at sign-in in a requiring project — needs a mailed link first, bound to the interaction
+  (`ui/:uid/totp/enroll/link`). A removal someone talked support into must not hand the next factor to whoever knows
+  the password; `project_user_totp_clear` is `high` for agents for the same reason.
+- **Guessing** is capped twice: 10 wrong codes per 15 minutes and 30 per day per account (`TotpAttempt`, the day
+  record keyed `…:day`), counted before the check. The first exhaustion of the short window in a day mails the
+  person that their password is known.
+- **Enrolling on the page raises the session** to multi-factor when the password was typed in it at most 15 minutes
+  earlier, so an app asking for a multi-factor sign-in does not send the person round again.
 
 ## The administrators' project needs its own door
 

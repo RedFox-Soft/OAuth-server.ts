@@ -102,6 +102,7 @@ import {
 	issuerFor
 } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
+import { selfServiceState } from '../../totp/self_service.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { listClientView } from '../clients/service.js';
 import {
@@ -1161,6 +1162,14 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			...(figure ? { activeThisMonth: figure.total } : {}),
 			mailDeliveryConfigured: mail,
 			/*
+			 * Whether people can turn on two-step verification themselves right now (specs/126), and if not why: `off`,
+			 * `no_password_login` or `no_mail`. Never on the administrators' project.
+			 */
+			twoStepSelfService:
+				bucket._id === ADMIN_BUCKET_ID
+					? ('off' as const)
+					: await selfServiceState(bucket),
+			/*
 			 * Whether any provider button can appear on any sign-in page of this instance. The Sign-in tab's preview
 			 * (specs/091) draws the page with the same rule the server renders it with, and this is the one input
 			 * of that rule a browser cannot otherwise know.
@@ -1208,6 +1217,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			}
 			if (params.id === ADMIN_BUCKET_ID) {
 				await assertAdminBucketChange(ctx, bucket, changes);
+				if (changes.totpSelfService !== undefined) {
+					throw new AdminError(
+						422,
+						'Administrators have no account page to turn two-step verification on from; require an authenticator app for everyone instead.',
+						{ field: 'totpSelfService' }
+					);
+				}
 			}
 			if (changes.passwordGuessing) {
 				changes.passwordGuessing = acceptedPasswordGuessing(

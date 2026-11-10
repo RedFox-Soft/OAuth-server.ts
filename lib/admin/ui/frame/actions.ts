@@ -155,8 +155,8 @@ export const ACTIONS = {
 	},
 	'user.totp.reset': {
 		class: 'C2',
-		title: (t) => `Reset the authenticator of ${t}?`,
-		okText: 'Reset authenticator'
+		title: (t) => `Remove the authenticator app of ${t}?`,
+		okText: 'Remove authenticator app'
 	},
 	'user.delete': {
 		class: 'C2',

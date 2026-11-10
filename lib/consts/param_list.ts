@@ -198,6 +198,13 @@ export const routeNames = {
 	account_services_callback: '/account/services/callback',
 	/* Where an agent's connect link leads (specs/119): the one act that fixes the exchange's refusal. */
 	account_services_link: '/account/services/link/:link',
+	/*
+	 * The person's own two-step verification (specs/126): the page, the link mailed to prove the mailbox, and the
+	 * "This wasn't me" link that takes an unwanted authenticator back off.
+	 */
+	account_security: '/account/security',
+	account_security_link: '/account/security/link',
+	account_security_disown: '/account/security/disown',
 	authorization: '/auth',
 	backchannel_authentication: '/backchannel',
 	code_verification: '/device',

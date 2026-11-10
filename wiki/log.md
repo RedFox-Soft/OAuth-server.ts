@@ -396,3 +396,5 @@ Operations:
 ## [2026-11-10] update | [[end-user-lifecycle]] — clearing an authenticator moved from the route into `lib/end_users/service.ts` (`clearEndUserAuthenticator`): an unknown account is refused before the audit write, and the provisioned-user exception is now in the AGENTS.md rule.
 
 ## [2026-11-10] update | [[self-service-password-reset]] — consuming a reset on an account whose address was never proven also removes its authenticator, so whoever registered the address first cannot keep a factor against its owner.
+
+## [2026-11-10] update | [[totp-second-factor]] — spec 126: a held factor is asked for at every password sign-in whatever the project requires; people turn it on themselves on `/account/security` with a fresh password sign-in and a browser-bound mailed link; replace/off need a fresh code; every change is mailed with a 72-hour "This was not me" link; an administrator's removal makes the next factor need a mailed link everywhere; 10 per 15 minutes and 30 per day wrong codes. Corrected [[authentication-context-reporting]] and [[amr-reporting]] (an enrolled person now reports multi-factor in any project).

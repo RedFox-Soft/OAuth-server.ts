@@ -446,7 +446,10 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 				rows,
 				offered,
 				await ensureXsrf(person.session),
-				await noticeOf(person, language, query)
+				await noticeOf(person, language, query),
+				new URL(
+					`${accountPageBase(person.bucket)}${routeNames.account_security}`
+				).pathname
 			);
 		},
 		{ query: ListQuery }

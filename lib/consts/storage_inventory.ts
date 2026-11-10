@@ -130,6 +130,8 @@ export const MODEL_AREAS = [
 	'TeamInvitationThrottle',
 	'TotpAttempt',
 	'TotpEnrollment',
+	'TotpLink',
+	'TotpLinkThrottle',
 	'TotpSpentStep',
 	'UpstreamSession',
 	'VerificationChallenge',
@@ -615,6 +617,14 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * expiring two minutes after it is written, once no clock could accept that step again.
 	 */
 	modelArea('TotpSpentStep', EXPIRES_AT, byAccount),
+	/*
+	 * A person's own two-step verification (specs/126): the links mailed to them, keyed by the digest of the token,
+	 * and how often one account was mailed an enrolment link. Account-owned, so a deleted person's pending links and
+	 * counts die with them; point-read by id, and expiring — ten minutes for an enrolment link, three days for the
+	 * "This wasn't me" link, a day for the count.
+	 */
+	modelArea('TotpLink', EXPIRES_AT, byAccount),
+	modelArea('TotpLinkThrottle', EXPIRES_AT, byAccount),
 	/*
 	 * An upstream session at one provider of one bucket → the account it signed in, keyed by
 	 * `sha256("<bucketId>:<providerId>:<sid>")`. Read only by the back-channel logout receiver, to resolve a

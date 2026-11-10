@@ -31,6 +31,8 @@ const SIGN_IN_ROUTES: Record<
 	'GET /ui/:uid/login': 'records none',
 	'GET /ui/:uid/totp': 'records none',
 	'GET /ui/:uid/totp/enroll': 'records none',
+	// The mailed link after an administrator's removal (specs/126): it offers a secret, and signs nobody in.
+	'GET /ui/:uid/totp/enroll/link': 'records none',
 	'GET /ui/:uid/registration': 'records none',
 	'GET /ui/:uid/consent': 'records none',
 	'GET /ui/:uid/federation/:providerId/start': 'records none'

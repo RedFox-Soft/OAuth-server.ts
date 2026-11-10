@@ -1,6 +1,6 @@
 import crypto from 'node:crypto';
 
-import { checkedAdapter, getUserStore } from '../adapters/index.js';
+import { checkedAdapter } from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import { decodeBase32, encodeBase32 } from './base32.js';
 import { verifyAt } from './code.js';
@@ -15,7 +15,8 @@ import { TotpEnrollmentPayload } from './types.js';
 /*
  * The lifecycle of a secret that has been offered but not yet proved.
  *
- * Records are keyed by the **interaction uid**, which decides three things at once. There is no
+ * Records are keyed by their **holder** — the interaction uid at sign-in, `account:<session uid>` on the person's own
+ * page (specs/126) — which decides three things at once. There is no
  * enrolment handle to put in a hidden form field, so none to leak or to guess. An enrolment can only be
  * completed from inside the interaction that started it. And a reload or a wrong code re-reads the same
  * record, so the same secret stays on screen — a fresh one per request would mean a person who mistyped
@@ -78,16 +79,17 @@ function ownedBy(
 }
 
 /*
- * The secret on offer for this interaction — created on the first call, and the *same one* on every
+ * The secret on offer for this holder — created on the first call, and the *same one* on every
  * later call until it is confirmed or expires.
  */
 export async function offer(
-	uid: string,
+	holder: string,
 	accountId: string,
 	bucketId: string,
-	{ email, label }: { email: string; label: string }
+	{ email, label }: { email: string; label: string },
+	extras: { replacing?: number } = {}
 ): Promise<Offer> {
-	const existing = await enrollments().find(uid);
+	const existing = await enrollments().find(holder);
 
 	// Compared rather than left to the store: MongoDB's TTL monitor deletes lazily, so an expired
 	// record can still be found for a while — the departure lib/password_reset/challenge.ts makes for
@@ -107,8 +109,16 @@ export async function offer(
 	if (!live) {
 		const exp = epochTime() + ENROLLMENT_TTL_SECONDS;
 		await enrollments().upsert(
-			uid,
-			{ accountId, bucketId, secret, exp },
+			holder,
+			{
+				accountId,
+				bucketId,
+				secret,
+				exp,
+				...(extras.replacing !== undefined
+					? { replacing: extras.replacing }
+					: {})
+			},
 			ENROLLMENT_TTL_SECONDS
 		);
 	}
@@ -123,6 +133,12 @@ export async function offer(
 export type ConfirmOutcome =
 	{ ok: true } | { ok: false; reason: 'expired' | 'invalid' | 'gone' };
 
+/* What a code proved: the secret it was made from, and the step it matched, which the enrolment spends. */
+export interface Proved {
+	secret: string;
+	step: number;
+}
+
 /*
  * Turn a proved secret into the account's enrolment.
  *
@@ -134,19 +150,25 @@ export type ConfirmOutcome =
  * `accountId` and `bucketId` are the sign-in's, not the offer's: the caller completes the sign-in of
  * the account the interaction now names, so a secret offered to anyone else is spent and refused as
  * expired. Otherwise a code proved for one account enrolled that account and signed in another.
+ *
+ * `holder` is where the offer lives: the interaction uid at sign-in, `account:<session uid>` on the person's own page
+ * (specs/126). The write is the caller's, through lib/end_users/service.ts, because what an enrolment also records —
+ * how it was set up, an audit entry, a confirmed address — depends on where it happened. `enrol` answers false when
+ * the account is gone; it receives the step so the code that completed the enrolment cannot also sign in.
  */
 export async function confirm(
-	uid: string,
+	holder: string,
 	accountId: string,
 	bucketId: string,
-	code: string
+	code: string,
+	enrol: (proved: Proved) => Promise<boolean>
 ): Promise<ConfirmOutcome> {
-	const pending = await enrollments().find(uid);
+	const pending = await enrollments().find(holder);
 	if (!pending || pending.exp <= epochTime()) {
 		return { ok: false, reason: 'expired' };
 	}
 	if (!ownedBy(pending, accountId, bucketId)) {
-		await enrollments().destroy(uid);
+		await enrollments().destroy(holder);
 		return { ok: false, reason: 'expired' };
 	}
 
@@ -156,30 +178,51 @@ export async function confirm(
 	}
 
 	/*
-	 * `lastStep` starts at the step just proved, not at zero: the code that completed the enrolment is
-	 * spent, and a person who submits it once more within the same 30 seconds — a double-submitted form,
-	 * or someone who watched them type it — must not be able to use it to sign in.
+	 * The pending record goes either way. When the account is gone there is nothing left to enrol into, so leaving it
+	 * would only keep a live secret addressed to a dead account until its TTL caught up.
 	 */
-	const enrolled = await getUserStore(pending.bucketId).update(
-		pending.accountId,
-		{
-			totp: { secret: pending.secret, enrolledAt: new Date(), lastStep: step }
-		}
-	);
-	/*
-	 * The write is the enrolment; reporting success without it would hand the caller a completed
-	 * second factor for an account that holds none — and, because the caller then writes
-	 * `result.login`, sign a person in as an account that no longer exists. `update` returns null for
-	 * exactly one reason: the row is gone, deleted between the offer and this confirmation.
-	 *
-	 * The pending record goes either way. There is nothing left to enrol into, so leaving it would
-	 * only keep a live secret addressed to a dead account until its TTL caught up.
-	 */
-	if (!enrolled) {
-		await enrollments().destroy(uid);
-		return { ok: false, reason: 'gone' };
-	}
+	const enrolled = await enrol({ secret: pending.secret, step });
+	await enrollments().destroy(holder);
+	return enrolled ? { ok: true } : { ok: false, reason: 'gone' };
+}
 
-	await enrollments().destroy(uid);
-	return { ok: true };
+/* Ends an offer without enrolling: a new start, or a page that is no longer allowed to finish it. */
+export async function dropOffer(holder: string): Promise<void> {
+	await enrollments().destroy(holder);
+}
+
+/* The offer waiting for this holder, when it belongs to this account: what a page needs to finish it. */
+export async function waitingOffer(
+	holder: string,
+	accountId: string,
+	bucketId: string
+): Promise<{ replacing?: number; attempts: number } | undefined> {
+	const pending = await enrollments().find(holder);
+	if (
+		!pending ||
+		pending.exp <= epochTime() ||
+		!ownedBy(pending, accountId, bucketId)
+	) {
+		return undefined;
+	}
+	return {
+		...(pending.replacing !== undefined
+			? { replacing: pending.replacing }
+			: {}),
+		attempts: pending.attempts ?? 0
+	};
+}
+
+/*
+ * One more wrong code against the offer on the person's page, answering how many there have been. The offer goes at
+ * the fifth, as an enrolment at sign-in ends: a new start costs a mailed link, which has limits of its own.
+ */
+export async function noteWrongCode(holder: string): Promise<number> {
+	const pending = await enrollments().find(holder);
+	if (!pending) return Number.POSITIVE_INFINITY;
+	const attempts = (pending.attempts ?? 0) + 1;
+	const remaining = pending.exp - epochTime();
+	if (remaining <= 0) return Number.POSITIVE_INFINITY;
+	await enrollments().upsert(holder, { ...pending, attempts }, remaining);
+	return attempts;
 }

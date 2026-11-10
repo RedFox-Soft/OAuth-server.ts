@@ -137,7 +137,21 @@ export interface PendingSignIn {
 	disconnect?: string;
 	/* An agent's connect link (specs/119) asked for this sign-in: return to it, never to an act. */
 	link?: string;
+	/*
+	 * The two-step verification page (specs/126) asked for this sign-in: return there, never to the act. Which act it
+	 * was for is said only so the page can tell the person what to do next.
+	 */
+	security?: SecurityStep;
 }
+
+export type SecurityStep = 'view' | 'enrol' | 'replace' | 'off';
+
+const SECURITY_STEPS: readonly SecurityStep[] = [
+	'view',
+	'enrol',
+	'replace',
+	'off'
+];
 
 /*
  * The page's own path, which is where the pending cookie lives: named on set and on clear, or the clear
@@ -189,7 +203,8 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			services,
 			connect,
 			disconnect,
-			link
+			link,
+			security
 		} = parsed as PendingSignIn;
 		return {
 			state,
@@ -199,7 +214,10 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			...(services === true ? { services } : undefined),
 			...(typeof connect === 'string' ? { connect } : undefined),
 			...(typeof disconnect === 'string' ? { disconnect } : undefined),
-			...(typeof link === 'string' ? { link } : undefined)
+			...(typeof link === 'string' ? { link } : undefined),
+			...(SECURITY_STEPS.includes(security as SecurityStep)
+				? { security }
+				: undefined)
 		};
 	} catch {
 		return undefined;
@@ -234,6 +252,8 @@ export function signInRedirect(
 		services?: boolean;
 		/* Return to this connect link (specs/119). */
 		link?: string;
+		/* Return to the two-step verification page (specs/126). */
+		security?: SecurityStep;
 	} = {}
 ): string {
 	const state = crypto.randomBytes(32).toString('base64url');
@@ -243,6 +263,7 @@ export function signInRedirect(
 		startedAt: epochTime(),
 		...(options.services ? { services: true as const } : undefined),
 		...(options.link ? { link: options.link } : undefined),
+		...(options.security ? { security: options.security } : undefined),
 		...(back?.connect ? { connect: back.connect } : undefined),
 		...(back?.disconnect ? { disconnect: back.disconnect } : undefined),
 		...(options.reauthenticate

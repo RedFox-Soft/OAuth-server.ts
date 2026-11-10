@@ -210,8 +210,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   from a route; whether a user may sign in is `canSignIn`, and anything that makes them unable to runs
   `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock and clearing an
   authenticator. An address is recorded verified only when it was proven, whatever the project requires, because that
-  is what `email_verified` says.
-  → `end-user-lifecycle.md`
+  is what `email_verified` says. A person's own authenticator is set up only after a fresh password sign-in and a
+  mailed link bound to that browser, changed only with a fresh code, and every change mails them; a held factor is
+  asked for at every password sign-in, but the password throttle reads only the project's requirement.
+  → `end-user-lifecycle.md`, `totp-second-factor.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion
   resolves the person through the browser sign-in's ladder, never a copy; an ID-JAG may be re-submitted, a

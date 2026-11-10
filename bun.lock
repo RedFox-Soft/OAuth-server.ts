@@ -10,6 +10,7 @@
         "@ant-design/icons": "^6.3.4",
         "@elysiajs/static": "^1.4.12",
         "@modelcontextprotocol/server": "^2.4.0",
+        "@rc-component/qrcode": "2.0.0",
         "@sentry/bun": "11.11.0",
         "antd": "^6.7.0",
         "debug": "^4.4.3",

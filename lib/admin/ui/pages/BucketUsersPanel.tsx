@@ -253,7 +253,7 @@ export function BucketUsersPanel({
 		if (row.totpEnrolled) {
 			items.push({
 				key: 'totp',
-				label: 'Reset authenticator',
+				label: 'Remove authenticator app…',
 				group: 'state',
 				onClick: () => void actions.resetTotp(row).then(after)
 			});

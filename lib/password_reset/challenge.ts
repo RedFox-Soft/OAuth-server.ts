@@ -376,9 +376,12 @@ export async function consume(
 		verified: true,
 		...(unprovenFactor ? { totp: undefined } : {})
 	});
-	if (unprovenFactor) {
-		await clearAttempts(challenge.bucketId, challenge.accountId);
-	}
+	/*
+	 * Both code-failure windows go with a completed reset (specs/126 FR-024), for the reason the sign-in counter below
+	 * does: the reset proves the owner is back, and a stranger who knew the old password must not keep them locked out
+	 * of their own code step for a day.
+	 */
+	await clearAttempts(challenge.bucketId, challenge.accountId);
 
 	/*
 	 * The sign-in door's failure counter goes too, and this is the whole of why the login throttle needs

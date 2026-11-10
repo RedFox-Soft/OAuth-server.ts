@@ -55,6 +55,8 @@ import {
 import {
 	TotpAttemptPayload,
 	TotpEnrollmentPayload,
+	TotpLinkPayload,
+	TotpLinkThrottlePayload,
 	TotpSpentStepPayload
 } from 'lib/totp/types.js';
 import { UpstreamSessionPayload } from 'lib/upstream_signals/types.js';
@@ -96,6 +98,8 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	TeamInvitationThrottle: TeamInvitationThrottlePayload,
 	TotpAttempt: TotpAttemptPayload,
 	TotpEnrollment: TotpEnrollmentPayload,
+	TotpLink: TotpLinkPayload,
+	TotpLinkThrottle: TotpLinkThrottlePayload,
 	TotpSpentStep: TotpSpentStepPayload,
 	UpstreamSession: UpstreamSessionPayload,
 	VerificationChallenge: VerificationChallengePayload,

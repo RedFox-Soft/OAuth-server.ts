@@ -4,7 +4,7 @@ title: 'The connected-applications page: an end user sees and removes the access
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-10-15
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -140,6 +140,16 @@ Since spec 095 every new Grant carries `bucketId` (`lib/actions/authorization/lo
 `lib/addon/account.ts:169`, `lib/interactions/index.ts:494`). An administrator may choose an account id, so two
 projects can share one. Before, `grantsIn` counted every grant as every project's, and one project's page or
 console would have listed the other's access. Older grants still read as before until they expire.
+
+## Three account pages (spec 126)
+
+Since 2026-11-10 the project has a third account page beside this one and connected services: **Two-step
+verification**, at `/account/security` (`lib/account_page/security_routes.ts`). The three link to each other from
+the line under the heading; connected services only where the project offers them. It resolves the person the same
+way, from the project's own session, and checks every POST the same way (`fromThisOrigin`, then the person, then the
+anti-forgery value). Its re-authentication returns through this page's callback with a `security` pending flag, back
+to the page and never to the act. Unlike the removal here, its freshness reads *how* the person signed in, not only
+when: see [[totp-second-factor]].
 
 ## Related
 

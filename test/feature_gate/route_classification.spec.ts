@@ -203,6 +203,10 @@ describe('route classification', () => {
 			'POST /verify-email/code',
 			'POST /verify-email/resend',
 			'POST /reset-password',
+			// A person's own two-step verification (specs/126): it mails a link and checks a code, and the
+			// "This wasn't me" link removes a factor without a session.
+			'POST /account/security',
+			'POST /account/security/disown',
 			// Unauthenticated by construction — one is how the first super-admin comes to exist, the other
 			// is how somebody invited into a group accepts. Both perform an account write.
 			'POST /admin/api/setup',

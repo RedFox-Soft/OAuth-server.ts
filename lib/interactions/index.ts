@@ -49,8 +49,15 @@ import {
 import { verifyForAccount } from 'lib/totp/verify.js';
 import {
 	confirm as confirmEnrollment,
-	offer as offerEnrollment
+	offer as offerEnrollment,
+	waitingOffer
 } from 'lib/totp/enrollment.js';
+import {
+	enrolAtSignIn,
+	followLink,
+	sendLink,
+	warnOfGuessing
+} from 'lib/totp/self_service.js';
 import { MAX_ATTEMPTS_PER_INTERACTION } from 'lib/totp/consts.js';
 import {
 	CustomOIDCProviderError,
@@ -1472,7 +1479,13 @@ export const ui = new Elysia()
 			 * account reveals that it exists.
 			 */
 			const { totpRequired } = loginOptions;
-			if (totpRequired) {
+			/*
+			 * A person who set up an authenticator is asked for it at every password sign-in, whatever the project
+			 * requires (specs/126 research R1): a factor that is not asked for protects nothing, and makes them believe
+			 * it does. It is also what lets a request for a multi-factor sign-in be met for them, through this ordinary
+			 * sign-in. Without one, only a project that requires a factor leads on, to setting one up.
+			 */
+			if (totpRequired || user.totp !== undefined) {
 				/*
 				 * `result` is deliberately NOT written here. That is the whole of "a correct password
 				 * alone establishes nothing": no session is created, no token is issued, and the
@@ -1507,8 +1520,8 @@ export const ui = new Elysia()
 					transient: body.remember !== 'on',
 					/*
 					 * The context this sign-in satisfied. A password alone, because a bucket that demands
-					 * a second factor never reaches here — it stages `secondFactor` above, and the
-					 * context is decided once the code is verified.
+					 * a second factor, and a person who holds one, never reach here — they stage
+					 * `secondFactor` above, and the context is decided once the code is verified.
 					 */
 					amr: [...AMR_FOR_DISTINCTION.password],
 					acr: configuration.acrMap.password
@@ -1592,6 +1605,9 @@ export const ui = new Elysia()
 				if (outcome.reason === 'not_enrolled') {
 					return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
 				}
+				// Someone with this password ran out of guesses at the code: the person hears of it (specs/126).
+				if (outcome.exhausted)
+					await warnOfGuessing(bucketId, pending.accountId);
 				interaction.payload.secondFactor = {
 					...pending,
 					attempts: pending.attempts + 1
@@ -1626,57 +1642,85 @@ export const ui = new Elysia()
 	 * same act: neither the registrant nor the existing account has a second factor, and both need one
 	 * before their sign-in can complete.
 	 */
-	.get('ui/:uid/totp/enroll', async ({ params: { uid }, interaction }) => {
-		const pending = interaction.payload.secondFactor;
-		if (!pending) {
-			return Response.redirect(buildUILoginPath(uid), 303);
-		}
-
-		const clientId = clientIdOf(interaction);
-		const bucketId = await resolveBucketForRequest(
-			clientId,
-			resourceOf(interaction),
-			await addressedBucketOf(interaction)
-		);
-		const { totpRequired } = await loginOptionsForClient(
-			clientId,
-			resourceOf(interaction),
-			await addressedBucketOf(interaction)
-		);
-		// Lowered while this person was mid-flow: there is nothing left to enrol for.
-		if (!totpRequired) {
-			return Response.redirect(buildUILoginPath(uid), 303);
-		}
-
-		const user = await getUserStore(bucketId).find(pending.accountId);
-		if (!user) {
-			return Response.redirect(buildUILoginPath(uid), 303);
-		}
-		if (user.totp) {
-			return Response.redirect(buildUIPath(uid, 'totp'), 303);
-		}
-
-		const bucket = await getBucketStore().find(bucketId);
-		const { otpauthUri, secretText } = await offerEnrollment(
-			uid,
-			user._id,
-			bucketId,
-			{
-				email: user.email,
-				label: bucket ? shownNameOf(bucket) : 'the application'
+	.get(
+		'ui/:uid/totp/enroll',
+		async ({ params: { uid }, interaction, request }) => {
+			const pending = interaction.payload.secondFactor;
+			if (!pending) {
+				return Response.redirect(buildUILoginPath(uid), 303);
 			}
-		);
 
-		return totpServer(uid, {
-			mode: 'enroll',
-			otpauthUri,
-			secretText,
-			handOffTo: redirectUriOf(interaction),
-			language: languageOf(interaction),
-			switcher: switcherOf(interaction, 'totp/enroll'),
-			...(await signInLook(interaction, bucketId))
-		});
-	})
+			const clientId = clientIdOf(interaction);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
+			);
+			const { totpRequired } = await loginOptionsForClient(
+				clientId,
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
+			);
+			// Lowered while this person was mid-flow: there is nothing left to enrol for.
+			if (!totpRequired) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+
+			const user = await getUserStore(bucketId).find(pending.accountId);
+			if (!user) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			if (user.totp) {
+				return Response.redirect(buildUIPath(uid, 'totp'), 303);
+			}
+
+			const bucket = await getBucketStore().find(bucketId);
+			/*
+			 * After an administrator removed this person's factor (specs/126 research R8), the new one is proved by a link
+			 * mailed to them before any secret is shown: a removal someone talked support into must not hand the next
+			 * factor to whoever knows the password. The link works only in this interaction, so only in this browser.
+			 */
+			if (
+				bucket &&
+				user.totpProofRequired === true &&
+				!(await waitingOffer(uid, user._id, bucketId))
+			) {
+				const origin = new URL(request.url).origin;
+				await sendLink(bucket, user, 'reenrol', uid, {
+					request,
+					urlFor: (token) =>
+						`${origin}${buildUIPath(uid, 'totp/enroll/link')}?token=${encodeURIComponent(token)}`
+				});
+				return totpServer(uid, {
+					mode: 'mailed',
+					handOffTo: redirectUriOf(interaction),
+					language: languageOf(interaction),
+					switcher: switcherOf(interaction, 'totp/enroll'),
+					...(await signInLook(interaction, bucketId))
+				});
+			}
+
+			const { otpauthUri, secretText } = await offerEnrollment(
+				uid,
+				user._id,
+				bucketId,
+				{
+					email: user.email,
+					label: bucket ? shownNameOf(bucket) : 'the application'
+				}
+			);
+
+			return totpServer(uid, {
+				mode: 'enroll',
+				otpauthUri,
+				secretText,
+				handOffTo: redirectUriOf(interaction),
+				language: languageOf(interaction),
+				switcher: switcherOf(interaction, 'totp/enroll'),
+				...(await signInLook(interaction, bucketId))
+			});
+		}
+	)
 	.post(
 		'ui/:uid/totp/enroll',
 		async ({ body, params: { uid }, interaction, cookie, route, request }) => {
@@ -1705,7 +1749,16 @@ export const ui = new Elysia()
 				uid,
 				pending.accountId,
 				bucketId,
-				body.code
+				body.code,
+				async (proved) =>
+					enrolAtSignIn(
+						bucketId,
+						pending.accountId,
+						proved,
+						// A link led here only for a person whose factor an administrator removed, and it proved the address.
+						(await getUserStore(bucketId).find(pending.accountId))
+							?.totpProofRequired === true
+					)
 			);
 
 			if (!outcome.ok) {
@@ -1764,6 +1817,41 @@ export const ui = new Elysia()
 			return resume(interaction, cookie, { route, request });
 		},
 		{ body: t.Object({ code: t.String() }) }
+	)
+	/*
+	 * The mailed link after an administrator's removal (specs/126 research R8): followed in the interaction that sent
+	 * it, it offers the new secret; anywhere else, or late, or a second time, it does nothing and the page asks again.
+	 */
+	.get(
+		'ui/:uid/totp/enroll/link',
+		async ({ params: { uid }, interaction, query }) => {
+			const pending = interaction.payload.secondFactor;
+			if (!pending) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			const clientId = clientIdOf(interaction);
+			const bucketId = await resolveBucketForRequest(
+				clientId,
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
+			);
+			const link = await followLink(
+				query.token ?? '',
+				uid,
+				pending.accountId,
+				bucketId
+			);
+			const user = await getUserStore(bucketId).find(pending.accountId);
+			const bucket = await getBucketStore().find(bucketId);
+			if (link?.purpose === 'reenrol' && user && !user.totp && bucket) {
+				await offerEnrollment(uid, user._id, bucketId, {
+					email: user.email,
+					label: shownNameOf(bucket)
+				});
+			}
+			return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
+		},
+		{ query: t.Object({ token: t.Optional(t.String()) }) }
 	)
 	/*
 	 * Leg one of a federated sign-in. Declares its own `params` schema, and that is load-bearing rather than

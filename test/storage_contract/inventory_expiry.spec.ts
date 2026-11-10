@@ -89,10 +89,13 @@ const REAPED_ON_EXPIRES_AT = [
 	 * The second factor's three areas, and expiry is the control in each rather than housekeeping. An
 	 * enrolment offer that outlived its window would leave a secret nobody proved sitting against a
 	 * live account; a failure window that never expired would lock an account out for good on ten
-	 * mistyped digits; a spent step that never expired would grow one record per sign-in for good.
+	 * mistyped digits; a spent step that never expired would grow one record per sign-in for good. A mailed link that
+	 * never expired would prove a mailbox for good, and a link count that never expired would stop a person for good.
 	 */
 	'TotpAttempt',
 	'TotpEnrollment',
+	'TotpLink',
+	'TotpLinkThrottle',
 	'TotpSpentStep',
 	/*
 	 * Which account an upstream session signed in. Reaped one session lifetime after the sign-in: a record

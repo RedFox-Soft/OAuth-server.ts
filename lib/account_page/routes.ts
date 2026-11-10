@@ -81,11 +81,11 @@ function pathOf(bucket: RequestBucket): string {
 }
 
 /* The person's choice, then their account's stored locale, then the browser (specs/097). */
-function personLanguage(person: PagePerson, request: Request): Language {
+export function personLanguage(person: PagePerson, request: Request): Language {
 	return languageOfRequest(request, [storedLocaleRanges(person.user)]).language;
 }
 
-function frameFor(person: PagePerson, language: Language): PageFrame {
+export function frameFor(person: PagePerson, language: Language): PageFrame {
 	const base = accountPageBase(person.bucket);
 	return {
 		language,
@@ -253,7 +253,10 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 						`${accountPageBase(person.bucket)}${routeNames.account_services}`
 					).pathname
 				: undefined;
-			return listPage(frame, rows, notice, servicesHref);
+			const securityHref = new URL(
+				`${accountPageBase(person.bucket)}${routeNames.account_security}`
+			).pathname;
+			return listPage(frame, rows, notice, servicesHref, securityHref);
 		},
 		{ query: ListQuery }
 	)
@@ -415,6 +418,14 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 						`${pagePath}?revoke=${encodeURIComponent(pending.revoke)}`
 					);
 				}
+			}
+			/* Asked for by the two-step verification page (specs/126): back there, and to no act. */
+			if (pending.security !== undefined) {
+				return seeOther(
+					new URL(
+						`${accountPageBase(person.bucket)}${routeNames.account_security}`
+					).pathname
+				);
 			}
 			/* Asked for by an agent's connect link (specs/119): back to the link, which checks who is signed in. */
 			if (pending.link !== undefined) {

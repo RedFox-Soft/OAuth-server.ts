@@ -4,7 +4,7 @@ title: 'Sign-in brute-force throttle'
 tags: [architecture, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-08-28
-updated: 2026-11-09
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -92,7 +92,9 @@ project, so they have no self-service escape from a long lockout — but it is *
 Stating it as the policy rather than the identity buys two things. It says the actual reason (a
 guessed password is not a sign-in where a second factor is required, so deep escalation buys little
 and risks the one lockout nobody can undo), and it self-corrects: turn a project's second factor off
-and its escalation deepens automatically, with nothing to remember. It also satisfies Principle II,
+and its escalation deepens automatically, with nothing to remember. It is read from the project and never from
+the account (spec 126): a person who holds a factor is asked for it in any project, but the throttle runs before the
+account is looked up, and an answer that depended on the account would tell a guesser which ones hold a factor. It also satisfies Principle II,
 which forbids deployment-shaped branches in business logic.
 
 The coupling to know: `totpRequired` **defaults to false** and is absent from both seeds of the

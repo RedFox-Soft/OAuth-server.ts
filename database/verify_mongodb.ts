@@ -15,6 +15,7 @@ import { verifyBucketGroups } from './verify_bucket_groups.js';
 import { verifyActivity } from './verify_activity.js';
 import { verifyTelemetry } from './verify_telemetry.js';
 import { verifyAttackerListCounts } from './verify_attacker_list.js';
+import { verifyTwoStep } from './verify_two_step.js';
 import { verifySealing } from './verify_sealing.js';
 import { verifyConnectedAccounts } from './verify_connected_accounts.js';
 import {
@@ -608,6 +609,18 @@ await verifyTelemetry(() => new TelemetryStateStore(), check);
 
 /* The attacker list's sign-in counters (specs/125): records per project, day and process, read by the bucket index. */
 await verifyAttackerListCounts(adapter('PasswordGuessingTally'), check);
+
+/* A person's own two-step verification (specs/126): the new fields written and removed, links and steps spent once. */
+await verifyTwoStep(
+	{
+		buckets: new UserBucketStore(),
+		users: (bucketId) => new UserStore(bucketId),
+		links: adapter('TotpLink'),
+		spent: adapter('TotpSpentStep'),
+		attempts: adapter('TotpAttempt')
+	},
+	check
+);
 
 /* The encryption pass's store and the keyring state (specs/116): each leaf compare-and-set where it is stored. */
 {

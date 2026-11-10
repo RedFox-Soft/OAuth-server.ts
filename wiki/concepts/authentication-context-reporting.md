@@ -4,7 +4,7 @@ title: "Reporting the authentication context a sign-in satisfied"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-13
-updated: 2026-10-15
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -145,12 +145,11 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
   (a new login check, `sl1_acr_values`), and on the backchannel in `transaction_failed`. A multi-factor
   sign-in satisfies a request for the password class. With the profile off `acr_values` stays voluntary
   and the essential checks above are unchanged. See [[ipsie-sl1-profile]].
-- **A second factor is demanded by the project, not by the person.** `totpRequired` is a
-  project (`UserBucket`) flag; `user.totp` is consulted only inside that branch, to choose the verify page over
-  the enrolment page. So an end user with an authenticator enrolled, in a project that does not require
-  one, signs in with a password and reports the single-factor context — and a relying party requiring
-  multi-factor is refused for them. The setting's own description says so, because it arrives as a
-  support question whose remedy is a different setting.
+- **A second factor is demanded by the project or held by the person** (since 2026-11-10, spec 126). The
+  code step is staged when `totpRequired` is on *or* `user.totp` exists, so an end user with an authenticator, in
+  any project, reports the multi-factor context and satisfies a relying party that requires it. Until then the
+  demand was the project's alone and such a person reported the single-factor context. A person without a factor,
+  or a provider sign-in, is still refused a required multi-factor context.
 - **A request that asks for nothing is told too.** Reversed 2026-10-23. Until then, an unasked request got
   no `acr`: OIDC Core §5.5.1.1 does not require the claim unless it was requested, and leaving it out kept
   every existing deployment's tokens byte-identical. IPSIE SL1 §3.2.1 now requires `acr` and `auth_time`

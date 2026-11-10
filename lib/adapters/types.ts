@@ -114,9 +114,21 @@ export const User = t.Object({
 			 * at enrolment: every later code is spent in the TotpSpentStep area instead (lib/totp/verify.ts),
 			 * because rewriting this object on each sign-in raced with clearing and replacing the factor.
 			 */
-			lastStep: t.Number()
+			lastStep: t.Number(),
+			/*
+			 * How it was set up (specs/126): by the person on their own two-step verification page, or at a sign-in while
+			 * the project required one. Absent on factors from before that release, which were all set up at sign-in.
+			 * The person page reads it, because "did they set this up themselves?" is the first question support asks.
+			 */
+			via: t.Optional(t.Union([t.Literal('self'), t.Literal('sign-in')]))
 		})
 	),
+	/*
+	 * Set when an administrator removed this account's authenticator (specs/126 research R8), and cleared by the next
+	 * enrolment. While it is set, setting up a new factor needs the mailed link even at sign-in in a project that
+	 * requires one, so a help-desk removal cannot hand the next factor to whoever knows the password.
+	 */
+	totpProofRequired: t.Optional(t.Literal(true)),
 	/*
 	 * The identity a provisioning system knows this person by. `userName` and `externalId` are stored
 	 * exactly as sent; the `*Key` fields beside them are derived by the store (lib/adapters/end_user_keys.ts),
@@ -264,6 +276,8 @@ export type EndUserPatch = Partial<
 		| 'federated'
 		/* Set when an enrolment is confirmed, and set back to undefined when an operator clears one. */
 		| 'totp'
+		/* Only `lib/end_users/service.ts` writes it: set by an administrator's removal, cleared by an enrolment. */
+		| 'totpProofRequired'
 		| 'email'
 		| 'userName'
 		| 'externalId'
@@ -2655,6 +2669,13 @@ export const UserBucket = t.Object({
 	 * which stops refusals: failing open is the safe side for a deny list.
 	 */
 	passwordGuessing: t.Optional(PasswordGuessingSetting),
+	/*
+	 * Whether people may turn on two-step verification themselves, on their own account page (specs/126). Absent
+	 * means yes: nothing changes for anyone until a person acts. It has effect only while password sign-in is open and
+	 * mail can be sent, since the enrolment is proved by a mailed link; the administrators' project never has it,
+	 * because its people have no account pages.
+	 */
+	totpSelfService: t.Optional(t.Boolean()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -2744,6 +2765,7 @@ export interface UserBucketStoreInstance {
 				| 'connectedServices'
 				| 'proxyKeys'
 				| 'passwordGuessing'
+				| 'totpSelfService'
 			>
 		>
 	): Promise<UserBucket | null>;

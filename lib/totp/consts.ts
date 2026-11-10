@@ -45,3 +45,32 @@ export const ACCOUNT_WINDOW_SECONDS = 15 * 60;
 // RFC 4226 §4 R6 recommends at least 128 bits and 160 for HMAC-SHA1; 160 is also what every
 // published test vector uses. Base32-encodes to 32 characters, which a person can retype.
 export const SECRET_BYTES = 20;
+
+/*
+ * The person's own two-step verification (specs/126). A "fresh" sign-in is one this browser completed no more than
+ * this long ago — with the password, to start an enrolment, or with a code, to replace or remove one. The account
+ * pages' re-authentication window is the same fifteen minutes (lib/consts/account_page.ts).
+ */
+export const FRESH_SECONDS = 15 * 60;
+
+// How long a link mailed to prove the mailbox works: one sitting, like the verification code's window.
+export const LINK_TTL_SECONDS = 10 * 60;
+
+/*
+ * How long the "This wasn't me" link in the mail about a new authenticator works. Long enough for an owner who reads
+ * their mail once a day or over a weekend; after it, a factor is the account's and only an administrator removes it.
+ */
+export const DISOWN_TTL_SECONDS = 72 * 60 * 60;
+
+// Mailed links per account: one a minute, five a day, beside the instance's per-caller mail limit (specs/115).
+export const LINK_COOLDOWN_SECONDS = 60;
+export const LINK_DAILY_CAP = 5;
+export const LINK_WINDOW_SECONDS = 24 * 60 * 60;
+
+/*
+ * Wrong codes per account per day, on top of the fifteen-minute window. With only that window someone who knows the
+ * password could script 960 guesses a day and land a code within a year with ~65 % likelihood; thirty a day makes it
+ * ~3 %. The arithmetic is here so it can be re-checked when either number moves.
+ */
+export const DAILY_FAILURE_CAP = 30;
+export const DAILY_WINDOW_SECONDS = 24 * 60 * 60;

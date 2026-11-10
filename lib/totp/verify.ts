@@ -5,6 +5,8 @@ import { verifyAt } from './code.js';
 import {
 	ACCOUNT_FAILURE_CAP,
 	ACCOUNT_WINDOW_SECONDS,
+	DAILY_FAILURE_CAP,
+	DAILY_WINDOW_SECONDS,
 	SPENT_STEP_TTL_SECONDS
 } from './consts.js';
 import { TotpAttemptPayload, TotpSpentStepPayload } from './types.js';
@@ -34,7 +36,12 @@ export function attemptKey(bucketId: string, accountId: string): string {
 
 export type Outcome =
 	| { ok: true }
-	| { ok: false; reason: 'invalid' | 'throttled' | 'not_enrolled' };
+	| {
+			ok: false;
+			reason: 'invalid' | 'throttled' | 'not_enrolled';
+			/* This wrong code used up the short window, the first time today: the person is to be told. */
+			exhausted?: true;
+	  };
 
 /*
  * `throttled` and `invalid` are separated for the caller's benefit only — one of them is worth a log
@@ -54,42 +61,28 @@ export async function verifyForAccount(
 
 	const now = epochTime();
 	const key = attemptKey(bucketId, accountId);
-	const prior = await attempts().find(key);
-	const windowActive =
-		prior !== undefined && now - prior.windowStart < ACCOUNT_WINDOW_SECONDS;
-
-	// Checked before verifying, so a locked-out account refuses even a correct code — the same shape
-	// lib/verification/challenge.ts uses once its attempt cap is reached.
-	if (windowActive && prior.failures >= ACCOUNT_FAILURE_CAP) {
+	/*
+	 * Two windows, each counted before the code is checked: ten wrong codes in fifteen minutes, and thirty in a day
+	 * (specs/126 research R9). The short one alone let a script that knows the password guess 960 codes a day.
+	 */
+	const attempt = await countAttempt(
+		key,
+		accountId,
+		now,
+		ACCOUNT_WINDOW_SECONDS,
+		ACCOUNT_FAILURE_CAP
+	);
+	if (attempt > ACCOUNT_FAILURE_CAP) {
 		return { ok: false, reason: 'throttled' };
 	}
-
-	/*
-	 * The attempt is counted before the code is checked, in one atomic write that answers this
-	 * attempt's own number. Counting a failure after checking was a read-modify-write, and a burst of
-	 * parallel guesses all read the same count and together advanced it by one. A right code is counted
-	 * too, harmlessly: success destroys the record.
-	 *
-	 * Opening a window is an insert-if-absent for the same reason, and the record dies with its window
-	 * rather than outliving it — so a lockout cannot become permanent, and an expired record is one
-	 * `create` treats as absent.
-	 */
-	if (!windowActive) {
-		await attempts().create(
-			key,
-			{
-				accountId,
-				failures: 0,
-				windowStart: now,
-				exp: now + ACCOUNT_WINDOW_SECONDS
-			},
-			ACCOUNT_WINDOW_SECONDS
-		);
-	}
-	// Absent only when a concurrent success cleared the record in between, which makes this attempt the
-	// first of a fresh slate.
-	const attempt = (await attempts().increment(key, 'failures')) ?? 1;
-	if (attempt > ACCOUNT_FAILURE_CAP) {
+	const today = await countAttempt(
+		dayKey(key),
+		accountId,
+		now,
+		DAILY_WINDOW_SECONDS,
+		DAILY_FAILURE_CAP
+	);
+	if (today > DAILY_FAILURE_CAP) {
 		return { ok: false, reason: 'throttled' };
 	}
 
@@ -105,6 +98,13 @@ export async function verifyForAccount(
 	});
 
 	if (step === null) {
+		/*
+		 * The wrong code that uses up the short window: someone holding the password is guessing, which is the best
+		 * sign of a stolen password the server has. The caller tells the person, at most once a day.
+		 */
+		if (attempt === ACCOUNT_FAILURE_CAP && (await firstWarningToday(key))) {
+			return { ok: false, reason: 'invalid', exhausted: true };
+		}
 		return { ok: false, reason: 'invalid' };
 	}
 
@@ -171,10 +171,61 @@ function spentKey(
 	return `${bucketId}:${accountId}:${enrolmentMark(enrolledAt)}:${step}`;
 }
 
-/* A clean slate: on a completed sign-in, and when an operator clears the enrolment entirely. */
+/*
+ * A clean slate, both windows: when an operator clears the enrolment, and when a password reset by its mailed link
+ * proves the owner is back (specs/126 FR-024). A completed sign-in clears only the short window.
+ */
 export async function clearAttempts(
 	bucketId: string,
 	accountId: string
 ): Promise<void> {
-	await attempts().destroy(attemptKey(bucketId, accountId));
+	const key = attemptKey(bucketId, accountId);
+	await attempts().destroy(key);
+	await attempts().destroy(dayKey(key));
+}
+
+function dayKey(key: string): string {
+	return `${key}:day`;
+}
+
+/*
+ * One more attempt in a window, answering its number, or more than `cap` when the window is already used up. Counted
+ * in one atomic write that answers this attempt's own number: counting after the check was a read-modify-write, and a
+ * burst of parallel guesses all read the same count and together advanced it by one. Opening a window is an
+ * insert-if-absent for the same reason, and the record dies with its window, so a lockout cannot become permanent.
+ */
+async function countAttempt(
+	key: string,
+	accountId: string,
+	now: number,
+	windowSeconds: number,
+	cap: number
+): Promise<number> {
+	const prior = await attempts().find(key);
+	const active = prior !== undefined && now - prior.windowStart < windowSeconds;
+	// Checked first, so a locked-out account refuses even a correct code, as lib/verification/challenge.ts does.
+	if (active && prior.failures >= cap) return cap + 1;
+	if (!active) {
+		await attempts().create(
+			key,
+			{ accountId, failures: 0, windowStart: now, exp: now + windowSeconds },
+			windowSeconds
+		);
+	}
+	// Absent only when a concurrent success cleared the record in between: this attempt starts a fresh slate.
+	return (await attempts().increment(key, 'failures')) ?? 1;
+}
+
+/* Marks today's warning as given, answering whether this is the first. A race costs at most a second mail. */
+async function firstWarningToday(key: string): Promise<boolean> {
+	const day = await attempts().find(dayKey(key));
+	if (!day || day.notifiedAt !== undefined) return false;
+	const remaining = day.exp - epochTime();
+	if (remaining <= 0) return false;
+	await attempts().upsert(
+		dayKey(key),
+		{ ...day, notifiedAt: epochTime() },
+		remaining
+	);
+	return true;
 }

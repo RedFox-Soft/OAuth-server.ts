@@ -4,7 +4,7 @@ title: "The IPSIE SL1 profile switch: what it enforces, what it needs, what it l
 tags: [oauth, oidc, config, contract, security]
 sources: [oauth-server-codebase]
 created: 2026-10-23
-updated: 2026-11-05
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -147,9 +147,11 @@ Administrators can pre-register a Client Identifier URL (CIMD §7.2): `clientIde
 
 ## What SL1 still needs
 
-- **Request-driven step-up.** SL1 says the provider "MUST be able to satisfy" a request for a multi-factor class. Today
-  that is satisfied only in a project that demands a second factor; elsewhere the request ends in the error. This is the
-  next feature.
+- **Request-driven step-up, for provider sign-ins.** SL1 says the provider "MUST be able to satisfy" a request for a
+  multi-factor class. Since 2026-11-10 (spec 126) it is satisfied for anyone who signs in with a password and holds an
+  authenticator app, in any project, because a held factor is asked for at every password sign-in
+  ([[totp-second-factor]]). A person who signs in through a provider still ends in the error; trusting the provider's
+  `amr`, or a local factor on top, is later work.
 - **`amr` after a federated sign-in** ([[amr-reporting]]).
 - **JWTs from other issuers** keep today's algorithms: upstream ID and logout tokens, ID-JAGs and jwt-bearer assertions
   from trusted issuers, and upstream security events. CR §3.3 binds them too, but refusing RS256 there breaks federation

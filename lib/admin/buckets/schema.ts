@@ -151,6 +151,12 @@ export const UpdateBucketBody = t.Object({
 	 */
 	totpRequired: t.Optional(t.Boolean()),
 	/*
+	 * Whether people may turn on two-step verification themselves, on their own account page (specs/126). Absent
+	 * means yes; it has effect only while password sign-in is open and mail can be sent, and it is refused on the
+	 * administrators' project, whose people have no account pages.
+	 */
+	totpSelfService: t.Optional(t.Boolean()),
+	/*
 	 * What a password sign-in from an address on FoxTrust's attacker list meets (specs/125): `nothing`, `count` or
 	 * `refuse`, and networks never checked against the list, each optionally until a date. Choosing `refuse` is a
 	 * tightening and goes through the preview below; it is refused on the administrators' project.

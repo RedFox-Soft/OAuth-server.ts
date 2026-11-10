@@ -49,6 +49,11 @@ import {
 	type EndUserActor
 } from '../../end_users/service.js';
 import { applyBulk, type BulkAct } from '../../end_users/bulk.js';
+import {
+	notifyTwoStep,
+	securityPageUrl,
+	selfServiceState
+} from '../../totp/self_service.js';
 import { applicationSessions } from '../../end_users/sessions.js';
 import type { InviteOutcome } from '../../password_reset/challenge.js';
 import type { AuditAction } from '../../consts/admin_audit_routes.js';
@@ -93,7 +98,7 @@ async function asAdmin<T>(operation: Promise<T>): Promise<T> {
 export const presentUser = <
 	T extends {
 		password?: string;
-		totp?: { enrolledAt: Date };
+		totp?: { enrolledAt: Date; via?: 'self' | 'sign-in' };
 		userNameKey?: string;
 		externalIdKey?: string;
 		connectionsDeclined?: unknown;
@@ -116,7 +121,12 @@ export const presentUser = <
 	return {
 		...safe,
 		totpEnrolled: Boolean(totp),
-		totpEnrolledAt: totp?.enrolledAt.toISOString() ?? null
+		totpEnrolledAt: totp?.enrolledAt.toISOString() ?? null,
+		/*
+		 * How it was set up (specs/126): by the person on their own page, or at a sign-in while the project required
+		 * one — which a factor from before that release, carrying no mark, always was. Support's first question.
+		 */
+		totpEnrolledVia: totp ? (totp.via ?? 'sign-in') : null
 	};
 };
 
@@ -709,6 +719,7 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const bucket = await loadBucketForUsers(ctx, params.id);
 
 			// No attribute names and no values in the entry — the act is the whole fact.
+			const before = await getUserStore(params.id).find(params.uid);
 			const cascade = await asAdmin(
 				clearEndUserAuthenticator(bucket, params.uid, () =>
 					recordAdminAudit(ctx, 'enduser.totp.clear', params.uid, {
@@ -716,6 +727,19 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 					})
 				)
 			);
+			/*
+			 * The person hears of it (specs/126 FR-028): a removal they did not ask for is how a help-desk call takes a
+			 * second factor away, and the mail says how to set one up again in this project's state.
+			 */
+			if (before?.totp) {
+				await notifyTwoStep(bucket, before, {
+					kind: 'removed',
+					required: bucket.totpRequired,
+					...((await selfServiceState(bucket)) === 'on'
+						? { pageUrl: securityPageUrl(bucket) }
+						: {})
+				});
+			}
 			if (cascade.failedAreas.length > 0) {
 				throw new AdminError(
 					500,

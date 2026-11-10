@@ -20,6 +20,10 @@ export type EndUser = Omit<
 	createdAt: string;
 	totpEnrolled: boolean;
 	totpEnrolledAt: string | null;
+	/* How it was set up (specs/126): by the person on their own page, or at a sign-in that required one. */
+	totpEnrolledVia?: 'self' | 'sign-in' | null;
+	/* An administrator removed it: the next one is proved by a mailed link first. */
+	totpProofRequired?: true;
 	groups?: { id: string; displayName: string; provisionedBy?: string }[];
 	/* `byEmail` only on the single read: who locked them, as a person rather than an account id. */
 	lockedLocally?: {

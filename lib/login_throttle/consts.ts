@@ -20,6 +20,12 @@
  * the reserved admin bucket has no self-service password reset, so its operators cannot use the escape
  * hatch every other population has. That rule is applied in throttle.ts, from the bucket's setting
  * rather than from the bucket's identity.
+ *
+ * Only from the bucket's setting, never from whether the account holds a factor (specs/126). Since then a
+ * person who set one up is asked for it in any bucket, but the throttle runs before the account is looked
+ * up, and an answer that depended on the account would tell a guesser whether it has a factor. In a
+ * requiring bucket a guessed password still leads an account without a factor on to setting one up; that
+ * is guarded by the mailed link an administrator's removal asks for, not by this curve.
  */
 
 /*

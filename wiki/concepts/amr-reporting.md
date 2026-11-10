@@ -4,7 +4,7 @@ title: "Reporting the authentication methods a sign-in used"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-01
-updated: 2026-10-15
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -114,8 +114,9 @@ decision.
 
 ## Gotchas
 
-- A two-factor sign-in followed by a password-only one on the same session is reachable only by a
-  project change in between: the second factor is demanded by the project, not by enrolment.
+- A two-factor sign-in followed by a password-only one on the same session is reachable only when the factor
+  itself goes in between (a held factor is asked for whatever the project requires, since spec 126);
+  `test/amr/id_token.spec.ts` takes it off the account to get there.
 - `test/totp/signin.spec.ts` used to assert `amr` on the session while its comment claimed that proved
   the ID token. It did not — the claim never got there. The cases now live in `test/amr/`, against the
   ID token.

@@ -90,6 +90,11 @@ export interface BucketSummary {
 	providers: { enabled: number; creating: number };
 	activeThisMonth?: number;
 	mailDeliveryConfigured: boolean;
+	/*
+	 * Whether people can turn on two-step verification themselves right now (specs/126), and if not why. Absent from a
+	 * server that predates it.
+	 */
+	twoStepSelfService?: 'on' | 'off' | 'no_password_login' | 'no_mail';
 	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
 	federationEnabled: boolean;
 	/*

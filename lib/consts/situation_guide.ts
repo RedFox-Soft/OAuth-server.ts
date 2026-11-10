@@ -1507,7 +1507,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'browser',
 				'fox',
 				'Signs in',
-				'The person signs in again; with an authenticator app, the project asks for a code too.'
+				'The person signs in again; anyone with an authenticator app types a code too.'
 			),
 			step(
 				'fox',
@@ -1542,7 +1542,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		},
 		goodToKnow: [
 			'Choose 15 minutes, an hour, 8 hours or a day. Pages that load data in the background, such as dashboards, stop working until the person reloads, so use it on admin paths.',
-			'If the project asks for an authenticator app at sign-in, signing in again asks for a code too.',
+			'Anyone who set up an authenticator app types a code when signing in again, whether or not the project requires one.',
 			'A person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides.',
 			'It is on every plan.'
 		],
@@ -1619,7 +1619,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		tab: 'product',
 		title: 'A second factor at sign-in',
 		sentence:
-			'After the password, the person types a six-digit code from an authenticator app, and one switch turns it on for the whole project.',
+			'After the password, the person types a six-digit code from an authenticator app. One switch asks it of everyone in the project.',
 		protocol: 'TOTP (RFC 6238)',
 		lanes: lanes('person', 'fox', 'totp'),
 		steps: [
@@ -1668,12 +1668,80 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		},
 		goodToKnow: [
 			'Any authenticator app works.',
-			'If someone loses their phone, an administrator clears the second factor on their user page.'
+			'If someone loses their phone, an administrator removes the app on their user page.',
+			'Without the switch, people can still turn it on for themselves.'
 		],
 		prompt: prompt(
 			'Turn on the second factor (TOTP) in my FoxAuth project.',
 			'project_update (second factor)',
 			'Tell me how many users have not set it up yet.'
+		)
+	},
+	{
+		id: 'selftwostep',
+		tab: 'product',
+		title: 'Let people turn on two-step verification themselves',
+		sentence:
+			'Each person can add a code from an authenticator app to their own account, on their account page. From then on, every password sign-in asks them for it.',
+		protocol: 'TOTP (RFC 6238)',
+		lanes: lanes('person', 'fox', 'mail', 'totp'),
+		steps: [
+			step(
+				'person',
+				'fox',
+				'Turns it on',
+				'On their account page, the person chooses Two-step verification.'
+			),
+			step(
+				'fox',
+				'mail',
+				'A link',
+				'FoxAuth emails them a link that works only in that browser.'
+			),
+			step(
+				'mail',
+				'person',
+				'Opens it',
+				'The person opens the link and scans a QR code with the app.'
+			),
+			step('totp', 'person', '6 digits', 'The app shows a code.'),
+			step(
+				'person',
+				'fox',
+				'Turned on',
+				'The person types the code. Every later password sign-in asks for one.'
+			)
+		],
+		problem: {
+			at: 'person',
+			mark: 'password',
+			caption: 'Only a project-wide switch gives anyone a code.',
+			lanes: ['person']
+		},
+		fixCaption: 'Anyone who wants a code can add one.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'A Two-step verification page beside their connected apps',
+				'An email with a link, then a QR code',
+				'Afterwards, a page asking for the code at every password sign-in'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open Sign-in',
+			target: { area: 'sign-in' }
+		},
+		goodToKnow: [
+			'It is on by default. It needs password sign-in and a mail server.',
+			'If someone loses their phone, an administrator removes the app on their user page; a new one then needs a link we email them.',
+			'Signing in through Google or another provider does not ask for this code.'
+		],
+		prompt: prompt(
+			'Add a "Two-step verification" link to my app’s account settings that opens {issuer}/account/security.',
+			'project_update (totpSelfService)',
+			'Tell me how many people have set one up.'
 		)
 	},
 	{

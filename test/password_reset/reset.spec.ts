@@ -712,6 +712,35 @@ describe('password reset — not a prober, not a mailer (US4)', () => {
 		expect(after?.totp?.enrolledAt).toEqual(enrolledAt);
 	});
 
+	// A stranger who knew the old password must not keep the owner out of their own code step (specs/126).
+	it('clears the limits on wrong codes from an authenticator app', async () => {
+		const email = 'code-limits@x.io';
+		const user = await seedUser(email);
+		const key = `${bucketId}:${user._id}`;
+		for (const id of [key, `${key}:day`]) {
+			await adapter('TotpAttempt').upsert(
+				id,
+				{
+					accountId: user._id,
+					failures: 99,
+					windowStart: epochTime(),
+					exp: epochTime() + 600
+				},
+				600
+			);
+		}
+
+		await requestReset(email);
+		await agent['reset-password'].post({
+			token: tokenFromMail(),
+			password: NEW_PASSWORD,
+			confirmPassword: NEW_PASSWORD
+		});
+
+		expect(await adapter('TotpAttempt').find(key)).toBeUndefined();
+		expect(await adapter('TotpAttempt').find(`${key}:day`)).toBeUndefined();
+	});
+
 	// No operator acted, so the trail records nothing. The constitution's immutable audit log must not be
 	// writable by an anonymous request.
 	it('writes nothing to the admin audit trail', async () => {

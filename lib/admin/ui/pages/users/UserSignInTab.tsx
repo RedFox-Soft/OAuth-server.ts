@@ -34,6 +34,17 @@ export function UserSignInTab({
 	const local = !user.provisionedBy;
 	const passwordLogin = bucket.passwordLogin;
 	const said = passwordText(user);
+	const providerOnly = user.passwordSet === false;
+	/* What the person can do about an authenticator in this project's state (specs/126 contracts/administration.md). */
+	const authenticatorState = user.totpEnrolled
+		? 'They type a code at every password sign-in.'
+		: providerOnly
+			? 'They sign in through a provider; an authenticator app is not used for them.'
+			: bucket.totpRequired
+				? `This project requires one: they set it up at their next password sign-in${user.totpProofRequired ? ', after a link we email them' : ''}.`
+				: bucket.totpSelfService !== false
+					? 'They can turn it on themselves on their account page, under Two-step verification.'
+					: 'This project does not let people set one up themselves, so they cannot get one now.';
 
 	return (
 		<Flex
@@ -74,7 +85,7 @@ export function UserSignInTab({
 			</Card>
 
 			<Card
-				title="Authenticator"
+				title="Authenticator app"
 				extra={
 					can.manageUsers && user.totpEnrolled ? (
 						<Button
@@ -85,7 +96,7 @@ export function UserSignInTab({
 								})
 							}
 						>
-							Reset authenticator
+							Remove authenticator app…
 						</Button>
 					) : undefined
 				}
@@ -99,17 +110,18 @@ export function UserSignInTab({
 							<>
 								<Tag color="green">Set up</Tag>
 								{user.totpEnrolledAt
-									? `on ${new Date(user.totpEnrolledAt).toLocaleString()}`
+									? ` on ${new Date(user.totpEnrolledAt).toLocaleString()}`
 									: null}
+								{user.totpEnrolledVia === 'self'
+									? ', by them on their account page.'
+									: ', at sign-in, while the project required one.'}
 							</>
 						) : (
 							'Not set up.'
 						)}
 					</Typography.Text>
 					<Typography.Text type="secondary">
-						{bucket.totpRequired
-							? 'This project requires one for password sign-in; without one, they set it up at their next sign-in.'
-							: 'This project does not require one.'}
+						{authenticatorState}
 					</Typography.Text>
 				</Flex>
 			</Card>

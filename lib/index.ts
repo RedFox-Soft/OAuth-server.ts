@@ -60,6 +60,7 @@ import { scimApp, scimMetadataApp } from './scim/index.js';
 import { federationBackChannelLogout } from './upstream_signals/back_channel_logout.js';
 import { accountPageRoutes } from './account_page/routes.js';
 import { accountServicesRoutes } from './account_page/services_routes.js';
+import { accountSecurityRoutes } from './account_page/security_routes.js';
 import { accountLinkRoutes } from './account_page/link_routes.js';
 import { behindProxyRoutes } from './behind_proxy/routes.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
@@ -273,6 +274,11 @@ elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(accountPageRoutes));
 elysia.use(accountServicesRoutes);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(accountServicesRoutes)
+);
+// The person's own two-step verification (specs/126), the same way.
+elysia.use(accountSecurityRoutes);
+elysia.group('/:bucket', (bucketScoped) =>
+	bucketScoped.use(accountSecurityRoutes)
 );
 // Where an agent's connect link leads (specs/119), the same way.
 elysia.use(accountLinkRoutes);

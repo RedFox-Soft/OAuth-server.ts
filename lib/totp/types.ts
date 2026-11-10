@@ -24,7 +24,14 @@ export const TotpEnrollmentPayload = t.Object({
 	bucketId: t.String(),
 	// Base32. Never reaches `user.totp` without a correct code, and never reaches a log or an audit entry.
 	secret: t.String(),
-	exp: t.Number()
+	exp: t.Number(),
+	/*
+	 * On the person's own page (specs/126): the factor a replacement is replacing (`enrolledAt`, epoch ms), so it writes
+	 * only while that one is still in place, and the wrong codes typed against this offer. At sign-in the interaction
+	 * counts them instead.
+	 */
+	replacing: t.Optional(t.Number()),
+	attempts: t.Optional(t.Number())
 });
 
 export type TotpEnrollmentPayload = Static<typeof TotpEnrollmentPayload>;
@@ -42,7 +49,12 @@ export const TotpAttemptPayload = t.Object({
 	accountId: t.String(),
 	failures: t.Number(),
 	windowStart: t.Number(),
-	exp: t.Number()
+	exp: t.Number(),
+	/*
+	 * On the day record only (`${bucketId}:${accountId}:day`, specs/126 research R9): when the person was mailed that
+	 * someone with their password could not give the code, so that mail goes at most once per day window.
+	 */
+	notifiedAt: t.Optional(t.Number())
 });
 
 export type TotpAttemptPayload = Static<typeof TotpAttemptPayload>;
@@ -58,3 +70,42 @@ export const TotpSpentStepPayload = t.Object({
 });
 
 export type TotpSpentStepPayload = Static<typeof TotpSpentStepPayload>;
+
+/*
+ * A link mailed to the person (specs/126 research R4, R7), keyed by the sha256 of its token: the token exists only in
+ * the mail. `holder` binds an enrolment link to the place it was asked for — `account:<session uid>` on the account
+ * page, the interaction uid at sign-in — so it does nothing in any other browser, and cannot be read aloud to someone
+ * who claims to be support. `enrolledAt` (epoch ms) is the factor a `replace` or `disown` link was sent about; either
+ * acts only while that same factor is still in place.
+ */
+export const TotpLinkPayload = t.Object({
+	accountId: t.String(),
+	bucketId: t.String(),
+	purpose: t.Union([
+		t.Literal('enrol'),
+		t.Literal('replace'),
+		t.Literal('reenrol'),
+		t.Literal('disown')
+	]),
+	holder: t.Optional(t.String()),
+	enrolledAt: t.Optional(t.Number()),
+	exp: t.Number()
+});
+
+export type TotpLinkPayload = Static<typeof TotpLinkPayload>;
+
+/*
+ * How often one account was mailed an enrolment link, keyed `${bucketId}:${accountId}`: the rate-window record
+ * (lib/helpers/rate_window.ts) and `latestLink`, the digest of the newest link, so a resend or a new start kills every
+ * earlier one.
+ */
+export const TotpLinkThrottlePayload = t.Object({
+	accountId: t.String(),
+	lastSentAt: t.Number(),
+	dayCount: t.Number(),
+	windowStart: t.Number(),
+	latestLink: t.Optional(t.String()),
+	exp: t.Number()
+});
+
+export type TotpLinkThrottlePayload = Static<typeof TotpLinkThrottlePayload>;

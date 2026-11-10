@@ -9,6 +9,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Two-step verification people turn on themselves** (spec 126). A project's people can add a code from an
+  authenticator app to their own account on a new account page, `/account/security`, after a sign-in with their
+  password and a link mailed to them that works only in that browser; moving it to another phone or turning it off
+  needs a code. Every change is mailed, with a 72-hour "This was not me" link. A person who holds a factor is now asked
+  for it at every password sign-in, in any project, so an app requiring a multi-factor sign-in gets one for them; people
+  who set one up while their project required it are asked again after this upgrade. Codes are capped at 30 wrong a
+  day per account, with a mail when someone with the password runs out of guesses. An administrator's removal mails the
+  person, is `high` for agents, and makes the next factor need a mailed link. Projects can turn self-service off
+  (`totpSelfService`). Re-run `db:setup` or `db:setup:pg`. Rolling back stops asking self-enrolled people for their code.
+
 ### Fixed
 
 - **A code from an authenticator app signs in once, even when sent twice at the same moment.** Two requests with

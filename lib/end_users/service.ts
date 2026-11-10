@@ -438,13 +438,112 @@ export async function clearEndUserAuthenticator(
 ): Promise<CascadeResult> {
 	await existing(bucket._id, id);
 	await record();
+	/*
+	 * The removal mark (specs/126 research R8): the next factor, wherever it is set up, needs the mailed link. A removal
+	 * someone talked support into must not hand the next factor to whoever knows the password.
+	 */
 	const cleared = await getUserStore(bucket._id).update(id, {
-		totp: undefined
+		totp: undefined,
+		totpProofRequired: true
 	});
 	if (!cleared) throw new EndUserError(404, 'user not found');
 	// So a new enrolment does not begin inside a lockout the lost device earned.
 	await clearAttempts(bucket._id, id);
 	return endSessionsForAccount(id);
+}
+
+/* When an enrolment's factor was set up; compared as instants because the stores may hand a date back as a string. */
+export function enrolmentInstant(
+	enrolledAt: Date | string | undefined
+): number | undefined {
+	if (enrolledAt === undefined) return undefined;
+	const at = new Date(enrolledAt).getTime();
+	return Number.isNaN(at) ? undefined : at;
+}
+
+export interface OwnEnrolment {
+	secret: string;
+	/* The step of the code that completed the enrolment, so that code cannot also sign in. */
+	step: number;
+	via: 'self' | 'sign-in';
+	/* For a replacement: the factor being replaced, which must still be the one in place. */
+	replacing?: number;
+}
+
+/*
+ * A person's authenticator, set up by them (specs/126): on their own page, or at a sign-in that asked for one. The
+ * enrolment was proved by a code from the new app, and on the page or after a removal also by a mailed link, which
+ * proves the address too — so it is recorded confirmed. A replacement writes only while the factor it replaces is
+ * still the one in place: an administrator who removed it meanwhile is not overruled.
+ */
+export async function enrolOwnAuthenticator(
+	bucket: UserBucket,
+	id: string,
+	enrolment: OwnEnrolment,
+	record: RecordChange,
+	options: { addressProved: boolean }
+): Promise<User> {
+	const user = await existing(bucket._id, id);
+	if (
+		enrolment.replacing !== undefined &&
+		enrolmentInstant(user.totp?.enrolledAt) !== enrolment.replacing
+	) {
+		throw new EndUserError(409, 'the authenticator changed meanwhile');
+	}
+	await record();
+	const enrolled = await getUserStore(bucket._id).update(id, {
+		totp: {
+			secret: enrolment.secret,
+			enrolledAt: new Date(),
+			lastStep: enrolment.step,
+			via: enrolment.via
+		},
+		totpProofRequired: undefined,
+		...(options.addressProved ? { verified: true } : {})
+	});
+	if (!enrolled) throw new EndUserError(404, 'user not found');
+	return enrolled;
+}
+
+/* The person turning their own factor off, on their page after entering a code from it (specs/126). */
+export async function removeOwnAuthenticator(
+	bucket: UserBucket,
+	id: string,
+	record: RecordChange
+): Promise<void> {
+	const user = await existing(bucket._id, id);
+	if (!user.totp) return;
+	await record();
+	const removed = await getUserStore(bucket._id).update(id, {
+		totp: undefined
+	});
+	if (!removed) throw new EndUserError(404, 'user not found');
+	await clearAttempts(bucket._id, id);
+}
+
+/*
+ * "This wasn't me" (specs/126 research R7): removes the factor the mail was about — only that one, still in place —
+ * and ends every session and token, because whoever set it up may be signed in with it. Answers whether it removed
+ * anything; a newer factor, or none, is left alone and recorded nowhere.
+ */
+export async function disownAuthenticator(
+	bucket: UserBucket,
+	id: string,
+	enrolledAt: number,
+	record: RecordChange
+): Promise<boolean> {
+	const user = await getUserStore(bucket._id).find(id);
+	if (!user?.totp || enrolmentInstant(user.totp.enrolledAt) !== enrolledAt) {
+		return false;
+	}
+	await record();
+	const removed = await getUserStore(bucket._id).update(id, {
+		totp: undefined
+	});
+	if (!removed) return false;
+	await clearAttempts(bucket._id, id);
+	await revokeAccountAccess(id);
+	return true;
 }
 
 /* Lifts the lock and restores nothing: the user signs in afresh, and only if also active. */

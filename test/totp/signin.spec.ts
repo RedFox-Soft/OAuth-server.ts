@@ -465,12 +465,16 @@ describe('second factor at sign-in (US3)', () => {
 			expectSignedIn(res);
 		});
 
-		// FR-024: an enrolled account in a bucket that does not require it is not asked for a code.
-		it('asks no code even of an account that happens to be enrolled', async () => {
+		/*
+		 * A person who set up an authenticator is asked for its code here too (specs/126 FR-019): the bucket not
+		 * requiring one is no reason to skip a factor the person holds. Reversed from FR-024 of spec 016.
+		 */
+		it('asks an account that holds an authenticator for its code', async () => {
 			const email = `optional-enrolled-${Math.random()}@x.io`;
 			await seedEnrolled(optionalBucketId, email);
-			const { res } = await passwordStep('totp-optional-app', email);
-			expectSignedIn(res);
+			const { uid, res } = await passwordStep('totp-optional-app', email);
+			expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
+			expect(res.location).toBe(`/ui/${uid}/totp`);
 		});
 	});
 

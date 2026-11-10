@@ -176,12 +176,20 @@ export function listPage(
 	rows: readonly ApplicationRow[],
 	notice?: string,
 	/* The connected-services page (specs/117), linked only where the project offers a service to connect. */
-	servicesHref?: string
+	servicesHref?: string,
+	/* The two-step verification page (specs/126), on every project. */
+	securityHref?: string
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
-	const services = servicesHref
-		? ` · <a href="${esc(servicesHref)}" style="${LINK}">${esc(T.servicesLink)}</a>`
-		: '';
+	const services = `${
+		servicesHref
+			? ` · <a href="${esc(servicesHref)}" style="${LINK}">${esc(T.servicesLink)}</a>`
+			: ''
+	}${
+		securityHref
+			? ` · <a href="${esc(securityHref)}" style="${LINK}">${esc(T.securityLink)}</a>`
+			: ''
+	}`;
 	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.title)}</h1>
 <p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })}${services} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
 <div role="status">${notice ? `<p style="background:${foxVar('success-bg')}; border:1px solid ${foxVar('success-border')}; border-radius:6px; padding:8px 12px; margin:8px 0;">${esc(notice)}</p>` : ''}</div>
@@ -344,9 +352,14 @@ export function servicesPage(
 	rows: readonly ServiceRowView[],
 	offered: readonly OfferedService[],
 	xsrf: string,
-	notice?: ServicesNotice
+	notice?: ServicesNotice,
+	/* The two-step verification page (specs/126). */
+	securityHref?: string
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
+	const security = securityHref
+		? ` · <a href="${esc(securityHref)}" style="${LINK}">${esc(T.securityLink)}</a>`
+		: '';
 	const connect = offered.length
 		? `<h2 style="font-size:16px; margin:24px 0 8px;">${esc(T.servicesAvailable)}</h2><ul style="list-style:none; padding:0; margin:0;">${offered
 				.map(
@@ -356,7 +369,7 @@ export function servicesPage(
 				.join('')}</ul>`
 		: '';
 	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.servicesTitle)}</h1>
-<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(appsHref)}" style="${LINK}">${esc(T.appsLink)}</a> · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
+<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(appsHref)}" style="${LINK}">${esc(T.appsLink)}</a>${security} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>
 <div role="status">${noticeBox(notice, frame.language)}</div>
 ${rows.length ? `<p style="margin:8px 0 16px;">${esc(T.servicesIntro)}</p>${rows.map((row, i) => serviceRow(row, i, frame, xsrf)).join('')}` : `<p style="margin:8px 0;">${esc(T.servicesEmpty)}</p>`}
 ${connect}`;
@@ -578,6 +591,209 @@ export function linkOutcomePage(
 		title,
 		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1>${lines.map((line) => `<p>${esc(line)}</p>`).join('')}${back}`,
 		status,
+		{ language }
+	);
+}
+
+// ---------------------------------------------------------------- two-step verification (specs/126)
+
+/* The pages a person has, linked from each other; the current one as text. */
+export interface AccountNav {
+	apps: string;
+	services?: string;
+	security: string;
+	current: 'apps' | 'services' | 'security';
+}
+
+export function navLine(frame: PageFrame, nav: AccountNav): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const entries: [AccountNav['current'], string, string | undefined][] = [
+		['apps', T.appsLink, nav.apps],
+		['services', T.servicesLink, nav.services],
+		['security', T.securityLink, nav.security]
+	];
+	return entries
+		.filter(([, , href]) => href !== undefined)
+		.map(([key, label, href]) =>
+			key === nav.current
+				? `<span aria-current="page">${esc(label)}</span>`
+				: `<a href="${esc(href ?? '')}" style="${LINK}">${esc(label)}</a>`
+		)
+		.join(' · ');
+}
+
+export type SecurityView =
+	| { state: 'unavailable' }
+	| { state: 'noPassword' }
+	| { state: 'off'; providerSession: boolean }
+	| { state: 'sent'; purpose: 'enrol' | 'replace' }
+	| {
+			state: 'offer';
+			qrSvg: string;
+			key: string;
+			otpauthUri: string;
+			wrong: boolean;
+	  }
+	| {
+			state: 'on';
+			since: Date;
+			required: boolean;
+			providers: readonly string[];
+			confirmOff: boolean;
+	  };
+
+export interface SecurityNotice {
+	kind: 'success' | 'error';
+	text: string;
+}
+
+function securityForm(
+	frame: PageFrame,
+	xsrf: string,
+	action: string,
+	label: string,
+	style: string
+): string {
+	return `<form method="post" action="${esc(frame.path)}" style="display:inline-block; margin:8px 16px 0 0;">${hidden({ action, xsrf })}<button type="submit" style="${style}">${esc(label)}</button></form>`;
+}
+
+function securityBody(
+	frame: PageFrame,
+	view: SecurityView,
+	xsrf: string
+): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const values = { service: frame.service, email: frame.email };
+	switch (view.state) {
+		case 'unavailable':
+			return `<p>${html(T.securityUnavailable, values)}</p>`;
+		case 'noPassword':
+			return `<p>${esc(T.securityNoPassword)}</p>`;
+		case 'off':
+			return [
+				`<p><strong>${html(T.securityOff, values)}</strong></p>`,
+				`<p>${esc(T.securityExplain)}</p>`,
+				`<p>${html(T.securityNeeds, values)}</p>`,
+				`<p>${html(T.securityLostPhone, values)}</p>`,
+				view.providerSession
+					? `<p>${esc(T.securitySignInWithPassword)}</p>`
+					: '',
+				securityForm(frame, xsrf, 'start', T.securityStart, PRIMARY)
+			].join('');
+		case 'sent':
+			return [
+				`<h2 style="font-size:18px; margin:16px 0 8px;">${esc(T.securitySentTitle)}</h2>`,
+				`<p>${html(T.securitySent, values)}</p>`,
+				securityForm(
+					frame,
+					xsrf,
+					view.purpose === 'replace' ? 'replace' : 'start',
+					T.securityResend,
+					PRIMARY
+				)
+			].join('');
+		case 'offer':
+			return [
+				`<h2 style="font-size:18px; margin:16px 0 8px;">${html(T.securityAddTitle, values)}</h2>`,
+				`<p>${esc(T.securityScan)}</p>`,
+				`<div style="display:inline-block; background:#ffffff; padding:8px; border-radius:8px; line-height:0;">${view.qrSvg}</div>`,
+				`<p>${esc(T.securityKey)}<br/><code data-key="${esc(view.key)}" style="font-size:16px; letter-spacing:1px; overflow-wrap:anywhere; user-select:all;">${esc(view.key)}</code></p>`,
+				`<p><a href="${esc(view.otpauthUri)}" style="${LINK}">${esc(T.securityOpenApp)}</a></p>`,
+				`<p style="${MUTED}">${esc(T.securitySpare)}</p>`,
+				`<form method="post" action="${esc(frame.path)}" style="margin-top:16px;">${hidden({ action: 'confirm', xsrf })}`,
+				`<label for="code" style="display:block; margin-bottom:4px;">${esc(T.securityCodeLabel)}</label>`,
+				`<input id="code" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" required style="font-size:18px; letter-spacing:2px; min-height:32px; padding:0 8px; border:1px solid ${foxVar('field-border')}; border-radius:6px; width:10ch;"${view.wrong ? ' aria-invalid="true" aria-describedby="code-error"' : ''}/>`,
+				view.wrong
+					? `<p id="code-error" style="color:${foxVar('danger-text')}; margin:4px 0;">${esc(T.securityWrongCode)}</p>`
+					: '',
+				`<p style="margin-top:12px;"><button type="submit" style="${PRIMARY}">${esc(T.securityTurnOn)}</button></p>`,
+				`</form>`
+			].join('');
+		case 'on': {
+			if (view.confirmOff) {
+				return [
+					`<h2 style="font-size:18px; margin:16px 0 8px;">${esc(T.securityOffConfirmTitle)}</h2>`,
+					`<p>${html(T.securityOffConfirm, values)}</p>`,
+					securityForm(frame, xsrf, 'off', T.securityTurnOff, BUTTON),
+					`<a href="${esc(frame.path)}" style="${LINK}">${esc(T.cancel)}</a>`
+				].join('');
+			}
+			return [
+				`<p><strong>${esc(T.securityOnTitle)}</strong></p>`,
+				`<p>${htmlWith(T.securityOnSince, { date: stamp(view.since, frame.language) })}</p>`,
+				`<p>${html(T.securityOnEvery, values)}</p>`,
+				...view.providers.map(
+					(provider) => `<p>${html(T.securityProvider, { provider })}</p>`
+				),
+				securityForm(frame, xsrf, 'replace', T.securityReplace, PRIMARY),
+				view.required
+					? `<p>${html(T.securityRequired, values)}</p>`
+					: `<a href="${esc(`${frame.path}?off=1`)}" style="${DANGER_LINK}">${esc(T.securityTurnOff)}</a>`
+			].join('');
+		}
+	}
+}
+
+export function securityPage(
+	frame: PageFrame,
+	nav: AccountNav,
+	view: SecurityView,
+	xsrf: string,
+	notice?: SecurityNotice
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const box = notice
+		? `<p style="background:${foxVar(notice.kind === 'success' ? 'success-bg' : 'danger-bg')}; border:1px solid ${foxVar(notice.kind === 'success' ? 'success-border' : 'danger-border')}; border-radius:6px; padding:8px 12px; margin:8px 0;">${esc(notice.text)}</p>`
+		: '';
+	const body = [
+		header(frame),
+		`<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.securityTitle)}</h1>`,
+		`<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>`,
+		`<nav style="margin:0 0 8px;">${navLine(frame, nav)}</nav>`,
+		`<div role="status">${box}</div>`,
+		securityBody(frame, view, xsrf)
+	].join('');
+	const response = page(T.securityTitle, body, 200, {
+		wide: true,
+		language: frame.language
+	});
+	// A page that may show a secret is never kept by a cache, whatever an intermediary does with the defaults.
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+/* "This wasn't me" (specs/126 research R7): the confirmation, and the two outcomes. No session is needed. */
+export function disownConfirmPage(
+	language: Language,
+	path: string,
+	token: string,
+	email: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	return page(
+		text(T.disownTitle, { email }),
+		[
+			`<h1 style="font-size:20px; margin:0 0 8px; overflow-wrap:anywhere;">${html(T.disownTitle, { email })}</h1>`,
+			`<p>${esc(T.disownEffect)}</p>`,
+			`<form method="post" action="${esc(path)}">${hidden({ token })}<button type="submit" style="${BUTTON}">${esc(T.disownButton)}</button></form>`
+		].join(''),
+		200,
+		{ language }
+	);
+}
+
+export function disownOutcomePage(
+	language: Language,
+	removed: boolean,
+	service: string,
+	forgot: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const title = removed ? T.disownDoneTitle : T.disownNothingTitle;
+	return page(
+		title,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1><p>${html(removed ? T.disownDone : T.disownNothing, { service, forgot })}</p>`,
+		removed ? 200 : 400,
 		{ language }
 	);
 }

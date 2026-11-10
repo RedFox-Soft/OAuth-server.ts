@@ -29,6 +29,8 @@ import { PasswordGuessingCard } from './PasswordGuessingCard.js';
 interface Policy {
 	passwordLogin: boolean;
 	totpRequired: boolean;
+	/* Whether people may turn on two-step verification themselves (specs/126); absent on the project means yes. */
+	totpSelfService: boolean;
 	registrationOpen: boolean;
 	emailVerificationRequired: boolean;
 	verificationMethod: 'link' | 'code';
@@ -37,6 +39,7 @@ interface Policy {
 const LABELS: Record<keyof Policy, string> = {
 	passwordLogin: 'Password sign-in',
 	totpRequired: 'Require an authenticator app',
+	totpSelfService: 'Let people turn on two-step verification themselves',
 	registrationOpen: 'Self-service sign-up',
 	emailVerificationRequired: 'Require a verified email address',
 	verificationMethod: 'Verification method'
@@ -46,6 +49,7 @@ export function policyOf(bucket: BucketView): Policy {
 	return {
 		passwordLogin: bucket.passwordLogin,
 		totpRequired: bucket.totpRequired,
+		totpSelfService: bucket.totpSelfService !== false,
 		registrationOpen: bucket.registrationOpen,
 		emailVerificationRequired: bucket.emailVerificationRequired,
 		verificationMethod: bucket.verificationMethod
@@ -465,9 +469,9 @@ export function SignInTab({
 				</Flex>
 			</Card>
 
-			<Card title="Second factor">
+			<Card title="Authenticator app">
 				<Setting
-					title="Require an authenticator app for password sign-in"
+					title="Require an authenticator app for everyone who signs in with a password"
 					control={
 						<Switch
 							aria-label={LABELS.totpRequired}
@@ -478,7 +482,7 @@ export function SignInTab({
 					effect={
 						draft.totpRequired
 							? `Password sign-ins also ask for a 6-digit code. ${consoleBucket ? 'Administrators' : 'People'} without an authenticator set one up at their next sign-in. Provider sign-ins use the provider's own second factor.`
-							: 'Password sign-ins need only the password. Authenticators set up while this was on are kept, but not asked for.'
+							: 'Off: password sign-ins ask for a code only from people who set up an authenticator app.'
 					}
 				>
 					{!draft.passwordLogin && (
@@ -495,6 +499,52 @@ export function SignInTab({
 						)}
 					{!baseline.totpRequired && draft.totpRequired && countsUnavailable}
 				</Setting>
+				{!consoleBucket && (
+					<Setting
+						title={LABELS.totpSelfService}
+						control={
+							<Switch
+								aria-label={LABELS.totpSelfService}
+								checked={draft.totpSelfService}
+								onChange={(on) => set('totpSelfService', on)}
+							/>
+						}
+						effect={
+							draft.totpSelfService
+								? 'On their account page, after a link we email them. From then on they type a code at every password sign-in.'
+								: 'People cannot set one up themselves. Only those who set one up while the project required it are asked for a code.'
+						}
+					>
+						{draft.totpSelfService && !draft.passwordLogin && (
+							<Typography.Text type="warning">
+								Has no effect while password sign-in is off.
+							</Typography.Text>
+						)}
+						{draft.totpSelfService &&
+							summary?.twoStepSelfService === 'no_mail' && (
+								<Typography.Text type="warning">
+									Needs a mail server: the link people confirm with is sent by
+									email. Set up SMTP in Settings first.
+								</Typography.Text>
+							)}
+					</Setting>
+				)}
+				<Flex
+					vertical
+					gap={4}
+				>
+					<Typography.Text strong>Where a code is asked</Typography.Text>
+					{counts && (
+						<Typography.Text>
+							{counts.users - counts.withoutAuthenticator === 0
+								? 'Nobody has set up an authenticator app yet.'
+								: `${plural(counts.users - counts.withoutAuthenticator, 'person has', 'people have')} an authenticator app; each is asked for a code at every password sign-in.`}
+						</Typography.Text>
+					)}
+					<Typography.Text type="secondary">
+						People who sign in through a provider are never asked.
+					</Typography.Text>
+				</Flex>
 			</Card>
 
 			<PasswordGuessingCard

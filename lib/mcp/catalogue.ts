@@ -469,7 +469,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists."
+			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists. `totpEnrolledVia` says how their authenticator app was set up (`self` on their own page, `sign-in` when the project required one), and `totpProofRequired` that an administrator removed it, so the next one needs a link emailed to them."
 	},
 	{
 		tool: 'project_user_session_list',
@@ -1227,8 +1227,8 @@ const catalogue = [
 		path: '/admin/api/admins/:id/totp',
 		action: 'admin.totp.clear',
 		/*
-		 * High, where project_user_totp_clear is ordinary: it removes a second factor from an account that
-		 * administers the instance, and signs it out.
+		 * High, as project_user_totp_clear is: it removes a second factor from an account that administers the
+		 * instance, and signs it out.
 		 */
 		consequence: 'high',
 		superAdminOnly: true,
@@ -1342,7 +1342,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: [],
 		summary:
-			"Create a project. `displayName` is the name its people know the service by, shown at the top of the page where they allow an app access (the consent page); without it that page shows the project's address. A project cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. A `slug` is served as a path beneath this instance, or with `addressForm: 'subdomain'` as a subdomain of its host (`<slug>.<instance host>`); a `host` is a hostname of its own. Each form must be listed in `can.addressForms` from whoami — the operator's `projects.addressForms` setting decides between path and subdomain for a team — and creating at all needs `can.createProject`. While plans are enforced and whoami's `can.nameSlug` is false, leave `slug` out: a random eight-character name is generated in the chosen form, and naming one is refused with `code: 'plan_limit'`; a refusal with that code names the limit and the plan, and only a larger plan, set by a super administrator, lifts it. `teamId` names the team it belongs to — one this administrator is a member of (a super administrator: any team but another administrator's personal team); without it, the administrator's active team."
+			"Create a project. `displayName` is the name its people know the service by, shown at the top of the page where they allow an app access (the consent page); without it that page shows the project's address. A project cannot be created unreachable: at creation it has no providers, so password login cannot be switched off. `totpRequired` makes a password sign-in also require a one-time code from an authenticator app; it governs password sign-in only and never gates a federated one. Anyone who set up an authenticator app is asked for its code at every password sign-in anyway; `totpSelfService` (default true) lets people turn one on themselves, on their account page, and has no effect without password sign-in or mail. A `slug` is served as a path beneath this instance, or with `addressForm: 'subdomain'` as a subdomain of its host (`<slug>.<instance host>`); a `host` is a hostname of its own. Each form must be listed in `can.addressForms` from whoami — the operator's `projects.addressForms` setting decides between path and subdomain for a team — and creating at all needs `can.createProject`. While plans are enforced and whoami's `can.nameSlug` is false, leave `slug` out: a random eight-character name is generated in the chosen form, and naming one is refused with `code: 'plan_limit'`; a refusal with that code names the limit and the plan, and only a larger plan, set by a super administrator, lifts it. `teamId` names the team it belongs to — one this administrator is a member of (a super administrator: any team but another administrator's personal team); without it, the administrator's active team."
 	},
 	{
 		tool: 'project_address_change',
@@ -1415,7 +1415,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy. `passwordGuessing` sets what a password sign-in from an address on FoxTrust's list of addresses seen guessing passwords meets — `mode` nothing, count (the default) or refuse, and `exempt` networks never checked (each a single address or range, optionally `until` a date-time, at most 100). Choosing refuse previews like the tightenings above, with the last 7 days' numbers (`listedAttempts`, `listedRightPassword`) as `expect`, and is refused on the administrators' project."
+			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. A person who set up an authenticator app is asked for its code at every password sign-in whatever `totpRequired` says. `totpSelfService` (absent means true) lets people turn two-step verification on themselves, on their own account page after a link mailed to them; an agent cannot set up a code for anyone. It has no effect while password sign-in is off or mail is not configured (project_summary_get reports `twoStepSelfService`: on, off, no_password_login or no_mail), and it is refused on the administrators' project. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy. `passwordGuessing` sets what a password sign-in from an address on FoxTrust's list of addresses seen guessing passwords meets — `mode` nothing, count (the default) or refuse, and `exempt` networks never checked (each a single address or range, optionally `until` a date-time, at most 100). Choosing refuse previews like the tightenings above, with the last 7 days' numbers (`listedAttempts`, `listedRightPassword`) as `expect`, and is refused on the administrators' project."
 	},
 
 	/* ----------------------------------------------- writes: end-users (10) */
@@ -1527,17 +1527,17 @@ const catalogue = [
 		path: '/admin/api/projects/:id/users/:uid/totp',
 		action: 'enduser.totp.clear',
 		/*
-		 * Ordinary rather than gated. The confirmation gate is for what cannot be undone; this is the
-		 * undoing — the state it repairs is a person locked out of their own account, and its cost is one
-		 * re-enrolment at their next sign-in.
+		 * High (specs/126 research R13): a person who set up an authenticator is asked for it at every password sign-in,
+		 * so removing it takes away a second factor they rely on, and talking support into a removal is the classic way
+		 * around one. The gate makes the agent describe that before it acts.
 		 */
-		consequence: 'ordinary',
+		consequence: 'high',
 		superAdminOnly: false,
 		bodySchema: null,
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"Clear an end-user's authenticator enrolment. Their existing authenticator stops working at once and their sessions end; they set a new one up at their next sign-in. Use when someone has lost the device holding their codes. Their password, grants and tokens are untouched."
+			"Remove an end-user's authenticator app, for a lost device. It stops working at once and their sessions end; until they set up a new one their password alone signs them in, so anyone who knows it can too. They are emailed that it was removed, and a new one needs a link emailed to them: on their account page, or at their next sign-in where the project requires one. Their password, grants and tokens are untouched. Only the person can set up an authenticator; an agent cannot set one up for anyone."
 	},
 	{
 		tool: 'project_user_lock',

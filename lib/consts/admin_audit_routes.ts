@@ -884,7 +884,15 @@ const nonRouteActions = [
 	/* A person connecting their own account from the account page (specs/117); no admin route does this. */
 	{ action: 'connected.account.connect', targetType: 'EndUser' },
 	/* A person letting an application use one of their accounts, or withdrawing it (specs/118); the account page only. */
-	{ action: 'connected.account.consent', targetType: 'EndUser' }
+	{ action: 'connected.account.consent', targetType: 'EndUser' },
+	/*
+	 * A person's own two-step verification (specs/126), from the account page or the "This wasn't me" link; no admin
+	 * route does these. An administrator's removal stays `enduser.totp.clear`.
+	 */
+	{ action: 'enduser.totp.enrol', targetType: 'EndUser' },
+	{ action: 'enduser.totp.replace', targetType: 'EndUser' },
+	{ action: 'enduser.totp.remove', targetType: 'EndUser' },
+	{ action: 'enduser.totp.disown', targetType: 'EndUser' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {

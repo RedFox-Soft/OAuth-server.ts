@@ -1,0 +1,69 @@
+---
+title: Let people turn on two-step verification
+description: 'Each person can add a code from an authenticator app to their own account, and from then on every password sign-in asks them for it.'
+sidebar:
+  order: 11
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A project can require a code from an authenticator app from everyone. Many projects do not, because some of their
+people would be stuck. This page shows the other way: each person decides for their own account.
+
+## What a person does {#steps}
+
+1. They sign in with their password and open their account page, **Two-step verification**. It sits beside their
+   connected apps, at `/account/security` under your project's address.
+2. They choose **Turn on two-step verification**. FoxAuth emails them a link.
+3. They open the link in the same browser, within 10 minutes. A link opened in another browser does nothing, so a
+   person cannot be talked into reading it out to someone who claims to be support.
+4. They scan the QR code with an authenticator app, for example Google Authenticator, Microsoft Authenticator or
+   1Password, and type the code it shows. On a phone, a link opens the app directly.
+
+From then on every password sign-in to the project asks for the code, in every app that signs in with it. The person
+receives an email each time two-step verification is turned on, moved to another phone or turned off.
+
+<Aside type="caution">
+	A sign-in through Google or another provider does not ask for this code. The
+	provider's own second factor protects that sign-in.
+</Aside>
+
+## Why it needs the password and the email {#proof}
+
+Someone who learned the password must not be able to add their own phone. So turning it on needs both:
+
+- a sign-in with the password in the last 15 minutes. A sign-in through a provider does not count;
+- the link mailed to the account's address, opened in the same browser.
+
+Moving it to another phone, or turning it off, needs a code from the current app entered in the last 15 minutes.
+
+## If someone else turned it on {#not-me}
+
+The email about a new authenticator app has a **This was not me** link. Within 72 hours it removes that app and signs
+the account out everywhere. The person should then change their password.
+
+## If someone loses their phone {#lost}
+
+An administrator removes the app on the person's page in the console. The person is emailed about it. Until they set up
+a new one, their password alone signs them in. The new one again needs a link mailed to them, even in a project that
+requires a code from everyone.
+
+Guessing codes is limited: 10 wrong codes in 15 minutes and 30 in a day per account. When someone with the password runs
+out of guesses, the person is emailed, at most once a day, that their password is known.
+
+## What you control {#settings}
+
+On the project's **Sign-in** tab, the **Authenticator app** card has:
+
+- **Require an authenticator app for everyone who signs in with a password**, as before;
+- **Let people turn on two-step verification themselves**, on by default. It needs password sign-in and a mail server;
+- **Where a code is asked**: how many people have an authenticator app.
+
+An agent can change the setting with `project_update` (`totpSelfService`). It cannot set up a code for anyone: only the
+person can.
+
+## For your app {#app}
+
+Add a link named "Two-step verification" to your app's account settings that opens `/account/security` under your
+project's issuer. An app that requires a multi-factor sign-in, with an essential `acr` claim or under the IPSIE SL1
+profile, now gets it for every person who has turned this on.
