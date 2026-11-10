@@ -46,3 +46,15 @@ export const TotpAttemptPayload = t.Object({
 });
 
 export type TotpAttemptPayload = Static<typeof TotpAttemptPayload>;
+
+/*
+ * One accepted step of one enrolment, keyed by `${bucketId}:${accountId}:${enrolledAt ms}:${step}`. Its existence is
+ * the replay guard: the insert-if-absent that writes it lets exactly one of several racing verifications of the same
+ * code through, which advancing `lastStep` on the person could not (a read, a check and a whole-object write).
+ */
+export const TotpSpentStepPayload = t.Object({
+	accountId: t.String(),
+	exp: t.Number()
+});
+
+export type TotpSpentStepPayload = Static<typeof TotpSpentStepPayload>;

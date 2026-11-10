@@ -52,7 +52,11 @@ import {
 	VerificationChallengePayload,
 	VerificationResendPayload
 } from 'lib/verification/types.js';
-import { TotpAttemptPayload, TotpEnrollmentPayload } from 'lib/totp/types.js';
+import {
+	TotpAttemptPayload,
+	TotpEnrollmentPayload,
+	TotpSpentStepPayload
+} from 'lib/totp/types.js';
 import { UpstreamSessionPayload } from 'lib/upstream_signals/types.js';
 
 export interface ReadableSchema {
@@ -92,6 +96,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	TeamInvitationThrottle: TeamInvitationThrottlePayload,
 	TotpAttempt: TotpAttemptPayload,
 	TotpEnrollment: TotpEnrollmentPayload,
+	TotpSpentStep: TotpSpentStepPayload,
 	UpstreamSession: UpstreamSessionPayload,
 	VerificationChallenge: VerificationChallengePayload,
 	VerificationResend: VerificationResendPayload

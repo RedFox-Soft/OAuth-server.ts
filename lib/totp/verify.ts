@@ -2,8 +2,12 @@ import { checkedAdapter, getUserStore } from '../adapters/index.js';
 import epochTime from '../helpers/epoch_time.js';
 import { decodeBase32 } from './base32.js';
 import { verifyAt } from './code.js';
-import { ACCOUNT_FAILURE_CAP, ACCOUNT_WINDOW_SECONDS } from './consts.js';
-import { TotpAttemptPayload } from './types.js';
+import {
+	ACCOUNT_FAILURE_CAP,
+	ACCOUNT_WINDOW_SECONDS,
+	SPENT_STEP_TTL_SECONDS
+} from './consts.js';
+import { TotpAttemptPayload, TotpSpentStepPayload } from './types.js';
 
 /*
  * Verification against a standing enrolment, with both things that make a six-digit secret survivable:
@@ -105,28 +109,66 @@ export async function verifyForAccount(
 	}
 
 	/*
-	 * Advancing `lastStep` is what makes FR-018 true, and it is the easiest part of this to lose: with
-	 * verification implemented as a pure predicate, a code observed in flight stays usable for the whole
-	 * remaining drift band.
+	 * Spending the step is what makes FR-018 true, and it is the easiest part of this to lose: with verification
+	 * implemented as a pure predicate, a code observed in flight stays usable for the whole remaining drift band.
 	 *
-	 * Which is also why the write is checked rather than fired and forgotten. `update` returns null only
-	 * when the row has gone — deleted between the read above and here — and reporting success on that
-	 * would do two wrong things at once: sign a person in as an account that no longer exists, and
-	 * report a verification whose replay guard never moved.
-	 *
-	 * `not_enrolled` rather than a reason of its own, because it is true and because the caller already
-	 * routes it somewhere terminating: the enrolment GET looks the account up, does not find it either,
-	 * and sends them back to the login door.
+	 * It is one insert-if-absent, so of several verifications of the same code racing here exactly one is let
+	 * through. Advancing `lastStep` on the person did not do that: two verifications both passed the check before
+	 * either wrote, a slower one could write an older step back, and because the write carried the whole `totp`
+	 * object it could restore a factor an administrator had just cleared or the person had just replaced. The
+	 * enrolment is part of the key, so a step spent under an old secret never refuses a new one.
 	 */
-	const advanced = await store.update(accountId, {
-		totp: { ...user.totp, lastStep: step }
-	});
-	if (!advanced) {
+	const spent = await spentSteps().create(
+		spentKey(bucketId, accountId, user.totp.enrolledAt, step),
+		{ accountId, exp: now + SPENT_STEP_TTL_SECONDS },
+		SPENT_STEP_TTL_SECONDS
+	);
+	if (!spent) {
+		return { ok: false, reason: 'invalid' };
+	}
+
+	/*
+	 * Read again rather than trusted from the read above: the factor this code proved may have been cleared or
+	 * replaced, or the account deleted, while it was being checked, and success then would sign a person in on a
+	 * factor that is no longer theirs, or as an account that no longer exists. Nothing is written to the person, so
+	 * nothing can bring an old factor back.
+	 *
+	 * `not_enrolled` rather than a reason of its own, because it is true and because the caller already routes it
+	 * somewhere terminating: the enrolment GET looks the account up, finds no factor or no account, and sends them
+	 * on or back to the login door.
+	 */
+	const current = await store.find(accountId);
+	if (!sameEnrolment(current?.totp?.enrolledAt, user.totp.enrolledAt)) {
 		return { ok: false, reason: 'not_enrolled' };
 	}
 
 	await attempts().destroy(key);
 	return { ok: true };
+}
+
+function spentSteps() {
+	return checkedAdapter('TotpSpentStep', TotpSpentStepPayload);
+}
+
+function enrolmentMark(enrolledAt: Date | string | undefined): number {
+	return enrolledAt === undefined ? Number.NaN : new Date(enrolledAt).getTime();
+}
+
+function sameEnrolment(
+	a: Date | string | undefined,
+	b: Date | string | undefined
+): boolean {
+	return enrolmentMark(a) === enrolmentMark(b);
+}
+
+/* Addressed, never scanned for; it expires on its own and dies with the account. */
+function spentKey(
+	bucketId: string,
+	accountId: string,
+	enrolledAt: Date | string,
+	step: number
+): string {
+	return `${bucketId}:${accountId}:${enrolmentMark(enrolledAt)}:${step}`;
 }
 
 /* A clean slate: on a completed sign-in, and when an operator clears the enrolment entirely. */

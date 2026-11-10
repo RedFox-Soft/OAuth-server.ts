@@ -35,7 +35,8 @@ import type { PasswordGuessingTallyPayload } from '../attacker_list/types.js';
 import type { TeamInvitationThrottlePayload } from '../admin/groups/invite_bounds.js';
 import type {
 	TotpAttemptPayload,
-	TotpEnrollmentPayload
+	TotpEnrollmentPayload,
+	TotpSpentStepPayload
 } from '../totp/types.js';
 import type { UpstreamSessionPayload } from '../upstream_signals/types.js';
 import type {
@@ -90,6 +91,7 @@ export interface ModelPayloadByName {
 	TeamInvitationThrottle: TeamInvitationThrottlePayload;
 	TotpAttempt: TotpAttemptPayload;
 	TotpEnrollment: TotpEnrollmentPayload;
+	TotpSpentStep: TotpSpentStepPayload;
 	UpstreamSession: UpstreamSessionPayload;
 	VerificationChallenge: VerificationChallengePayload;
 	VerificationResend: VerificationResendPayload;

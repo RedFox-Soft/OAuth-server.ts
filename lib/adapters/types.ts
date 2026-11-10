@@ -110,9 +110,9 @@ export const User = t.Object({
 			secret: t.String(),
 			enrolledAt: t.Date(),
 			/*
-			 * The time step of the most recently accepted code. A submitted code whose step is at or below
-			 * this is refused, which is what stops a code observed in flight being replayed for the rest of
-			 * its ~90-second acceptance band.
+			 * The time step of the code that completed the enrolment, so that code cannot sign in. Written once,
+			 * at enrolment: every later code is spent in the TotpSpentStep area instead (lib/totp/verify.ts),
+			 * because rewriting this object on each sign-in raced with clearing and replacing the factor.
 			 */
 			lastStep: t.Number()
 		})

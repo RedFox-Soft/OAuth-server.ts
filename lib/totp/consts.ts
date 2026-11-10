@@ -14,6 +14,13 @@ export const DIGITS = 6;
 // for no gain, because the replay guard already caps how long any single code stays usable.
 export const DRIFT_STEPS = 1;
 
+/*
+ * How long the record that spends one accepted step lives. A code for step s is accepted while the current step is
+ * s-1, s or s+1, so for at most (2·DRIFT_STEPS + 1)·STEP_SECONDS after the earliest moment it can be accepted; the
+ * record is written no earlier than that moment, so one more step on top covers it with room to spare.
+ */
+export const SPENT_STEP_TTL_SECONDS = (2 * DRIFT_STEPS + 2) * STEP_SECONDS;
+
 // How long an offered-but-unconfirmed enrolment secret survives. Matches the verification flow's
 // CODE_TTL_SECONDS: an enrolment is a single sitting, and a secret nobody proved should not outlive it.
 export const ENROLLMENT_TTL_SECONDS = 15 * 60;

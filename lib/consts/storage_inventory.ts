@@ -130,6 +130,7 @@ export const MODEL_AREAS = [
 	'TeamInvitationThrottle',
 	'TotpAttempt',
 	'TotpEnrollment',
+	'TotpSpentStep',
 	'UpstreamSession',
 	'VerificationChallenge',
 	'VerificationResend'
@@ -608,6 +609,12 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 */
 	modelArea('TotpAttempt', EXPIRES_AT, byAccount),
 	modelArea('TotpEnrollment', EXPIRES_AT, byAccount),
+	/*
+	 * One accepted step of one enrolment: the replay guard, written by an insert-if-absent so that racing
+	 * verifications of one code let exactly one through. Account-owned like its siblings, point-read by id, and
+	 * expiring two minutes after it is written, once no clock could accept that step again.
+	 */
+	modelArea('TotpSpentStep', EXPIRES_AT, byAccount),
 	/*
 	 * An upstream session at one provider of one bucket → the account it signed in, keyed by
 	 * `sha256("<bucketId>:<providerId>:<sid>")`. Read only by the back-channel logout receiver, to resolve a

@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-10-29
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -97,11 +97,20 @@ too, and the sweep seeds an administrator with an authenticator.
 
 ## Two guards that only exist in the failure path
 
-**The replay guard.** `verifyForAccount` writes the accepted step to `user.totp.lastStep`, and a code at
-or below it is refused. This is the easiest part of the design to lose: implement verification as a pure
-predicate and it disappears, leaving a code observed in flight usable for the rest of its ~90-second
-band. `verifyAt` returns the matching **step** rather than a boolean precisely so the guard is
-expressible.
+**The replay guard.** `verifyForAccount` spends the accepted step with an insert-if-absent in the
+`TotpSpentStep` area, keyed by project, account, enrolment time and step, kept for 120 s
+(`SPENT_STEP_TTL_SECONDS`, `lib/totp/consts.ts`), longer than any clock can accept that step. Of several
+requests carrying one code at once, exactly one is let through. This is the easiest part of the design to
+lose: implement verification as a pure predicate and it disappears, leaving a code observed in flight usable
+for the rest of its ~90-second band. `verifyAt` returns the matching **step** rather than a boolean
+precisely so the guard is expressible.
+
+Until 2026-11-10 the guard was `user.totp.lastStep`, read, checked and written back as the whole `totp`
+object. That raced three ways: parallel requests with one code all passed before either wrote, a slower
+request could write an older step back, and the write could restore a factor an administrator had just
+cleared. `lastStep` is now written only at enrolment, so the enrolling code cannot sign in, and a successful
+check re-reads the person and refuses as `not_enrolled` when the enrolment it proved is gone or replaced
+(`lib/totp/verify.ts`; `test/totp/replay.spec.ts`).
 
 **Two throttles, not one.** A counter on the interaction alone is defeated by starting a new interaction,
 which costs an attacker a single request — hence the per-account window as well. Every failure answers

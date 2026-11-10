@@ -86,13 +86,14 @@ const REAPED_ON_EXPIRES_AT = [
 	 */
 	'TeamInvitationThrottle',
 	/*
-	 * The second factor's two areas, and expiry is the control in both rather than housekeeping. An
+	 * The second factor's three areas, and expiry is the control in each rather than housekeeping. An
 	 * enrolment offer that outlived its window would leave a secret nobody proved sitting against a
 	 * live account; a failure window that never expired would lock an account out for good on ten
-	 * mistyped digits.
+	 * mistyped digits; a spent step that never expired would grow one record per sign-in for good.
 	 */
 	'TotpAttempt',
 	'TotpEnrollment',
+	'TotpSpentStep',
 	/*
 	 * Which account an upstream session signed in. Reaped one session lifetime after the sign-in: a record
 	 * that outlived every session it could reach would map a provider's session to an account for good.

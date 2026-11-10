@@ -334,29 +334,34 @@ describe('second factor at sign-in (US3)', () => {
 
 	/*
 	 * The narrower race the one above cannot reach: the row survives the read at the top of
-	 * verifyForAccount and is gone by the write that advances `lastStep`. Only a failed write can
-	 * express it, so the write is what this drives.
+	 * verifyForAccount and is gone once the code has been checked. Only a read that changes between the
+	 * two can express it, so the first read is what this drives.
 	 *
 	 * Worth its own test rather than trusting the deletion case, because the two take different exits —
-	 * that one returns before ever verifying a code, so it would pass with the guard deleted.
+	 * that one returns before ever verifying a code, so it would pass with the re-read deleted.
 	 */
-	it('refuses when the replay guard cannot be advanced', async () => {
-		const email = `no-advance-${Math.random()}@x.io`;
+	it('refuses when the account is deleted while its code is checked', async () => {
+		const email = `vanishing-mid-check-${Math.random()}@x.io`;
 		await seedEnrolled(requiredBucketId, email);
 		const { uid, cookie } = await passwordStep('totp-required-app', email);
 
 		const store = getUserStore(requiredBucketId);
-		const update = spyOn(store, 'update').mockResolvedValueOnce(null);
+		const read = store.find.bind(store);
+		const find = spyOn(store, 'find').mockImplementationOnce(async (id) => {
+			const before = await read(id);
+			await store.destroy(id);
+			return before;
+		});
 		try {
 			const res = await postForm(`/ui/${uid}/totp`, cookie, {
 				code: currentCode()
 			});
-			expect(update).toHaveBeenCalled();
-			// Not signed in on a verification whose replay guard never moved.
+			expect(find).toHaveBeenCalled();
+			// Not signed in as an account that no longer exists.
 			expect(res.setCookie ?? '').not.toContain(SESSION_COOKIE_PREFIX);
 			expect(res.location).toBe(`/ui/${uid}/totp/enroll`);
 		} finally {
-			update.mockRestore();
+			find.mockRestore();
 		}
 	});
 

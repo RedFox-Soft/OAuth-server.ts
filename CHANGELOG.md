@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A code from an authenticator app signs in once, even when sent twice at the same moment.** Two requests with
+  the same code could both pass, a slower one could make an older code usable again, and a check running while an
+  administrator reset the authenticator could put the old one back. Each accepted code is now recorded once in a new
+  storage area: re-run `db:setup` or `db:setup:pg`.
+
 ## [1.6.0] - 2026-11-10
 
 Your own proxy (Caddy, Traefik or nginx) can now put a project's sign-in in front of a web app, check tokens for an
