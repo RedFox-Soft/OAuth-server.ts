@@ -151,6 +151,16 @@ export function agentBlock(
 				: '3. This is a public client: no secret; PKCE is what protects the code.',
 			'4. Validate the ID token issuer against the issuer above.'
 		);
+		// specs/127: say what the app gets, or how it can ask for a code on some pages only.
+		if (view.requireCode) {
+			lines.push(
+				'Every sign-in to this app includes a code from an authenticator app; no parameter is needed. A person turned away comes back with error=unmet_authentication_requirements: show a page that explains it.'
+			);
+		} else if (connection.multiFactorAcr) {
+			lines.push(
+				`To ask for a code from an authenticator app only on some pages, send acr_values=${connection.multiFactorAcr} and check acr in the ID token.`
+			);
+		}
 	}
 	lines.push(
 		'',

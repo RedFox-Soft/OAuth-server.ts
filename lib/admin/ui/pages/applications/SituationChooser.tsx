@@ -24,6 +24,7 @@ import {
 } from './situations.js';
 import { buildBody, DEFAULT_VALUES, type FormValues } from './clientForm.js';
 import { ClientFormFields } from './ClientFormFields.js';
+import { useCodeConsent, withConsent } from './codeConsent.js';
 import { handOff } from './handOff.js';
 import { GUIDE_SITUATIONS } from '../../../../consts/situation_guide.js';
 import { CreateFields, type CreateValues } from '../behind-proxy/CreateForm.js';
@@ -98,6 +99,7 @@ export function SituationChooser({
 }) {
 	const navigate = useNavigate();
 	const feedback = useFeedback();
+	const sendWithConsent = useCodeConsent();
 	/* An app behind a proxy has a form of its own, which the guide's "Set this up" opens at once too. */
 	const preset = SITUATIONS.find(
 		(s) => s.id === initial && (s.expand || s.id === 'behindProxy')
@@ -207,11 +209,18 @@ export function SituationChooser({
 	async function create(body: Record<string, unknown>, api?: string) {
 		setSaving(true);
 		try {
-			const result = await request<{ clientId: string; secret?: string }>(
-				'POST',
-				`${base}/clients`,
-				body
+			const result = await sendWithConsent(
+				(consent) =>
+					request<{ clientId: string; secret?: string }>(
+						'POST',
+						`${base}/clients`,
+						withConsent(body, consent)
+					),
+				typeof body.clientName === 'string' && body.clientName
+					? body.clientName
+					: 'this application'
 			);
+			if (!result) return;
 			if (!result.ok) {
 				feedback.failed(result, full ? form : undefined);
 				return;

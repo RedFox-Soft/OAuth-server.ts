@@ -4,7 +4,7 @@ import { CONSENT_TEXTS as CONSENT_CATALOGUE } from 'lib/i18n/texts/consent/index
 
 const CONSENT_TEXTS = CONSENT_CATALOGUE.en;
 import { describe, it, expect, beforeAll, afterEach } from 'bun:test';
-import bootstrap from '../test_helper.js';
+import bootstrap, { changeClient } from '../test_helper.js';
 import { elysia } from 'lib/index.ts';
 import {
 	errorStore,
@@ -222,6 +222,31 @@ describe('a device sign-in from a browser with no session', () => {
 		expect((await poll(device_code)).error).toBe(
 			'unmet_authentication_requirements'
 		);
+	});
+
+	// specs/127: a device approved for an app that requires a code stops at the same page as a browser sign-in.
+	it('shows the refusal page and tells the device unmet_authentication_requirements when the person goes back', async () => {
+		const restore = await changeClient('tv', { 'signIn.requireCode': true });
+		try {
+			const browser = new Browser();
+			const { device_code, user_code } = await deviceAuthorization();
+
+			const signedIn = await signIn(
+				browser,
+				await enterCode(browser, user_code),
+				await newUser()
+			);
+			const refusal = signedIn.headers.get('location') ?? '';
+			expect(refusal).toMatch(/^\/ui\/[^/]+\/code-required$/);
+			expect((await browser.request(refusal)).status).toBe(200);
+			await browser.post(refusal, { action: 'return' });
+
+			expect((await poll(device_code)).error).toBe(
+				'unmet_authentication_requirements'
+			);
+		} finally {
+			await restore();
+		}
 	});
 
 	it('tells the device invalid_target when the requested resource is withdrawn before approval', async () => {

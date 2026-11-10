@@ -73,6 +73,16 @@ describe('a client document naming internal client attributes', () => {
 		expect(client['consent.require']).not.toBe(false);
 	});
 
+	// specs/127: only an administrator makes an application require a code, or lifts it.
+	it('requires no code because it names the requirement', async () => {
+		const { client } = await resolveServed({
+			'signIn.requireCode': true,
+			requireCode: true
+		});
+
+		expect(client['signIn.requireCode']).toBe(false);
+	});
+
 	it('gives the person no checkboxes when it asks for them', async () => {
 		const { client } = await resolveServed({
 			'consent.partial': true,

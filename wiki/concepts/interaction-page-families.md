@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-16
+updated: 2026-11-11
 graph:
   node_type: concept
   relationships:
@@ -45,6 +45,12 @@ without JavaScript ([[connected-apps-page]]).
 
 Both families build their `Response` through `htmlResponse`. That is enforced, not merely conventional:
 see [[html-response-security-policy]].
+
+Two pages added by spec 127 show the rule from both sides. The refusal of an application that requires a code
+(`ui/:uid/code-required`, `codeRequiredPage.tsx`) is the antd shell: it lives inside the interaction, carries the
+project's masthead and language switch, and its buttons continue the sign-in or end it. The page for a sign-in that
+has expired (`lib/interactions/expiredPage.ts`, rendered by the shared error handler for an HTML request under `/ui/`)
+is plain: the interaction is gone, so nothing on it could continue anything, and the way forward starts at the app.
 
 ## The hydration contract, and the way it fails
 

@@ -222,6 +222,7 @@ export function Clients({
 									{row.registeredDynamically ? (
 										<Tag>Self-registered</Tag>
 									) : null}
+									{row.requireCode ? <Tag>Code required</Tag> : null}
 								</Space>
 							)
 						},

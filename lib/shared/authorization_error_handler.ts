@@ -1,6 +1,7 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
 import { eventBus } from 'lib/event_bus.js';
-import { OIDCProviderError } from '../helpers/errors.ts';
+import { OIDCProviderError, SessionNotFound } from '../helpers/errors.ts';
+import { signInExpiredPage } from '../interactions/expiredPage.js';
 import { getErrorHtmlResponse } from '../html/error.tsx';
 import { routeNames } from 'lib/consts/param_list.js';
 import { isScimPath, isScimRoute, SCIM_MEDIA_TYPE } from 'lib/consts/scim.js';
@@ -529,6 +530,21 @@ export async function errorHandler(obj: ErrorHandlerContext) {
 	}
 
 	const accept = request.headers.get('accept') || '';
+	/*
+	 * A sign-in page whose sign-in is gone (specs/127 FR-022): the interaction no longer exists, or the browser no longer
+	 * holds its cookie, which expires with it — the case a person actually meets after the hour runs out.
+	 */
+	const signInGone =
+		error instanceof SessionNotFound ||
+		(error instanceof ValidationError &&
+			getFirstError(error)?.path === '/_interaction');
+	if (
+		accept.includes('text/html') &&
+		signInGone &&
+		new URL(request.url).pathname.includes('/ui/')
+	) {
+		return signInExpiredPage(languageOfRequest(request).language);
+	}
 	if (accept.includes('text/html')) {
 		// The page's own words follow the reader (specs/097); the protocol code and description stay English.
 		return getErrorHtmlResponse(

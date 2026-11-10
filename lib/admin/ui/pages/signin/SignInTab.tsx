@@ -14,7 +14,7 @@ import {
 import type { FederationProvider } from '../../../../federation/types.js';
 import { DEFAULT_BUCKET_ID } from '../../../consts.js';
 import { Link, useLeaveGuard } from '../../frame/router.js';
-import { bucketHref } from '../../frame/routes.js';
+import { applicationHref, bucketHref } from '../../frame/routes.js';
 import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useSignInSave } from './useSignInSave.js';
@@ -481,7 +481,7 @@ export function SignInTab({
 					}
 					effect={
 						draft.totpRequired
-							? `Password sign-ins also ask for a 6-digit code. ${consoleBucket ? 'Administrators' : 'People'} without an authenticator set one up at their next sign-in. Provider sign-ins use the provider's own second factor.`
+							? `Password sign-ins also ask for a 6-digit code. ${consoleBucket ? 'Administrators' : 'People'} without an authenticator set one up at their next sign-in.`
 							: 'Off: password sign-ins ask for a code only from people who set up an authenticator app.'
 					}
 				>
@@ -541,8 +541,23 @@ export function SignInTab({
 								: `${plural(counts.users - counts.withoutAuthenticator, 'person has', 'people have')} an authenticator app; each is asked for a code at every password sign-in.`}
 						</Typography.Text>
 					)}
+					{(summary?.codeRequiredApps?.length ?? 0) > 0 && (
+						<Typography.Text>
+							Every sign-in to these applications includes a code:{' '}
+							{summary?.codeRequiredApps?.map((app, index) => (
+								<span key={app.id}>
+									{index > 0 ? ', ' : ''}
+									<Link href={applicationHref(bucket._id, app.id)}>
+										{app.name}
+									</Link>
+								</span>
+							))}
+							.
+						</Typography.Text>
+					)}
 					<Typography.Text type="secondary">
-						People who sign in through a provider are never asked.
+						People who sign in through a provider are never asked for a code
+						here. Apps that require a code turn them away.
 					</Typography.Text>
 				</Flex>
 			</Card>

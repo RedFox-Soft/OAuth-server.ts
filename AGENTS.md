@@ -172,8 +172,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   `registerClient`, and in a test change the stored record (`changeClient`), never the object. A client
   belongs to the bucket in its server-only `bucketId` for life, and carries its own `corsOrigins`; neither
   is ever recognised metadata. In the console an application is edited only on its own page, and a
-  "situation" is a console preset, never an API field. → `client-identity-from-database.md`,
-  `client-registration-attributes.md`, `mcp-server-authorization.md`, `application-page.md`
+  "situation" is a console preset, never an API field. An application's requirement of a code is an operator base key
+  (`signIn.requireCode`), kept across a registration PUT and enforced at every grant for a person through
+  `codeRequiredAndMissing`, never only at the sign-in. → `client-identity-from-database.md`,
+  `client-registration-attributes.md`, `mcp-server-authorization.md`, `application-page.md`, `totp-second-factor.md`
 - **The situation guide** — every situation in "What do you need?" is declared once, in
   `lib/consts/situation_guide.ts`, and the console and the site both draw from it. A change that adds, changes or
   removes something a person sets up (a grant, a setting, a console form, a provider kind, a plan feature) adds,

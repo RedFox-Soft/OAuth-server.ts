@@ -61,6 +61,11 @@ export const BASE_METADATA_KEYS = [
 	 */
 	'consent.partial',
 	/*
+	 * Whether every sign-in to this application must include a code from an authenticator app. An operator's
+	 * judgement of what the application holds, never something it may claim or waive about itself (specs/127).
+	 */
+	'signIn.requireCode',
+	/*
 	 * Whether the server created this client on its own request. A base key rather than recognised
 	 * metadata: it is not something a client may send — `lib/actions/registration.ts` sets it after the
 	 * wire translation — and it must survive the round trip through storage, which only keeps what is

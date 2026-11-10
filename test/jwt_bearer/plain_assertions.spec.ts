@@ -1,7 +1,7 @@
 import { describe, beforeAll, it, expect } from 'bun:test';
 import { decodeJwt } from 'jose';
 
-import bootstrap, { seedAccount } from '../test_helper.js';
+import bootstrap, { changeClient, seedAccount } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { shaped } from 'test/shape.js';
 import {
@@ -93,6 +93,20 @@ describe('a plain assertion presented with the JWT bearer grant', () => {
 			aud: PROFILE_API,
 			scope: 'profile.read'
 		});
+	});
+
+	// specs/127: an outside issuer's assertion is not a sign-in here in which the person typed a code.
+	it('is refused with invalid_grant when the application requires a code', async () => {
+		const restore = await changeClient('migrator', {
+			'signIn.requireCode': true
+		});
+		try {
+			const res = await asMigrator(await plain(), { scope: 'profile.read' });
+
+			expect(refusal(res)).toBe('invalid_grant');
+		} finally {
+			await restore();
+		}
 	});
 
 	it("accepts the project's token endpoint as the audience", async () => {

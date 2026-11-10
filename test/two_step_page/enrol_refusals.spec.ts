@@ -33,7 +33,8 @@ import {
 	person,
 	project,
 	signedIn,
-	startAndFollow
+	startAndFollow,
+	textOf
 } from './helpers.ts';
 
 const LINK_PATH = '/account/security/link';
@@ -136,6 +137,34 @@ describe('turning on two-step verification without the proof it needs', () => {
 		expect(html).not.toContain('name="action" value="start"');
 		expect(linkMailsTo(email)).toHaveLength(0);
 	});
+
+	// specs/127: the page says why, and that apps requiring a code cannot be opened that way.
+	for (const [what, setup] of [
+		[
+			'has no password',
+			async (accountId: string) => {
+				await getUserStore(DEFAULT_BUCKET_ID).update(accountId, {
+					passwordSet: false
+				});
+			}
+		],
+		[
+			'is in a project with password sign-in off',
+			async () => {
+				await project({ passwordLogin: false });
+			}
+		]
+	] as const) {
+		it(`tells a person who ${what} that two-step verification is not used for them`, async () => {
+			const { browser, accountId } = await signedIn();
+			await setup(accountId);
+
+			const shown = textOf(await (await browser.request(PAGE)).text());
+
+			expect(shown).toContain('isn’t used for your account');
+			expect(shown).toContain('require a code from an authenticator app');
+		});
+	}
 
 	for (const [what, setup] of [
 		[

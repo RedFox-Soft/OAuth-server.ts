@@ -113,7 +113,12 @@ export function ApplicationPage({
 				]}
 				title={name}
 				tags={
-					client?.registeredDynamically ? <Tag>Self-registered</Tag> : undefined
+					client?.registeredDynamically || client?.requireCode ? (
+						<>
+							{client.registeredDynamically ? <Tag>Self-registered</Tag> : null}
+							{client.requireCode ? <Tag>Code required</Tag> : null}
+						</>
+					) : undefined
 				}
 				meta={client ? describe(client) : undefined}
 				tabs={TABS.map((t) => ({

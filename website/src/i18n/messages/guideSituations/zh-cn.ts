@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '7e36e97b6111';
+export const source = '4aaa23515d01';
 
 export default {
 	questions: {
@@ -719,7 +719,7 @@ export default {
 			goodToKnow: [
 				'任何身份验证器应用都可以。',
 				'如果有人丢了手机，管理员可以在该用户的页面上移除该应用。',
-				'即使没有开启开关，用户也可以自己开启。'
+				'即使没有开启开关，用户也可以自己开启，应用也可以单独要求它。'
 			],
 			actionLabel: '打开 Sign-in'
 		},
@@ -757,9 +757,57 @@ export default {
 			goodToKnow: [
 				'默认开启。需要密码登录和邮件服务器。',
 				'如果有人丢失了手机，管理员可以在其用户页面上移除该应用；之后设置新应用需要我们邮件发送的链接。',
-				'通过 Google 或其他身份提供方登录时不会要求此验证码。'
+				'通过 Google 或其他身份提供方登录时不会要求此验证码，因此要求验证码的应用会拒绝这些人。'
 			],
 			actionLabel: '打开 Sign-in'
+		},
+		appcode: {
+			title: '只在需要的应用中要求验证码',
+			sentence:
+				'某个应用（例如账单）不接受没有身份验证器应用验证码的登录。项目中的其他应用保持不变。',
+			protocol: 'OpenID Connect acr',
+			problemCaption: '被盗的密码也能打开账单应用。',
+			fixCaption: '账单应用只接受带验证码的登录。',
+			lanes: {
+				person: '用户',
+				app: '你的应用',
+				fox: 'FoxAuth',
+				totp: '身份验证器'
+			},
+			steps: [
+				{
+					label: '打开',
+					text: '用户打开应用，被引导去登录。'
+				},
+				{
+					label: '登录',
+					text: '应用请 FoxAuth 让用户登录。'
+				},
+				{
+					label: '密码和验证码',
+					text: 'FoxAuth 先要求输入密码，再要求输入应用中的验证码。没有设置的人可以当场设置。'
+				},
+				{
+					label: '6 位数字',
+					text: '应用显示一个验证码。'
+				},
+				{
+					label: '带验证码登录',
+					text: 'FoxAuth 告诉应用，这次登录包含了验证码。'
+				}
+			],
+			sees: [
+				'输入密码后再输入身份验证器应用中的验证码，每次登录一次',
+				'如果没有，会看到一个可以设置并继续的页面',
+				'通过身份提供方登录的人会被告知无法以这种方式打开此应用'
+			],
+			goodToKnow: [
+				'在应用的设置中打开 “Require a code from an authenticator app”。保存前，你会看到这会影响多少人。',
+				'每次登录只要求一次验证码，而不是每次打开应用都要。',
+				'没有验证码的登录所得的刷新令牌会失效，用户需要重新登录并输入验证码。',
+				'通过身份提供方登录的人无法以这种方式打开此应用。'
+			],
+			actionLabel: '打开应用'
 		},
 		knownguessers: {
 			title: '阻止已知地址猜测密码',
@@ -1191,6 +1239,7 @@ export default {
 				'每次登录都必须使用 PKCE，并且只有预先注册的应用才能登录。',
 				'签名使用 PS256、ES256 或 EdDSA。',
 				'另一项单独的设置 FAPI behaviours，还会要求应用签名的断言只把本服务器列为受众。',
+				'按需的第二因素适用于有密码和身份验证器应用的人，不适用于通过身份提供方登录的人；就绪检查会列出没有新人能提供第二因素的项目。',
 				'这是整个服务器的设置。'
 			],
 			actionLabel: '打开该设置'

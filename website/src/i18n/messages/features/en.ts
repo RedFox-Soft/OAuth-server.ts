@@ -142,7 +142,7 @@ export default {
 				},
 				totp: {
 					title: 'TOTP second factor',
-					body: 'Time-based one-time passwords: a project can require one from everyone, and each person can turn one on for their own account, proved by a link mailed to them. Every change is mailed, with a 72-hour "This was not me" link. Also available for the admin console.'
+					body: 'Time-based one-time passwords: a project can require one from everyone, and each person can turn one on for their own account, proved by a link mailed to them. Every change is mailed, with a 72-hour "This was not me" link. One application can require a code on its own, and a person without one sets it up inside the same sign-in. Also available for the admin console.'
 				},
 				pairwise: {
 					title: 'Pairwise subject identifiers',

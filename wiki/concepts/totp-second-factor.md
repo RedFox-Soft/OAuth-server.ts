@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-11-10
+updated: 2026-11-11
 graph:
   node_type: concept
   relationships:
@@ -204,6 +204,39 @@ the administrators' project.
   person that their password is known.
 - **Enrolling on the page raises the session** to multi-factor when the password was typed in it at most 15 minutes
   earlier, so an app asking for a multi-factor sign-in does not send the person round again.
+
+## An application that requires a code (spec 127)
+
+An administrator can make one application require a code: the operator-only base key `signIn.requireCode`
+(`requireCode` at the edge), kept beside `consent.partial` and for the same reason — it is a judgement about the
+application, never something it may claim or waive. `translate()` drops it from every registration path, and the
+RFC 7592 `PUT`, which rebuilds a record from its body, carries it over explicitly
+(`lib/actions/registration.ts`), or a self-registered app could lift its own requirement by registering again.
+
+- **One predicate for every door.** `codeRequiredAndMissing(client, acr)` (`lib/client_policy/require_code.ts`) is
+  what the login prompt's `second_factor` check and every grant that acts for a person read: refresh
+  (`usableRefreshToken`), authorization and device codes and CIBA at token time, the CIBA result, token exchange (the
+  subject's own `acr`, and the agent's requirement as well as the exchanging app's) and `jwt-bearer`, which is always
+  refused there — an outside issuer's assertion is not a sign-in here. Only the multi-factor context meets it; an
+  absent `acr` does not. There is no freshness: a multi-factor session, however old, is enough, and the console says
+  so.
+- **A refusal page, not an error.** See [[authentication-context-reporting]]: after a sign-in that gave no code, the
+  interaction is re-opened at `ui/:uid/code-required` instead of ending. Its variants are chosen from the session
+  itself (not the interaction's snapshot, which has no sign-in time or provider): `setUp` for a password person when
+  self-service is in effect, `askOperators` otherwise, `provider`/`providerAsk` for a provider sign-in — never a set-up
+  link there, since a provider sign-in is never asked for this code. "Return to the app" ends the interaction with
+  `unmet_authentication_requirements` the way declining consent ends it with `access_denied`.
+- **Setting one up from the refusal page stays inside the sign-in.** It reuses the mailed-link mode of the sign-in
+  enrolment (`secondFactor.selfService` on the interaction), with the account page's proofs: a password typed in this
+  browser within 15 minutes, a link bound to the interaction uid, then a code; `via: 'self'`, the address marked
+  verified, the "This was not me" mail. Taking the person to `/account/security` and back was rejected: it needed a
+  second, nested sign-in and a return address, for the same proofs.
+- **Turning it on is previewed** like a project's sign-in tightening (`lib/admin/clients/require_code_preview.ts`):
+  people with a password and no app, people with no password, people holding a grant to the app now. Sign-ins are not
+  recorded per application, so "who used it lately" cannot be counted. For agents any call that names the field is
+  `high` (`highWhenSets`).
+- **Rollback fails closed.** An older release drops an unknown base key on read and erases it on its next write, so
+  the no-op migration `2026-11-11-app-requires-code-fence` makes every older release refuse the database.
 
 ## The administrators' project needs its own door
 

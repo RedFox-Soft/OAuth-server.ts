@@ -617,7 +617,8 @@ await verifyTwoStep(
 		users: (bucketId) => new UserStore(bucketId),
 		links: adapter('TotpLink'),
 		spent: adapter('TotpSpentStep'),
-		attempts: adapter('TotpAttempt')
+		attempts: adapter('TotpAttempt'),
+		clients: adapter('Client')
 	},
 	check
 );

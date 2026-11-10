@@ -8,6 +8,8 @@ import { isScheduledForDeletion } from '../consts/bucket_deletion.ts';
 import { SL1_DEFAULT_SIGNING_ALGORITHM } from '../consts/sl1.ts';
 import { keysFor, rootKeys } from '../keys/issuer_keys.ts';
 import { validateClient } from '../models/client/validate.ts';
+import { ADMIN_BUCKET_ID } from '../admin/consts.ts';
+import { selfServiceState } from '../totp/self_service.ts';
 import {
 	sl1,
 	sl1ClientViolations,
@@ -30,6 +32,12 @@ export type Sl1Readiness = {
 		clientName?: string;
 		violations: Sl1Violation[];
 	}[];
+	/*
+	 * Advice, not a blocker (specs/127): the projects where nobody new can meet a request for a second factor — none of
+	 * them requires an authenticator app and people cannot set one up themselves, or password sign-in is off. Only
+	 * people who already hold one meet it there.
+	 */
+	projectsWithoutSecondFactor: { projectId: string; name: string }[];
 };
 
 export type Sl1Issuer = Sl1Readiness['issuers'][number];
@@ -92,6 +100,22 @@ async function clientsAffected(): Promise<Sl1Readiness['clients']> {
 	return affected;
 }
 
+async function projectsWithoutSecondFactor(): Promise<
+	Sl1Readiness['projectsWithoutSecondFactor']
+> {
+	const found: Sl1Readiness['projectsWithoutSecondFactor'] = [];
+	for (const bucket of await getBucketStore().list()) {
+		if (bucket._id === ADMIN_BUCKET_ID || isScheduledForDeletion(bucket)) {
+			continue;
+		}
+		const offered =
+			bucket.passwordLogin &&
+			(bucket.totpRequired || (await selfServiceState(bucket)) === 'on');
+		if (!offered) found.push({ projectId: bucket._id, name: bucket.name });
+	}
+	return found;
+}
+
 /* What turning the profile on would need and what it would refuse, computed without enabling anything. */
 export async function sl1Readiness(): Promise<Sl1Readiness> {
 	const settings = SL1_SETTING_PREREQUISITES.filter(
@@ -107,6 +131,7 @@ export async function sl1Readiness(): Promise<Sl1Readiness> {
 		canEnable: settings.length === 0 && issuers.length === 0,
 		settings,
 		issuers,
-		clients: await clientsAffected()
+		clients: await clientsAffected(),
+		projectsWithoutSecondFactor: await projectsWithoutSecondFactor()
 	};
 }

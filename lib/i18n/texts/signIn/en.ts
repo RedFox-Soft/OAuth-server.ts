@@ -9,7 +9,8 @@ export const en = {
 		login: 'Sign in',
 		registration: 'Create account',
 		totpEnroll: 'Set Up Authenticator',
-		totpVerify: 'Two-Step Verification'
+		totpVerify: 'Two-Step Verification',
+		codeRequired: 'A Code Is Needed'
 	},
 
 	/*
@@ -85,7 +86,14 @@ export const en = {
 		mailedHeading: 'Check your email',
 		mailedHint:
 			'Your authenticator app was removed from your account. We sent you a link: open it in this browser within 10 minutes to set up a new one.',
-		mailedResend: 'Send a new link'
+		mailedResend: 'Send a new link',
+		/* Setting one up from an application that requires it (specs/127), after the link in the mail. */
+		linkHint:
+			'We sent you a link. Open it in this browser within 10 minutes to set up an authenticator app.',
+		continueApp: 'Continue to {app}',
+		continueAny: 'Continue',
+		everySignIn:
+			'From now on, a code will be asked at every password sign-in to {service}.'
 	},
 
 	notices: {
@@ -104,7 +112,34 @@ export const en = {
 		mailLimited:
 			'Too many emails were requested from your network in the last hour. Please try again later.',
 		/* An app behind a proxy that asks for a recent sign-in (specs/124 FR-022). */
-		freshSignIn: '{host} asks you to sign in again to open this page.'
+		freshSignIn: '{host} asks you to sign in again to open this page.',
+		/* An application that requires a code, before this sign-in has one (specs/127). */
+		codeAskedByApp: '{app} asks for a code from an authenticator app.',
+		codeAsked:
+			'The app you’re signing in to asks for a code from an authenticator app.'
+	},
+
+	/*
+	 * An application that requires a code from an authenticator app, reached by a sign-in that gave none (specs/127).
+	 * The app is named only where the page may name it (the masthead rule); a value is always a value.
+	 */
+	codeRequired: {
+		headingApp: '{app} asks for a code from an authenticator app',
+		headingAny:
+			'The app you’re signing in to asks for a code from an authenticator app',
+		noFactor:
+			'Your account, {email}, doesn’t have an authenticator app set up yet, so you can’t open it this way.',
+		setUpHint:
+			'Setting one up takes about two minutes: we email you a link, then you scan a QR code with an app on your phone, for example Google Authenticator, Microsoft Authenticator or 1Password.',
+		setUp: 'Set up an authenticator app',
+		askOperators:
+			'{service} doesn’t let people set one up themselves. Ask the people who run {service}.',
+		provider:
+			'You signed in with {provider}. A code from an authenticator app can’t be used with a sign-in through {provider} here, so you can’t open it this way.',
+		passwordInstead: 'Sign in with a password instead',
+		providerAsk: 'Ask the people who run {service}.',
+		returnApp: 'Return to {app} without signing in',
+		returnAny: 'Return to the app without signing in'
 	},
 
 	errors: {

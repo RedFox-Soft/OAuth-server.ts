@@ -30,8 +30,16 @@ import {
 const ACR_REASONS = new Set([
 	'essential_acr',
 	'essential_acrs',
-	'sl1_acr_values'
+	'sl1_acr_values',
+	'second_factor'
 ]);
+/*
+ * The application requires a code (specs/127). After a sign-in that gave none, the person is shown a page that says
+ * so and offers what can help (setting one up in this same sign-in, a password instead of a provider), rather than
+ * being handed back to the application with an error it may not explain.
+ */
+const SECOND_FACTOR_REASON = 'second_factor';
+export const CODE_REQUIRED_PAGE = 'code-required';
 const isAcrReason = (reason: string) => ACR_REASONS.has(reason);
 
 /*
@@ -126,7 +134,10 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	 * both consent checks already read for this purpose. Scoped to the ACR reasons: every other
 	 * prompt can legitimately be satisfied by a further interaction.
 	 */
-	if (oidc.result?.login && prompt.reasons.some(isAcrReason)) {
+	const refused =
+		oidc.result?.login !== undefined &&
+		prompt.reasons.includes(SECOND_FACTOR_REASON);
+	if (oidc.result?.login && prompt.reasons.some(isAcrReason) && !refused) {
 		throw new errors.UnmetAuthenticationRequirements(
 			failedCheck.error_description
 		);
@@ -173,8 +184,9 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 
 	eventBus.emit('interaction.started', oidc, prompt);
 	// `prompt=create` opens on the registration page; it is the login prompt that carries it.
-	const page =
-		prompt.name === 'login' && prompt.reasons.includes(CREATE_PROMPT_REASON)
+	const page = refused
+		? CODE_REQUIRED_PAGE
+		: prompt.name === 'login' && prompt.reasons.includes(CREATE_PROMPT_REASON)
 			? 'registration'
 			: prompt.name;
 	const destination = `/ui/${uid}/${page}`;

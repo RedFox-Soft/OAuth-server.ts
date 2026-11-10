@@ -10,6 +10,7 @@ import { foxVar } from '../html/theme/palette.js';
 import { LanguageSwitch, type SwitcherProps } from './languageSwitch.js';
 import { useLanguage } from '../i18n/context.js';
 import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
+import { Message } from '../i18n/message.js';
 
 /*
  * The second factor's one page, in two modes.
@@ -42,6 +43,11 @@ export interface TotpPageProps {
 	switcher?: SwitcherProps;
 	/* Where this sign-in leads: see LoginPage. */
 	face: SignInFace;
+	/*
+	 * Set up from an application that requires a code (specs/127): the person chose to, the link proves their
+	 * mailbox, and confirming continues to the application rather than only closing this step.
+	 */
+	continuing?: boolean;
 }
 
 function ErrorBanner({ message }: { message: string }) {
@@ -77,7 +83,8 @@ export function TotpPage({
 	secretText,
 	logoSrc = DEFAULT_LOGO,
 	switcher,
-	face
+	face,
+	continuing = false
 }: TotpPageProps) {
 	const T = SIGN_IN_TEXTS[useLanguage()];
 	const enrolling = mode === 'enroll';
@@ -108,7 +115,9 @@ export function TotpPage({
 						logoSrc={logoSrc}
 						heading={T.totp.mailedHeading}
 					/>
-					<Typography.Paragraph>{T.totp.mailedHint}</Typography.Paragraph>
+					<Typography.Paragraph>
+						{continuing ? T.totp.linkHint : T.totp.mailedHint}
+					</Typography.Paragraph>
 					<Button href={`${buildUIPath(uid, 'totp/enroll')}?resend=1`}>
 						{T.totp.mailedResend}
 					</Button>
@@ -200,6 +209,15 @@ export function TotpPage({
 					</Flex>
 				)}
 
+				{enrolling && continuing && (
+					<Typography.Paragraph>
+						<Message
+							t={T.totp.everySignIn}
+							values={{ service: face.service }}
+						/>
+					</Typography.Paragraph>
+				)}
+
 				<Form
 					name="totp"
 					method="post"
@@ -232,7 +250,20 @@ export function TotpPage({
 							htmlType="submit"
 							block
 						>
-							{enrolling ? T.totp.confirm : T.totp.verify}
+							{enrolling && continuing ? (
+								face.app ? (
+									<Message
+										t={T.totp.continueApp}
+										values={{ app: face.app.name }}
+									/>
+								) : (
+									T.totp.continueAny
+								)
+							) : enrolling ? (
+								T.totp.confirm
+							) : (
+								T.totp.verify
+							)}
 						</Button>
 					</Form.Item>
 				</Form>

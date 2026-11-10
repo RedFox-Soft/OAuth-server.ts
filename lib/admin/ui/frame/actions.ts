@@ -43,6 +43,13 @@ export const ACTIONS = {
 		title: (t) => `Delete client ${t}?`,
 		okText: 'Delete client'
 	},
+	// Turns people away from the application (specs/127): asked with the server's counts of whom.
+	'client.requireCode.confirm': {
+		class: 'C2',
+		title: (t) => `Require a code for ${t}?`,
+		okText: 'Require a code',
+		cancelText: 'Keep editing'
+	},
 
 	'resource.declare': { class: 'C0' },
 	'resource.edit': { class: 'C0' },

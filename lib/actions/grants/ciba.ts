@@ -26,6 +26,10 @@ import { issuerFor } from '../../configs/issuer.js';
 import { routeNames } from '../../consts/param_list.js';
 import { conformedIdTokenScope } from '../../consts/groups_claim.js';
 import { sessionExpiryInput } from '../../shared/session_expiry.js';
+import {
+	codeRequiredAndMissing,
+	REQUIRE_CODE_DESCRIPTION
+} from '../../client_policy/require_code.ts';
 
 const { AuthorizationPending, ExpiredToken, InvalidGrant } = errors;
 
@@ -126,6 +130,14 @@ export const handler = async function cibaHandler(
 
 	if (request.payload.accountId !== grant.payload.accountId) {
 		throw new InvalidGrant('accountId mismatch');
+	}
+
+	/*
+	 * The sign-in check stops this before a code is issued (specs/127); this holds for one issued in the moment before
+	 * the application was made to require a code.
+	 */
+	if (codeRequiredAndMissing(oidc.client, request.payload.acr)) {
+		throw new InvalidGrant(REQUIRE_CODE_DESCRIPTION);
 	}
 
 	oidc.entity('Account', account);

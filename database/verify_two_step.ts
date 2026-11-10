@@ -20,10 +20,31 @@ export async function verifyTwoStep(
 		links: ModelAdapter<Record<string, unknown>>;
 		spent: ModelAdapter<Record<string, unknown>>;
 		attempts: ModelAdapter<Record<string, unknown>>;
+		/* An application's requirement of a code (specs/127): a base key on the stored client document. */
+		clients: ModelAdapter<Record<string, unknown>>;
 	},
 	check: Check
 ): Promise<void> {
 	const stamp = String(Date.now());
+
+	{
+		const clientId = `verify-require-code-${stamp}`;
+		const bucketId = `verify-require-code-bucket-${stamp}`;
+		await stores.clients.upsert(clientId, {
+			clientId,
+			bucketId,
+			'signIn.requireCode': true
+		});
+		const stored = await stores.clients.find(clientId);
+		const listed = await stores.clients.findByIndexed('bucketId', bucketId);
+		check(
+			"an application's requirement of a code is stored with the client and read back by its project",
+			stored?.['signIn.requireCode'] === true &&
+				listed.some((record) => record['signIn.requireCode'] === true),
+			JSON.stringify({ stored, listed: listed.length })
+		);
+		await stores.clients.destroy(clientId);
+	}
 	const exp = Math.floor(Date.now() / 1000) + 600;
 
 	const bucket = await stores.buckets.create({

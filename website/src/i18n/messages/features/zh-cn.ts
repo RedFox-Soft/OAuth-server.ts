@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '32c5ac0a4031';
+export const source = '52ce7e27f735';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -139,7 +139,7 @@ export default {
 				},
 				totp: {
 					title: 'TOTP 第二因素',
-					body: '基于时间的一次性密码：项目可以要求所有人使用，每个人也可以为自己的账号开启，并通过邮件中的链接确认。每次更改都会发送邮件，其中附有 72 小时内有效的“这不是我”链接。管理控制台也可使用。'
+					body: '基于时间的一次性密码：项目可以要求所有人使用，每个人也可以为自己的账号开启，并通过邮件中的链接确认。每次更改都会发送邮件，其中附有 72 小时内有效的“这不是我”链接。单个应用可以自行要求验证码，没有验证码的人可以在同一次登录中完成设置。管理控制台也可使用。'
 				},
 				pairwise: {
 					title: '成对主体标识符',

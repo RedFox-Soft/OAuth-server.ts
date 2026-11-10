@@ -4,7 +4,7 @@ title: "Reporting the authentication context a sign-in satisfied"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-13
-updated: 2026-11-10
+updated: 2026-11-11
 graph:
   node_type: concept
   relationships:
@@ -86,6 +86,13 @@ when `oidc.result?.login` is present and the failing prompt's reasons name an AC
 `oidc.result.login` is the discriminator between *"has not tried yet"*, which must be shown a login
 page, and *"tried, and it is still not enough"*. The `max_age` check and both consent checks already
 read it for precisely that; the two ACR checks were the ones that did not.
+
+**A fourth reason does not end the request (spec 127, 2026-11-11).** `second_factor` — the application itself
+requires a code ([[totp-second-factor]]) — is in `ACR_REASONS` like the other three, so it can never re-open the
+login page in a ring. But when it fails after a login, the guard opens a new interaction at `ui/:uid/code-required`
+instead of throwing: a person who could set a code up, or sign in with a password instead of a provider, is shown how,
+and the error reaches the application only if they choose to go back. The other three reasons still throw, and
+`prompt=none` still errors at once. The device flow follows the redirect the same way.
 
 **The delivery was the awkward part.** The shared handler redirected an error to the client only on
 the authorization route, and an interaction resumes on `/ui/:uid/resume`, so a throw there rendered to

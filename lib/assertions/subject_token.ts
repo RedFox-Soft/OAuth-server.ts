@@ -10,6 +10,10 @@ import type { Account, OIDCContext } from '../helpers/oidc_context.js';
 import type { DPoPProof } from '../helpers/validate_dpop.js';
 import { IdToken } from '../models/id_token.js';
 import {
+	codeRequiredAndMissing,
+	REQUIRE_CODE_DESCRIPTION
+} from '../client_policy/require_code.js';
+import {
 	RefreshTokenRefused,
 	usableRefreshToken
 } from '../shared/refresh_token_validation.js';
@@ -78,6 +82,18 @@ async function fromIdToken(
 
 	const account = await findAccount(oidc, payload.sub);
 	if (!account) throw refused('account');
+	/*
+	 * An application that requires a code (specs/127) vouches for a person elsewhere only on a sign-in that gave one. A
+	 * refresh token as the subject is held to the same by `usableRefreshToken`.
+	 */
+	if (
+		codeRequiredAndMissing(
+			client,
+			typeof payload.acr === 'string' ? payload.acr : undefined
+		)
+	) {
+		throw refused(REQUIRE_CODE_DESCRIPTION);
+	}
 	return {
 		account,
 		...(typeof payload.auth_time === 'number'

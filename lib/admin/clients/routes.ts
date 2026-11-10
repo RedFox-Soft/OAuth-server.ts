@@ -26,6 +26,8 @@ import nanoid from '../../helpers/nanoid.js';
 import { assertApplicationRoom } from '../../plans/enforce.js';
 import { connectionOf } from './connection.js';
 import { readClientUsage } from '../../models/client/usage.js';
+import { requireCodePreview } from './require_code_preview.js';
+import { sameExpect } from '../buckets/sign_in_preview.js';
 import { parseClientIdentifierUrl } from '../../client_metadata_document/identifier.js';
 
 /*
@@ -48,6 +50,33 @@ function loadBucket(
  * The application under this bucket, answered exactly as a missing one when the bucket does not hold it,
  * so naming another bucket's application tells the caller nothing about it.
  */
+/*
+ * The 409 that turning `requireCode` on answers until it is confirmed with the counts it previewed (specs/127): the
+ * protocol of the project PATCH, so the console and an agent consent the same way. Null when the change may go ahead.
+ */
+function consentRefused(
+	preview: Awaited<ReturnType<typeof requireCodePreview>>,
+	confirm: boolean | undefined,
+	expect: Readonly<Record<string, number | undefined>> | undefined
+) {
+	if (!preview) return null;
+	if (confirm !== true) {
+		return { confirmationRequired: true as const, ...preview };
+	}
+	if (!sameExpect(expect, preview.expect)) {
+		return {
+			error: 'admin_error' as const,
+			message:
+				expect === undefined
+					? 'confirm with the counts of the preview you reviewed (expect)'
+					: 'what this change affects changed since you reviewed it',
+			...preview,
+			confirmationRequired: true as const
+		};
+	}
+	return null;
+}
+
 async function clientOf(
 	bucket: UserBucket,
 	clientId: string
@@ -119,11 +148,11 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 	})
 	.post(
 		'/admin/api/projects/:id/clients',
-		async ({ admin, params, body, set }) => {
+		async ({ admin, params, body, set, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
 			await assertApplicationRoom(ctx, bucket);
-			const { clientIdentifierUrl, ...metadata } = body;
+			const { clientIdentifierUrl, confirm, expect, ...metadata } = body;
 			// Allocated here so the entry names the client that is about to exist.
 			const clientId = clientIdentifierUrl ?? nanoid();
 			if (clientIdentifierUrl !== undefined) {
@@ -143,6 +172,14 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 					);
 				}
 			}
+			// Before the audit entry, so nothing is recorded for a change that was only described.
+			const preview = await requireCodePreview(
+				bucket,
+				undefined,
+				metadata.requireCode
+			);
+			const refused = consentRefused(preview, confirm, expect);
+			if (refused) return status(409, refused);
 			await recordAdminAudit(ctx, 'client.create', clientId, scopeOf(bucket));
 			const { view, secret } = await createClient(bucket._id, {
 				...metadata,
@@ -163,15 +200,25 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 	)
 	.patch(
 		'/admin/api/projects/:id/clients/:clientId',
-		async ({ admin, params, body }) => {
+		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucket(ctx, params.id, 'edit');
-			assertManaged(await clientOf(bucket, params.clientId));
+			const current = await clientOf(bucket, params.clientId);
+			assertManaged(current);
+			const { confirm, expect, ...changes } = body;
+			// Before the audit entry, so nothing is recorded for a change that was only described.
+			const preview = await requireCodePreview(
+				bucket,
+				current,
+				changes.requireCode
+			);
+			const refused = consentRefused(preview, confirm, expect);
+			if (refused) return status(409, refused);
 			await recordAdminAudit(ctx, 'client.update', params.clientId, {
 				...scopeOf(bucket),
-				attributes: Object.keys(body)
+				attributes: Object.keys(changes)
 			});
-			const { view, secret } = await updateClient(params.clientId, body);
+			const { view, secret } = await updateClient(params.clientId, changes);
 			return {
 				...(await connected(view, bucket)),
 				...(secret ? { secret } : {})

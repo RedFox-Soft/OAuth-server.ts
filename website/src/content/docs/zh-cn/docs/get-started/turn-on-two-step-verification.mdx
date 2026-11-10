@@ -1,7 +1,7 @@
 ---
 title: 让用户自己开启两步验证
 description: '每个人都可以为自己的账号添加身份验证器应用中的验证码，此后每次用密码登录都会要求输入验证码。'
-source: 115afb90d014
+source: 799eb91d6950
 sidebar:
   order: 11
 ---
@@ -21,7 +21,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 <Aside type="caution">
 	通过 Google
-	或其他身份提供方登录时不会要求此验证码。这类登录由身份提供方自己的第二重验证保护。
+	或其他身份提供方登录时不会要求此验证码。这类登录由身份提供方自己的第二重验证保护，要求验证码的应用会拒绝这类登录。
 </Aside>
 
 ## 为什么需要密码和邮件 {#proof}
@@ -55,4 +55,4 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## 对于您的应用 {#app}
 
-在应用的账号设置中添加一个名为“两步验证”的链接，打开项目颁发者（issuer）下的 `/account/security`。要求多因素登录的应用（通过必需的 `acr` 声明或 IPSIE SL1 配置文件）现在可以为每个开启了此功能的人获得多因素登录。
+在应用的账号设置中添加一个名为“两步验证”的链接，打开项目颁发者（issuer）下的 `/account/security`。要求多因素登录的应用（通过必需的 `acr` 声明或 IPSIE SL1 配置文件）现在可以为每个开启了此功能的人获得多因素登录。如需在某个应用中不借助任何参数要求验证码，请参阅[在一个应用中要求验证码](/zh-cn/docs/get-started/require-a-code-for-an-app/)。

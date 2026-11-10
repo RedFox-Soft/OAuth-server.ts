@@ -303,14 +303,16 @@ export async function notifyEnrolled(
 }
 
 /*
- * An enrolment completed at sign-in, in a project that requires a factor (or after the link a removal asks for). The
+ * An enrolment completed at sign-in, in a project that requires a factor (or after the link a removal asks for), or
+ * from an application that requires one (specs/127, `via: 'self'`: the person's own choice, as on their page). The
  * person is the actor, as on their page; `addressProved` when a mailed link led here.
  */
 export async function enrolAtSignIn(
 	bucketId: string,
 	accountId: string,
 	proved: Proved,
-	addressProved = false
+	addressProved = false,
+	via: 'self' | 'sign-in' = 'sign-in'
 ): Promise<boolean> {
 	const bucket = await getBucketStore().find(bucketId);
 	if (!bucket) return false;
@@ -318,7 +320,7 @@ export async function enrolAtSignIn(
 		const user = await enrolOwnAuthenticator(
 			bucket,
 			accountId,
-			{ secret: proved.secret, step: proved.step, via: 'sign-in' },
+			{ secret: proved.secret, step: proved.step, via },
 			() =>
 				recordEndUserAudit(bucketId, accountId, 'enduser.totp.enrol', {
 					targetScope: bucketId,

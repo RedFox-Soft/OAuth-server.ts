@@ -12,7 +12,13 @@ import { once } from 'node:events';
 import { generateKeyPair, SignJWT, exportJWK } from 'jose';
 
 import { AccessDenied } from '../../lib/helpers/errors.ts';
-import bootstrap, { agent, seedAccount, formAgent } from '../test_helper.js';
+import bootstrap, {
+	agent,
+	changeClient,
+	seedAccount,
+	formAgent
+} from '../test_helper.js';
+import { configuration } from 'lib/configs/application.ts';
 
 import { emitter, CLIENT_SECRET } from './ciba.config.js';
 import { eventBus, type ServerListener } from 'lib/event_bus.js';
@@ -223,6 +229,40 @@ describe('features.ciba', () => {
 				expect(request.jti).toBeFalsy();
 				await backchannelResult(request, result);
 				expect(request.jti).toBeTruthy();
+			});
+
+			// specs/127: an application that requires a code takes a backchannel result only from a sign-in that gave one.
+			it('fails the request when the application requires a code and the authentication gave none', async () => {
+				const restore = await changeClient('client', {
+					'signIn.requireCode': true
+				});
+				try {
+					const withoutCode = new BackchannelAuthenticationRequest({
+						clientId: 'client',
+						accountId: 'accountId'
+					});
+					await backchannelResult(
+						withoutCode,
+						new Grant({ clientId: 'client', accountId: 'accountId' }),
+						{ acr: configuration.acrMap.password }
+					);
+					expect(withoutCode.payload.error).toBe('transaction_failed');
+					expect(withoutCode.payload.acr).toBeUndefined();
+
+					const withCode = new BackchannelAuthenticationRequest({
+						clientId: 'client',
+						accountId: 'accountId'
+					});
+					await backchannelResult(
+						withCode,
+						new Grant({ clientId: 'client', accountId: 'accountId' }),
+						{ acr: configuration.acrMap.multi_factor }
+					);
+					expect(withCode.payload.error).toBeUndefined();
+					expect(withCode.payload.acr).toBe(configuration.acrMap.multi_factor);
+				} finally {
+					await restore();
+				}
 			});
 
 			it('pings the client (204)', async () => {

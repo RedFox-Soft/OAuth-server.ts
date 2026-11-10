@@ -41,11 +41,16 @@ import {
 	recordAttempt
 } from '../login_throttle/throttle.js';
 import {
+	codeRequiredServer,
 	consentServer,
 	loginServer,
 	registrationServer,
 	totpServer
 } from './serverRender.js';
+import type { SignInFace } from './signInMasthead.js';
+import type { CodeRequiredVariant } from './codeRequiredPage.js';
+import { knownProviderByIssuer } from 'lib/consts/known_providers.js';
+import { REQUIRE_CODE_DESCRIPTION } from 'lib/client_policy/require_code.js';
 import { verifyForAccount } from 'lib/totp/verify.js';
 import {
 	confirm as confirmEnrollment,
@@ -55,6 +60,8 @@ import {
 import {
 	enrolAtSignIn,
 	followLink,
+	freshPassword,
+	selfServiceState,
 	sendLink,
 	warnOfGuessing
 } from 'lib/totp/self_service.js';
@@ -84,6 +91,7 @@ import loadAccount from 'lib/actions/authorization/load_account.js';
 import { canSignIn } from 'lib/end_users/can_sign_in.js';
 import loadGrant from 'lib/actions/authorization/load_grant.js';
 import interactions, {
+	CODE_REQUIRED_PAGE,
 	expiredInteractionCookie
 } from 'lib/actions/authorization/interactions.js';
 import {
@@ -1080,6 +1088,111 @@ function freshSignInNotice(interaction: Interaction): string | undefined {
 	});
 }
 
+/*
+ * Why the login page appears to a person who may already be signed in (specs/127): the application requires a code
+ * from an authenticator app, and this sign-in has none yet. Named only where the page may name the app at all.
+ */
+function codeAskedNotice(
+	interaction: Interaction,
+	face: SignInFace
+): string | undefined {
+	const reasons = interaction.payload.prompt?.reasons ?? [];
+	if (!reasons.includes('second_factor')) return undefined;
+	const T = SIGN_IN_TEXTS[languageOf(interaction)].notices;
+	return face.app
+		? text(T.codeAskedByApp, { app: face.app.name })
+		: T.codeAsked;
+}
+
+/* An interaction that stopped because the application requires a code this sign-in did not give (specs/127). */
+function refusalOf(interaction: Interaction): boolean {
+	return (interaction.payload.prompt?.reasons ?? []).includes('second_factor');
+}
+
+/*
+ * Who a refused sign-in is about and how they signed in, read from the session itself rather than from the snapshot
+ * the interaction keeps: the snapshot has no sign-in time and no provider, and those decide what the page may offer.
+ */
+async function refusedSignIn(interaction: Interaction, bucketId: string) {
+	if (!refusalOf(interaction)) return undefined;
+	const kept = interaction.payload.session;
+	const accountId = kept?.accountId;
+	const session = kept?.cookie ? await Session.tryFind(kept.cookie) : undefined;
+	if (!accountId || !session || session.payload.accountId !== accountId) {
+		return undefined;
+	}
+	const user = await getUserStore(bucketId).find(accountId);
+	if (!user) return undefined;
+	/*
+	 * A bucket that cannot be read is read as the sign-in options read it — password sign-in open — but nothing is
+	 * offered that depends on its settings: no setting up, no provider named.
+	 */
+	const bucket = await getBucketStore().find(bucketId);
+	return { session, bucket, user };
+}
+
+type RefusedSignIn = NonNullable<Awaited<ReturnType<typeof refusedSignIn>>>;
+
+/*
+ * What the refusal page may offer (specs/127 data-model). A provider sign-in is never sent to set up a code — it would
+ * not be asked for one — and is offered a password only where one would work. A password sign-in of someone who holds
+ * a factor needs no page: signing in again asks for it.
+ */
+async function refusalVariant({
+	session,
+	bucket,
+	user
+}: RefusedSignIn): Promise<CodeRequiredVariant | 'signIn'> {
+	const amr = session.payload.amr ?? [];
+	const hasPassword = user.passwordSet !== false;
+	if (!amr.includes('pwd')) {
+		return hasPassword && bucket?.passwordLogin !== false
+			? 'provider'
+			: 'providerAsk';
+	}
+	if (user.totp) return 'signIn';
+	return hasPassword && bucket && (await selfServiceState(bucket)) === 'on'
+		? 'setUp'
+		: 'askOperators';
+}
+
+/* The provider as its sign-in button names it: the catalogue's name for a recognised one, the administrator's otherwise. */
+function providerNameOf({ session, bucket }: RefusedSignIn): string {
+	const id = session.payload.upstream?.providerId;
+	const provider = bucket?.federation.find((p) => p.id === id);
+	if (!provider) return '';
+	return (
+		knownProviderByIssuer(provider.issuer)?.displayName ?? provider.displayName
+	);
+}
+
+/*
+ * Setting up a code from the refusal page (specs/127 research R4): only where it is the person's to choose and the
+ * proofs of their own page hold — self-service on, a password on the account, and the password typed in this browser
+ * within fifteen minutes. The mailed link is asked for next, by the enrolment page.
+ */
+async function stageSelfServiceEnrolment(
+	interaction: Interaction,
+	bucketId: string
+): Promise<Interaction['payload']['secondFactor']> {
+	const refused = await refusedSignIn(interaction, bucketId);
+	if (!refused || !freshPassword(refused.session)) return undefined;
+	if ((await refusalVariant(refused)) !== 'setUp') return undefined;
+	const staged = {
+		accountId: refused.user._id,
+		attempts: 0,
+		selfService: true
+	};
+	interaction.payload.secondFactor = staged;
+	await interaction.persist();
+	return staged;
+}
+
+async function selfServiceStillOn(bucketId: string): Promise<boolean> {
+	const bucket = await getBucketStore().find(bucketId);
+	return bucket !== null && (await selfServiceState(bucket)) === 'on';
+}
+
 /* The parameters that ask an upstream provider for a fresh sign-in, when this one was asked for a fresh sign-in. */
 function freshSignInParams(interaction: Interaction): Record<string, string> {
 	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
@@ -1296,10 +1409,12 @@ export const ui = new Elysia()
 				request,
 				await getBucketStore().find(signsInto)
 			);
+			const look = await signInLook(interaction, signsInto);
 			return loginServer(uid, {
 				notice:
 					resolveNotice(query.notice, languageOf(interaction)) ??
-					freshSignInNotice(interaction),
+					freshSignInNotice(interaction) ??
+					codeAskedNotice(interaction, look.face),
 				/*
 				 * Back from a provider that was cancelled or refused: the notice says so, and the provider may be one
 				 * of those folded away (specs/105), so the fold opens. The notice does not name the provider, so it
@@ -1312,7 +1427,7 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'login'),
-				...(await signInLook(interaction, signsInto)),
+				...look,
 				...options,
 				...listRefusalOf(guessing)
 			});
@@ -1645,25 +1760,39 @@ export const ui = new Elysia()
 	.get(
 		'ui/:uid/totp/enroll',
 		async ({ params: { uid }, interaction, request }) => {
-			const pending = interaction.payload.secondFactor;
-			if (!pending) {
-				return Response.redirect(buildUILoginPath(uid), 303);
-			}
-
 			const clientId = clientIdOf(interaction);
 			const bucketId = await resolveBucketForRequest(
 				clientId,
 				resourceOf(interaction),
 				await addressedBucketOf(interaction)
 			);
-			const { totpRequired } = await loginOptionsForClient(
-				clientId,
-				resourceOf(interaction),
-				await addressedBucketOf(interaction)
-			);
-			// Lowered while this person was mid-flow: there is nothing left to enrol for.
-			if (!totpRequired) {
-				return Response.redirect(buildUILoginPath(uid), 303);
+			const pending =
+				interaction.payload.secondFactor ??
+				(await stageSelfServiceEnrolment(interaction, bucketId));
+			if (!pending) {
+				return Response.redirect(
+					refusalOf(interaction)
+						? buildUIPath(uid, CODE_REQUIRED_PAGE)
+						: buildUILoginPath(uid),
+					303
+				);
+			}
+
+			if (pending.selfService === true) {
+				// Turned off, or password sign-in closed, while this person was mid-flow.
+				if (!(await selfServiceStillOn(bucketId))) {
+					return Response.redirect(buildUIPath(uid, CODE_REQUIRED_PAGE), 303);
+				}
+			} else {
+				const { totpRequired } = await loginOptionsForClient(
+					clientId,
+					resourceOf(interaction),
+					await addressedBucketOf(interaction)
+				);
+				// Lowered while this person was mid-flow: there is nothing left to enrol for.
+				if (!totpRequired) {
+					return Response.redirect(buildUILoginPath(uid), 303);
+				}
 			}
 
 			const user = await getUserStore(bucketId).find(pending.accountId);
@@ -1680,19 +1809,25 @@ export const ui = new Elysia()
 			 * mailed to them before any secret is shown: a removal someone talked support into must not hand the next
 			 * factor to whoever knows the password. The link works only in this interaction, so only in this browser.
 			 */
+			/*
+			 * The same for a person setting one up from an application that requires it (specs/127): as on their own page,
+			 * the password they just typed is not enough on its own, so their mailbox is proved too.
+			 */
+			const continuing = pending.selfService === true;
 			if (
 				bucket &&
-				user.totpProofRequired === true &&
+				(user.totpProofRequired === true || continuing) &&
 				!(await waitingOffer(uid, user._id, bucketId))
 			) {
 				const origin = new URL(request.url).origin;
-				await sendLink(bucket, user, 'reenrol', uid, {
+				await sendLink(bucket, user, continuing ? 'enrol' : 'reenrol', uid, {
 					request,
 					urlFor: (token) =>
 						`${origin}${buildUIPath(uid, 'totp/enroll/link')}?token=${encodeURIComponent(token)}`
 				});
 				return totpServer(uid, {
 					mode: 'mailed',
+					continuing,
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'totp/enroll'),
@@ -1712,6 +1847,7 @@ export const ui = new Elysia()
 
 			return totpServer(uid, {
 				mode: 'enroll',
+				continuing,
 				otpauthUri,
 				secretText,
 				handOffTo: redirectUriOf(interaction),
@@ -1744,6 +1880,10 @@ export const ui = new Elysia()
 			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
 				return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
 			}
+			const continuing = pending.selfService === true;
+			if (continuing && !(await selfServiceStillOn(bucketId))) {
+				return Response.redirect(buildUIPath(uid, CODE_REQUIRED_PAGE), 303);
+			}
 
 			const outcome = await confirmEnrollment(
 				uid,
@@ -1755,9 +1895,14 @@ export const ui = new Elysia()
 						bucketId,
 						pending.accountId,
 						proved,
-						// A link led here only for a person whose factor an administrator removed, and it proved the address.
-						(await getUserStore(bucketId).find(pending.accountId))
-							?.totpProofRequired === true
+						/*
+						 * A link led here only for a person whose factor an administrator removed, or who chose to set one up
+						 * from an application that requires it; either way it proved the address.
+						 */
+						continuing ||
+							(await getUserStore(bucketId).find(pending.accountId))
+								?.totpProofRequired === true,
+						continuing ? 'self' : 'sign-in'
 					)
 			);
 
@@ -1794,6 +1939,7 @@ export const ui = new Elysia()
 				);
 				return totpServer(uid, {
 					mode: 'enroll',
+					continuing,
 					errorMessage: invalidCode(interaction),
 					otpauthUri,
 					secretText,
@@ -1843,7 +1989,8 @@ export const ui = new Elysia()
 			);
 			const user = await getUserStore(bucketId).find(pending.accountId);
 			const bucket = await getBucketStore().find(bucketId);
-			if (link?.purpose === 'reenrol' && user && !user.totp && bucket) {
+			const expected = pending.selfService === true ? 'enrol' : 'reenrol';
+			if (link?.purpose === expected && user && !user.totp && bucket) {
 				await offerEnrollment(uid, user._id, bucketId, {
 					email: user.email,
 					label: shownNameOf(bucket)
@@ -1852,6 +1999,53 @@ export const ui = new Elysia()
 			return Response.redirect(buildUIPath(uid, 'totp/enroll'), 303);
 		},
 		{ query: t.Object({ token: t.Optional(t.String()) }) }
+	)
+	/*
+	 * The application requires a code and this sign-in gave none (specs/127). The page waits in the open sign-in; its
+	 * actions continue it (setting a code up, a password instead) or end it, which hands the application the standard
+	 * error the way declining consent hands it `access_denied`.
+	 */
+	.get(
+		`ui/:uid/${CODE_REQUIRED_PAGE}`,
+		async ({ params: { uid }, interaction }) => {
+			const bucketId = await resolveBucketForRequest(
+				clientIdOf(interaction),
+				resourceOf(interaction),
+				await addressedBucketOf(interaction)
+			);
+			const refused = await refusedSignIn(interaction, bucketId);
+			if (!refused) return Response.redirect(buildUILoginPath(uid), 303);
+			const variant = await refusalVariant(refused);
+			if (variant === 'signIn') {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			return codeRequiredServer(uid, {
+				variant,
+				email: refused.user.email,
+				...(variant === 'provider' || variant === 'providerAsk'
+					? { provider: providerNameOf(refused) }
+					: {}),
+				handOffTo: redirectUriOf(interaction),
+				language: languageOf(interaction),
+				switcher: switcherOf(interaction, CODE_REQUIRED_PAGE),
+				...(await signInLook(interaction, bucketId))
+			});
+		}
+	)
+	.post(
+		`ui/:uid/${CODE_REQUIRED_PAGE}`,
+		async ({ params: { uid }, interaction, cookie, route, request }) => {
+			if (!refusalOf(interaction)) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			interaction.payload.result = {
+				...(interaction.payload.result ?? {}),
+				error: 'unmet_authentication_requirements',
+				error_description: REQUIRE_CODE_DESCRIPTION
+			};
+			return resume(interaction, cookie, { route, request });
+		},
+		{ body: t.Object({ action: t.Literal('return') }) }
 	)
 	/*
 	 * Leg one of a federated sign-in. Declares its own `params` schema, and that is load-bearing rather than

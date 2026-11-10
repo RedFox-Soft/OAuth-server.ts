@@ -1087,8 +1087,9 @@ const catalogue = [
 		bodySchema: CreateClientBody,
 		querySchema: null,
 		pathParams: ['id'],
+		highWhenSets: ['requireCode'],
 		summary:
-			'Register an OAuth client (application) in a project; it signs that project’s people in for its whole life, and no operation moves it to another. corsOrigins lists the web origins whose browser code may read its responses — an invalid origin refuses the whole list. Only the project’s own client_credentials clients may obtain machine tokens for the APIs declared in it. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host. primaryColor takes a colour written #rrggbb (null removes it); the sign-in, two-step and consent pages paint it, shifted to the nearest legible shade where needed, only for this organization’s own users — the response’s paintedPrimaryColor shows the light and dark shades they will see.'
+			'Register an OAuth client (application) in a project; it signs that project’s people in for its whole life, and no operation moves it to another. corsOrigins lists the web origins whose browser code may read its responses — an invalid origin refuses the whole list. Only the project’s own client_credentials clients may obtain machine tokens for the APIs declared in it. A confidential client’s generated secret is returned exactly once, here, and is never readable again. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host. primaryColor takes a colour written #rrggbb (null removes it); the sign-in, two-step and consent pages paint it, shifted to the nearest legible shade where needed, only for this organization’s own users — the response’s paintedPrimaryColor shows the light and dark shades they will see. requireCode makes every sign-in to the application include a code from an authenticator app, once per sign-in: people without one are asked to set one up or turned away, people who sign in through a provider are turned away, and its refresh tokens from sign-ins without a code stop working; turning it on answers a preview of how many people that reaches, repeated with confirm: true and its expect to apply.'
 	},
 	{
 		tool: 'client_update',
@@ -1100,9 +1101,14 @@ const catalogue = [
 		bodySchema: UpdateClientBody,
 		querySchema: null,
 		pathParams: ['id', 'clientId'],
-		highWhenSets: ['redirectUris', 'grantTypes', 'tokenEndpointAuthMethod'],
+		highWhenSets: [
+			'redirectUris',
+			'grantTypes',
+			'tokenEndpointAuthMethod',
+			'requireCode'
+		],
 		summary:
-			"Change a client's registered metadata — redirect URIs, grant types, and the rest. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host. primaryColor takes a colour written #rrggbb (null removes it); the sign-in, two-step and consent pages paint it, shifted to the nearest legible shade where needed, only for this organization’s own users — the response’s paintedPrimaryColor shows the light and dark shades they will see."
+			"Change a client's registered metadata — redirect URIs, grant types, and the rest. partialConsent lets the person untick individual permissions on the consent page — turn it on only for an application that copes with receiving fewer permissions than it asked for. logo takes a data:image/png, image/jpeg or image/webp base64 URL of at most 64 KiB (null removes it), and policyUri and tosUri take https addresses; the consent page shows them only to this organization’s own users, the links only when they are on a redirect URI’s host. primaryColor takes a colour written #rrggbb (null removes it); the sign-in, two-step and consent pages paint it, shifted to the nearest legible shade where needed, only for this organization’s own users — the response’s paintedPrimaryColor shows the light and dark shades they will see. requireCode makes every sign-in to the application include a code from an authenticator app, once per sign-in: people without one are asked to set one up or turned away, people who sign in through a provider are turned away, and its refresh tokens from sign-ins without a code stop working; turning it on answers a preview of how many people that reaches, repeated with confirm: true and its expect to apply."
 	},
 	{
 		tool: 'client_secret_rotate',

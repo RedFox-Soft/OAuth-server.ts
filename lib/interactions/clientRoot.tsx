@@ -4,6 +4,7 @@ import { ConsentPage } from './consentPage.tsx';
 import { emptyConsentView } from './consentView.ts';
 import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
+import { CodeRequiredPage } from './codeRequiredPage.tsx';
 import type { SignInFace } from './signInMasthead.tsx';
 import { EndUserTheme } from '../html/theme/provider.tsx';
 import type { PaintedAccent } from '../html/theme/accent.ts';
@@ -96,6 +97,16 @@ function pageElement(
 					uid={uid}
 					face={UNNAMED}
 					mode="verify"
+					{...props}
+				/>
+			);
+		case 'code-required':
+			// The variant is the server's; the spread comes last so the server's value wins on hydration.
+			return (
+				<CodeRequiredPage
+					uid={uid}
+					face={UNNAMED}
+					variant="askOperators"
 					{...props}
 				/>
 			);

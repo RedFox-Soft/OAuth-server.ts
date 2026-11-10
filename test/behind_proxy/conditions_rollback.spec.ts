@@ -60,15 +60,17 @@ const stored = {
  */
 describe('an older release against a database with conditions', () => {
 	it('refuses to start, because the database is ahead of what it declares', () => {
-		const fence = MIGRATIONS.at(-1);
-		expect(fence?.id).toBe('2026-11-06-proxy-conditions-fence');
-		const records = MIGRATIONS.map((migration) => ({
+		const at = MIGRATIONS.findIndex(
+			(migration) => migration.id === '2026-11-06-proxy-conditions-fence'
+		);
+		expect(at).toBeGreaterThan(-1);
+		const records = MIGRATIONS.slice(0, at + 1).map((migration) => ({
 			id: migration.id,
 			appliedAt: new Date(),
 			checksum: checksumOf(migration)
 		}));
 
-		const older = compare(MIGRATIONS.slice(0, -1), records);
+		const older = compare(MIGRATIONS.slice(0, at), records);
 
 		expect(older.status).toBe('ahead');
 		expect(older.unknown).toEqual(['2026-11-06-proxy-conditions-fence']);

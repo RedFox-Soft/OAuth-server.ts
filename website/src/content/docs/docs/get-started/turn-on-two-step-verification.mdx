@@ -25,7 +25,8 @@ receives an email each time two-step verification is turned on, moved to another
 
 <Aside type="caution">
 	A sign-in through Google or another provider does not ask for this code. The
-	provider's own second factor protects that sign-in.
+	provider's own second factor protects that sign-in, and an app that requires a
+	code turns it away.
 </Aside>
 
 ## Why it needs the password and the email {#proof}
@@ -66,4 +67,5 @@ person can.
 
 Add a link named "Two-step verification" to your app's account settings that opens `/account/security` under your
 project's issuer. An app that requires a multi-factor sign-in, with an essential `acr` claim or under the IPSIE SL1
-profile, now gets it for every person who has turned this on.
+profile, now gets it for every person who has turned this on. To require a code in one app without any parameter, see
+[Require a code in one app](/docs/get-started/require-a-code-for-an-app/).

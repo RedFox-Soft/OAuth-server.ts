@@ -22,7 +22,8 @@ export const SWITCH_PAGES = [
 	'totp',
 	'totp/enroll',
 	'consent',
-	'forgot-password'
+	'forgot-password',
+	'code-required'
 ] as const;
 
 export type SwitchPage = (typeof SWITCH_PAGES)[number];

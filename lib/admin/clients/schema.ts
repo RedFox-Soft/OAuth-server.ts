@@ -114,6 +114,25 @@ const editable = {
 	sectorIdentifierUri: t.Optional(t.Union([t.String(), t.Null()]))
 };
 
+/* Whole numbers by `multipleOf`, as the project body spells it: `t.Integer` coerces through a string branch. */
+const PreviewCount = t.Number({ minimum: 0, multipleOf: 1 });
+
+/*
+ * Consent to the preview of turning `requireCode` on (specs/127), the project PATCH's protocol: the first call answers
+ * 409 with what it would do to whom, counted, and the change is applied only when repeated with `confirm` and those
+ * counts as `expect`. Every other change ignores both.
+ */
+const requireCodeConsent = {
+	confirm: t.Optional(t.Boolean()),
+	expect: t.Optional(
+		t.Object({
+			withoutAuthenticator: t.Optional(PreviewCount),
+			providerOnly: t.Optional(PreviewCount),
+			holders: t.Optional(PreviewCount)
+		})
+	)
+};
+
 export const CreateClientBody = t.Object({
 	/*
 	 * Pre-registers a Client Identifier URL (CIMD §7.2): the application's client id is this https URL instead of a
@@ -139,6 +158,9 @@ export const CreateClientBody = t.Object({
 	requireConsent: t.Optional(t.Boolean()),
 	// Lets the person untick individual permissions; only for an application that copes with fewer (specs/093).
 	partialConsent: t.Optional(t.Boolean()),
+	// Every sign-in to it must include a code from an authenticator app (specs/127). Turning it on is previewed.
+	requireCode: t.Optional(t.Boolean()),
+	...requireCodeConsent,
 	backchannelTokenDeliveryMode: t.Optional(
 		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
 		// 'ping', the CIBA request check knows 'poll') and checkCibaDeliveryModes refuses any mode
@@ -176,6 +198,9 @@ export const UpdateClientBody = t.Object({
 	requireConsent: t.Optional(t.Boolean()),
 	// Lets the person untick individual permissions; only for an application that copes with fewer (specs/093).
 	partialConsent: t.Optional(t.Boolean()),
+	// Every sign-in to it must include a code from an authenticator app (specs/127). Turning it on is previewed.
+	requireCode: t.Optional(t.Boolean()),
+	...requireCodeConsent,
 	backchannelTokenDeliveryMode: t.Optional(
 		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
 		// 'ping', the CIBA request check knows 'poll') and checkCibaDeliveryModes refuses any mode

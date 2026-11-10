@@ -26,6 +26,8 @@ interface Readiness {
 		clientName?: string;
 		violations: Violation[];
 	}[];
+	/* Absent from a server that predates it (specs/127). */
+	projectsWithoutSecondFactor?: { projectId: string; name: string }[];
 }
 
 /* The operator's words for each rule the profile applies to an application. */
@@ -154,6 +156,15 @@ export function Sl1ReadinessCard() {
 										{`${client.clientName ?? client.clientId} (project ${client.projectId})`}
 									</Typography.Text>
 									{`: ${client.violations.map(describe).join('; ')}`}
+								</li>
+							))}
+						</Section>
+					)}
+					{(view.projectsWithoutSecondFactor?.length ?? 0) > 0 && (
+						<Section title="Projects where nobody new can give a second factor (people who already set one up still can)">
+							{view.projectsWithoutSecondFactor?.map((project) => (
+								<li key={project.projectId}>
+									{`${project.name}: it neither requires an authenticator app nor lets people set one up themselves, or password sign-in is off`}
 								</li>
 							))}
 						</Section>

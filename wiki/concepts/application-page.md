@@ -4,7 +4,7 @@ title: 'The application page: creating an application from a situation and conne
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-10-20
-updated: 2026-10-20
+updated: 2026-11-11
 graph:
   node_type: concept
   relationships:
@@ -68,6 +68,12 @@ address or storage. It is **peeked in a state initialiser and forgotten in an ef
 - `hasSecret: Boolean(client.clientSecret)` — the auth method answered wrongly both ways (`none` with a symmetric
   algorithm holds a secret; `private_key_jwt` does not). Rotate is offered only when it is true.
 - A PATCH that gives an application a secret returns it once as `secret`, like the create does.
+- `connection.multiFactorAcr` (spec 127): the instance's own multi-factor `acr` value, which the Connect tab's "What to
+  request" card names for an application that asks for a code on some pages only. An application with "Require a code
+  from an authenticator app" on is told it needs no parameter instead.
+- Turning "Require a code from an authenticator app" on answers a 409 preview on the client POST and PATCH, the
+  project PATCH's protocol; the console asks with the server's own consequences (`codeConsent.ts`) and resends with
+  `confirm` and `expect`. The list and the page header mark such an application "Code required".
 - `agentClients` on the project (`lib/admin/buckets/agent_clients.ts`) and `connection` on each declared resource
   (`lib/resources/connection.ts`: issuer, exact audience, RFC 9728 metadata, metadata URL, challenge). Computed on the
   server because the console's CSP is `connect-src 'self'`: it cannot read a subdomain or hostname project's

@@ -135,6 +135,29 @@ export function ClientFormFields({
 					) : null
 				}
 			</Form.Item>
+			{/*
+			 * Beside consent: it too is what a person passes through on the way in (specs/127). The explanation follows the
+			 * switch, so the off state says what an application can still do itself.
+			 */}
+			<Form.Item<FormValues>
+				shouldUpdate={(prev, cur) => prev.requireCode !== cur.requireCode}
+				noStyle
+			>
+				{() => (
+					<Form.Item
+						name="requireCode"
+						label="Require a code from an authenticator app"
+						valuePropName="checked"
+						extra={
+							form.getFieldValue('requireCode')
+								? 'Everyone who opens this application has typed a code from their authenticator app in this sign-in: once per sign-in, not every time they open it, and with no limit on how long ago. People without one, and people who sign in through a provider, can’t open it. Existing sign-ins keep working until the application next renews its tokens. Assertion grants (JWT bearer, identity assertions) are refused, and a token exchange needs a sign-in with a code.'
+								: 'Off: the application gets the sign-in the person already has. It can still ask for a code when it sends people to sign in.'
+						}
+					>
+						<Switch />
+					</Form.Item>
+				)}
+			</Form.Item>
 			<Form.Item
 				name="logo"
 				label="Logo on the consent page"

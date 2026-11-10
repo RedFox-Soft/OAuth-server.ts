@@ -164,7 +164,7 @@ export const zhHans: AccountTexts = {
 	securityOffConfirmTitle: '关闭两步验证？',
 	securityOffConfirm: '登录{service}将只需要您的密码。',
 	securityNoPassword:
-		'您是通过身份提供方登录的，而不是在此处使用密码。它自己的第二重验证会保护您。',
+		'您是通过身份提供方登录的，因此此处的两步验证不适用于您的账号。{service} 中要求身份验证器应用验证码的应用，无法通过身份提供方登录打开。',
 	securityUnavailable: '{service}的运营人员尚未在此处提供两步验证。',
 	securitySignInWithPassword:
 		'要进行设置，请用密码登录，而不是通过身份提供方登录。',

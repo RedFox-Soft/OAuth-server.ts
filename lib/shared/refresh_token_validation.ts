@@ -10,6 +10,10 @@ import { Grant } from '../models/grant.js';
 import { RefreshToken } from '../models/refresh_token.js';
 import { servingBucketIdOf } from '../admin/auth/bucketAddress.js';
 import { sl1, sl1Exempt } from '../sl1/rules.js';
+import {
+	codeRequiredAndMissing,
+	REQUIRE_CODE_DESCRIPTION
+} from '../client_policy/require_code.js';
 
 /*
  * What makes a refresh token usable, in one place: the refresh grant redeems one and the token exchange
@@ -140,6 +144,15 @@ export async function usableRefreshToken(
 		!refreshToken.payload.jkt
 	) {
 		throw new RefreshTokenRefused('refresh token is not bound to a DPoP key');
+	}
+
+	/*
+	 * An application that requires a code (specs/127) keeps none of the sign-ins that gave none, however long their
+	 * refresh tokens live: turning the requirement on would otherwise leave weeks of password-only tokens in it. The
+	 * application sends the person to sign in again, this time with a code.
+	 */
+	if (codeRequiredAndMissing(client, refreshToken.payload.acr)) {
+		throw new RefreshTokenRefused(REQUIRE_CODE_DESCRIPTION);
 	}
 
 	const account = await findAccount(

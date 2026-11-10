@@ -1669,7 +1669,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		goodToKnow: [
 			'Any authenticator app works.',
 			'If someone loses their phone, an administrator removes the app on their user page.',
-			'Without the switch, people can still turn it on for themselves.'
+			'Without the switch, people can still turn it on for themselves, and an application can require it on its own.'
 		],
 		prompt: prompt(
 			'Turn on the second factor (TOTP) in my FoxAuth project.',
@@ -1736,12 +1736,80 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		goodToKnow: [
 			'It is on by default. It needs password sign-in and a mail server.',
 			'If someone loses their phone, an administrator removes the app on their user page; a new one then needs a link we email them.',
-			'Signing in through Google or another provider does not ask for this code.'
+			'Signing in through Google or another provider does not ask for this code, so an application that requires one turns them away.'
 		],
 		prompt: prompt(
 			'Add a "Two-step verification" link to my app’s account settings that opens {issuer}/account/security.',
 			'project_update (totpSelfService)',
 			'Tell me how many people have set one up.'
+		)
+	},
+	{
+		id: 'appcode',
+		tab: 'product',
+		title: 'Ask for a code only in the apps that need it',
+		sentence:
+			'One application, such as billing, lets nobody in without a code from an authenticator app. The other applications of the project stay as they are.',
+		protocol: 'OpenID Connect acr',
+		lanes: lanes('person', 'app', 'fox', 'totp'),
+		steps: [
+			step(
+				'person',
+				'app',
+				'Opens it',
+				'The person opens the application and is sent to sign in.'
+			),
+			step(
+				'app',
+				'fox',
+				'Sign in',
+				'The application asks FoxAuth to sign the person in.'
+			),
+			step(
+				'person',
+				'fox',
+				'Password and code',
+				'FoxAuth asks for the password, then a code from the app. Someone without one can set it up right there.'
+			),
+			step('totp', 'person', '6 digits', 'The app shows a code.'),
+			step(
+				'fox',
+				'app',
+				'Signed in with a code',
+				'FoxAuth tells the application the sign-in included a code.'
+			)
+		],
+		problem: {
+			at: 'app',
+			mark: 'password',
+			caption: 'A stolen password opens the billing app too.',
+			lanes: ['person', 'app']
+		},
+		fixCaption: 'The billing app takes only sign-ins with a code.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'A code from an authenticator app after the password, once per sign-in',
+				'Without one, a page that offers to set one up and continue',
+				'A sign-in through a provider is told it cannot open this app'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open Applications',
+			target: { area: 'applications' }
+		},
+		goodToKnow: [
+			'Turn it on in the application’s Settings, under "Require a code from an authenticator app". Before it saves, you see how many people it affects.',
+			'A code is asked once per sign-in, not every time the app opens.',
+			'Refresh tokens from sign-ins without a code stop working, so people sign in again with one.',
+			'People who sign in through a provider cannot open the app this way.'
+		],
+		prompt: prompt(
+			'Make my billing application in FoxAuth require a code from an authenticator app, and tell me first how many people that affects.',
+			'client_update (requireCode)',
+			'Make my app show a helpful page when it receives unmet_authentication_requirements.'
 		)
 	},
 	{
@@ -2628,6 +2696,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'PKCE is required on every sign-in, and only applications registered in advance may sign in.',
 			'Signatures use PS256, ES256 or EdDSA.',
 			'A separate setting, FAPI behaviours, also makes an application’s signed assertion name this server as its only audience.',
+			'A second factor on request works for people with a password and an authenticator app, not for people who sign in through a provider; the readiness check lists projects where nobody new could give one.',
 			'It is a setting for the whole server.'
 		],
 		prompt: prompt(

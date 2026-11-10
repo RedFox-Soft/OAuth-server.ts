@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia';
 import {
+	adapter,
 	getBucketStore,
 	getBucketGroupStore,
 	getContainerOwnershipStore,
@@ -964,6 +965,26 @@ function destructionUnderway(bucket: UserBucket, at: Date): boolean {
 	return until !== undefined && until.getTime() >= at.getTime();
 }
 
+/* The stored applications of a project that require a code from an authenticator app (specs/127), by name. */
+async function codeRequiredApps(
+	bucketId: string
+): Promise<{ id: string; name: string }[]> {
+	const stored = await adapter('Client').findByIndexed('bucketId', bucketId);
+	return stored
+		.filter((record) => record['signIn.requireCode'] === true)
+		.map((record) => {
+			const id = String(record.clientId);
+			const name =
+				typeof record.client_name === 'string' && record.client_name
+					? record.client_name
+					: typeof record.clientName === 'string' && record.clientName
+						? record.clientName
+						: id;
+			return { id, name };
+		})
+		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
@@ -1169,6 +1190,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 				bucket._id === ADMIN_BUCKET_ID
 					? ('off' as const)
 					: await selfServiceState(bucket),
+			/* The applications that require a code from an authenticator app (specs/127): where else a code is asked. */
+			codeRequiredApps: await codeRequiredApps(bucket._id),
 			/*
 			 * Whether any provider button can appear on any sign-in page of this instance. The Sign-in tab's preview
 			 * (specs/091) draws the page with the same rule the server renders it with, and this is the one input

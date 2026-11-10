@@ -1,6 +1,7 @@
 import { openidConfiguration } from '../../actions/discovery.js';
 import { accountPageUrl } from '../../account_page/client.js';
 import { addressing, type RequestBucket } from '../../configs/issuer.js';
+import { configuration } from '../../configs/application.js';
 
 /* When an application first and last received a token (spec 107); null until it has. */
 export interface LastUsed {
@@ -22,6 +23,11 @@ export interface Connection {
 	endpoints: Record<string, string>;
 	signInPageUrl: string | null;
 	lastUsed: LastUsed | null;
+	/*
+	 * The authentication context this instance reports for a sign-in with a code (specs/127), which an application
+	 * asks for in `acr_values` and checks in the ID token. This instance's own value, not the default.
+	 */
+	multiFactorAcr: string;
 }
 
 /* The members of a discovery document a client is configured with: its endpoints and where its keys are. */
@@ -60,6 +66,7 @@ export async function connectionOf(
 		postLogoutRedirectUris: [...(application.postLogoutRedirectUris ?? [])],
 		endpoints,
 		signInPageUrl: issuer === null ? null : accountPageUrl(bucket),
-		lastUsed
+		lastUsed,
+		multiFactorAcr: configuration.acrMap.multi_factor
 	};
 }

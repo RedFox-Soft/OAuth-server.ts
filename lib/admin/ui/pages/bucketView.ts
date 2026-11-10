@@ -95,6 +95,8 @@ export interface BucketSummary {
 	 * server that predates it.
 	 */
 	twoStepSelfService?: 'on' | 'off' | 'no_password_login' | 'no_mail';
+	/* The applications that require a code (specs/127). Absent from a server that predates it. */
+	codeRequiredApps?: { id: string; name: string }[];
 	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
 	federationEnabled: boolean;
 	/*

@@ -287,6 +287,8 @@ describe('MCP tool catalogue', () => {
 		expect(sometimes.map((t) => t.tool).sort()).toEqual([
 			/* Who may open which path of an app behind a proxy, and which host the rules guard (specs/122). */
 			'behind_proxy_app_update',
+			/* Whether every sign-in to a new application must include a code (specs/127). */
+			'client_create',
 			'client_update',
 			'federation_provider_create',
 			'federation_provider_update',

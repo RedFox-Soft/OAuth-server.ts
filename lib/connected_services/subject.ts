@@ -20,6 +20,10 @@ import { AccessToken } from '../models/access_token.js';
 import type { Grant } from '../models/grant.js';
 import { findDeclaredResource } from '../resources/registry.js';
 import { namespaceOf } from '../resources/namespace.js';
+import {
+	codeRequiredAndMissing,
+	REQUIRE_CODE_DESCRIPTION
+} from '../client_policy/require_code.js';
 
 /*
  * The person an upstream token exchange acts for, read off its subject token (specs/118 R2, R3): an access token
@@ -43,6 +47,8 @@ interface Presented {
 	jkt?: string;
 	/* An opaque token names its grant; a JWT does not. */
 	grantId?: string;
+	/* The sign-in the token came from, when it says (specs/127). */
+	acr?: string;
 }
 
 function refused(detail: string): InvalidGrant {
@@ -65,10 +71,12 @@ async function fromRecord(
 		throw refused('another project');
 	}
 	const audience: unknown = token.payload.aud;
+	const { acr } = token.payload;
 	return {
 		accountId,
 		agentClientId: clientId,
 		grantId,
+		...(typeof acr === 'string' ? { acr } : {}),
 		...(typeof audience === 'string' ? { audience } : {}),
 		...(jkt ? { jkt } : {})
 	};
@@ -112,9 +120,11 @@ async function fromJwt(value: string, bucket: UserBucket): Promise<Presented> {
 			? cnf.jkt
 			: undefined;
 	const aud: unknown = payload.aud;
+	const acr: unknown = payload.acr;
 	return {
 		accountId: sub,
 		agentClientId: clientId,
+		...(typeof acr === 'string' ? { acr } : {}),
 		...(typeof aud === 'string' ? { audience: aud } : {}),
 		...(typeof jkt === 'string' ? { jkt } : {})
 	};
@@ -141,6 +151,20 @@ export async function exchangeSubject(
 			: await fromRecord(params.subject_token, bucket);
 	if (presented.audience === MCP_RESOURCE) {
 		throw refused('administrative audience');
+	}
+	/*
+	 * An application that requires a code (specs/127) reaches a person's other services only on the strength of a
+	 * sign-in that gave one — the agent whose token this is, and the application exchanging it, alike.
+	 */
+	const agent =
+		presented.agentClientId === client.clientId
+			? client
+			: await adapter('Client').find(presented.agentClientId);
+	if (
+		codeRequiredAndMissing(client, presented.acr) ||
+		codeRequiredAndMissing(agent ?? undefined, presented.acr)
+	) {
+		throw refused(REQUIRE_CODE_DESCRIPTION);
 	}
 
 	if (

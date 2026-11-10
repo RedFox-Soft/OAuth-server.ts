@@ -8,6 +8,10 @@ import {
 	UnauthorizedClient
 } from '../../helpers/errors.js';
 import { findAccount } from '../../addon/account.js';
+import {
+	codeRequiredAndMissing,
+	REQUIRE_CODE_DESCRIPTION
+} from '../../client_policy/require_code.ts';
 import { JWT_DPOP_GRANT } from '../../consts/assertion_grants.js';
 import ResourceServer from '../../helpers/resource_server.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
@@ -120,6 +124,14 @@ export async function jwtBearer(
 		throw new UnauthorizedClient(
 			'the JWT bearer grant requires a client that authenticates'
 		);
+	}
+
+	/*
+	 * An application that requires a code (specs/127) is reached only through a sign-in here in which the person typed
+	 * one. An outside issuer's assertion is not such a sign-in, whatever it says about its own second factor.
+	 */
+	if (codeRequiredAndMissing(client, undefined)) {
+		throw new InvalidGrant(REQUIRE_CODE_DESCRIPTION);
 	}
 
 	const { assertion } = oidc.params;

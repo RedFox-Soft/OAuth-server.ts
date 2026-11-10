@@ -4,7 +4,7 @@ title: "The IPSIE SL1 profile switch: what it enforces, what it needs, what it l
 tags: [oauth, oidc, config, contract, security]
 sources: [oauth-server-codebase]
 created: 2026-10-23
-updated: 2026-11-10
+updated: 2026-11-11
 graph:
   node_type: concept
   relationships:
@@ -110,7 +110,10 @@ Turning the profile on never changes a stored setting or record by itself.
 - the unmet settings;
 - the issuers without a PS256 signer;
 - every client the profile would refuse or change, each with its rule codes from `sl1ClientViolations`
-  (`lib/sl1/rules.ts:72`).
+  (`lib/sl1/rules.ts:72`);
+- advice, not a blocker (spec 127): `projectsWithoutSecondFactor`, the projects where nobody new can give a second
+  factor on request — none required, people cannot set one up themselves, or password sign-in is off. SL1 §3.2.1 asks
+  that a request for two factors can be met; there it can be only for people who already hold one.
 
 `default_algorithm` marks a client that registered no algorithm and will be signed for PS256.
 

@@ -1,4 +1,5 @@
 import { satisfiesAcr, sl1, sl1Exempt } from '../../sl1/rules.ts';
+import { codeRequiredAndMissing } from '../../client_policy/require_code.ts';
 import { OIDCProviderError } from '../../helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
 import { Client } from '../../models/client.js';
@@ -129,7 +130,13 @@ export async function backchannelResult(
 			 */
 			if (
 				!satisfiesRequiredAcr(request.payload.claims, acr) ||
-				!satisfiesSl1AcrValues(request.payload.params?.acr_values, acr, client)
+				!satisfiesSl1AcrValues(
+					request.payload.params?.acr_values,
+					acr,
+					client
+				) ||
+				// The application requires a code from an authenticator app (specs/127), whatever the request asked.
+				codeRequiredAndMissing(client, acr)
 			) {
 				Object.assign(request.payload, {
 					error: 'transaction_failed',

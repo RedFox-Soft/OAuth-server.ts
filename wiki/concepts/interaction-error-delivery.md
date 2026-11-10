@@ -4,7 +4,7 @@ title: 'Interaction error delivery'
 tags: [architecture, contract, oauth]
 sources: [oauth-server-codebase]
 created: 2026-10-01
-updated: 2026-10-13
+updated: 2026-11-11
 ---
 
 # Interaction error delivery
@@ -80,6 +80,10 @@ Since spec 092 both branches wait on one check. The form carries back the accoun
 submission naming another account, or none, is refused as "session principal changed" before either
 branch runs (`lib/interactions/index.ts:1796-1790`). Nothing is granted and no denial is delivered, so the
 client hears nothing about a decision the person on screen never made. See [[consent-screen-decisions]].
+
+"Return to the app without signing in" on the page of an application that requires a code (spec 127) is the same
+kind of result: `POST ui/:uid/code-required` writes `unmet_authentication_requirements` to the interaction's result
+and resumes, so the error is delivered through the same rule, and on a device interaction lands on the device code.
 
 ## A delivered fault is still recorded
 

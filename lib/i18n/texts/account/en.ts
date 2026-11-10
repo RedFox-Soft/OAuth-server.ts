@@ -195,7 +195,7 @@ export const en = {
 	securityOffConfirmTitle: 'Turn off two-step verification?',
 	securityOffConfirm: 'Signing in to {service} will need only your password.',
 	securityNoPassword:
-		'You sign in through a provider, not with a password here. Its own second factor protects you.',
+		'You sign in through a provider, so two-step verification here isn’t used for your account. Apps of {service} that require a code from an authenticator app can’t be opened through a provider sign-in.',
 	securityUnavailable:
 		'The people who run {service} have not made two-step verification available here.',
 	securitySignInWithPassword:

@@ -5,7 +5,8 @@ export const zhHans: SignInTexts = {
 		login: '登录',
 		registration: '注册',
 		totpEnroll: '设置身份验证器',
-		totpVerify: '两步验证'
+		totpVerify: '两步验证',
+		codeRequired: '需要验证码'
 	},
 
 	headings: {
@@ -66,7 +67,12 @@ export const zhHans: SignInTexts = {
 		mailedHeading: '请查看您的邮箱',
 		mailedHint:
 			'身份验证器应用已从您的账号中移除。我们已向您发送了一个链接：请在 10 分钟内用此浏览器打开它，以设置新的身份验证器应用。',
-		mailedResend: '发送新链接'
+		mailedResend: '发送新链接',
+		linkHint:
+			'我们已向您发送了一个链接。请在 10 分钟内用此浏览器打开它，以设置身份验证器应用。',
+		continueApp: '继续进入 {app}',
+		continueAny: '继续',
+		everySignIn: '此后，每次使用密码登录 {service} 时都会要求输入验证码。'
 	},
 
 	notices: {
@@ -80,7 +86,26 @@ export const zhHans: SignInTexts = {
 		federationLink:
 			'此电子邮件地址在此处已有账户。请使用该账户的密码登录一次，以将其关联到您的身份提供商。',
 		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。',
-		freshSignIn: '{host} 要求您重新登录以打开此页面。'
+		freshSignIn: '{host} 要求您重新登录以打开此页面。',
+		codeAskedByApp: '{app} 需要身份验证器应用中的验证码。',
+		codeAsked: '您要登录的应用需要身份验证器应用中的验证码。'
+	},
+
+	codeRequired: {
+		headingApp: '{app} 需要身份验证器应用中的验证码',
+		headingAny: '您要登录的应用需要身份验证器应用中的验证码',
+		noFactor:
+			'您的账号 {email} 尚未设置身份验证器应用，因此无法以这种方式进入。',
+		setUpHint:
+			'设置大约需要两分钟：我们会通过电子邮件向您发送一个链接，然后您用手机上的应用（例如 Google Authenticator、Microsoft Authenticator 或 1Password）扫描二维码。',
+		setUp: '设置身份验证器应用',
+		askOperators: '{service} 不允许用户自行设置。请联系 {service} 的管理员。',
+		provider:
+			'您是通过 {provider} 登录的。通过 {provider} 登录时，此处无法使用身份验证器应用中的验证码，因此无法以这种方式进入。',
+		passwordInstead: '改用密码登录',
+		providerAsk: '请联系 {service} 的管理员。',
+		returnApp: '不登录，返回 {app}',
+		returnAny: '不登录，返回应用'
 	},
 
 	errors: {

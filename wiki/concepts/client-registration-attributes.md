@@ -4,7 +4,7 @@ title: "Client registration attributes are declared once"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-23
-updated: 2026-10-15
+updated: 2026-11-11
 ---
 
 # Client registration attributes are declared once
@@ -40,6 +40,11 @@ Neither is in `ATTRIBUTES` or the wire map, so a registration request or a clien
 set either: one would choose its own issuer, the other grant itself CORS. Only the admin route that created
 the client, or the registration endpoint from the project address it was reached at (`bucketId` alone,
 `lib/actions/registration.ts:229`), writes them, and every update path carries them forward.
+
+An RFC 7592 `PUT` rebuilds the record from its body and carries over only the base keys
+`lib/actions/registration.ts` names. Since spec 127 that includes `signIn.requireCode`, an administrator's requirement
+of a code, which would otherwise fall back to its default and let an application lift it by registering itself again.
+`consent.partial` is not carried and returns to `false`: that fails narrow, so it was left.
 
 ## Three things that fail silently if you get them wrong
 

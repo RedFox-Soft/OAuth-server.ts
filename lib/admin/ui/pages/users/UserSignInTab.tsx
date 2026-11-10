@@ -39,7 +39,7 @@ export function UserSignInTab({
 	const authenticatorState = user.totpEnrolled
 		? 'They type a code at every password sign-in.'
 		: providerOnly
-			? 'They sign in through a provider; an authenticator app is not used for them.'
+			? 'They sign in through a provider; an authenticator app is not used for them, and apps that require a code turn them away.'
 			: bucket.totpRequired
 				? `This project requires one: they set it up at their next password sign-in${user.totpProofRequired ? ', after a link we email them' : ''}.`
 				: bucket.totpSelfService !== false

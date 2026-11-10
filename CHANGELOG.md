@@ -20,6 +20,18 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   day per account, with a mail when someone with the password runs out of guesses. An administrator's removal mails the
   person, is `high` for agents, and makes the next factor need a mailed link. Projects can turn self-service off
   (`totpSelfService`). Re-run `db:setup` or `db:setup:pg`. Rolling back stops asking self-enrolled people for their code.
+- **An application can require a code from an authenticator app** (spec 127). One switch on the application page
+  (`requireCode` in the API and MCP): nobody gets into it, or keeps getting tokens for it, without a sign-in in which
+  they typed a code. Turning it on first shows how many people it turns away or sends to set one up, and is `high` for
+  agents. A person without a code sees a page inside the sign-in instead of an error: they can set one up there and
+  continue, sign in with a password instead of a provider, or go back to the app, which then gets
+  `unmet_authentication_requirements`. Refresh tokens from sign-ins without a code stop working while it is on, and
+  assertion grants are refused. Run `db:migrate`: it records a migration after which an older release refuses to start.
+
+### Changed
+
+- **An expired sign-in shows a plain page in the person's language** ("This sign-in has expired") instead of the
+  generic `interaction session not found` error.
 
 ### Fixed
 

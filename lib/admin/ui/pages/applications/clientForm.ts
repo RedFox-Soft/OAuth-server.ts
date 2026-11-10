@@ -97,6 +97,7 @@ export interface Connection {
 	endpoints: Record<string, string>;
 	signInPageUrl: string | null;
 	lastUsed: LastUsed | null;
+	multiFactorAcr?: string;
 }
 
 export interface ClientView {
@@ -111,6 +112,7 @@ export interface ClientView {
 	scope?: string;
 	requireConsent: boolean;
 	partialConsent?: boolean;
+	requireCode?: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -138,6 +140,7 @@ export interface FormValues extends Omit<KeyAttributes, 'jwks'> {
 	scope?: string;
 	requireConsent: boolean;
 	partialConsent?: boolean;
+	requireCode?: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -175,6 +178,7 @@ export function formValuesOf(row: ClientRow): FormValues {
 		scope: row.scope,
 		requireConsent: row.requireConsent,
 		partialConsent: row.partialConsent ?? false,
+		requireCode: row.requireCode ?? false,
 		authorizationDetailsTypes: row.authorizationDetailsTypes,
 		backchannelTokenDeliveryMode: row.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
@@ -252,6 +256,7 @@ export function buildBody(values: FormValues, stored: Stored | null = null) {
 		scope: values.scope,
 		requireConsent: values.requireConsent,
 		partialConsent: Boolean(values.partialConsent),
+		requireCode: Boolean(values.requireCode),
 		corsOrigins: values.corsOrigins ?? [],
 		...(values.authorizationDetailsTypes?.length
 			? { authorizationDetailsTypes: values.authorizationDetailsTypes }

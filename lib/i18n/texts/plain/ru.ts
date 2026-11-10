@@ -111,6 +111,10 @@ export const ru: PlainTexts = {
 			'Приложение на {host} ждёт этот ответ. Продолжайте, только если доверяете этому сайту.',
 		error: 'Ошибка: {error}'
 	},
+	signInExpired: {
+		title: 'Время на вход истекло',
+		body: 'Вернитесь в приложение и войдите ещё раз.'
+	},
 	federation: {
 		backToSignIn: 'Вернуться ко входу',
 		rejected: {

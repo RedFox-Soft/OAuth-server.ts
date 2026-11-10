@@ -111,6 +111,10 @@ export const en = {
 			'The application at {host} is waiting for this answer. Continue only if you trust that site.',
 		error: 'Error: {error}'
 	},
+	signInExpired: {
+		title: 'This sign-in has expired',
+		body: 'Go back to the app and sign in again.'
+	},
 	federation: {
 		backToSignIn: 'Back to sign in',
 		rejected: {

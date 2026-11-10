@@ -249,7 +249,11 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 									providers: providersOf(person),
 									confirmOff: query.off === '1' && !bucket.totpRequired
 								};
-			} else if (!hasPassword(person)) {
+			} else if (
+				!hasPassword(person) ||
+				// Without password sign-in nobody here is asked for a code, so it is not theirs to set up either (specs/127).
+				(await selfServiceState(bucket)) === 'no_password_login'
+			) {
 				view = { state: 'noPassword' };
 			} else if ((await selfServiceState(bucket)) !== 'on') {
 				view = { state: 'unavailable' };

@@ -382,7 +382,12 @@ async function update({ params, body, headers, request, set }: ClientContext) {
 	Object.assign(properties, {
 		registeredDynamically: client.registeredDynamically,
 		bucketId: client.bucketId,
-		registrationUsedAt: client.registrationUsedAt
+		registrationUsedAt: client.registrationUsedAt,
+		/*
+		 * An administrator's requirement of a code (specs/127): rebuilt from the body, it would return to its default,
+		 * and an application could lift its own requirement by registering itself again.
+		 */
+		'signIn.requireCode': client['signIn.requireCode']
 	});
 
 	const secretRequired = !client.clientSecret && needsSecret(properties);

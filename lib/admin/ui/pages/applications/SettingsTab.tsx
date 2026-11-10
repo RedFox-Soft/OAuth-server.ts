@@ -16,6 +16,7 @@ import {
 	type FormValues
 } from './clientForm.js';
 import { ClientFormFields } from './ClientFormFields.js';
+import { useCodeConsent, withConsent } from './codeConsent.js';
 
 function same(a: unknown, b: unknown): boolean {
 	return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
@@ -37,6 +38,7 @@ export function SettingsTab({
 	onChanged: (client: ClientRow) => void;
 }) {
 	const feedback = useFeedback();
+	const sendWithConsent = useCodeConsent();
 	const confirm = useConfirm();
 	const navigate = useNavigate();
 	const [form] = Form.useForm<FormValues>();
@@ -94,14 +96,20 @@ export function SettingsTab({
 		}
 		setSaving(true);
 		try {
-			const result = await request<ClientRow & { secret?: string }>(
-				'PATCH',
-				`${base}/${encodeURIComponent(client.clientId)}`,
-				buildBody(current, {
-					logo: client.logo ?? null,
-					primaryColor: client.primaryColor ?? null
-				})
+			const body = buildBody(current, {
+				logo: client.logo ?? null,
+				primaryColor: client.primaryColor ?? null
+			});
+			const result = await sendWithConsent(
+				(consent) =>
+					request<ClientRow & { secret?: string }>(
+						'PATCH',
+						`${base}/${encodeURIComponent(client.clientId)}`,
+						withConsent(body, consent)
+					),
+				client.clientName ?? client.clientId
 			);
+			if (!result) return;
 			if (!result.ok) {
 				if (result.status >= 500) feedback.failed(result);
 				else setRefusal(result.error.message);

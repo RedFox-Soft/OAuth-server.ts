@@ -149,6 +149,16 @@ export const ClientSchema = t.Object({
 	'consent.partial': t.Boolean(),
 
 	/*
+	 * signIn.requireCode
+	 *
+	 * description: Lets nobody into this application, or keep getting tokens for it, without a sign-in in which
+	 * they typed a code from an authenticator app (specs/127). An operator's decision about who may reach the
+	 * application, so a base key no registration may name: an application that could clear it would let a
+	 * password-only sign-in back in, and a request parameter that could would be removable by whoever opens the link.
+	 */
+	'signIn.requireCode': t.Boolean(),
+
+	/*
 	 * registeredDynamically
 	 *
 	 * description: Whether this client was created on its own request through dynamic client

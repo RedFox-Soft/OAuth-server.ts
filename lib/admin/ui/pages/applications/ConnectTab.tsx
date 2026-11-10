@@ -469,6 +469,22 @@ export function ConnectTab({
 							requested and the person consents to it.
 						</Typography.Paragraph>
 					)}
+					{/* specs/127: the application's own setting, or the parameter that asks for it on some pages only. */}
+					{client.requireCode ? (
+						<Typography.Paragraph type="secondary">
+							Every sign-in to this application includes a code from an
+							authenticator app; no parameter is needed.
+						</Typography.Paragraph>
+					) : connection.multiFactorAcr ? (
+						<Typography.Paragraph type="secondary">
+							To ask for a code only on some pages, send{' '}
+							<Typography.Text code>
+								acr_values={connection.multiFactorAcr}
+							</Typography.Text>{' '}
+							and check <Typography.Text code>acr</Typography.Text> in the ID
+							token.
+						</Typography.Paragraph>
+					) : null}
 				</Card>
 			)}
 

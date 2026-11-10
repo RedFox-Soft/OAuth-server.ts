@@ -105,6 +105,10 @@ export const zhHans: PlainTexts = {
 		waiting: '{host}上的应用正在等待此响应。仅当您信任该网站时，才继续。',
 		error: '错误：{error}'
 	},
+	signInExpired: {
+		title: '此登录已过期',
+		body: '请返回应用并重新登录。'
+	},
 	federation: {
 		backToSignIn: '返回登录',
 		rejected: {

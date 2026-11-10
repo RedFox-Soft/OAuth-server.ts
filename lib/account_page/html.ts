@@ -668,7 +668,7 @@ function securityBody(
 		case 'unavailable':
 			return `<p>${html(T.securityUnavailable, values)}</p>`;
 		case 'noPassword':
-			return `<p>${esc(T.securityNoPassword)}</p>`;
+			return `<p>${html(T.securityNoPassword, values)}</p>`;
 		case 'off':
 			return [
 				`<p><strong>${html(T.securityOff, values)}</strong></p>`,

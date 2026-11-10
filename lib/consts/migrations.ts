@@ -1788,6 +1788,27 @@ const proxyConditionsFence: Migration = {
 	postgres: { noop: true, reason: FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/127 research R11). An application that requires a code from an authenticator app
+ * records it as a base key of the client, and a release that predates it drops an unknown base key when it reads a
+ * client (`lib/models/client/validate.ts`) and erases it on its next write of that client: it would let a password-only
+ * sign-in into an application its administrator closed to one. Recording this migration makes the startup gate of every
+ * older release see a database that is ahead, and refuse it. Both halves do nothing; the record is the whole effect.
+ */
+const REQUIRE_CODE_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than applications that require a code refuses to start against a database that may hold a requirement it would ignore.';
+
+const appRequiresCodeFence: Migration = {
+	id: '2026-11-11-app-requires-code-fence',
+	description:
+		'Mark the database as holding applications that require a code from an authenticator app, so that an older release refuses to start against it rather than letting people in without one',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: REQUIRE_CODE_FENCE_REASON },
+	postgres: { noop: true, reason: REQUIRE_CODE_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1801,5 +1822,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	adminSignUpRequiresVerification,
 	clientAddressSource,
 	planConnectedServicesLimit,
-	proxyConditionsFence
+	proxyConditionsFence,
+	appRequiresCodeFence
 ];

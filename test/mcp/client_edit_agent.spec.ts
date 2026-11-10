@@ -159,6 +159,76 @@ describe('an agent editing a client', () => {
 		expect(entries[0]?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
 	});
 
+	// specs/127: making an application require a code is high-consequence for an agent and previewed as for a person.
+	it('holds back requiring a code until confirmed, then previews whom it reaches, then applies it', async () => {
+		const token = await agentToken();
+		const record = {
+			clientId: 'agent-edit-code',
+			bucketId: DEFAULT_BUCKET_ID,
+			applicationType: 'web',
+			redirectUris: ['https://rp.example.com/cb'],
+			responseTypes: ['code'],
+			grantTypes: ['authorization_code'],
+			token_endpoint_auth_method: 'none'
+		};
+		seedClient(record);
+		const args = {
+			id: DEFAULT_BUCKET_ID,
+			clientId: record.clientId,
+			requireCode: true
+		};
+
+		const described = await rpc(call('client_update', args), token);
+		expect(described.result?.structuredContent?.status).toBe(
+			'confirmation_required'
+		);
+		const previewed = await confirmed('client_update', args, token);
+		const preview = previewed.result?.structuredContent?.preview as
+			{ expect?: Record<string, number> } | undefined;
+		expect(preview?.expect).toHaveProperty('withoutAuthenticator');
+		expect((await Client.find(record.clientId))['signIn.requireCode']).toBe(
+			false
+		);
+
+		const applied = await confirmed(
+			'client_update',
+			{ ...args, confirm: true, expect: preview?.expect },
+			token
+		);
+
+		expect(applied.result?.isError).not.toBe(true);
+		expect((await Client.find(record.clientId))['signIn.requireCode']).toBe(
+			true
+		);
+		const { entries } = await adminAuditStore.list({
+			targetId: record.clientId,
+			action: 'client.update'
+		});
+		expect(entries.at(-1)?.attributes).toEqual(['requireCode']);
+		expect(entries.at(-1)?.viaClientId).toBe(ADMIN_MCP_CLIENT_ID);
+	});
+
+	it('holds back a new application that requires a code, and previews it', async () => {
+		const token = await agentToken();
+		const args = {
+			id: DEFAULT_BUCKET_ID,
+			grantTypes: ['authorization_code'],
+			tokenEndpointAuthMethod: 'none',
+			redirectUris: ['https://new.example.com/cb'],
+			requireCode: true
+		};
+
+		const described = await rpc(call('client_create', args), token);
+		expect(described.result?.structuredContent?.status).toBe(
+			'confirmation_required'
+		);
+		const previewed = await confirmed('client_create', args, token);
+		const preview = previewed.result?.structuredContent?.preview as
+			{ expect?: Record<string, number> } | undefined;
+
+		expect(preview?.expect?.holders).toBe(0);
+	});
+
 	it('gives a client a logo, recorded as the agent and by name, and lists it without the image', async () => {
 		const token = await agentToken();
 		const record = {

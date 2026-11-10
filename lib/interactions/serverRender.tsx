@@ -4,6 +4,10 @@ import { LoginPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
 import { TotpPage } from './totpPage.js';
+import {
+	CodeRequiredPage,
+	type CodeRequiredVariant
+} from './codeRequiredPage.js';
 import type { ConsentView } from './consentView.js';
 import type { SwitcherProps } from './languageSwitch.js';
 import type { OfferedProvider } from './signInOptions.js';
@@ -241,9 +245,11 @@ export async function totpServer(
 		switcher?: SwitcherProps;
 		accent?: PaintedAccent;
 		face?: SignInFace;
+		continuing?: boolean;
 	}
 ) {
 	const { mode, errorMessage, otpauthUri, secretText, switcher } = options;
+	const continuing = options.continuing === true;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	const T = SIGN_IN_TEXTS[language];
@@ -266,7 +272,8 @@ export async function totpServer(
 			secretText,
 			logoSrc,
 			switcher,
-			face
+			face,
+			continuing
 		},
 		<TotpPage
 			uid={uid}
@@ -277,6 +284,7 @@ export async function totpServer(
 			logoSrc={logoSrc}
 			switcher={switcher}
 			face={face}
+			continuing={continuing}
 		/>,
 		language,
 		options.accent
@@ -289,6 +297,50 @@ export async function totpServer(
 	 */
 	return htmlResponse(html, {
 		status: errorMessage ? 400 : 200,
+		handOffTo: options.handOffTo,
+		language
+	});
+}
+
+/*
+ * The application requires a code and this sign-in has none (specs/127). Every value the page reads is in the props
+ * too: the variant decides which actions exist, so a props script without it would hydrate a different page.
+ */
+export async function codeRequiredServer(
+	uid: string,
+	options: {
+		variant: CodeRequiredVariant;
+		email?: string;
+		provider?: string;
+		handOffTo?: string;
+		language?: Language;
+		switcher?: SwitcherProps;
+		accent?: PaintedAccent;
+		face?: SignInFace;
+	}
+) {
+	const { variant, email, provider, switcher } = options;
+	const language = options.language ?? 'en';
+	const face = faceOr(options.face);
+	const logoSrc = versionedAsset('logo.svg');
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		SIGN_IN_TEXTS[language].titles.codeRequired,
+		{ uid, variant, email, provider, logoSrc, switcher, face },
+		<CodeRequiredPage
+			uid={uid}
+			variant={variant}
+			email={email}
+			provider={provider}
+			logoSrc={logoSrc}
+			switcher={switcher}
+			face={face}
+		/>,
+		language,
+		options.accent
+	);
+	return htmlResponse(html, {
+		status: 200,
 		handOffTo: options.handOffTo,
 		language
 	});

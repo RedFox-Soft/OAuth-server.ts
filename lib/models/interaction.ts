@@ -95,7 +95,12 @@ export const InteractionPayload = t.Object({
 			/* The "remember me" choice, carried across the code step so it is not lost. */
 			transient: t.Optional(t.Boolean()),
 			/* Wrong codes in this attempt. The per-account window lives in the TotpAttempt area. */
-			attempts: t.Number()
+			attempts: t.Number(),
+			/*
+			 * Set up from an application that requires a code (specs/127), in a project that does not require one: the
+			 * person's own choice, proved as on their own page — a fresh password and a link mailed to them first.
+			 */
+			selfService: t.Optional(t.Boolean())
 		})
 	),
 	/*

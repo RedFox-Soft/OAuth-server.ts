@@ -101,6 +101,49 @@ describe('a registration body naming internal client attributes', () => {
 		expect(client['consent.require']).not.toBe(false);
 	});
 
+	// specs/127: only an administrator makes an application require a code, or lifts it.
+	it('requires no code for a registration or an update that names the requirement', async () => {
+		const own = await register({
+			'signIn.requireCode': true,
+			requireCode: true
+		});
+		expect((await Client.find(own.clientId))['signIn.requireCode']).toBe(false);
+
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb'],
+				'signIn.requireCode': true,
+				requireCode: true
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		expect((await Client.find(own.clientId))['signIn.requireCode']).toBe(false);
+	});
+
+	it('keeps an administrator’s requirement of a code through an update that replaces the registration', async () => {
+		const own = await register();
+		const stored = present(
+			await adapter('Client').find(own.clientId),
+			'the stored client'
+		);
+		await adapter('Client').upsert(own.clientId, {
+			...stored,
+			'signIn.requireCode': true
+		});
+
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb']
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		expect((await Client.find(own.clientId))['signIn.requireCode']).toBe(true);
+	});
+
 	it('gives the person no checkboxes for a registration that asks for them', async () => {
 		const { clientId } = await register({
 			'consent.partial': true,

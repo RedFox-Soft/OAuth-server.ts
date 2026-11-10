@@ -1,4 +1,8 @@
 import { satisfiesAcr, sl1, sl1Exempt } from '../../../sl1/rules.ts';
+import {
+	codeRequiredAndMissing,
+	REQUIRE_CODE_DESCRIPTION
+} from '../../../client_policy/require_code.ts';
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
 import { Prompt, type CheckPartial } from '../prompt.js';
@@ -207,6 +211,18 @@ class LoginPromt extends Prompt {
 				return !satisfiesAcr(values.split(' '), oidc.acr);
 			},
 			details: (oidc) => ({ acr_values: oidc.params.acr_values })
+		},
+		{
+			reason: 'second_factor',
+			description: REQUIRE_CODE_DESCRIPTION,
+			/*
+			 * The application's own requirement (specs/127), read from the client, never from the request: a parameter can
+			 * be removed by whoever opens the link. Met only by a sign-in in which the person typed a code; a sign-in that
+			 * already did, however long ago, is not asked again.
+			 */
+			error: 'unmet_authentication_requirements',
+			check: (oidc) => codeRequiredAndMissing(oidc.client, oidc.acr),
+			details: () => ({ requireCode: true })
 		}
 	];
 }
