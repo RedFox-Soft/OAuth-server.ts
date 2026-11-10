@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-11-10
+
+Your own proxy (Caddy, Traefik or nginx) can now put a project's sign-in in front of a web app, check tokens for an
+API or MCP server tool by tool, and add conditions on network, hours, attributes and a fresh sign-in. A project can
+also count or refuse password sign-ins from addresses FoxTrust lists as password-guessing. One migration, which
+cannot be undone, and new storage areas: take a backup, then run the usual setup and migrate steps.
+
 ### Added
 
 - **Sign-in in front of a web app, through your proxy** (spec 122, issue #57 part 1). A project can hold apps behind
@@ -2322,7 +2329,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.2.0...v1.3.0

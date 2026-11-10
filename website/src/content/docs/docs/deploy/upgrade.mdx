@@ -718,6 +718,33 @@ What an operator sees afterwards:
   the sign-in outlived the grant it remembered and was refused with `access_denied`, which the console showed as
   `422 Property 'code' is missing`. A refused console sign-in now shows its own reason.
 
+### Then 1.6.0
+
+1.6.0 carries one schema migration, which the usual `db:migrate` step applies, and `db:setup` provisions the new
+storage areas for apps behind your proxy and for the password-guessing counts. The migration changes no data, but it
+cannot be undone: once it is recorded, an older release refuses to start against the database, so take a backup
+first. No new setting is on by default. Check these before upgrading:
+
+- **Rolling back below 1.6.0 is not possible** without restoring that backup. During a rolling deploy, a process
+  still on the older release answers errors for apps and APIs with conditions until it is replaced.
+- **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof`. Before, it was read as no proof and
+  the client got an unbound token. A client that sends such a proof must send a correct one.
+
+What an operator sees afterwards:
+
+- **Apps behind your proxy.** A project's Applications tab can put sign-in in front of a web app that Caddy, Traefik
+  or nginx serves. See [Put sign-in in front of a web app](/docs/get-started/put-sign-in-in-front-of-a-web-app/).
+- **APIs checked at your proxy.** An API can leave token checks to your proxy, with the scopes each MCP tool needs.
+  See [Protect an MCP server at your proxy](/docs/get-started/protect-an-mcp-server-at-your-proxy/).
+- **Conditions at your proxy**: address ranges, opening hours, an attribute, groups for an API and a fresh sign-in.
+  See [Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/). Access tokens now carry
+  `auth_time`, `acr` and `amr`.
+- **FoxTrust's list of password-guessing addresses**, off until a super administrator turns it on under
+  **Settings → Integrations** (attack reporting must be on). Each project then counts sign-ins from listed addresses
+  by default and can choose to refuse them. See
+  [Refuse password guessing from known addresses](/docs/get-started/refuse-password-guessing-addresses/).
+- **Sign-in answers in the same time** whether or not an account exists for the address typed.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
