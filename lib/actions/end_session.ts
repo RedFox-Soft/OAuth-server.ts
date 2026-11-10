@@ -17,7 +17,8 @@ import { Client, postLogoutRedirectUriAllowed } from 'lib/models/client.js';
 import {
 	AuthorizationCookies,
 	routeNames,
-	sessionCookieName
+	sessionCookieName,
+	ADMINISTRATORS_POPULATION
 } from 'lib/consts/param_list.js';
 import {
 	OIDCContext,
@@ -62,9 +63,6 @@ const logoutParameters = t.Object({
 });
 
 type LogoutParams = Static<typeof logoutParameters>;
-
-/* The marker on the confirmation's address naming the administrators' sign-in (specs/109). */
-const ADMINISTRATORS_POPULATION = 'administrators';
 
 const logoutResponses = {
 	200: RedirectOrHtmlResponse,

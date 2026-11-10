@@ -4,7 +4,7 @@ title: 'A project is a tenant with its own issuer'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-09-15
-updated: 2026-11-05
+updated: 2026-11-11
 graph:
   node_type: concept
   relationships:
@@ -198,6 +198,15 @@ while building the prefixed URL itself; it now reads the form's `action`, and so
 Since 2026-10-13 that address is the confirmation's origin-relative path (`/acme/logout/confirm`): built
 absolute from a host-addressed project's issuer, it read as a foreign form target and left the page framable
 ([[html-response-security-policy]]).
+
+**The same defect survived in the account change (fixed 2026-11-11).** When another account of the same project
+signs in during an interaction, `resume()` (`lib/actions/authorization/resume.ts`) asks first with the same sign-out
+confirmation — and kept passing the bare `/logout/confirm`, on the reasoning that the screen is reached at `/ui/`,
+which no project prefixes. But the confirmation reads the session of the project it is posted to, so on a
+path-addressed project "Yes, sign me out" again answered "could not find logout details". It now builds the address
+exactly as the sign-out page does (the issuer's path, plus the administrators' marker, now
+`ADMINISTRATORS_POPULATION` in `lib/consts/param_list.ts`). `test/end_session/account_change.spec.ts` reads the
+form's `action` for a path-addressed project. Found by the spec 127 browser walk.
 
 The path stays `/` for every project and deliberately does not carry the partition. It would, if every
 project were prefixed — but the default project is served at the root, so its cookie must live at

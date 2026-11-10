@@ -189,6 +189,12 @@ export type PipelineParamsWith<K extends keyof PipelineParams> =
 		[P in K]-?: Exclude<PipelineParams[P], undefined>;
 	};
 
+/*
+ * The marker on the sign-out confirmation's address naming the administrators' sign-in (specs/109). Shared by the
+ * sign-out page and the account-change confirmation of a sign-in, which both build that address.
+ */
+export const ADMINISTRATORS_POPULATION = 'administrators';
+
 export const routeNames = {
 	/* The end-user connected-applications page and the return address of the sign-in it starts (specs/095). */
 	account_apps: '/account/apps',

@@ -166,3 +166,76 @@ describe('an account change on a bucket with a hostname of its own', () => {
 		expect(location.pathname).toBe(`/ui/${uid}/resume`);
 	});
 });
+
+/**
+ * @proves On a bucket addressed by a path, switching accounts during an interaction is confirmed where that
+ * bucket's sign-in lives: the confirmation form posts under the bucket's path, so it reads the bucket's own
+ * session, and confirming carries the sign-out out instead of failing to find it.
+ */
+describe('an account change on a bucket addressed by a path', () => {
+	const SLUG = 'switchpath';
+	let bucketId: string;
+
+	beforeAll(async () => {
+		await bootstrap(import.meta.url, { config: 'end_session' });
+		forgetBucketAddresses();
+		const bucket = await getBucketStore().create({
+			ownerGroupId: UNASSIGNED_GROUP_ID,
+			name: 'Switch by path',
+			slug: SLUG
+		});
+		bucketId = bucket._id;
+		await bindClientToBucket('client', bucketId);
+		seedAccount('erin', {}, bucketId);
+		seedAccount('frank', {}, bucketId);
+	});
+
+	it('posts the confirmation under the bucket’s path and carries the sign-out out', async () => {
+		const session = new Session({
+			jti: nanoid(),
+			accountId: 'erin',
+			bucketId,
+			loginTs: epochTime()
+		});
+		const sessionId = await session.save();
+		const uid = nanoid();
+		await new Interaction(uid, {
+			cookieID: 'interaction-cookie',
+			bucketId,
+			params: {
+				client_id: 'client',
+				redirect_uri: 'https://client.example.com/cb',
+				response_type: 'code',
+				scope: 'openid'
+			},
+			session: { uid: session.payload.uid, accountId: 'erin' },
+			result: { login: { accountId: 'frank' } }
+		}).save(60);
+		const cookie = `_interaction=interaction-cookie; ${sessionCookieName(await issuingBucket(bucketId))}=${sessionId}`;
+		const page = await elysia.handle(
+			new Request(`http://localhost/ui/${uid}/resume`, { headers: { cookie } })
+		);
+		const html = await page.text();
+		const xsrf = html.match(/name="xsrf" value="([^"]+)"/)?.[1];
+		const action = html.match(/<form[^>]*action="([^"]+)"/)?.[1];
+		if (!xsrf || !action)
+			throw new Error('expected the sign-out confirmation form');
+
+		expect(action).toBe(`/${SLUG}/logout/confirm`);
+		const confirmed = await elysia.handle(
+			new Request(`http://localhost${action}`, {
+				method: 'POST',
+				headers: {
+					cookie,
+					'content-type': 'application/x-www-form-urlencoded'
+				},
+				body: `xsrf=${xsrf}&logout=true`
+			})
+		);
+
+		expect(confirmed.status).toBe(303);
+		expect(new URL(confirmed.headers.get('location') ?? '').pathname).toBe(
+			`/ui/${uid}/resume`
+		);
+	});
+});

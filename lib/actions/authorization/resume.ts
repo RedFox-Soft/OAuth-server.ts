@@ -1,10 +1,16 @@
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
-import { routeNames, type PipelineParams } from 'lib/consts/param_list.js';
+import {
+	ADMINISTRATORS_POPULATION,
+	routeNames,
+	type PipelineParams
+} from 'lib/consts/param_list.js';
 import type { Interaction } from 'lib/models/interaction.js';
 import nanoid from '../../helpers/nanoid.js';
 import { ISSUER } from 'lib/configs/env.js';
 import { hasOwnOrigin, issuerFor } from 'lib/configs/issuer.js';
 import { logout } from 'lib/html/logout.js';
+import { ownFormAction } from 'lib/html/csp.js';
+import { ADMIN_BUCKET_ID } from 'lib/admin/consts.js';
 import { recordOwnLanguage } from 'lib/end_users/service.js';
 import { SessionNotFound } from '../../helpers/errors.js';
 import { resolveBucketForRequest } from '../../admin/auth/resolveBucket.js';
@@ -90,8 +96,11 @@ export default async function resumeAction(
 		};
 
 		/*
-		 * The bare address, as before: this screen is reached at /ui/, which no bucket prefixes, and which
-		 * session cookie its confirmation must read is a question of its own.
+		 * At the bucket's own address, as the sign-out page builds it (end_session.ts). This screen is reached at /ui/,
+		 * which no bucket prefixes, but the confirmation reads the session of the bucket it is posted to: a bare
+		 * `/logout/confirm` read the default bucket's, which holds none of this state, so switching accounts on a
+		 * bucket addressed by a path ended in "could not find logout details". Same-origin, so `form-action 'self'`
+		 * still covers it.
 		 *
 		 * The pending request's redirect URI goes to the page's policy because confirming starts a redirect
 		 * chain — confirmation, then /ui/:uid/resume, then the client — and `form-action` governs every hop
@@ -100,7 +109,13 @@ export default async function resumeAction(
 		 */
 		return logout(
 			secret,
-			routeNames.end_session_confirm,
+			ownFormAction(
+				`${issuerFor(oidc.bucket)}${routeNames.end_session_confirm}${
+					oidc.signInBucket._id === ADMIN_BUCKET_ID
+						? `?${ADMINISTRATORS_POPULATION}`
+						: ''
+				}`
+			),
 			storedParams.redirect_uri,
 			interaction.payload.language
 		);

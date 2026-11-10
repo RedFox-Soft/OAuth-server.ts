@@ -35,6 +35,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Fixed
 
+- **Switching accounts during a sign-in works on a project addressed by a path.** When another account signed in, the
+  "Do you want to sign out?" confirmation posted to the server's root and failed with "could not find logout details";
+  it now posts under the project's own path.
 - **A code from an authenticator app signs in once, even when sent twice at the same moment.** Two requests with
   the same code could both pass, a slower one could make an older code usable again, and a check running while an
   administrator reset the authenticator could put the old one back. Each accepted code is now recorded once in a new
