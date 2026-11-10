@@ -208,8 +208,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   → `admin-audit-trail.md`
 - **End users** — change an end user only through `lib/end_users/service.ts`, never the user store
   from a route; whether a user may sign in is `canSignIn`, and anything that makes them unable to runs
-  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock. An address is
-  recorded verified only when it was proven, whatever the project requires, because that is what `email_verified` says.
+  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock and clearing an
+  authenticator. An address is recorded verified only when it was proven, whatever the project requires, because that
+  is what `email_verified` says.
   → `end-user-lifecycle.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion

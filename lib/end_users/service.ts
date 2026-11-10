@@ -7,7 +7,12 @@ import {
 	type UserBucket
 } from '../adapters/types.js';
 import { ApplicationConfig } from '../configs/application.js';
-import { cascadeForAccount, type CascadeResult } from '../helpers/cascade.js';
+import {
+	cascadeForAccount,
+	endSessionsForAccount,
+	type CascadeResult
+} from '../helpers/cascade.js';
+import { clearAttempts } from '../totp/verify.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import { RESERVED_CLAIMS } from '../consts/reserved_claims.js';
@@ -414,6 +419,32 @@ export async function assignEndUserToConnection(
 		.catch(duplicateAsError);
 	if (!assigned) throw new EndUserError(404, 'user not found');
 	return assigned;
+}
+
+/*
+ * Recovery for a lost authenticator: the enrolment goes, and so do the sessions, because a session obtained with a
+ * factor the account no longer holds must not outlive it. Grants and tokens stay — revoking a token is not
+ * withdrawing consent (lib/helpers/cascade.ts states this boundary).
+ *
+ * Allowed on a provisioned user, as the local lock is: it is account recovery, not a profile edit, and nothing a
+ * connection sends reaches the field. Clearing an account that holds no authenticator succeeds and still records,
+ * so an operator need not know the current state to reach the one they want; an account that does not exist is
+ * refused before the record.
+ */
+export async function clearEndUserAuthenticator(
+	bucket: UserBucket,
+	id: string,
+	record: RecordChange
+): Promise<CascadeResult> {
+	await existing(bucket._id, id);
+	await record();
+	const cleared = await getUserStore(bucket._id).update(id, {
+		totp: undefined
+	});
+	if (!cleared) throw new EndUserError(404, 'user not found');
+	// So a new enrolment does not begin inside a lockout the lost device earned.
+	await clearAttempts(bucket._id, id);
+	return endSessionsForAccount(id);
 }
 
 /* Lifts the lock and restores nothing: the user signs in afresh, and only if also active. */

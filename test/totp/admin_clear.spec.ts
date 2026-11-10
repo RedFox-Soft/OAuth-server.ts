@@ -175,12 +175,36 @@ describe('clearing a lost authenticator (US5)', () => {
 		expect(res.status).toBe(200);
 	});
 
-	it('answers 404 for an account that does not exist', async () => {
+	it('answers 404 for an account that does not exist, and records nothing', async () => {
+		const uid = unique('no-such-account');
 		const res = await client.admin.api
 			.projects({ id: bucketId })
-			.users({ uid: 'no-such-account' })
+			.users({ uid })
 			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
 		expect(res.status).toBe(404);
+
+		// The trail says what happened to people, so a clear of nobody is not in it.
+		const { entries } = await adminAuditStore.list({
+			targetType: 'EndUser',
+			targetId: uid
+		});
+		expect(entries).toHaveLength(0);
+	});
+
+	// Account recovery, not a profile edit: the connection that provisioned the person cannot do it.
+	it('clears the authenticator of a person a directory provisioned', async () => {
+		const user = await enrolledAccount(bucketId);
+		await getUserStore(bucketId).update(user._id, {
+			provisionedBy: 'scim-connection'
+		});
+
+		const res = await client.admin.api
+			.projects({ id: bucketId })
+			.users({ uid: user._id })
+			.totp.delete(undefined, { headers: { cookie: admin.cookie } });
+
+		expect(res.status).toBe(200);
+		expect((await getUserStore(bucketId).find(user._id))?.totp).toBeUndefined();
 	});
 
 	it('refuses a caller with no rights over the bucket, changing nothing', async () => {

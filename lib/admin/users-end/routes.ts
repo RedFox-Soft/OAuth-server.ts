@@ -31,8 +31,6 @@ import {
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { sendOnDemand, sendRateRefused } from '../../verification/challenge.js';
 import { recordAdminAudit } from '../audit/record.js';
-import { endSessionsForAccount } from '../../helpers/cascade.js';
-import { clearAttempts } from '../../totp/verify.js';
 import nanoid from '../../helpers/nanoid.js';
 import {
 	assertInvitationsPossible,
@@ -40,6 +38,7 @@ import {
 	endApplicationAccess,
 	EndUserError,
 	inviteEndUser,
+	clearEndUserAuthenticator,
 	lockEndUser,
 	markEndUserVerified,
 	removeEndUser,
@@ -699,16 +698,9 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		}
 	)
 	/*
-	 * Recovery for a lost authenticator: clear the enrolment, and the account enrols afresh at its next
-	 * sign-in. Ordinary and audited rather than gated, because it is the *recovery* action — the harm it
-	 * undoes is someone permanently locked out, and what it costs is one re-enrolment.
-	 *
-	 * Deliberately a reset and not a deletion. Sessions go, because a session obtained with a factor the
-	 * account no longer holds must not outlive it; grants and tokens stay, because revoking a token is
-	 * not withdrawing consent (lib/helpers/cascade.ts states this boundary).
-	 *
-	 * Idempotent: clearing an account that holds no authenticator succeeds, and still records. An
-	 * operator should not have to know the current state to reach the one they want.
+	 * Recovery for a lost authenticator (lib/end_users/service.ts says what it clears and what it keeps).
+	 * Ordinary and audited rather than gated, because it is the *recovery* action — the harm it undoes is
+	 * someone permanently locked out.
 	 */
 	.delete(
 		'/admin/api/projects/:id/users/:uid/totp',
@@ -716,21 +708,14 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForUsers(ctx, params.id);
 
-			// Audit-first, as the password reset beside it is: a mutation is not reported successful
-			// unless its entry was recorded. No attribute names and no values — the act is the whole fact.
-			await recordAdminAudit(ctx, 'enduser.totp.clear', params.uid, {
-				...scope(bucket)
-			});
-
-			const updated = await getUserStore(params.id).update(params.uid, {
-				totp: undefined
-			});
-			if (!updated) throw new AdminError(404, 'user not found');
-
-			// So a re-enrolment does not begin inside a lockout the lost device earned.
-			await clearAttempts(params.id, params.uid);
-
-			const cascade = await endSessionsForAccount(params.uid);
+			// No attribute names and no values in the entry — the act is the whole fact.
+			const cascade = await asAdmin(
+				clearEndUserAuthenticator(bucket, params.uid, () =>
+					recordAdminAudit(ctx, 'enduser.totp.clear', params.uid, {
+						...scope(bucket)
+					})
+				)
+			);
 			if (cascade.failedAreas.length > 0) {
 				throw new AdminError(
 					500,

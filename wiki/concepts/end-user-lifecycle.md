@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-10-15
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -94,7 +94,8 @@ A user with `provisionedBy` set belongs to that connection. An administrator's u
 delete is refused with 409 naming the connection, before the audit write, so a refusal leaves no entry
 (`assertActorMayChange`, `service.ts`). A connection reaches only its own users; another connection's, or
 a local one, answers 404 to it. Clearing an authenticator stays allowed — it is account recovery, not a
-profile edit.
+profile edit — and since 2026-11-10 it is a service operation too (`clearEndUserAuthenticator`), so an
+account that does not exist is refused before the audit write.
 
 **Why `provisionedBy` and not `managedBy`.** `managedBy` is the name of a retired ownership field (the
 manager list that team ownership replaced). A new field with the old name would have read as that field
