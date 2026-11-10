@@ -394,3 +394,5 @@ Operations:
 ## [2026-11-10] update | [[totp-second-factor]] — the replay guard is a spent-step record written by insert-if-absent (`TotpSpentStep`, 120 s), not `lastStep` written back on the person: racing uses of one code let only one through, and a factor cleared during a check no longer comes back. `lastStep` is written only at enrolment.
 
 ## [2026-11-10] update | [[end-user-lifecycle]] — clearing an authenticator moved from the route into `lib/end_users/service.ts` (`clearEndUserAuthenticator`): an unknown account is refused before the audit write, and the provisioned-user exception is now in the AGENTS.md rule.
+
+## [2026-11-10] update | [[self-service-password-reset]] — consuming a reset on an account whose address was never proven also removes its authenticator, so whoever registered the address first cannot keep a factor against its owner.

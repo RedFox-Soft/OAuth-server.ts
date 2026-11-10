@@ -19,6 +19,7 @@ import { canSignIn } from '../end_users/can_sign_in.js';
 import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import { clearFailures } from '../login_throttle/throttle.js';
+import { clearAttempts } from '../totp/verify.js';
 import {
 	nextRateFields,
 	rateRefusal,
@@ -357,11 +358,27 @@ export async function consume(
 	await challenges().destroy(id);
 	await throttles().destroy(throttleKey(challenge.bucketId, challenge.email));
 
-	await getUserStore(challenge.bucketId).update(challenge.accountId, {
+	/*
+	 * An authenticator set up before the address was ever proven goes with the old password. Whoever registered the
+	 * address first held the password then, and in a project that requires an authenticator but not a proven address
+	 * they set one up too — so the person who owns the address, proving it here for the first time, would reset the
+	 * password and still meet a stranger's code. A factor set up after the address was proven is the owner's, and a
+	 * reset never touches it.
+	 */
+	const store = getUserStore(challenge.bucketId);
+	const before = await store.find(challenge.accountId);
+	const unprovenFactor =
+		before?.verified !== true && before?.totp !== undefined;
+
+	await store.update(challenge.accountId, {
 		password: await Bun.password.hash(password),
 		passwordSet: true,
-		verified: true
+		verified: true,
+		...(unprovenFactor ? { totp: undefined } : {})
 	});
+	if (unprovenFactor) {
+		await clearAttempts(challenge.bucketId, challenge.accountId);
+	}
 
 	/*
 	 * The sign-in door's failure counter goes too, and this is the whole of why the login throttle needs

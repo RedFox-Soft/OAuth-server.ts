@@ -660,6 +660,58 @@ describe('password reset — not a prober, not a mailer (US4)', () => {
 		expect(await login(uid, cookie, email, NEW_PASSWORD)).toBe(303);
 	});
 
+	/*
+	 * Someone registered the address before its owner and set up an authenticator while it was unproven. The owner
+	 * proves the address for the first time with this link; the stranger's factor must not stand between them and
+	 * their account.
+	 */
+	it('removes an authenticator set up before the address was proven', async () => {
+		const email = 'unproven-factor@x.io';
+		const user = await getUserStore(otherBucketId).create(
+			email,
+			await Bun.password.hash(OLD_PASSWORD),
+			false
+		);
+		await getUserStore(otherBucketId).update(user._id, {
+			totp: {
+				secret: 'JBSWY3DPEHPK3PXP',
+				enrolledAt: new Date(),
+				lastStep: 0
+			}
+		});
+
+		await requestReset(email, OTHER_CLIENT_ID);
+		await agent['reset-password'].post({
+			token: tokenFromMail(),
+			password: NEW_PASSWORD,
+			confirmPassword: NEW_PASSWORD
+		});
+
+		const after = await getUserStore(otherBucketId).find(user._id);
+		expect(after?.verified).toBeTrue();
+		expect(after?.totp).toBeUndefined();
+	});
+
+	// The owner's own factor, set up after the address was proven, is what protects them if the password leaks.
+	it('keeps the authenticator of an account whose address was already proven', async () => {
+		const email = 'proven-factor@x.io';
+		const user = await seedUser(email);
+		const enrolledAt = new Date();
+		await getUserStore(bucketId).update(user._id, {
+			totp: { secret: 'JBSWY3DPEHPK3PXP', enrolledAt, lastStep: 0 }
+		});
+
+		await requestReset(email);
+		await agent['reset-password'].post({
+			token: tokenFromMail(),
+			password: NEW_PASSWORD,
+			confirmPassword: NEW_PASSWORD
+		});
+
+		const after = await getUserStore(bucketId).find(user._id);
+		expect(after?.totp?.enrolledAt).toEqual(enrolledAt);
+	});
+
 	// No operator acted, so the trail records nothing. The constitution's immutable audit log must not be
 	// writable by an anonymous request.
 	it('writes nothing to the admin audit trail', async () => {

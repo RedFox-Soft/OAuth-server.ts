@@ -15,6 +15,9 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   the same code could both pass, a slower one could make an older code usable again, and a check running while an
   administrator reset the authenticator could put the old one back. Each accepted code is now recorded once in a new
   storage area: re-run `db:setup` or `db:setup:pg`.
+- **A password reset removes an authenticator set up before the address was proven.** In a project that requires an
+  authenticator but not a proven address, someone who registered another person's address first could set up their
+  own; the owner, resetting the password, still met that code. A factor set up after the address was proven stays.
 
 ## [1.6.0] - 2026-11-10
 

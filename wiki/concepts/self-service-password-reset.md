@@ -4,7 +4,7 @@ title: 'Self-service password reset'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-10-15
+updated: 2026-11-10
 graph:
   node_type: concept
   relationships:
@@ -134,6 +134,12 @@ proves. Without this an unverified account in a verification-required project is
 is gated on `verified`, and re-registering is deliberately non-committal about an existing address, so
 nothing resends anything. The same `update()` writes the password hash, `passwordSet: true` (spec 082) and
 `verified: true`.
+
+**And it removes an authenticator set up before the address was proven** (2026-11-10). Whoever registered an
+address first held the password then, and in a project that requires an authenticator but not a proven address
+they enrolled one too; the owner, proving the address here for the first time, would otherwise reset the password
+and still meet a stranger's code. A factor set up after the address was proven is the owner's and survives a reset
+(`consume`, `lib/password_reset/challenge.ts`; `test/password_reset/reset.spec.ts`).
 
 ## Sessions, and nothing more
 
