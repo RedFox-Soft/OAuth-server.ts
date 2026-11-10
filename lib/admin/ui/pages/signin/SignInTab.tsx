@@ -478,7 +478,7 @@ export function SignInTab({
 					effect={
 						draft.totpRequired
 							? `Password sign-ins also ask for a 6-digit code. ${consoleBucket ? 'Administrators' : 'People'} without an authenticator set one up at their next sign-in. Provider sign-ins use the provider's own second factor.`
-							: 'Password sign-ins need only the password. Anyone may still set up an authenticator.'
+							: 'Password sign-ins need only the password. Authenticators set up while this was on are kept, but not asked for.'
 					}
 				>
 					{!draft.passwordLogin && (
