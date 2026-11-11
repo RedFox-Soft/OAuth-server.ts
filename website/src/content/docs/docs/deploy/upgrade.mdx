@@ -745,6 +745,33 @@ What an operator sees afterwards:
   [Refuse password guessing from known addresses](/docs/get-started/refuse-password-guessing-addresses/).
 - **Sign-in answers in the same time** whether or not an account exists for the address typed.
 
+### Then 1.7.0
+
+1.7.0 carries two schema migrations, which the usual `db:migrate` step applies, and `db:setup` provisions the new
+storage areas for codes from an authenticator app. The migrations change no data, but they cannot be undone: once
+they are recorded, an older release refuses to start against the database, so take a backup first. Check these
+before upgrading:
+
+- **Rolling back below 1.7.0 is not possible** without restoring that backup. During a rolling deploy, a process
+  still on the older release does not ask for a code, so turn the new requirements on once every process runs 1.7.0.
+- **A person who holds a code is asked for it at every password sign-in**, in any project, including people who set
+  one up while their project required it and the project later stopped requiring it.
+- **People can set up a code themselves** on a new account page, `/account/security`. This is on by default in every project with
+  password sign-in once mail is set up, the administrators' project aside; a project can turn it off on its Sign-in
+  tab.
+
+What an operator sees afterwards:
+
+- **Two-step verification on a person's own account**, after a sign-in with their password and a link mailed to
+  them. Every change is mailed. See
+  [Let people turn on two-step verification](/docs/get-started/turn-on-two-step-verification/).
+- **An application that requires a code.** One switch on the application page; turning it on first shows how many
+  people it turns away. Refresh tokens from sign-ins without a code stop working while it is on. See
+  [Require a code in one app](/docs/get-started/require-a-code-for-an-app/).
+- **A code on one path behind your proxy**, as part of the "Ask to sign in again" condition. See
+  [Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/#with-code).
+- **An expired sign-in shows a plain page** in the person's language instead of `interaction session not found`.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash

@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-11-11
+
+People can turn on two-step verification for their own account, and an administrator can ask for a code from an
+authenticator app only where it matters: in one application, or on one path of an app behind your proxy. A person
+without a code is offered to set one up inside the same sign-in instead of meeting an error. Two migrations, which
+cannot be undone, and new storage areas: take a backup, then run the usual setup and migrate steps.
+
 ### Added
 
 - **A code at your proxy** (spec 128). The "Ask to sign in again" condition on a path of an app behind your proxy can
@@ -2371,7 +2378,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.3.0...v1.4.0
