@@ -304,6 +304,13 @@ export const ACTIONS = {
 		cancelText: 'Keep editing'
 	},
 	'behindProxy.rules.public': { class: 'C3', word: 'public' },
+	// Turns people away from a path (specs/128): asked with the server's counts of whom.
+	'behindProxy.codeCondition.confirm': {
+		class: 'C2',
+		title: (t) => `Ask for a code on ${t}?`,
+		okText: 'Ask for a code',
+		cancelText: 'Keep editing'
+	},
 	'behindProxy.delete': {
 		class: 'C2',
 		title: (t) => `Delete ${t}?`,

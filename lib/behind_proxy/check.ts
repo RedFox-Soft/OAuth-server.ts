@@ -204,6 +204,8 @@ async function reserved(
 	switch (path) {
 		case START_PATH: {
 			const maxAge = maxAgeOf(query.get('max_age'));
+			/* A retry of a sign-in the path asked a code of keeps asking (specs/128 FR-018); only a fresh one can. */
+			const requireCode = maxAge !== undefined && query.get('code') === '1';
 			return startSignIn(
 				ctx,
 				returnToOf(query.get('rd'), ctx.app.address),
@@ -212,7 +214,8 @@ async function reserved(
 					...(query.get('prompt') === 'login'
 						? { prompt: 'login' as const }
 						: {}),
-					...(maxAge === undefined ? {} : { maxAge })
+					...(maxAge === undefined ? {} : { maxAge }),
+					...(requireCode ? { requireCode: true as const } : {})
 				}
 			);
 		}
@@ -429,7 +432,8 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 					canSignIn: person.standing.canSignIn,
 					groupIds: person.standing.groupIds,
 					attributes: person.standing.attributes,
-					signedInAt: person.standing.signedInAt
+					signedInAt: person.standing.signedInAt,
+					signedInWithCode: person.standing.signedInWithCode
 				}
 			: null,
 		address: believed.address,
@@ -467,9 +471,12 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 				ctx,
 				returnToOf(rawPath, app.address),
 				decision.reason,
-				decision.maxAgeSeconds === undefined
-					? {}
-					: { maxAge: decision.maxAgeSeconds }
+				{
+					...(decision.maxAgeSeconds === undefined
+						? {}
+						: { maxAge: decision.maxAgeSeconds }),
+					...(decision.requireCode ? { requireCode: true as const } : {})
+				}
 			);
 		}
 		return answer(401, decision.reason, {

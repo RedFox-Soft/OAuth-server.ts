@@ -68,8 +68,11 @@ function atLeastAsStrict(
 				after.values.every((value) => before.values.includes(value))
 			);
 		case 'fresh':
+			/* Dropping the code (specs/128) admits a sign-in without one, however recent. */
 			return (
-				after.kind === 'fresh' && after.maxAgeMinutes <= before.maxAgeMinutes
+				after.kind === 'fresh' &&
+				after.maxAgeMinutes <= before.maxAgeMinutes &&
+				(before.withCode !== true || after.withCode === true)
 			);
 		case 'group':
 			return (

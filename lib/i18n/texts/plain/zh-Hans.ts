@@ -180,6 +180,12 @@ export const zhHans: PlainTexts = {
 			tryAgain: '重新登录',
 			reason: '原因：{reason}，时间：{time}'
 		},
+		codeNeeded: {
+			title: '{host} 的此页面需要身份验证器应用中的验证码',
+			body: '您没有使用验证码登录就返回了。{host} 的其他页面可能仍可打开。',
+			open: '打开 {host}',
+			reason: '原因：{reason}，时间：{time}'
+		},
 		address: {
 			title: '{host} 看到的您的地址',
 			seen: '检查看到您的地址为 {address}。',

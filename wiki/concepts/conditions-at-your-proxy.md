@@ -4,7 +4,7 @@ title: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-06
-updated: 2026-11-06
+updated: 2026-11-10
 ---
 
 # Conditions at your proxy
@@ -12,7 +12,7 @@ updated: 2026-11-06
 Spec 124. A path of an app behind the proxy ([[behind-your-proxy]]) and an API whose tokens the proxy checks
 ([[token-checks-at-your-proxy]]) can carry conditions on top of "who": **network** (`only`/`not` ranges),
 **time** (windows in one IANA zone), **attribute** (an administrator- or SCIM-set field), **fresh** (apps: sign-in no
-older than N minutes) and **group** (APIs). A condition only narrows; kinds combine with AND, values inside one kind
+older than N minutes, optionally `withCode`, see below) and **group** (APIs). A condition only narrows; kinds combine with AND, values inside one kind
 with OR; at most one condition of a kind per rule (`lib/admin/conditions.ts` `conditionsFrom`).
 
 ## One pure decision, fed the address it may believe
@@ -74,6 +74,38 @@ whose `authTime` is older (60 s skew) with "We couldn't confirm your sign-in", n
 deleted. The federated start forwards `prompt=login` and `max_age` to the provider (`freshSignInParams`,
 `lib/interactions/index.ts`); the provider's own `auth_time` is not checked.
 
+The decision asks one sign-in that meets every condition of the path (`signInAsked`, `decide.ts`, specs/128 R3): the
+shortest interval, and a code if any fresh condition wants one, even one that holds now, because the sign-in replaces
+the app session. Since spec 128 a first sign-in (`no_session`) to such a path carries them too, so nobody signs in once
+without and is sent straight back.
+
+## A code at the proxy (`withCode`)
+
+Spec 128. `FreshCondition.withCode: true` (stored only when on) holds only when the app session's sign-in had the
+multi-factor acr (`AppSession.withCode` = `acr === configuration.acrMap.multi_factor`, `session.ts`) and is within N.
+No separate "time of the code" field: every sign-in with a code is a `loginAccount` that sets its own `auth_time`, so
+"a code within N" is "a sign-in with a code within N" (critique Н7). `decide()` cannot read `configuration` (it is
+console-bundled), so the fact `signedInWithCode` is computed server-side; the console simulator has a checkbox.
+
+- **Why `max_age` and `acr_values` both** (S13): an essential acr alone says nothing about how fresh the code must be —
+  a person who typed a code yesterday still holds a multi-factor session, `/auth` would pass silently with the old
+  code, and the callback would refuse it in a loop. `max_age` forces a new password-and-code sign-in; `acr_values`
+  makes the refusal page appear for someone without a code.
+- **The request binds only for the proxy's own client** (`proxyAsksForCode`, `lib/client_policy/require_code.ts`), at
+  Part B's `second_factor` check, so the loop guard, refusal page, in-sign-in set-up and "Return" are reused. For every
+  other client `acr_values` stays voluntary (OIDC Core §3.1.2.1, S9). Binding here gives nobody anything: the pending
+  sign-in records `requireCode` server-side and the callback refuses a code without the multi-factor acr whatever the
+  request said.
+- **No loop after "Return"**: the callback turns `error=unmet_authentication_requirements` (with `requireCode`) into
+  the plain code-needed page (`codeNeededPage`, reason `code_required`), not the sign-in-failed page whose "Sign in
+  again" would lead to the same refusal. Its only link opens the app's `/`, and only when `/` gathers no code condition.
+  The not-fresh page's retry keeps `code=1` on `/_foxauth/start`.
+- **Preview** (`lib/admin/behind-proxy/code_preview.ts`): a save in which a path newly gathers a code condition answers
+  409 with counts over the rule's audience (project tally, or the named groups' members paged through the people
+  list's own `memberOf`/`totpEnrolled` filters), Part B's confirm/`expect` protocol, and needs `manageUsers` (S15). The
+  audience ignores the path's other conditions, so the counts are an upper bound.
+- Turning it off is a loosening (`atLeastAsStrict` requires `!before.withCode || after.withCode`).
+
 ## Attributes a person cannot set
 
 Selectable: the enterprise profile fields, `title` and `claim:<key>`, except the claims federation copies in and the
@@ -84,7 +116,7 @@ server's own (`NOT_SELECTABLE_CLAIMS`, `conditions.ts`). A condition nobody in t
 
 `widenings()` probes paths for "who" as before and, per probe path, compares the gathered conditions kind by kind
 (`condition_widening.ts`): ranges by coverage, windows by a 10 080-minute bitmap (a zone change always widens), values
-by subset, `maxAgeMinutes` by order. Sound, not exact: it may ask once too often, never too rarely (property test C28).
+by subset, `maxAgeMinutes` by order and `withCode` as a flag that may only stay or appear. Sound, not exact: it may ask once too often, never too rarely (property test C28).
 
 ## Rollback fails closed
 
@@ -92,6 +124,8 @@ A rule with conditions is stored as `who: { kind: 'conditional', who, conditions
 (500, not ignored); API conditions are a field of the closed `ToolsTable`. The no-op migration
 `2026-11-06-proxy-conditions-fence` makes an older release refuse to start and its `db:migrate` exit 1. Cost: no
 rollback below this release, and during a rolling deploy older processes answer errors for conditioned apps and APIs.
+Spec 128 adds `2026-11-12-proxy-code-condition-fence` for `withCode`, which the closed fresh-condition schema of an older
+release refuses.
 
 ## Related
 

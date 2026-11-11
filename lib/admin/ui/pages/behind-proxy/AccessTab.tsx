@@ -37,6 +37,7 @@ import {
 	type Condition
 } from '../../../../behind_proxy/conditions.js';
 import { ConditionsEditor } from './ConditionsEditor.js';
+import { useCodeConsent, withConsent } from '../applications/codeConsent.js';
 import { conditionText, KIND_LABELS, loosenedText } from './conditionsText.js';
 import {
 	baseWho,
@@ -201,6 +202,7 @@ export function AccessTab({
 }) {
 	const feedback = useFeedback();
 	const confirm = useConfirm();
+	const codeConsent = useCodeConsent('path');
 	const host = hostOfAddress(app.address);
 	const baseline = useMemo(() => draftOf(app), [app]);
 	const [draft, setDraft] = useState<DraftRule[]>(baseline);
@@ -317,20 +319,25 @@ export function AccessTab({
 	async function put() {
 		setSaving(true);
 		try {
-			const result = await request<AppView>(
-				'PATCH',
-				behindProxyApi(bucketId, app.id),
-				{
-					rules: draft.map((rule) => ({
-						path: rule.path.trim(),
-						who: bodyOf(rule.who),
-						...(rule.conditions.length > 0
-							? { conditions: rule.conditions }
-							: {})
-					})),
-					...((app.timeZone ?? null) !== zone ? { timeZone: zone } : {})
-				}
+			const body = {
+				rules: draft.map((rule) => ({
+					path: rule.path.trim(),
+					who: bodyOf(rule.who),
+					...(rule.conditions.length > 0 ? { conditions: rule.conditions } : {})
+				})),
+				...((app.timeZone ?? null) !== zone ? { timeZone: zone } : {})
+			};
+			/* Asking for a code on a path is confirmed with the server's counts of whom it turns away (specs/128). */
+			const result = await codeConsent(
+				(consent) =>
+					request<AppView>(
+						'PATCH',
+						behindProxyApi(bucketId, app.id),
+						withConsent(body, consent)
+					),
+				host
 			);
+			if (!result) return;
 			if (!result.ok) {
 				if (result.status >= 500) feedback.failed(result);
 				else setRefusal(result.error.message);
@@ -759,6 +766,8 @@ function AccessCheck({
 	const [from, setFrom] = useState('');
 	const [moment, setMoment] = useState('');
 	const [signedInAgo, setSignedInAgo] = useState(0);
+	/* Unset until the operator ticks it: then it follows whether the chosen person holds an authenticator app. */
+	const [withCodeChoice, setWithCode] = useState<boolean | null>(null);
 	const [method, setMethod] = useState('GET');
 	const [personId, setPersonId] = useState('');
 	const [people, setPeople] = useState<PersonOption[]>([]);
@@ -804,8 +813,13 @@ function AccessCheck({
 				}
 			: null
 	);
+	const withCode = withCodeChoice ?? chosen?.view.totpEnrolled === true;
 	const person = viewed
-		? { ...viewed, signedInAt: Math.floor(at / 1000) - signedInAgo * 60 }
+		? {
+				...viewed,
+				signedInAt: Math.floor(at / 1000) - signedInAgo * 60,
+				signedInWithCode: withCode
+			}
 		: null;
 	const typed = address.trim();
 	const target = typed ? targetOf(typed) : null;
@@ -869,7 +883,10 @@ function AccessCheck({
 			case 'attribute_mismatch':
 				return `${who} does not have the attribute the conditions ask for.`;
 			case 'sign_in_again':
-				return `${who} signed in longer ago than the path allows, so they are asked to sign in again.`;
+				/* A code condition failed for want of a code, not of time (specs/128): say which. */
+				return decision.requireCode && person?.signedInWithCode !== true
+					? `${who} did not sign in with a code from an authenticator app, so they are asked to sign in again with one.`
+					: `${who} signed in longer ago than the path allows, so they are asked to sign in again.`;
 			default:
 				return decision.reason;
 		}
@@ -996,6 +1013,12 @@ function AccessCheck({
 							label: `Signed in ${o.label}`
 						}))}
 					/>
+					<Checkbox
+						checked={withCode}
+						onChange={(e) => setWithCode(e.target.checked)}
+					>
+						Signed in with a code from an authenticator app
+					</Checkbox>
 				</Flex>
 				{!typed && (
 					<Typography.Text type="secondary">

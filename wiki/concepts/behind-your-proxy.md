@@ -4,7 +4,7 @@ title: 'Apps behind your proxy: sign-in in front of a web app through forward au
 tags: [architecture, contract, gotcha, oauth]
 sources: [oauth-server-codebase]
 created: 2026-11-05
-updated: 2026-11-05
+updated: 2026-11-11
 ---
 
 # Apps behind your proxy
@@ -140,6 +140,13 @@ The callback is honoured once, only in the browser that started the sign-in, for
 for. The marker cookie's digest is compared **before** the pending record is consumed, so a crafted link carrying
 someone else's `state` cannot use up a sign-in that is in progress (`sign_in.ts:142-168`). The return path is
 limited to the app's own origin and never to a reserved path (`sign_in.ts:56-78`).
+
+**A path that asks for a code** (spec 128, [[conditions-at-your-proxy]]): the sign-in sends `max_age` and
+`acr_values=<multi_factor>`, which bind for this client alone at the login prompt's `second_factor` check, so a person
+without a code meets the refusal page of [[totp-second-factor]], named by the app's host. The pending sign-in records
+`requireCode`, and the callback makes no session from a code without the multi-factor acr. "Return without signing
+in" comes back as `error=unmet_authentication_requirements` and ends on the plain code-needed page (reason
+`code_required`), never on the sign-in-failed page, whose "Sign in again" would lead to the same refusal.
 
 **Monthly active users.** A sign-in here issues no token, so `executeGrant` never sees it. The redemption calls
 the activity writer `markActivity` directly, with the account `findAccount` resolved and the code's sign-in kind

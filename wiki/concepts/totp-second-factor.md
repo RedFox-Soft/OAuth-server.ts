@@ -238,6 +238,16 @@ RFC 7592 `PUT`, which rebuilds a record from its body, carries it over explicitl
 - **Rollback fails closed.** An older release drops an unknown base key on read and erases it on its next write, so
   the no-op migration `2026-11-11-app-requires-code-fence` makes every older release refuse the database.
 
+## A code at the proxy (spec 128)
+
+An app behind the proxy cannot carry `signIn.requireCode`: it signs in through the project's synthesized
+`proxy.<bucketId>` client, one per project, and a code is wanted per path. So the fresh sign-in condition of a path
+gets a flag instead, `withCode` ([[conditions-at-your-proxy]]). The proxy's sign-in sends `acr_values` with the
+multi-factor value, and `proxyAsksForCode` (beside `codeRequiredAndMissing`) makes it binding for that client only, at
+the same `second_factor` check, so the refusal page, the in-sign-in set-up and "Return" are the ones above. It also
+sends `max_age`, because the condition, unlike the application setting, has a freshness: a code typed yesterday does
+not open a path that asks for one within 15 minutes.
+
 ## The administrators' project needs its own door
 
 The console signs in through this same flow — `resolveBucketForRequest` maps the reserved console

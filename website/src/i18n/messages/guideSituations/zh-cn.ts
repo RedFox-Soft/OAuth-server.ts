@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '4aaa23515d01';
+export const source = 'dcaa1b994aaa';
 
 export default {
 	questions: {
@@ -659,7 +659,8 @@ export default {
 			goodToKnow: [
 				'可选择 15 分钟、1 小时、8 小时或 1 天。在后台加载数据的页面（例如仪表板）会停止工作，直到用户重新加载，因此请将其用于管理路径。',
 				'设置了身份验证器应用的人重新登录时也要输入验证码，无论项目是否要求。',
-				'通过外部身份提供方登录的人会被要求在那里重新登录；那次登录有多新，由该提供方决定。',
+				'勾选 “with a code from an authenticator app” 后，只有近期使用验证码的登录才能打开该路径。保存前，你会看到这会拒绝多少人；如果项目允许，没有验证码的人会被要求先设置一个。',
+				'不勾选时，通过外部身份提供方登录的人会被要求在那里重新登录；那次登录有多新，由该提供方决定。勾选后，他们无法打开该路径。',
 				'所有套餐均可使用。'
 			]
 		},
@@ -805,7 +806,8 @@ export default {
 				'在应用的设置中打开 “Require a code from an authenticator app”。保存前，你会看到这会影响多少人。',
 				'每次登录只要求一次验证码，而不是每次打开应用都要。',
 				'没有验证码的登录所得的刷新令牌会失效，用户需要重新登录并输入验证码。',
-				'通过身份提供方登录的人无法以这种方式打开此应用。'
+				'通过身份提供方登录的人无法以这种方式打开此应用。',
+				'对于在你的代理之后的应用，请改为在路径的 “Ask to sign in again” 条件上勾选 “with a code from an authenticator app”。'
 			],
 			actionLabel: '打开应用'
 		},

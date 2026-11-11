@@ -36,7 +36,7 @@ export type ConditionInput =
 			windows: { days: number[]; start: number; end: number }[];
 	  }
 	| { kind: 'attribute'; attribute: string; values: string[] }
-	| { kind: 'fresh'; maxAgeMinutes: number }
+	| { kind: 'fresh'; maxAgeMinutes: number; withCode?: boolean }
 	| { kind: 'group'; groups: string[] };
 
 const RANGE_PROBLEMS = {
@@ -169,7 +169,12 @@ export async function conditionsFrom(
 				break;
 			}
 			case 'fresh':
-				out.push({ kind: 'fresh', maxAgeMinutes: condition.maxAgeMinutes });
+				/* Stored only when on, so a condition without it is the record it always was (specs/128 R1). */
+				out.push({
+					kind: 'fresh',
+					maxAgeMinutes: condition.maxAgeMinutes,
+					...(condition.withCode === true ? { withCode: true as const } : {})
+				});
 				break;
 			case 'group':
 				out.push({

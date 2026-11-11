@@ -47,6 +47,8 @@ export interface Person {
 	groupIds: readonly string[];
 	attributes?: Readonly<Record<string, string>>;
 	signedInAt?: number | null;
+	/* Whether that sign-in included a code from an authenticator app (specs/128). */
+	signedInWithCode?: boolean | null;
 }
 
 export type Outcome = 'allow' | 'sign_in' | 'deny';
@@ -87,6 +89,8 @@ export interface Decision {
 	conditions?: ConditionOutcome[];
 	/* For a fresh sign-in: the oldest sign-in the path accepts, in seconds. */
 	maxAgeSeconds?: number;
+	/* For a fresh sign-in: the sign-in must include a code from an authenticator app (specs/128). */
+	requireCode?: true;
 }
 
 /* The "who" a rule decides with, its conditions set aside. */
@@ -333,6 +337,23 @@ function failed(judged: readonly ConditionOutcome[], kind: ConditionKind) {
 	return judged.some((c) => c.kind === kind && c.result === 'fail');
 }
 
+/*
+ * What a sign-in for a path must meet (specs/128 research R3): the shortest interval of its fresh conditions, and a code
+ * whenever any of them wants one, even one that holds today, because the sign-in replaces the app's session.
+ */
+function signInAsked(
+	judged: readonly ConditionOutcome[]
+): Pick<Decision, 'maxAgeSeconds' | 'requireCode'> {
+	const fresh = judged.flatMap((c) =>
+		c.condition.kind === 'fresh' ? [c.condition] : []
+	);
+	if (fresh.length === 0) return {};
+	return {
+		maxAgeSeconds: Math.min(...fresh.map((c) => c.maxAgeMinutes)) * 60,
+		...(fresh.some((c) => c.withCode) ? { requireCode: true as const } : {})
+	};
+}
+
 export function decide(input: DecideInput): Decision {
 	const { rules, method, rawPath, person } = input;
 	const canonical = canonicalPath(rawPath);
@@ -358,7 +379,7 @@ export function decide(input: DecideInput): Decision {
 	const decided = (
 		outcome: Outcome,
 		reason: Reason,
-		extra: Pick<Decision, 'maxAgeSeconds'> = {}
+		extra: Pick<Decision, 'maxAgeSeconds' | 'requireCode'> = {}
 	): Decision => ({
 		outcome,
 		reason,
@@ -372,7 +393,11 @@ export function decide(input: DecideInput): Decision {
 	/* Where and when come before any session, so a refusal by them never asks for a password first (R2). */
 	if (failed(judged, 'network')) return decided('deny', 'not_from_network');
 	if (failed(judged, 'time')) return decided('deny', 'outside_hours');
-	if (!person) return decided('sign_in', 'no_session');
+	/*
+	 * A first sign-in to a path that asks for a recent one, or for a code, asks for them at once (specs/128 research
+	 * R3), so a person is not signed in once without and sent straight back.
+	 */
+	if (!person) return decided('sign_in', 'no_session', signInAsked(judged));
 	if (!person.canSignIn) return decided('deny', 'cannot_sign_in');
 	if (
 		who.kind === 'groups' &&
@@ -386,14 +411,7 @@ export function decide(input: DecideInput): Decision {
 		(c) => c.condition.kind === 'fresh' && c.result === 'fail'
 	);
 	if (stale.length > 0) {
-		const minutes = Math.min(
-			...judged.flatMap((c) =>
-				c.condition.kind === 'fresh' ? [c.condition.maxAgeMinutes] : []
-			)
-		);
-		return decided('sign_in', 'sign_in_again', {
-			maxAgeSeconds: minutes * 60
-		});
+		return decided('sign_in', 'sign_in_again', signInAsked(judged));
 	}
 	return decided('allow', 'allowed');
 }

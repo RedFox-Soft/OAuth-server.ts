@@ -1071,21 +1071,49 @@ async function unverifiedAtSignIn(
  * for a recent sign-in to open a page. Named by the app's host, taken from the callback the sign-in returns to.
  */
 function freshSignInNotice(interaction: Interaction): string | undefined {
-	const clientId = clientIdOf(interaction);
-	if (!isBehindProxyClient(clientId)) return undefined;
+	const host = proxyHostOf(interaction);
+	if (host === undefined) return undefined;
 	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
-	if (params.max_age === undefined) return undefined;
 	const reasons = interaction.payload.prompt?.reasons ?? [];
-	if (!reasons.includes('max_age')) return undefined;
-	let host: string;
+	/* The path also asks for a code (specs/128): one notice says both, and Part B's own notice stands down. */
+	const asksForCode =
+		typeof params.acr_values === 'string' &&
+		params.acr_values.split(' ').includes(configuration.acrMap.multi_factor);
+	const fresh = params.max_age !== undefined && reasons.includes('max_age');
+	if (!fresh && !(asksForCode && reasons.includes('second_factor'))) {
+		return undefined;
+	}
+	const T = SIGN_IN_TEXTS[languageOf(interaction)].notices;
+	return text(asksForCode ? T.freshSignInCode : T.freshSignIn, { host });
+}
+
+/*
+ * The host of the app behind the proxy an interaction signs in to, taken from the callback the sign-in returns to;
+ * undefined for any other client. It is what the person typed, and the project declared it.
+ */
+function proxyHostOf(interaction: Interaction): string | undefined {
+	if (!isBehindProxyClient(clientIdOf(interaction))) return undefined;
+	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
 	try {
-		host = new URL(String(params.redirect_uri)).host;
+		return new URL(String(params.redirect_uri)).host;
 	} catch {
 		return undefined;
 	}
-	return text(SIGN_IN_TEXTS[languageOf(interaction)].notices.freshSignIn, {
-		host
-	});
+}
+
+/*
+ * The look of a page that names the app a sign-in is for (the refusal page, the set-up that continues it): an app behind
+ * the proxy is named by its host, as the proxy's own pages name it (specs/128 research R7).
+ */
+async function lookNamingApp(
+	interaction: Interaction,
+	bucketId: string
+): Promise<Awaited<ReturnType<typeof signInLook>>> {
+	const look = await signInLook(interaction, bucketId);
+	const host = proxyHostOf(interaction);
+	return host === undefined
+		? look
+		: { ...look, face: { ...look.face, app: { name: host } } };
 }
 
 /*
@@ -1098,6 +1126,8 @@ function codeAskedNotice(
 ): string | undefined {
 	const reasons = interaction.payload.prompt?.reasons ?? [];
 	if (!reasons.includes('second_factor')) return undefined;
+	/* A path behind the proxy says it in its own notice (freshSignInNotice). */
+	if (proxyHostOf(interaction) !== undefined) return undefined;
 	const T = SIGN_IN_TEXTS[languageOf(interaction)].notices;
 	return face.app
 		? text(T.codeAskedByApp, { app: face.app.name })
@@ -1831,7 +1861,9 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'totp/enroll'),
-					...(await signInLook(interaction, bucketId))
+					...(continuing
+						? await lookNamingApp(interaction, bucketId)
+						: await signInLook(interaction, bucketId))
 				});
 			}
 
@@ -1853,7 +1885,9 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'totp/enroll'),
-				...(await signInLook(interaction, bucketId))
+				...(continuing
+					? await lookNamingApp(interaction, bucketId)
+					: await signInLook(interaction, bucketId))
 			});
 		}
 	)
@@ -1946,7 +1980,9 @@ export const ui = new Elysia()
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'totp/enroll'),
-					...(await signInLook(interaction, bucketId))
+					...(continuing
+						? await lookNamingApp(interaction, bucketId)
+						: await signInLook(interaction, bucketId))
 				});
 			}
 
@@ -2028,7 +2064,7 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, CODE_REQUIRED_PAGE),
-				...(await signInLook(interaction, bucketId))
+				...(await lookNamingApp(interaction, bucketId))
 			});
 		}
 	)

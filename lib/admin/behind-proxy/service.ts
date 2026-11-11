@@ -185,7 +185,8 @@ function byPath(a: BehindProxyRule, b: BehindProxyRule): number {
 	return a.path < b.path ? -1 : 1;
 }
 
-async function rulesOf(
+/* The rules as they would be stored, checked as a save checks them; the code preview reads them before the save. */
+export async function rulesOf(
 	bucket: UserBucket,
 	input: readonly RuleInput[]
 ): Promise<BehindProxyRule[]> {

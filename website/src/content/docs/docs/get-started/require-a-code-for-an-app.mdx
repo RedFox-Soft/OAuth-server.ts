@@ -62,6 +62,9 @@ Leave the switch off and ask for a code where you need it. Send `acr_values` wit
 which the app's **Connect** tab shows, and check `acr` in the ID token. Under the IPSIE SL1 profile, or with an
 essential `acr` claim, the request is binding. Otherwise it is only a request, so the app must check the ID token.
 
+An app behind your proxy asks for a code on a path instead: see
+[Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/#with-code).
+
 ## Rolling back {#rollback}
 
 `db:migrate` records a migration after which an older release refuses to start against the database. An older

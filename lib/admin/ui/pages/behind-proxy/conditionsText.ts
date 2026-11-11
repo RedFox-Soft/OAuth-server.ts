@@ -106,7 +106,9 @@ export function conditionText(
 		case 'attribute':
 			return `${attributeText(condition.attribute)} is ${or(condition.values)}`;
 		case 'fresh':
-			return `signed in within ${freshText(condition.maxAgeMinutes)}`;
+			return condition.withCode
+				? `signed in with a code within ${freshText(condition.maxAgeMinutes)}`
+				: `signed in within ${freshText(condition.maxAgeMinutes)}`;
 		case 'group':
 			return `members of ${or(condition.groupIds.map((id) => nameOf(id) ?? 'a deleted group'))}`;
 	}

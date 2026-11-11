@@ -130,9 +130,26 @@ browser is sent to sign in again, and the sign-in page says why. A request that 
 
 - Pages that load data in the background, such as dashboards, stop working until the person reloads. Use this on
   admin paths, not on the whole app.
-- If the project asks for an authenticator app at sign-in, signing in again asks for a code too.
+- Anyone who set up an authenticator app types a code when signing in again.
 - A person who signs in through an outside provider is asked to sign in there again. How fresh that sign-in is, the
   provider decides.
+
+### With a code from an authenticator app {#with-code}
+
+Tick **with a code from an authenticator app** under the condition. The path then opens only for a sign-in that
+included a code and is not older than the time you chose, at most a day. The rule reads "signed in with a code within
+15 min".
+
+- Before it saves, the console shows how many of the people who may open the path have no authenticator app, and how
+  many can sign in only through a provider. You confirm with those numbers. Only someone who may manage the project's
+  people can turn it on.
+- A person with a code signs in again with the password and the code, even when they typed a code earlier that day.
+- A person without one sees a page that names your app's address. If the project lets people set one up, they set it
+  up there and reach the page they opened, in the same sign-in. Otherwise the page asks them to contact you.
+- A person who signs in through a provider is told this way of signing in cannot open the page.
+- Going back without signing in ends on a page that says the page needs a code. It never starts the same sign-in
+  again.
+- The console's **Check access** has a box for whether the person signed in with a code.
 
 ## Groups and attributes for an API {#api}
 
@@ -160,6 +177,7 @@ once. The FoxAuth console itself is never behind these conditions, so a rule can
 ## Upgrading and rolling back {#rollback}
 
 The first release with conditions marks the database so that an older release refuses to start against it. An older
-release could not enforce conditions, so it must not run. You cannot roll back below this release. During a rolling
+release could not enforce conditions, so it must not run. The first release with a code at the proxy marks it again,
+for the same reason. You cannot roll back below this release. During a rolling
 deploy, an older process still running answers an error for an app or an API with conditions until it is replaced. It
 never lets a request through.

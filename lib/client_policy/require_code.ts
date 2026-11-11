@@ -17,6 +17,24 @@ export function codeRequiredAndMissing(
 	return acr !== configuration.acrMap.multi_factor;
 }
 
+/*
+ * Whether the sign-in for a path behind the proxy that asks for a code (specs/128 research R4) is being reached without
+ * one. The proxy's own client writes `acr_values` with the multi-factor value into its request, and for that client
+ * alone the request binds: for any other client `acr_values` stays the voluntary request OIDC Core §3.1.2.1 makes it.
+ * Binding it here gives nobody anything — the proxy checks the context of the code it is handed whatever the request
+ * said, so removing the value only earns a refusal at the proxy's callback.
+ */
+export function proxyAsksForCode(
+	client: { readonly behindProxyBucketId?: string } | undefined,
+	acrValues: unknown,
+	acr: string | undefined
+): boolean {
+	if (client?.behindProxyBucketId === undefined) return false;
+	if (typeof acrValues !== 'string') return false;
+	const multiFactor = configuration.acrMap.multi_factor;
+	return acrValues.split(' ').includes(multiFactor) && acr !== multiFactor;
+}
+
 /* What a refusal says, at the token endpoint and to an application its sign-in hands back. */
 export const REQUIRE_CODE_DESCRIPTION =
 	'the application requires a sign-in with a code from an authenticator app';

@@ -187,6 +187,13 @@ export const en = {
 			tryAgain: 'Sign in again',
 			reason: 'Reason: {reason}, at {time}'
 		},
+		/* A page that asks for a sign-in with a code from an authenticator app, reached without one (specs/128). */
+		codeNeeded: {
+			title: 'This page of {host} needs a code from an authenticator app',
+			body: 'You went back without signing in with a code. Other pages of {host} may still open.',
+			open: 'Open {host}',
+			reason: 'Reason: {reason}, at {time}'
+		},
 		address: {
 			title: 'Your address, as {host} sees it',
 			seen: 'The check sees your address as {address}.',

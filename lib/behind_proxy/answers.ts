@@ -19,6 +19,10 @@ export type AnswerReason =
 	/* The proxy self-test page (specs/124), and a fresh sign-in that came back older than asked. */
 	| 'address_test'
 	| 'sign_in_not_fresh'
+	/*
+	 * A sign-in the path asked a code of (specs/128) came back without one, or the person went back without signing in.
+	 */
+	| 'code_required'
 	/* The API check (specs/123 contracts/api-check.md). */
 	| ApiReason;
 

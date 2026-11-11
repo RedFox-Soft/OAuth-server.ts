@@ -1515,7 +1515,9 @@ const AttributeConditionSchema = t.Object(
 const FreshConditionSchema = t.Object(
 	{
 		kind: t.Literal('fresh'),
-		maxAgeMinutes: t.Integer({ minimum: 5, maximum: 1440 })
+		maxAgeMinutes: t.Integer({ minimum: 5, maximum: 1440 }),
+		/* Only a sign-in with a code from an authenticator app meets it (specs/128); present only when on. */
+		withCode: t.Optional(t.Literal(true))
 	},
 	closed
 );

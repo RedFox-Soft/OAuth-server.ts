@@ -11,6 +11,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **A code at your proxy** (spec 128). The "Ask to sign in again" condition on a path of an app behind your proxy can
+  ask for a code from an authenticator app: only a recent sign-in with a code then opens the path. A person without
+  one gets the refusal page and can set one up inside the same sign-in; going back ends on a page that says what the
+  path needs instead of "Sign in again". Turning it on shows first how many people it turns away. Run `db:migrate`;
+  an older release then refuses to start against the database.
 - **Two-step verification people turn on themselves** (spec 126). A project's people can add a code from an
   authenticator app to their own account on a new account page, `/account/security`, after a sign-in with their
   password and a link mailed to them that works only in that browser; moving it to another phone or turning it off

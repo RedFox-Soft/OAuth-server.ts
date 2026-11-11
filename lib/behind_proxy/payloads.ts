@@ -50,6 +50,11 @@ export const BehindProxySignInPayload = t.Object({
 	 * The oldest sign-in the path that sent the person here accepts, in seconds (specs/124 FR-021): the callback
 	 * refuses a sign-in older than this rather than starting the same sign-in again.
 	 */
-	maxAge: t.Optional(t.Number())
+	maxAge: t.Optional(t.Number()),
+	/*
+	 * The path asked for a sign-in with a code from an authenticator app (specs/128): the callback refuses one without,
+	 * whatever the request to the sign-in said.
+	 */
+	requireCode: t.Optional(t.Literal(true))
 });
 export type BehindProxySignInPayload = Static<typeof BehindProxySignInPayload>;

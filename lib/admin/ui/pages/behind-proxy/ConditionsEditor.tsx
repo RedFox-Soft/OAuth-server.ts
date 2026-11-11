@@ -644,11 +644,32 @@ function FreshFields({
 					</Space.Compact>
 				)}
 			</Flex>
+			<Checkbox
+				checked={condition.withCode === true}
+				disabled={disabled}
+				onChange={(e) => {
+					const { withCode: _was, ...plain } = condition;
+					onChange(
+						e.target.checked ? { ...plain, withCode: true as const } : plain
+					);
+				}}
+			>
+				with a code from an authenticator app
+			</Checkbox>
+			{condition.withCode && (
+				<Typography.Text type="secondary">
+					People without one, and people who sign in through a provider, can’t
+					open this path. People without one are asked to set one up when the
+					project lets them.
+				</Typography.Text>
+			)}
 			<Typography.Text type="secondary">
 				Pages that load data in the background, such as dashboards, stop working
 				until the person reloads the page. Use this on admin paths, not on the
-				whole app. A person who signs in through an outside provider is asked to
-				sign in there again; how fresh that sign-in is, the provider decides.
+				whole app.
+				{condition.withCode
+					? ''
+					: ' A person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides.'}
 			</Typography.Text>
 		</Flex>
 	);

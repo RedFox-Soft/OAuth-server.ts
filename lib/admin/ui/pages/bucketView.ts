@@ -97,6 +97,8 @@ export interface BucketSummary {
 	twoStepSelfService?: 'on' | 'off' | 'no_password_login' | 'no_mail';
 	/* The applications that require a code (specs/127). Absent from a server that predates it. */
 	codeRequiredApps?: { id: string; name: string }[];
+	/* The apps behind the proxy with paths that ask for a code (specs/128). Absent from a server that predates it. */
+	codeRequiredPaths?: { appId: string; name: string; paths: string[] }[];
 	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
 	federationEnabled: boolean;
 	/*

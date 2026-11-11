@@ -250,10 +250,15 @@ const condition = fc.oneof(
 			maxLength: 2
 		})
 	}),
-	fc.record({
-		kind: fc.constant('fresh' as const),
-		maxAgeMinutes: fc.constantFrom(5, 15, 60)
-	})
+	fc
+		.record({
+			kind: fc.constant('fresh' as const),
+			maxAgeMinutes: fc.constantFrom(5, 15, 60),
+			withCode: fc.boolean()
+		})
+		.map(({ withCode, ...fresh }) =>
+			withCode ? { ...fresh, withCode: true as const } : fresh
+		)
 );
 const who = fc.oneof(
 	fc.constant({ kind: 'project' as const }),
@@ -288,7 +293,8 @@ const request = fc.record({
 		fc.record({
 			groupIds: fc.uniqueArray(fc.constantFrom(...GROUPS), { maxLength: 2 }),
 			department: fc.option(fc.constantFrom('Ops', 'Sales', 'SRE')),
-			signedInAgo: fc.integer({ min: 0, max: 120 })
+			signedInAgo: fc.integer({ min: 0, max: 120 }),
+			withCode: fc.boolean()
 		})
 	)
 });
@@ -308,7 +314,8 @@ function admits(rulesIn: PathRule[], r: Probe): boolean {
 						attributes: r.person.department
 							? { department: r.person.department }
 							: {},
-						signedInAt: Math.floor(r.at / 1000) - r.person.signedInAgo * 60
+						signedInAt: Math.floor(r.at / 1000) - r.person.signedInAgo * 60,
+						signedInWithCode: r.person.withCode
 					}
 				: null,
 			address: r.address,
@@ -397,7 +404,8 @@ describe('widening of rules with conditions', () => {
 			[DEPT],
 			[{ ...DEPT, values: ['Ops', 'Sales'] }]
 		],
-		['raising the sign-in age', [FRESH15], [{ ...FRESH15, maxAgeMinutes: 60 }]]
+		['raising the sign-in age', [FRESH15], [{ ...FRESH15, maxAgeMinutes: 60 }]],
+		['no longer asking for a code', [{ ...FRESH15, withCode: true }], [FRESH15]]
 	] as const)('%s is reported as a widening', (_case, from, to) => {
 		const found = widenings(
 			base(from as unknown as Condition[]),
@@ -420,7 +428,8 @@ describe('widening of rules with conditions', () => {
 			[HOURS],
 			[{ ...HOURS, windows: [{ ...HOURS.windows[0], end: 1140 }] }]
 		],
-		['lowering the sign-in age', [FRESH15], [{ ...FRESH15, maxAgeMinutes: 5 }]]
+		['lowering the sign-in age', [FRESH15], [{ ...FRESH15, maxAgeMinutes: 5 }]],
+		['asking for a code too', [FRESH15], [{ ...FRESH15, withCode: true }]]
 	] as const)('%s reports nothing', (_case, from, to) => {
 		expect(
 			widenings(
@@ -445,5 +454,133 @@ describe('widening of rules with conditions', () => {
 		);
 
 		expect(found.some((w) => (w.loosened ?? []).length > 0)).toBe(true);
+	});
+});
+
+/**
+ * @proves A fresh sign-in condition that asks for a code (specs/128) is met only by a recent sign-in that included one,
+ * and a condition without the flag decides as it always did, whatever the sign-in carried.
+ */
+describe('a fresh sign-in condition with a code', () => {
+	const at = Date.UTC(2026, 10, 5, 11, 0);
+	const rulesWith = (conditions: Condition[]): PathRule[] => [
+		{ path: '/', who: { kind: 'project' } },
+		{ path: '/admin', who: withConditions({ kind: 'project' }, conditions) }
+	];
+	const asked = (
+		conditions: Condition[],
+		signedInAgo: number,
+		signedInWithCode: boolean | null
+	) =>
+		decide({
+			rules: rulesWith(conditions),
+			method: 'GET',
+			rawPath: '/admin',
+			person: {
+				canSignIn: true,
+				groupIds: [],
+				signedInAt: Math.floor(at / 1000) - signedInAgo * 60,
+				signedInWithCode
+			},
+			address: '203.0.113.9',
+			at,
+			timeZone: ZONE
+		});
+	const CODE15: Condition = {
+		kind: 'fresh',
+		maxAgeMinutes: 15,
+		withCode: true
+	};
+	const FRESH15: Condition = { kind: 'fresh', maxAgeMinutes: 15 };
+
+	it.each([
+		['with a code, 5 minutes ago', 5, true, 'allow'],
+		['with a code, 20 minutes ago', 20, true, 'sign_in'],
+		['without a code, 5 minutes ago', 5, false, 'sign_in'],
+		[
+			'from a session that recorded no context, 5 minutes ago',
+			5,
+			null,
+			'sign_in'
+		]
+	] as const)('a sign-in %s is decided %s', (_case, ago, withCode, outcome) => {
+		const decision = asked([CODE15], ago, withCode);
+
+		expect(decision.outcome).toBe(outcome);
+		if (outcome === 'sign_in') {
+			expect(decision).toMatchObject({
+				reason: 'sign_in_again',
+				maxAgeSeconds: 900,
+				requireCode: true
+			});
+		}
+	});
+
+	it('a condition without the flag never asks for a code, whatever the sign-in carried', () => {
+		fc.assert(
+			fc.property(
+				fc.integer({ min: 0, max: 60 }),
+				fc.option(fc.boolean()),
+				(ago, withCode) => {
+					const decision = asked([FRESH15], ago, withCode);
+					const plain = asked([FRESH15], ago, undefined as unknown as null);
+					expect(decision.outcome).toBe(plain.outcome);
+					expect(decision.requireCode).toBeUndefined();
+				}
+			),
+			RUNS
+		);
+	});
+
+	it('one sign-in meets every condition of the path: the shortest interval, and a code if any asks for one', () => {
+		const decision = decide({
+			rules: [
+				{
+					path: '/',
+					who: withConditions({ kind: 'project' }, [
+						{ kind: 'fresh', maxAgeMinutes: 480, withCode: true }
+					])
+				},
+				{ path: '/admin', who: withConditions({ kind: 'project' }, [FRESH15]) }
+			],
+			method: 'GET',
+			rawPath: '/admin',
+			person: {
+				canSignIn: true,
+				groupIds: [],
+				signedInAt: Math.floor(at / 1000) - 60 * 60,
+				signedInWithCode: true
+			},
+			at,
+			timeZone: ZONE
+		});
+
+		expect(decision).toMatchObject({
+			outcome: 'sign_in',
+			maxAgeSeconds: 900,
+			requireCode: true
+		});
+	});
+
+	it('a refusal by network comes before asking for a sign-in with a code', () => {
+		const decision = decide({
+			rules: rulesWith([
+				CODE15,
+				{ kind: 'network', only: ['203.0.113.0/24'], not: [] }
+			]),
+			method: 'GET',
+			rawPath: '/admin',
+			person: {
+				canSignIn: true,
+				groupIds: [],
+				signedInAt: Math.floor(at / 1000) - 60 * 60,
+				signedInWithCode: false
+			},
+			address: '198.51.100.7',
+			at,
+			timeZone: ZONE
+		});
+
+		expect(decision.reason).toBe('not_from_network');
 	});
 });

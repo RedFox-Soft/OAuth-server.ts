@@ -159,6 +159,30 @@ export async function verifyBehindProxy(
 	);
 	await sessions.destroy(sessionId);
 
+	/*
+	 * A path that asks for a sign-in with a code (specs/128): the flag is stored on the closed condition only when on,
+	 * and read back as written, so the decision and the summary see it on either backend.
+	 */
+	await store.update(winner, {
+		rules: [
+			{ path: '/', who: { kind: 'groups', groupIds: ['g1'] } },
+			{
+				path: '/admin',
+				who: {
+					kind: 'conditional',
+					who: { kind: 'groups', groupIds: ['g1'] },
+					conditions: [{ kind: 'fresh', maxAgeMinutes: 15, withCode: true }]
+				}
+			}
+		]
+	});
+	const withCode = await store.find(winner);
+	check(
+		'a fresh condition that asks for a code is stored and read back with the flag',
+		JSON.stringify(withCode?.rules).includes('"withCode":true'),
+		JSON.stringify(withCode?.rules)
+	);
+
 	await store.delete(`c-${stamp}`);
 	check('a deleted app is gone', (await store.find(`c-${stamp}`)) === null);
 	const removed = await store.destroyByBucket(bucketId);

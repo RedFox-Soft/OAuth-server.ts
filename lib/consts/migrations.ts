@@ -1809,6 +1809,27 @@ const appRequiresCodeFence: Migration = {
 	postgres: { noop: true, reason: REQUIRE_CODE_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/128 research R11). A fresh sign-in condition at the proxy may now ask for a code from an
+ * authenticator app. A release that predates it refuses the app record its closed condition schema does not know, and
+ * one from before conditions ignores conditions altogether; either way an app closed to a sign-in without a code would
+ * stop being so. Recording this migration makes the startup gate of every older release see a database that is ahead,
+ * and refuse it. Both halves do nothing; the record is the whole effect.
+ */
+const PROXY_CODE_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than a code at the proxy refuses to start against a database that may hold a condition asking for one.';
+
+const proxyCodeConditionFence: Migration = {
+	id: '2026-11-12-proxy-code-condition-fence',
+	description:
+		'Mark the database as holding conditions at the proxy that ask for a code from an authenticator app, so that an older release refuses to start against it rather than letting people in without one',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: PROXY_CODE_FENCE_REASON },
+	postgres: { noop: true, reason: PROXY_CODE_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1823,5 +1844,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	clientAddressSource,
 	planConnectedServicesLimit,
 	proxyConditionsFence,
-	appRequiresCodeFence
+	appRequiresCodeFence,
+	proxyCodeConditionFence
 ];

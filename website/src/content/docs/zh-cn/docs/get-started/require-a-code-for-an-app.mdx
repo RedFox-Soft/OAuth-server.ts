@@ -1,7 +1,7 @@
 ---
 title: 在一个应用中要求验证码
 description: '某个应用（例如账单）不接受没有身份验证器应用验证码的登录，项目中的其他应用保持不变。'
-source: bcd4daebc7eb
+source: 09a03983df86
 sidebar:
   order: 12
 ---
@@ -48,6 +48,8 @@ import { Aside } from '@astrojs/starlight/components';
 ## 只在部分页面要求验证码 {#some-pages}
 
 保持开关关闭，在需要的地方要求验证码。发送 `acr_values`，值为您服务器的多因素值（应用的 **Connect** 选项卡会显示它），并检查 ID 令牌中的 `acr`。在 IPSIE SL1 配置文件下或使用必需的 `acr` 声明时，该请求是强制的。否则它只是一个请求，因此应用必须检查 ID 令牌。
+
+在您的代理之后的应用则是在路径上要求验证码：请参阅[在代理处添加条件](/zh-cn/docs/get-started/add-conditions-at-your-proxy/#with-code)。
 
 ## 回滚 {#rollback}
 

@@ -3,6 +3,7 @@ import { markActivity } from '../activity/note.js';
 import type { BehindProxyApp } from '../adapters/types.js';
 import { findAccount } from '../addon/index.js';
 import { servingBucketIdOf } from '../admin/auth/bucketAddress.js';
+import { configuration } from '../configs/application.js';
 import { issuerFor, type RequestBucket } from '../configs/issuer.js';
 import { routeNames } from '../consts/param_list.js';
 import constantEquals from '../helpers/constant_equals.js';
@@ -14,8 +15,8 @@ import { AuthorizationCode } from '../models/authorization_code.js';
 import { Grant } from '../models/grant.js';
 import { redirect, withReason, type AnswerReason } from './answers.js';
 import { behindProxyCallbackUri, behindProxyClientId } from './client.js';
-import { hasControlCharacter } from './decide.js';
-import { notConfirmedPage, signInFailedPage } from './pages.js';
+import { gatherConditions, hasControlCharacter } from './decide.js';
+import { codeNeededPage, notConfirmedPage, signInFailedPage } from './pages.js';
 import { pendingSignIns, savePendingSignIn } from './records.js';
 import {
 	cookieHeader,
@@ -89,7 +90,7 @@ export async function startSignIn(
 	{ bucket, app }: SignInContext,
 	returnTo: string,
 	reason: AnswerReason,
-	options: { prompt?: 'login'; maxAge?: number } = {}
+	options: { prompt?: 'login'; maxAge?: number; requireCode?: true } = {}
 ): Promise<Response> {
 	const state = randomValue();
 	const marker = randomValue();
@@ -104,7 +105,8 @@ export async function startSignIn(
 			markerDigest: digestOf(marker),
 			used: false,
 			exp: epochTime() + SIGN_IN_SECONDS,
-			...(options.maxAge === undefined ? {} : { maxAge: options.maxAge })
+			...(options.maxAge === undefined ? {} : { maxAge: options.maxAge }),
+			...(options.requireCode ? { requireCode: true as const } : {})
 		},
 		SIGN_IN_SECONDS
 	);
@@ -121,10 +123,36 @@ export async function startSignIn(
 	if (options.maxAge !== undefined) {
 		params.set('max_age', String(options.maxAge));
 	}
+	/*
+	 * A path that asks for a code (specs/128 research R4): binding at the sign-in for this client only, so a person who
+	 * holds one is asked for it and anyone else meets the refusal page. Only a hint all the same — the callback checks
+	 * the code it is handed, so removing this gets whoever removed it refused there.
+	 */
+	if (options.requireCode) {
+		params.set('acr_values', configuration.acrMap.multi_factor);
+	}
 	return redirect(
 		`${issuerFor(bucket)}${routeNames.authorization}?${params.toString()}`,
 		reason,
 		[cookieHeader(markerCookieName(app._id), marker, SIGN_IN_SECONDS)]
+	);
+}
+
+/*
+ * The page a sign-in that asked for a code ends on without one (specs/128 research R6). Its one link opens the app's
+ * start page, and only when no condition there asks for a code: otherwise it would start the same refusal again.
+ */
+function codeNeeded({ app, request }: SignInContext): Response {
+	const startAsksForCode = gatherConditions(app.rules, '/').some(
+		({ condition }) => condition.kind === 'fresh' && condition.withCode
+	);
+	return withReason(
+		codeNeededPage({
+			host: new URL(app.address).host,
+			...(startAsksForCode ? {} : { openHref: `${app.address}/` }),
+			language: languageOfRequest(request).language
+		}),
+		'code_required'
 	);
 }
 
@@ -175,11 +203,31 @@ export async function completeSignIn(
 	}
 
 	const code = query.get('code');
+	/*
+	 * The person went back from the refusal page without a code (specs/128 FR-019). "Sign in again" there would only lead
+	 * to the same refusal, so the page says what the path needs and starts nothing.
+	 */
+	if (
+		pending.requireCode &&
+		query.get('error') === 'unmet_authentication_requirements'
+	) {
+		return codeNeeded(ctx);
+	}
 	if (query.has('error') || !code) {
 		return failed(ctx, shownError(query.get('error')));
 	}
 	const redeemed = await redeem(ctx, code, pending.codeVerifier);
 	if (!redeemed) return failed(ctx, 'sign_in_failed');
+	/*
+	 * A path that asked for a code is satisfied by the context the code carries, never by what the request said
+	 * (specs/128 FR-017): a request stripped of its `acr_values` comes back without one, and makes no session.
+	 */
+	if (
+		pending.requireCode &&
+		redeemed.how.acr !== configuration.acrMap.multi_factor
+	) {
+		return codeNeeded(ctx);
+	}
 	/*
 	 * A path that asked for a recent sign-in is satisfied by the sign-in time the code carries, never by what the
 	 * request says (specs/124 FR-021). One older than asked shows a page to try again rather than starting the same
@@ -195,7 +243,7 @@ export async function completeSignIn(
 				notConfirmedPage({
 					host: new URL(app.address).host,
 					reason: 'sign_in_not_fresh',
-					startHref: `${START_PATH}?max_age=${String(pending.maxAge)}&rd=${encodeURIComponent(pending.returnTo)}`,
+					startHref: `${START_PATH}?max_age=${String(pending.maxAge)}${pending.requireCode ? '&code=1' : ''}&rd=${encodeURIComponent(pending.returnTo)}`,
 					language: languageOfRequest(request).language
 				}),
 				'sign_in_not_fresh'

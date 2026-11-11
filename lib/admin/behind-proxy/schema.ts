@@ -74,7 +74,9 @@ const AttributeBody = t.Object(
 const FreshBody = t.Object(
 	{
 		kind: t.Literal('fresh'),
-		maxAgeMinutes: t.Number({ minimum: 5, maximum: 1440, multipleOf: 1 })
+		maxAgeMinutes: t.Number({ minimum: 5, maximum: 1440, multipleOf: 1 }),
+		/* Only a sign-in with a code from an authenticator app meets it (specs/128). */
+		withCode: t.Optional(t.Boolean())
 	},
 	closed
 );
@@ -136,7 +138,23 @@ export const UpdateBehindProxyAppBody = t.Object(
 		proxyKind: t.Optional(ProxyKind),
 		rules: t.Optional(t.Array(Rule, { maxItems: 50 })),
 		/* The zone the app's time conditions and refusal pages read the clock in (specs/124). */
-		timeZone: t.Optional(TimeZoneBody)
+		timeZone: t.Optional(TimeZoneBody),
+		/*
+		 * Asking for a code on a path (specs/128) answers 409 with what it would do to whom, counted, and is applied only
+		 * when repeated with `confirm` and those counts as `expect`.
+		 */
+		confirm: t.Optional(t.Boolean()),
+		expect: t.Optional(
+			t.Object(
+				{
+					withoutAuthenticator: t.Optional(
+						t.Number({ minimum: 0, multipleOf: 1 })
+					),
+					providerOnly: t.Optional(t.Number({ minimum: 0, multipleOf: 1 }))
+				},
+				{ additionalProperties: false }
+			)
+		)
 	},
 	{ additionalProperties: false }
 );

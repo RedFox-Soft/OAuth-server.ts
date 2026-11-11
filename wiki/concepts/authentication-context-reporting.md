@@ -92,7 +92,10 @@ requires a code ([[totp-second-factor]]) — is in `ACR_REASONS` like the other 
 login page in a ring. But when it fails after a login, the guard opens a new interaction at `ui/:uid/code-required`
 instead of throwing: a person who could set a code up, or sign in with a password instead of a provider, is shown how,
 and the error reaches the application only if they choose to go back. The other three reasons still throw, and
-`prompt=none` still errors at once. The device flow follows the redirect the same way.
+`prompt=none` still errors at once. The device flow follows the redirect the same way. Since spec 128 the same check
+also fails when the proxy's own client (`proxy.<bucketId>`) names the multi-factor value in `acr_values` and the
+session is not multi-factor (`proxyAsksForCode`): for that client alone the voluntary parameter binds, because the
+server wrote it and checks the code it gets back anyway ([[conditions-at-your-proxy]]).
 
 **The delivery was the awkward part.** The shared handler redirected an error to the client only on
 the authorization route, and an interaction resumes on `/ui/:uid/resume`, so a throw there rendered to

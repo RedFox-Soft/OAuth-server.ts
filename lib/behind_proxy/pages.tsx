@@ -152,6 +152,30 @@ export function notConfirmedPage(input: {
 	);
 }
 
+/*
+ * A page that asks for a sign-in with a code from an authenticator app, reached without one (specs/128 research R6):
+ * the person went back from the refusal page, or the sign-in came back without a code. It never starts the same
+ * sign-in again; the one link opens the app's start page, and only when that page asks for no code itself.
+ */
+export function codeNeededPage(input: {
+	host: string;
+	openHref?: string;
+	language: Language;
+}): Response {
+	const t = PLAIN_TEXTS[input.language].behindProxy.codeNeeded;
+	return page(
+		text(t.title, { host: input.host }),
+		`<h2 style="${heading}">${html(t.title, { host: input.host })}</h2>` +
+			`<p style="${body}">${html(t.body, { host: input.host })}</p>` +
+			(input.openHref
+				? `<p style="margin-top:12px;"><a href="${esc(input.openHref)}" style="color:${foxVar('link')};">${html(t.open, { host: input.host })}</a></p>`
+				: '') +
+			reasonLine(t.reason, 'code_required', input.language),
+		403,
+		{ language: input.language }
+	);
+}
+
 export type AddressCause = 'noKey' | 'wrongKey' | 'several' | 'notPublic';
 
 /*

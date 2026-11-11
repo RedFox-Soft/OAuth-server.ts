@@ -1543,11 +1543,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		goodToKnow: [
 			'Choose 15 minutes, an hour, 8 hours or a day. Pages that load data in the background, such as dashboards, stop working until the person reloads, so use it on admin paths.',
 			'Anyone who set up an authenticator app types a code when signing in again, whether or not the project requires one.',
-			'A person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides.',
+			'Tick "with a code from an authenticator app" and only a recent sign-in with a code opens the path. Before it saves, you see how many people it turns away; people without one are asked to set one up when the project lets them.',
+			'Without the code, a person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides. With it, they cannot open the path.',
 			'It is on every plan.'
 		],
 		prompt: prompt(
-			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old.\nAdd a fresh sign-in condition to the rule for /admin.',
+			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old, and to type a code from an authenticator app.\nAdd a fresh sign-in condition with withCode to the rule for /admin, and tell me first how many people that affects.',
 			'behind_proxy_app_update with rules[].conditions',
 			'Use it on admin paths: a dashboard that loads data in the background stops until it is reloaded.'
 		)
@@ -1804,7 +1805,8 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Turn it on in the application’s Settings, under "Require a code from an authenticator app". Before it saves, you see how many people it affects.',
 			'A code is asked once per sign-in, not every time the app opens.',
 			'Refresh tokens from sign-ins without a code stop working, so people sign in again with one.',
-			'People who sign in through a provider cannot open the app this way.'
+			'People who sign in through a provider cannot open the app this way.',
+			'For an app behind your proxy, tick "with a code from an authenticator app" on the "Ask to sign in again" condition of a path instead.'
 		],
 		prompt: prompt(
 			'Make my billing application in FoxAuth require a code from an authenticator app, and tell me first how many people that affects.',

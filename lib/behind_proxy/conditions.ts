@@ -25,7 +25,15 @@ export type AttributeCondition = {
 	attribute: string;
 	values: string[];
 };
-export type FreshCondition = { kind: 'fresh'; maxAgeMinutes: number };
+/*
+ * `withCode` (specs/128): the sign-in must also have included a code from an authenticator app. Present only when on,
+ * so a record without it reads exactly as before.
+ */
+export type FreshCondition = {
+	kind: 'fresh';
+	maxAgeMinutes: number;
+	withCode?: true;
+};
 export type GroupCondition = { kind: 'group'; groupIds: string[] };
 
 export type Condition =
@@ -96,6 +104,11 @@ export interface Facts {
 		attributes?: Readonly<Record<string, string>>;
 		/* Epoch seconds of the person's sign-in. */
 		signedInAt?: number | null;
+		/*
+		 * Whether that sign-in included a code from an authenticator app (specs/128 research R2): worked out by the
+		 * server from the session's recorded context, because this module cannot read the instance's settings.
+		 */
+		signedInWithCode?: boolean | null;
 	} | null;
 	/* The console: an input not given is "unknown" instead of failing. */
 	explain: boolean;
@@ -160,6 +173,10 @@ export function evaluate(condition: Condition, facts: Facts): ConditionResult {
 		}
 		case 'fresh': {
 			if (!facts.person) return 'unknown';
+			/* A sign-in without a code never meets a condition that asks for one, however recent. */
+			if (condition.withCode && facts.person.signedInWithCode !== true) {
+				return 'fail';
+			}
 			const signedInAt = facts.person.signedInAt ?? null;
 			if (signedInAt === null || facts.at === null) return missing(explain);
 			return facts.at - signedInAt * 1000 <= condition.maxAgeMinutes * 60_000

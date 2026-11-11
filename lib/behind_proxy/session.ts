@@ -5,6 +5,7 @@ import QuickLRU from 'quick-lru';
 import { getUserStore } from '../adapters/index.js';
 import type { User } from '../adapters/types.js';
 import { groupIdsOfUser, groupNamesOf } from '../bucket_groups/service.js';
+import { configuration } from '../configs/application.js';
 import { ttl } from '../configs/liveTime.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import epochTime from '../helpers/epoch_time.js';
@@ -112,6 +113,12 @@ export interface AppSession {
 	accountId: string;
 	/* Epoch seconds the person signed in; null for a session made before conditions. */
 	authTime: number | null;
+	/*
+	 * Whether that sign-in included a code from an authenticator app (specs/128 research R2): its recorded context is
+	 * the multi-factor one, which only a sign-in in which the person typed this server's code produces. A session that
+	 * recorded no context did not.
+	 */
+	withCode: boolean;
 }
 
 /*
@@ -134,7 +141,8 @@ export async function readAppSession(
 	return {
 		id,
 		accountId: record.accountId,
-		authTime: record.authTime ?? null
+		authTime: record.authTime ?? null,
+		withCode: record.acr === configuration.acrMap.multi_factor
 	};
 }
 
@@ -156,6 +164,8 @@ export interface Standing {
 	attributes: Record<string, string>;
 	/* When the person signed in (epoch seconds), from the sign-in this session came from; null for an older one. */
 	signedInAt: number | null;
+	/* Whether that sign-in included a code from an authenticator app (specs/128). */
+	signedInWithCode: boolean;
 }
 
 /*
@@ -206,7 +216,8 @@ export async function standingOf(
 		groupNames,
 		localeRanges: storedLocaleRanges(user),
 		attributes: attributesOf(user),
-		signedInAt: session.authTime
+		signedInAt: session.authTime,
+		signedInWithCode: session.withCode
 	};
 	standings.set(session.id, { standing, at: now });
 	return standing;

@@ -254,7 +254,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   console shares. An API's check reads a token as the API would, never reads a grant for a JWT, refuses a token bound
   to a key, and trusts MCP headers only from 2026-07-28 clients. A person's address is read only with a valid project
   proxy key and one strict `X-Forwarded-For`, and only compared; conditions accumulate down the paths; an older release
-  must fail closed on them. → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`, `conditions-at-your-proxy.md`
+  must fail closed on them. A condition asking for a code is judged on the app session's acr and checked again on the
+  redeemed code, never on what the sign-in request said. → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`,
+  `conditions-at-your-proxy.md`
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment

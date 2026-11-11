@@ -113,6 +113,9 @@ export const en = {
 			'Too many emails were requested from your network in the last hour. Please try again later.',
 		/* An app behind a proxy that asks for a recent sign-in (specs/124 FR-022). */
 		freshSignIn: '{host} asks you to sign in again to open this page.',
+		/* The same, when the page also asks for a code from an authenticator app (specs/128). */
+		freshSignInCode:
+			'{host} asks you to sign in again with a code from an authenticator app to open this page.',
 		/* An application that requires a code, before this sign-in has one (specs/127). */
 		codeAskedByApp: '{app} asks for a code from an authenticator app.',
 		codeAsked:

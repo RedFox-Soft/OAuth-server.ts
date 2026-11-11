@@ -14,7 +14,11 @@ import {
 import type { FederationProvider } from '../../../../federation/types.js';
 import { DEFAULT_BUCKET_ID } from '../../../consts.js';
 import { Link, useLeaveGuard } from '../../frame/router.js';
-import { applicationHref, bucketHref } from '../../frame/routes.js';
+import {
+	applicationHref,
+	behindProxyHref,
+	bucketHref
+} from '../../frame/routes.js';
 import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useSignInSave } from './useSignInSave.js';
@@ -550,6 +554,21 @@ export function SignInTab({
 									<Link href={applicationHref(bucket._id, app.id)}>
 										{app.name}
 									</Link>
+								</span>
+							))}
+							.
+						</Typography.Text>
+					)}
+					{(summary?.codeRequiredPaths?.length ?? 0) > 0 && (
+						<Typography.Text>
+							Apps behind your proxy ask for a code on these paths:{' '}
+							{summary?.codeRequiredPaths?.map((app, index) => (
+								<span key={app.appId}>
+									{index > 0 ? '; ' : ''}
+									<Link href={behindProxyHref(bucket._id, app.appId, 'access')}>
+										{app.name}
+									</Link>{' '}
+									{app.paths.join(', ')}
 								</span>
 							))}
 							.

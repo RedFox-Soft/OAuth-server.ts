@@ -216,7 +216,7 @@ export default {
 				proxyConditions: {
 					title:
 						'Conditions at your proxy: network, hours, attribute, fresh sign-in',
-					body: 'A path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from your address ranges, opening hours in a time zone you choose, an attribute such as the department, groups for an API, and for an app a sign-in no older than N minutes. Conditions only narrow access and add up down the paths. The proxy passes the address it saw with a key of the project, so a browser cannot choose its own. The console checks a case before you save and asks before any change that lets more people in.'
+					body: 'A path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from your address ranges, opening hours in a time zone you choose, an attribute such as the department, groups for an API, and for an app a sign-in no older than N minutes, with a code from an authenticator app if you ask for one. Conditions only narrow access and add up down the paths. The proxy passes the address it saw with a key of the project, so a browser cannot choose its own. The console checks a case before you save and asks before any change that lets more people in.'
 				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',

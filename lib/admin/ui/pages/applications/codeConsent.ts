@@ -1,7 +1,10 @@
 import { useConfirm } from '../../frame/confirm.js';
 import type { RequestResult } from '../../frame/request.js';
 
-/* The server's account of making an application require a code (specs/127): what it does to whom, counted. */
+/*
+ * The server's account of making an application require a code (specs/127), or a path behind the proxy ask for one
+ * (specs/128): what it does to whom, counted.
+ */
 interface Preview {
 	confirmationRequired: true;
 	consequences: string[];
@@ -24,7 +27,7 @@ function isPreview(body: unknown): body is Preview {
  * the operator read, and a count that moved in between is asked again (the Sign-in tab's protocol, useSignInSave).
  * Answers null when the operator kept editing.
  */
-export function useCodeConsent() {
+export function useCodeConsent(of: 'application' | 'path' = 'application') {
 	const confirm = useConfirm();
 
 	return async function send<T>(
@@ -35,7 +38,7 @@ export function useCodeConsent() {
 		const result = await go(consent);
 		if (!result.ok && result.status === 409 && isPreview(result.error)) {
 			const preview = result.error;
-			const agreed = await confirm('client.requireCode.confirm', {
+			const asked = {
 				target: name,
 				consequences: consent
 					? [
@@ -43,7 +46,11 @@ export function useCodeConsent() {
 							...preview.consequences
 						]
 					: preview.consequences
-			});
+			};
+			const agreed =
+				of === 'path'
+					? await confirm('behindProxy.codeCondition.confirm', asked)
+					: await confirm('client.requireCode.confirm', asked);
 			return agreed ? send(go, name, preview.expect) : null;
 		}
 		return result;

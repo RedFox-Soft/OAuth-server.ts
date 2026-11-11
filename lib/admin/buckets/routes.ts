@@ -6,9 +6,11 @@ import {
 	getContainerOwnershipStore,
 	getGroupStore,
 	getProtectedResourceStore,
+	getBehindProxyAppStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from '../../adapters/index.js';
+import { conditionsOf } from '../../behind_proxy/decide.js';
 import {
 	assertAuth,
 	assertActiveGroup,
@@ -985,6 +987,27 @@ async function codeRequiredApps(
 		.sort((a, b) => a.name.localeCompare(b.name));
 }
 
+/* The project's apps behind the proxy with a path that asks for a code (specs/128), and those paths. */
+async function codeRequiredPaths(
+	bucketId: string
+): Promise<{ appId: string; name: string; paths: string[] }[]> {
+	const apps = await getBehindProxyAppStore().listByBucket(bucketId);
+	return apps
+		.map((app) => ({
+			appId: app._id,
+			name: app.name,
+			paths: app.rules
+				.filter((rule) =>
+					conditionsOf(rule.who).some(
+						(condition) => condition.kind === 'fresh' && condition.withCode
+					)
+				)
+				.map((rule) => rule.path)
+		}))
+		.filter((app) => app.paths.length > 0)
+		.sort((a, b) => a.name.localeCompare(b.name));
+}
+
 export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 	.use(resolveAdmin)
 	.onError(({ error, set }) => {
@@ -1192,6 +1215,8 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					: await selfServiceState(bucket),
 			/* The applications that require a code from an authenticator app (specs/127): where else a code is asked. */
 			codeRequiredApps: await codeRequiredApps(bucket._id),
+			/* The paths behind the proxy that ask for a code (specs/128). */
+			codeRequiredPaths: await codeRequiredPaths(bucket._id),
 			/*
 			 * Whether any provider button can appear on any sign-in page of this instance. The Sign-in tab's preview
 			 * (specs/091) draws the page with the same rule the server renders it with, and this is the one input

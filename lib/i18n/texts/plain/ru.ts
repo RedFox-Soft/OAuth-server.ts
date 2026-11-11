@@ -186,6 +186,12 @@ export const ru: PlainTexts = {
 			tryAgain: 'Войти ещё раз',
 			reason: 'Причина: {reason}, время: {time}'
 		},
+		codeNeeded: {
+			title: 'Этой странице {host} нужен код из приложения-аутентификатора',
+			body: 'Вы вернулись, не войдя с кодом. Другие страницы {host} могут открываться.',
+			open: 'Открыть {host}',
+			reason: 'Причина: {reason}, время: {time}'
+		},
 		address: {
 			title: 'Ваш адрес глазами {host}',
 			seen: 'Проверка видит ваш адрес как {address}.',

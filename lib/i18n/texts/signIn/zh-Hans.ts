@@ -87,6 +87,8 @@ export const zhHans: SignInTexts = {
 			'此电子邮件地址在此处已有账户。请使用该账户的密码登录一次，以将其关联到您的身份提供商。',
 		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。',
 		freshSignIn: '{host} 要求您重新登录以打开此页面。',
+		freshSignInCode:
+			'{host} 要求您使用身份验证器应用中的验证码重新登录以打开此页面。',
 		codeAskedByApp: '{app} 需要身份验证器应用中的验证码。',
 		codeAsked: '您要登录的应用需要身份验证器应用中的验证码。'
 	},

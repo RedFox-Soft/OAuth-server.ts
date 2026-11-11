@@ -1,6 +1,7 @@
 import { satisfiesAcr, sl1, sl1Exempt } from '../../../sl1/rules.ts';
 import {
 	codeRequiredAndMissing,
+	proxyAsksForCode,
 	REQUIRE_CODE_DESCRIPTION
 } from '../../../client_policy/require_code.ts';
 import * as errors from '../../errors.ts';
@@ -218,10 +219,13 @@ class LoginPromt extends Prompt {
 			/*
 			 * The application's own requirement (specs/127), read from the client, never from the request: a parameter can
 			 * be removed by whoever opens the link. Met only by a sign-in in which the person typed a code; a sign-in that
-			 * already did, however long ago, is not asked again.
+			 * already did, however long ago, is not asked again. A path behind the proxy asks the same through its own client's
+			 * request (specs/128), and its `max_age` says how recent the sign-in with a code must be.
 			 */
 			error: 'unmet_authentication_requirements',
-			check: (oidc) => codeRequiredAndMissing(oidc.client, oidc.acr),
+			check: (oidc) =>
+				codeRequiredAndMissing(oidc.client, oidc.acr) ||
+				proxyAsksForCode(oidc.client, oidc.params.acr_values, oidc.acr),
 			details: () => ({ requireCode: true })
 		}
 	];

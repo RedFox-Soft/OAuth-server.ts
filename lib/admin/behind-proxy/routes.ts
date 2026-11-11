@@ -11,10 +11,14 @@ import { scheduledBucketGuard } from '../buckets/scheduled_guard.js';
 import { recordAdminAudit } from '../audit/record.js';
 import { getBehindProxyAppStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
+import { bucketCan } from '../auth/can.js';
+import { sameExpect } from '../buckets/sign_in_preview.js';
+import { codeConditionPreview } from './code_preview.js';
 import {
 	createApp,
 	deleteApp,
 	loadApp,
+	rulesOf,
 	updateApp,
 	viewApp,
 	viewApps
@@ -34,6 +38,33 @@ import {
 
 function scope(bucket: UserBucket) {
 	return { targetScope: bucket._id, ownerGroupId: bucket.ownerGroupId };
+}
+
+/*
+ * The 409 that asking for a code on a path answers until it is confirmed with the counts it previewed (specs/128): the
+ * application setting's protocol, so the console and an agent consent the same way. Null when the change may go ahead.
+ */
+function consentRefused(
+	preview: Awaited<ReturnType<typeof codeConditionPreview>>,
+	confirm: boolean | undefined,
+	expect: Readonly<Record<string, number | undefined>> | undefined
+) {
+	if (!preview) return null;
+	if (confirm !== true) {
+		return { confirmationRequired: true as const, ...preview };
+	}
+	if (!sameExpect(expect, preview.expect)) {
+		return {
+			error: 'admin_error' as const,
+			message:
+				expect === undefined
+					? 'confirm with the counts of the preview you reviewed (expect)'
+					: 'what this change affects changed since you reviewed it',
+			...preview,
+			confirmationRequired: true as const
+		};
+	}
+	return null;
 }
 
 export const behindProxyRoutes = new Elysia({ name: 'admin-behind-proxy' })
@@ -81,9 +112,31 @@ export const behindProxyRoutes = new Elysia({ name: 'admin-behind-proxy' })
 	)
 	.patch(
 		'/admin/api/projects/:id/behind-proxy/:appId',
-		async ({ admin, params, body }) => {
+		async ({ admin, params, body: given, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
+			const { confirm, expect, ...body } = given;
+			if (body.rules !== undefined) {
+				const current = await loadApp(bucket, params.appId);
+				const preview = await codeConditionPreview(
+					bucket,
+					current.rules,
+					await rulesOf(bucket, body.rules)
+				);
+				/*
+				 * The counts are what the people list shows (S15): only someone who may manage the project's people asks for
+				 * a code on its paths and sees them.
+				 */
+				if (preview && !bucketCan(ctx, bucket).manageUsers) {
+					throw new AdminError(
+						403,
+						"asking for a code on a path needs the right to manage this project's people"
+					);
+				}
+				// Before the audit entry, so nothing is recorded for a change that was only described.
+				const refused = consentRefused(preview, confirm, expect);
+				if (refused) return status(409, refused);
+			}
 			const updated = await updateApp(bucket, params.appId, body, () =>
 				recordAdminAudit(ctx, 'behindproxy.update', params.appId, {
 					attributes: Object.keys(body),

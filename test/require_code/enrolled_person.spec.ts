@@ -118,4 +118,21 @@ describe('a person with a code, at an application that requires one', () => {
 		expect(codeStep.headers.get('location')).toEndWith('/login');
 		expect(propsOf(await opened.response.text())).not.toHaveProperty('mode');
 	});
+
+	/**
+	 * @proves A voluntary request for the multi-factor context from an ordinary application wakes no step and refuses
+	 * nothing: only the proxy's own sign-in binds it (specs/128), and an application that wants a code says so in its
+	 * own setting.
+	 */
+	it('a voluntary acr_values naming the multi-factor value asks nothing of a password sign-in', async () => {
+		const { email } = await person();
+		const browser = new Browser();
+
+		const landed = await signInTo(browser, email, PLAIN_APP, {
+			acr_values: configuration.acrMap.multi_factor
+		});
+
+		expect(landed.url).toStartWith('https://time.acme.test/cb');
+		expect(new URL(landed.url).searchParams.has('error')).toBe(false);
+	});
 });
