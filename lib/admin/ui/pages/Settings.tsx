@@ -24,6 +24,7 @@ import {
 	AttackerListCard,
 	type AttackerListView
 } from '../settings/AttackerListCard.js';
+import { NetworkFactsCard } from '../settings/NetworkFactsCard.js';
 import { CallerAddressCard } from '../settings/CallerAddressCard.js';
 import { PlansCard } from '../settings/PlansCard.js';
 import { Sl1ReadinessCard } from '../settings/Sl1ReadinessCard.js';
@@ -352,6 +353,11 @@ export function Settings() {
 						{!searching && pane === 'integrations' && (
 							<AttackerListCard
 								key={`attacker-list-${String(baseline['attackerList.enabled'])}`}
+							/>
+						)}
+						{!searching && pane === 'integrations' && (
+							<NetworkFactsCard
+								key={`network-facts-${String(baseline['networkFacts.enabled'])}`}
 							/>
 						)}
 						{!searching && pane === 'integrations' && <SmtpCard />}

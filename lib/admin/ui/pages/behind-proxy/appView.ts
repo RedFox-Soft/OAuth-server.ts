@@ -41,6 +41,32 @@ export interface AddressesView {
 		probe: boolean;
 	} | null;
 	networkConditionsSupported: boolean;
+	/* Whether FoxTrust's network facts can be judged now (specs/129 FR-009, FR-028). */
+	networkFacts?: NetworkFactsView;
+}
+
+export interface NetworkFactsView {
+	state: 'off' | 'not-yet' | 'current' | 'stale';
+	builtAt: string | null;
+}
+
+/*
+ * Why a path with network facts is closed now, or null when they can be judged (specs/129 FR-028). "Not loaded yet"
+ * closes it too, but only for the minute after the download is turned on, so it is said gently.
+ */
+export function networkFactsClosed(
+	view: NetworkFactsView | undefined
+): string | null {
+	const state = view?.state ?? 'off';
+	if (state === 'current') return null;
+	if (state === 'off') {
+		return 'Closed: network facts are off. A super administrator turns them on in Settings → Integrations.';
+	}
+	if (state === 'not-yet') return 'Closed until network facts finish loading.';
+	const since = view?.builtAt
+		? new Date(Date.parse(view.builtAt) + 26 * 60 * 60 * 1000).toLocaleString()
+		: 'some time';
+	return `Closed: network facts are out of date since ${since}. They open again when a fresh snapshot loads.`;
 }
 
 /*

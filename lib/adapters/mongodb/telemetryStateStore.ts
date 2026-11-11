@@ -144,6 +144,19 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		);
 	}
 
+	async raiseNetworkFactsBuiltAt(builtAt: string): Promise<void> {
+		await this.collection().updateOne(
+			{
+				_id: this.stateId,
+				$or: [
+					{ networkFactsBuiltAt: { $exists: false } },
+					{ networkFactsBuiltAt: { $lt: builtAt } }
+				]
+			},
+			{ $set: { networkFactsBuiltAt: builtAt } }
+		);
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		const found = await this.collection().findOne({ _id: this.stateId });
 		if (!found) return null;

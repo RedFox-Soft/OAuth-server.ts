@@ -4,6 +4,7 @@ import { getUserStore } from '../adapters/index.js';
 import type { ProtectedResource } from '../adapters/types.js';
 import { groupIdsOfUser } from '../bucket_groups/service.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
+import { factsForBelieved } from '../network_facts/lookup.js';
 import { decideAccess, type AccessRefusal } from './conditions.js';
 import { attributesOf } from './session.js';
 
@@ -52,11 +53,13 @@ export async function accessRefusal(
 			}
 		}
 	}
+	const network = factsForBelieved(address, access.conditions);
 	return decideAccess(access.conditions, {
 		address,
 		at: Date.now(),
 		timeZone: access.timeZone ?? null,
 		person,
+		...(network ? { network } : {}),
 		explain: false
 	});
 }

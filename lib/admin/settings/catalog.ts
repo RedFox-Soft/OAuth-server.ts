@@ -1109,6 +1109,17 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 		description:
 			"Every hour each server process downloads FoxTrust's signed list of addresses seen guessing passwords in the last 7 days and checks its signature before using it. Each project then chooses, on its Sign-in tab, what happens when a password sign-in comes from one of those addresses: nothing, counting only (the default), or refusing it once that address has also failed passwords on this server. Federated sign-in, password reset, sign-up and every token endpoint are never affected. The download sends FoxTrust nothing about this server except, while usage reporting is on, its FoxAuth version. A list that cannot be downloaded or is more than 3 hours old is not used, so nobody is refused because of it. Off by default; needs attack reporting, because the list is built from what servers report."
 	},
+	{
+		key: 'networkFacts.enabled',
+		domain: 'integrations',
+		group: 'Network facts',
+		label: 'Network facts from FoxTrust',
+		summary:
+			'Keep Tor, VPNs, hosting or chosen countries out of paths at your proxy, judged on FoxTrust data',
+		type: 'boolean',
+		description:
+			'Each server process downloads FoxTrust\'s signed snapshot of what is known about internet addresses: a full file once a day (about 13 MB) and an update every hour, and checks the signature of each before using it. Projects can then add network facts to "From where" in the conditions of an app behind the proxy or an API checked at the proxy: not from Tor, a commercial VPN, or hosting and clouds, and only from or not from chosen countries. The address of a person is only compared inside this server; it is never sent to FoxTrust or anywhere else, and FoxTrust learns only that the file was downloaded (and, while usage reporting is on, this server\'s FoxAuth version). Countries come from DB-IP (CC BY 4.0). If the download is turned off, or the snapshot is more than 26 hours old, every path with a network facts condition is closed until a fresh snapshot loads. Off by default.'
+	},
 
 	{
 		key: 'sentry.enabled',

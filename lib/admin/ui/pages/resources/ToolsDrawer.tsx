@@ -27,6 +27,7 @@ import {
 import { ConditionsEditor } from '../behind-proxy/ConditionsEditor.js';
 import {
 	addressesProven,
+	networkFactsClosed,
 	type AddressesView
 } from '../behind-proxy/appView.js';
 import { KIND_LABELS } from '../behind-proxy/conditionsText.js';
@@ -234,6 +235,7 @@ export function ToolsDrawer({
 							}))}
 							countUrl={`/admin/api/projects/${encodeURIComponent(bucketId)}/attribute-matches`}
 							disabled={false}
+							networkFactsOn={addresses?.networkFacts?.state !== 'off'}
 							unavailable={
 								addressesProven(addresses)
 									? {}
@@ -246,6 +248,14 @@ export function ToolsDrawer({
 								setConditions(next);
 							}}
 						/>
+						{conditions.some((c) => c.kind === 'network' && c.facts) &&
+							networkFactsClosed(addresses?.networkFacts) !== null && (
+								<Alert
+									type="error"
+									showIcon
+									title={networkFactsClosed(addresses?.networkFacts)}
+								/>
+							)}
 						<Typography.Text type="secondary">
 							With no condition, anyone who can sign in to this project can get
 							a token for this API. A network condition is about the machine

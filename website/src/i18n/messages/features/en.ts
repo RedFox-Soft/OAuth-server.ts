@@ -218,6 +218,10 @@ export default {
 						'Conditions at your proxy: network, hours, attribute, fresh sign-in',
 					body: 'A path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from your address ranges, opening hours in a time zone you choose, an attribute such as the department, groups for an API, and for an app a sign-in no older than N minutes, with a code from an authenticator app if you ask for one. Conditions only narrow access and add up down the paths. The proxy passes the address it saw with a key of the project, so a browser cannot choose its own. The console checks a case before you save and asks before any change that lets more people in.'
 				},
+				proxyNetworkFacts: {
+					title: 'Network facts at your proxy: Tor, VPNs, hosting, countries',
+					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and compares people's addresses only with its own copy, so no address is sent anywhere. A matching address is refused or, on an app, asked to sign in again, with a code if you ask for one. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
+				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',
 					body: 'A client_id can be an HTTPS URL that names a JSON document describing the client. The server retrieves and validates the document on demand and never stores it. The MCP authorization specification names this mechanism first for a client with no prior relationship to the server.'

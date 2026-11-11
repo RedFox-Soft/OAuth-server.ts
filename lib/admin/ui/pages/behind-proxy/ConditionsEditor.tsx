@@ -28,8 +28,15 @@ import {
 	MAX_FRESH_MINUTES,
 	PROFILE_ATTRIBUTES,
 	type Condition,
-	type ConditionKind
+	type ConditionKind,
+	type NetworkCategory,
+	type NetworkFactsPart
 } from '../../../../behind_proxy/conditions.js';
+import { COUNTRY_CODES } from '../../../../consts/countries.js';
+import {
+	DBIP_ATTRIBUTION,
+	DBIP_ATTRIBUTION_URL
+} from '../../../../consts/network_facts.js';
 import {
 	ATTRIBUTE_LABELS,
 	clock,
@@ -102,9 +109,12 @@ export function ConditionsEditor({
 	countUrl,
 	disabled,
 	unavailable = {},
+	networkFactsOn = false,
 	onChange
 }: {
 	conditions: Condition[];
+	/* Whether a super administrator has the download of FoxTrust's network facts on (specs/129 FR-015). */
+	networkFactsOn?: boolean;
 	/*
 	 * Kinds that cannot be added yet, with why and what to do first: told before anything is typed, since a save the
 	 * server refuses would send the administrator to another tab and lose the draft.
@@ -174,6 +184,8 @@ export function ConditionsEditor({
 						<NetworkFields
 							condition={condition}
 							disabled={disabled}
+							factsOn={networkFactsOn}
+							signInAgain={kinds.includes('fresh')}
 							onChange={replace}
 						/>
 					)}
@@ -266,10 +278,14 @@ export function ConditionsEditor({
 function NetworkFields({
 	condition,
 	disabled,
+	factsOn,
+	signInAgain,
 	onChange
 }: {
 	condition: Extract<Condition, { kind: 'network' }>;
 	disabled: boolean;
+	factsOn: boolean;
+	signInAgain: boolean;
 	onChange: (next: Condition) => void;
 }) {
 	const [only, setOnly] = useState(condition.only.join('\n'));
@@ -317,6 +333,253 @@ function NetworkFields({
 				If FoxAuth cannot tell the address, the request is refused. A VPN or a
 				residential proxy can still get around a list: it slows an attacker, it
 				does not stop one.
+			</Typography.Text>
+			<NetworkFactsFields
+				facts={condition.facts}
+				disabled={disabled}
+				factsOn={factsOn}
+				signInAgain={signInAgain}
+				onChange={(facts) => {
+					const { facts: _dropped, ...rest } = condition;
+					onChange(facts ? { ...rest, facts } : rest);
+				}}
+			/>
+		</Flex>
+	);
+}
+
+const CATEGORY_OPTIONS: {
+	value: NetworkCategory;
+	label: string;
+	scope: string;
+}[] = [
+	{ value: 'tor', label: 'Tor', scope: 'Exits of the Tor network.' },
+	{
+		value: 'vpn',
+		label: 'Commercial VPN',
+		scope: 'VPN services FoxTrust lists. Not a company VPN.'
+	},
+	{
+		value: 'hosting',
+		label: 'Hosting or a cloud',
+		scope:
+			'Data centres and clouds, which also carry content networks and some companies’ own exits.'
+	}
+];
+
+function countryName(code: string): string {
+	try {
+		return new Intl.DisplayNames(['en'], { type: 'region' }).of(code) ?? code;
+	} catch {
+		return code;
+	}
+}
+
+const COUNTRY_OPTIONS = COUNTRY_CODES.map((code) => ({
+	value: code,
+	label: `${countryName(code)} (${code})`
+})).sort((a, b) => a.label.localeCompare(b.label));
+
+/* DB-IP Country Lite is CC BY 4.0: this line goes wherever a country from it is shown (specs/129 FR-025). */
+export function DbIpAttribution() {
+	return (
+		<Typography.Text type="secondary">
+			<a
+				href={DBIP_ATTRIBUTION_URL}
+				target="_blank"
+				rel="noreferrer"
+			>
+				{DBIP_ATTRIBUTION}
+			</a>
+			, CC BY 4.0
+		</Typography.Text>
+	);
+}
+
+/*
+ * The network facts part of "From where" (specs/129): FoxTrust's categories to keep out, countries to keep in or out,
+ * and what a matching address leads to. Offered only while the download is on; a part saved before it went off stays,
+ * shown with a warning, because the server keeps it and closes the path.
+ */
+function NetworkFactsFields({
+	facts,
+	disabled,
+	factsOn,
+	signInAgain,
+	onChange
+}: {
+	facts: NetworkFactsPart | undefined;
+	disabled: boolean;
+	factsOn: boolean;
+	signInAgain: boolean;
+	onChange: (next: NetworkFactsPart | undefined) => void;
+}) {
+	const base: NetworkFactsPart = facts ?? {
+		categories: [],
+		outcome: { kind: 'refuse' }
+	};
+	const set = (next: NetworkFactsPart) =>
+		onChange(
+			next.categories.length === 0 && !next.countries ? undefined : next
+		);
+	const locked = disabled || !factsOn;
+	const outcome = base.outcome;
+	return (
+		<Flex
+			vertical
+			gap={8}
+			style={{ marginTop: 8 }}
+		>
+			<Typography.Text strong>Network facts from FoxTrust</Typography.Text>
+			{!factsOn && (
+				<Alert
+					type={facts ? 'warning' : 'info'}
+					showIcon
+					title={
+						facts
+							? 'Network facts are off on this server, so this part closes the path until a super administrator turns them on in Settings → Integrations.'
+							: 'Not available: a super administrator turns network facts on in Settings → Integrations.'
+					}
+				/>
+			)}
+			<Typography.Text>Not from</Typography.Text>
+			<Checkbox.Group
+				aria-label="Not from these networks"
+				value={base.categories}
+				disabled={locked}
+				onChange={(values) => set({ ...base, categories: values })}
+			>
+				<Flex
+					vertical
+					gap={4}
+				>
+					{CATEGORY_OPTIONS.map((option) => (
+						<Checkbox
+							key={option.value}
+							value={option.value}
+						>
+							{option.label}{' '}
+							<Typography.Text type="secondary">{option.scope}</Typography.Text>
+						</Checkbox>
+					))}
+				</Flex>
+			</Checkbox.Group>
+			<Typography.Text>Countries</Typography.Text>
+			<Radio.Group
+				aria-label="Countries"
+				value={base.countries?.mode ?? 'any'}
+				disabled={locked}
+				onChange={(e) => {
+					const mode = String(e.target.value);
+					const { countries: _dropped, ...rest } = base;
+					if (mode === 'only' || mode === 'not') {
+						set({
+							...rest,
+							countries: { mode, codes: base.countries?.codes ?? [] }
+						});
+					} else {
+						set(rest);
+					}
+				}}
+				options={[
+					{ value: 'any', label: 'Any country' },
+					{ value: 'only', label: 'Only from' },
+					{ value: 'not', label: 'Not from' }
+				]}
+			/>
+			{base.countries && (
+				<>
+					<Select
+						mode="multiple"
+						aria-label="Choose countries"
+						placeholder="Choose countries"
+						style={{ width: '100%' }}
+						value={base.countries.codes}
+						disabled={locked}
+						showSearch={{ optionFilterProp: 'label' }}
+						options={COUNTRY_OPTIONS}
+						onChange={(codes: string[]) =>
+							set({
+								...base,
+								countries: { mode: base.countries?.mode ?? 'only', codes }
+							})
+						}
+					/>
+					{base.countries.mode === 'only' && (
+						<Typography.Text type="secondary">
+							An address with no known country, such as one of your proxy’s own
+							network, is turned away. Add that network to the “Only from”
+							ranges above if it should pass.
+						</Typography.Text>
+					)}
+					<DbIpAttribution />
+				</>
+			)}
+			{signInAgain && (
+				<>
+					<Typography.Text>A matching address is</Typography.Text>
+					<Radio.Group
+						aria-label="What a matching address leads to"
+						value={outcome.kind}
+						disabled={locked}
+						onChange={(e) =>
+							set({
+								...base,
+								outcome:
+									e.target.value === 'refuse'
+										? { kind: 'refuse' }
+										: { kind: 'sign_in_again', maxAgeMinutes: 15 }
+							})
+						}
+						options={[
+							{ value: 'refuse', label: 'Refused' },
+							{ value: 'sign_in_again', label: 'Asked to sign in again' }
+						]}
+					/>
+					{outcome.kind === 'sign_in_again' && (
+						<Space wrap>
+							<span>within</span>
+							<InputNumber
+								aria-label="Minutes"
+								min={MIN_FRESH_MINUTES}
+								max={MAX_FRESH_MINUTES}
+								value={outcome.maxAgeMinutes}
+								disabled={locked}
+								onChange={(value) =>
+									set({
+										...base,
+										outcome: { ...outcome, maxAgeMinutes: value ?? 15 }
+									})
+								}
+							/>
+							<span>minutes</span>
+							<Checkbox
+								checked={outcome.withCode === true}
+								disabled={locked}
+								onChange={(e) => {
+									const { withCode: _dropped, ...rest } = outcome;
+									set({
+										...base,
+										outcome: e.target.checked
+											? { ...rest, withCode: true }
+											: rest
+									});
+								}}
+							>
+								with a code from an authenticator app
+							</Checkbox>
+						</Space>
+					)}
+					<Typography.Text type="secondary">
+						What FoxTrust knows about a network can be wrong. Asking for a new
+						sign-in is gentler than refusing.
+					</Typography.Text>
+				</>
+			)}
+			<Typography.Text type="secondary">
+				Looked up in this server’s copy of FoxTrust’s snapshot: people’s
+				addresses are never sent anywhere. While the download is off or the
+				snapshot is more than 26 hours old, this part closes the path.
 			</Typography.Text>
 		</Flex>
 	);

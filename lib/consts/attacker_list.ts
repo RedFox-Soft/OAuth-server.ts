@@ -1,19 +1,8 @@
 /*
  * FoxTrust's signed list of addresses seen guessing passwords (specs/125; the format is FoxTrust's contract,
- * format 1, public at https://foxtrust.dev/docs/snapshots under "Attacker list").
- *
- * Every value here is fixed in the release. No setting or environment variable overrides the publication or
- * the keys: an operator who could point the server elsewhere could feed it a list of their choosing, and a key
- * rotation or a move of the publication is announced by FoxTrust and shipped as a FoxAuth release.
+ * format 1, public at https://foxtrust.dev/docs/snapshots under "Attacker list"). The publication's address and keys
+ * are lib/consts/foxtrust_publication.ts, shared with network facts.
  */
-
-export const ATTACKER_LIST_BASE = 'https://data.foxtrust.dev';
-export const ATTACKER_LIST_MANIFEST = 'v1/manifest.json';
-
-/* Raw Ed25519 public keys by FoxTrust key id; a second one is added beside the first for the length of a rotation. */
-export const ATTACKER_LIST_KEYS: Readonly<Record<string, string>> = {
-	'731e0302': 'J8tD2l9BFu879cXgAK5lXy39gncA0BrHUo/Fr8w4cQU='
-};
 
 /* The format this release reads; a manifest that lists only another is "update FoxAuth", never a guess. */
 export const ATTACKER_LIST_FORMAT = 1;
@@ -44,4 +33,3 @@ export const LOCAL_TALLY_MAX_KEYS = 10_000;
 /* The hourly check runs at this minute, after FoxTrust's :50 build is published, plus a per-process offset. */
 export const ATTACKER_LIST_CHECK_MINUTE = 55;
 export const ATTACKER_LIST_MAX_OFFSET_MS = 4 * 60 * 1000;
-export const ATTACKER_LIST_TIMEOUT_MS = 30_000;

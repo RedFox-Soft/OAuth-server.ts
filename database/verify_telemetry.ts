@@ -123,4 +123,23 @@ export async function verifyTelemetry(
 		'raising the list build time leaves the reports in the document untouched',
 		(await makeStore().read())?.lastAttackReport === later
 	);
+	/* The same for FoxTrust's network facts (specs/129), which share the document. */
+	await Promise.all(
+		[...offered]
+			.reverse()
+			.map((builtAt) => makeStore().raiseNetworkFactsBuiltAt(builtAt))
+	);
+	check(
+		'eight processes raising the network facts build time at once leave the latest',
+		(await makeStore().read())?.networkFactsBuiltAt === offered[7]
+	);
+	await makeStore().raiseNetworkFactsBuiltAt(offered[0]);
+	check(
+		'an earlier network facts build time never lowers the stored one',
+		(await makeStore().read())?.networkFactsBuiltAt === offered[7]
+	);
+	check(
+		'raising the network facts build time leaves the list build time untouched',
+		(await makeStore().read())?.attackerListBuiltAt === offered[7]
+	);
 }

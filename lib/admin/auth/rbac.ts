@@ -91,6 +91,10 @@ export type AdminErrorCode =
 	/* Conditions at the proxy (specs/124). */
 	| 'proxy_key_limit'
 	| 'proxy_address_unproven'
+	/* A network facts condition added or changed while the download is off (specs/129 FR-015). */
+	| 'network_facts_off'
+	/* Text that is no IP address, where one was asked for (specs/129). */
+	| 'invalid_address'
 	| 'attribute_matches_nobody';
 
 export class AdminError extends Error {

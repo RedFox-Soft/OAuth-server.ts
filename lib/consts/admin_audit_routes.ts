@@ -844,6 +844,16 @@ const routes = [
 		path: '/admin/api/settings/smtp/test',
 		targetType: 'SmtpSettings'
 	},
+	/*
+	 * Changes nothing, and is recorded all the same, as the SMTP test is (specs/129 research R11): an administrator
+	 * looked up what FoxTrust's snapshot says about an address. The record says who and when, never the address.
+	 */
+	{
+		action: 'networkfacts.lookup',
+		method: 'POST',
+		path: '/admin/api/network-facts/lookup',
+		targetType: 'NetworkFacts'
+	},
 	{
 		action: 'sentry.settings.update',
 		method: 'PUT',
@@ -988,6 +998,7 @@ export const ENDUSER_ACTOR_PREFIX = 'enduser:';
 export const SETTINGS_TARGET_ID = 'settings';
 export const SMTP_TARGET_ID = 'smtp';
 export const SENTRY_TARGET_ID = 'sentry';
+export const NETWORK_FACTS_TARGET_ID = 'network-facts';
 
 /*
  * `<entity>[.<aspect>].<verb>`, lowercase. Pinned by the drift guard so the trail can be filtered by

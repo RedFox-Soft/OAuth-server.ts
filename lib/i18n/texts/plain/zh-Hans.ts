@@ -168,6 +168,16 @@ export const zhHans: PlainTexts = {
 			body: '如果您的团队使用 VPN，请连接后重新加载此页面。',
 			reason: '原因：{reason}，时间：{time}'
 		},
+		networkFacts: {
+			title: '无法从您所在的位置打开 {host}',
+			body: '此页面不对您的网络或您所在的国家或地区开放。如果您认为这有误，请联系 {host} 的管理人员。',
+			reason: '原因：{reason}，时间：{time}'
+		},
+		networkFactsUnknown: {
+			title: '现在无法打开 {host}',
+			body: '请稍后再试。如果问题持续，请联系 {host} 的管理人员。',
+			reason: '原因：{reason}，时间：{time}'
+		},
 		closed: {
 			title: '{host} 当前不开放',
 			opens: '将于{when}（{zone}）重新开放，{inTime}。',

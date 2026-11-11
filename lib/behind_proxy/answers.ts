@@ -48,6 +48,8 @@ export type ApiReason =
 	| 'not_in_group'
 	| 'attribute_mismatch'
 	| 'not_from_network'
+	/* A network facts condition could not be judged: the download is off or out of date (specs/129). */
+	| 'network_facts_unknown'
 	| 'outside_hours';
 
 export function answer(

@@ -22,6 +22,8 @@ sources:
   - https://auth0.com/ai/docs/mcp/get-started/authorization-for-your-mcp-server
   - https://auth0.com/docs/secure/attack-protection/suspicious-ip-throttling
   - https://auth0.com/docs/secure/multi-factor-authentication/adaptive-mfa
+  - https://auth0.com/docs/secure/tenant-access-control-list
+  - https://auth0.com/docs/secure/tenant-access-control-list/use-curated-blocklists
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -309,6 +311,20 @@ groups:
         verdict: us
         why: 'With Auth0 each condition is code you write in an Action, checked at sign-in. Here a condition is a field on the rule for a path or an API, and your proxy has it checked on every request.'
         note: 'The post-login event object documents `event.request.ip` as "The originating IP address of the request." The API object says `api.access.deny(reason)` will "Mark the current login attempt as denied."'
+      - dimension: 'Tor, VPNs, hosting and countries at your proxy'
+        us:
+          {
+            status: flag,
+            text: "Behind networkFacts.enabled, off by default, on every plan. A rule for a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads FoxTrust's signed snapshot, about 13 MB a day plus an update every hour, and compares people's addresses only with its own copy. A matching address is refused or, on an app, asked to sign in again. A snapshot more than 26 hours old closes those paths until a fresh one loads."
+          }
+        them:
+          {
+            status: flag,
+            text: "No check endpoint for a proxy. On an Enterprise plan a Tenant ACL rule can block requests to the Auth0 tenant by country, and Attack Protection customers can use Auth0's curated lists of Tor exit nodes, commercial VPNs, proxies, low-reputation addresses and iCloud Private Relay. It applies to requests Auth0 receives, not to the paths of your own app."
+          }
+        verdict: different
+        why: 'Auth0 knows more kinds of network and judges them at its own service, on an Enterprise plan. FoxAuth judges them on every request your proxy sends, path by path, on every plan, and can ask for a new sign-in instead of refusing.'
+        note: 'The curated blocklists page lists auth0.tor, "IP addresses identified as active TOR exit nodes," and auth0.vpn, "IP addresses originating from commercial Virtual Private Network (VPN) providers." The Tenant ACL page says "Customers on an Enterprise plan can create 1 Tenant ACL."'
       - dimension: Refusing password sign-ins from known password-guessing addresses
         us:
           {

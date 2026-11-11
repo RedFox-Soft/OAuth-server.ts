@@ -264,6 +264,11 @@ Each rule is the part that is easy to break. Read the named page before changing
   in `lib/consts/attack_report_fields.ts`; an attack is counted by one synchronous `noteAttack` beside the
   refusal, only when a credential was presented, and its address never goes to a log line or a bus event.
   → `instance-telemetry.md`, `attack-reports.md`
+- **FoxTrust's network facts** — downloaded and verified per process through `lib/foxtrust/` with the same pinned keys,
+  never an older pair than one accepted, and they fail CLOSED: off, not loaded or more than 26 hours old is
+  `{ known: false }`, which closes every path with a network facts condition. Looked up only for the address the check
+  believes, and handed to the decision as facts, never as the snapshot; only categories and the country are read,
+  never FoxTrust's risk, level or reasons. → `network-facts.md`
 - **FoxTrust's attacker list** — the list is downloaded and verified per process against the pinned keys in
   `lib/consts/attacker_list.ts`, its build time only ever raised, and it fails open: missing, stale or unverifiable
   refuses nobody. It is asked only at the password door, only about `callerAddressOf`'s address, never a trusted

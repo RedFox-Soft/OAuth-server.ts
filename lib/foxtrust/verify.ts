@@ -1,7 +1,7 @@
 /*
- * Ed25519 verification of FoxTrust's publication (specs/125): a detached 64-byte signature over the exact bytes, made
- * with a key this release pins. The keys arrive as an argument so a test can sign with a key of its own; in the server
- * they are always ATTACKER_LIST_KEYS.
+ * Ed25519 verification of FoxTrust's publication (specs/125, specs/129): a detached 64-byte signature over the exact
+ * bytes, made with a key this release pins. The keys arrive as an argument so a test can sign with a key of its own;
+ * in the server they are always FOXTRUST_KEYS.
  */
 
 const imported = new Map<string, Promise<CryptoKey | null>>();

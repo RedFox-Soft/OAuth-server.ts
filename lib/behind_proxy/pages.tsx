@@ -103,6 +103,29 @@ export function networkDeniedPage(input: {
 	);
 }
 
+/*
+ * Refused for where the connection comes from, by FoxTrust's network facts (specs/129 FR-024): before any sign-in, with
+ * no source, category or country named, because which of them failed is not the visitor's to read either.
+ */
+export function networkFactsPage(input: {
+	host: string;
+	reason: string;
+	language: Language;
+	zone: string | null;
+	known: boolean;
+}): Response {
+	const texts = PLAIN_TEXTS[input.language].behindProxy;
+	const t = input.known ? texts.networkFacts : texts.networkFactsUnknown;
+	return page(
+		text(t.title, { host: input.host }),
+		`<h2 style="${heading}">${html(t.title, { host: input.host })}</h2>` +
+			`<p style="${body}">${html(t.body, { host: input.host })}</p>` +
+			reasonLine(t.reason, input.reason, input.language, input.zone),
+		403,
+		{ language: input.language }
+	);
+}
+
 /* Refused for the hour: when the app opens again, in its own zone, and how far off that is. */
 export function closedPage(input: {
 	host: string;

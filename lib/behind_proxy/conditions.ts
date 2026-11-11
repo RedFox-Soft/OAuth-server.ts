@@ -1,3 +1,4 @@
+import type { NetworkCategory } from '../consts/network_facts.js';
 import { inAnyWindow, minuteOfWeek, type TimeWindow } from './clock.js';
 import {
 	inAnyRange,
@@ -13,11 +14,35 @@ import {
  * only the two pure modules beside it, because the console bundles this with `decide()`.
  */
 
+export type { NetworkCategory } from '../consts/network_facts.js';
+
+/*
+ * What a matching address leads to (specs/129 FR-018): a refusal before any sign-in, or a sign-in no older than
+ * `maxAgeMinutes` (with a code when `withCode`), decided exactly as a fresh condition is.
+ */
+export type NetworkFactsOutcome =
+	| { kind: 'refuse' }
+	| { kind: 'sign_in_again'; maxAgeMinutes: number; withCode?: true };
+
+/*
+ * The part of "From where" judged on FoxTrust's network facts (specs/129): categories to keep out, and countries to
+ * keep in or out. At least one category or country.
+ */
+export type NetworkFactsPart = {
+	categories: NetworkCategory[];
+	countries?: { mode: 'only' | 'not'; codes: string[] };
+	outcome: NetworkFactsOutcome;
+};
+
 export type NetworkCondition = {
 	kind: 'network';
-	/* Canonical ranges; at least one of the two lists holds one, together at most MAX_RANGE_LINES. */
+	/*
+	 * Canonical ranges; together at most MAX_RANGE_LINES. Both may be empty only when `facts` asks something, so the
+	 * condition always says something.
+	 */
 	only: string[];
 	not: string[];
+	facts?: NetworkFactsPart;
 };
 export type TimeCondition = { kind: 'time'; windows: TimeWindow[] };
 export type AttributeCondition = {
@@ -92,6 +117,19 @@ export function isSelectableAttribute(name: string): boolean {
 
 export type ConditionResult = 'pass' | 'fail' | 'unknown';
 
+/*
+ * What FoxTrust's snapshot says about the believed address (specs/129 data-model §6), worked out by the server and
+ * handed in, never the snapshot itself. `known: false` covers a download that is off, not loaded yet or older than
+ * 26 hours, and a record the server could not read. An address with no record is known, with nothing in it.
+ */
+export type NetworkFacts =
+	| {
+			readonly known: true;
+			readonly categories: readonly NetworkCategory[];
+			readonly country: string | null;
+	  }
+	| { readonly known: false };
+
 /* What a condition is judged on. A null input is one the console's "Check access" was not given. */
 export interface Facts {
 	/* The address the check believed (specs/124 FR-006), as text. */
@@ -110,6 +148,11 @@ export interface Facts {
 		 */
 		signedInWithCode?: boolean | null;
 	} | null;
+	/*
+	 * The network facts of `address` (specs/129). Absent when nobody looked them up: live, that closes a condition
+	 * that needs them; in the console it is "not checked".
+	 */
+	network?: NetworkFacts;
 	/* The console: an input not given is "unknown" instead of failing. */
 	explain: boolean;
 }
@@ -118,14 +161,10 @@ function missing(explain: boolean): ConditionResult {
 	return explain ? 'unknown' : 'fail';
 }
 
-function network(
+function ranges(
 	condition: NetworkCondition,
-	text: string | null,
-	explain: boolean
+	address: Address
 ): ConditionResult {
-	if (text === null) return missing(explain);
-	const address: Address | null = parseAddress(text);
-	if (!address) return 'fail';
 	const only = parseRanges(condition.only);
 	const not = parseRanges(condition.not);
 	if (only.length > 0 && !inAnyRange(address, only)) return 'fail';
@@ -140,11 +179,95 @@ function network(
 	return 'pass';
 }
 
+export type FactsVerdict = 'missing' | 'unknown' | 'match' | 'clear';
+
+/*
+ * The network facts part against the facts of the address (specs/129 data-model §8). Unknown facts are never a
+ * match and never clear: a condition fails closed on them, whatever its outcome (FR-014). An address with no record
+ * has no category and no country, so "only from" countries match it and "not from" ones do not — which, for an address
+ * of the proxy's own network, differs on purpose from the ranges above.
+ */
+export function factsVerdict(
+	part: NetworkFactsPart,
+	facts: Pick<Facts, 'address' | 'network' | 'explain'>
+): FactsVerdict {
+	if (facts.address === null) return 'missing';
+	const network = facts.network;
+	if (!network) return facts.explain ? 'missing' : 'unknown';
+	if (!network.known) return 'unknown';
+	if (part.categories.some((c) => network.categories.includes(c))) {
+		return 'match';
+	}
+	const countries = part.countries;
+	if (countries) {
+		const listed =
+			network.country !== null && countries.codes.includes(network.country);
+		if (countries.mode === 'only' ? !listed : listed) return 'match';
+	}
+	return 'clear';
+}
+
+/* How one network condition came out, and which part decided it. */
+export interface NetworkJudgement {
+	result: ConditionResult;
+	part: 'ranges' | 'facts' | null;
+	verdict: FactsVerdict | null;
+	/* A matching address on a "sign in again" part: the sign-in it asks for, judged as a fresh condition. */
+	asks: FreshCondition | null;
+}
+
+export function judgeNetwork(
+	condition: NetworkCondition,
+	facts: Facts
+): NetworkJudgement {
+	const none = { verdict: null, asks: null };
+	if (facts.address === null) {
+		return { result: missing(facts.explain), part: null, ...none };
+	}
+	const address: Address | null = parseAddress(facts.address);
+	if (!address) return { result: 'fail', part: 'ranges', ...none };
+	if (ranges(condition, address) === 'fail') {
+		return { result: 'fail', part: 'ranges', ...none };
+	}
+	const part = condition.facts;
+	if (!part) return { result: 'pass', part: null, ...none };
+	const verdict = factsVerdict(part, facts);
+	switch (verdict) {
+		case 'missing':
+			return {
+				result: missing(facts.explain),
+				part: 'facts',
+				verdict,
+				asks: null
+			};
+		case 'unknown':
+			return { result: 'fail', part: 'facts', verdict, asks: null };
+		case 'clear':
+			return { result: 'pass', part: 'facts', verdict, asks: null };
+		case 'match': {
+			if (part.outcome.kind === 'refuse') {
+				return { result: 'fail', part: 'facts', verdict, asks: null };
+			}
+			const asks: FreshCondition = {
+				kind: 'fresh',
+				maxAgeMinutes: part.outcome.maxAgeMinutes,
+				...(part.outcome.withCode ? { withCode: true as const } : {})
+			};
+			return {
+				result: evaluate(asks, facts),
+				part: 'facts',
+				verdict,
+				asks
+			};
+		}
+	}
+}
+
 export function evaluate(condition: Condition, facts: Facts): ConditionResult {
 	const { explain } = facts;
 	switch (condition.kind) {
 		case 'network':
-			return network(condition, facts.address, explain);
+			return judgeNetwork(condition, facts).result;
 		case 'time': {
 			if (facts.at === null || facts.timeZone === null) {
 				return missing(explain);
@@ -221,6 +344,7 @@ export type AccessRefusal =
 	| 'not_in_group'
 	| 'attribute_mismatch'
 	| 'not_from_network'
+	| 'network_facts_unknown'
 	| 'outside_hours';
 
 const REFUSAL_OF: Record<ConditionKind, AccessRefusal> = {
@@ -248,9 +372,15 @@ export function decideAccess(
 		conditions.map((c) => ({ condition: c })),
 		API_ORDER
 	)) {
-		if (evaluate(condition.condition, facts) !== 'pass') {
-			return REFUSAL_OF[condition.condition.kind];
+		const c = condition.condition;
+		if (c.kind === 'network') {
+			const judged = judgeNetwork(c, facts);
+			if (judged.result === 'pass') continue;
+			return judged.verdict === 'unknown'
+				? 'network_facts_unknown'
+				: 'not_from_network';
 		}
+		if (evaluate(c, facts) !== 'pass') return REFUSAL_OF[c.kind];
 	}
 	return null;
 }

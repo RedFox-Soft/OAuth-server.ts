@@ -76,6 +76,23 @@ describe('an older release against a database with conditions', () => {
 		expect(older.unknown).toEqual(['2026-11-06-proxy-conditions-fence']);
 	});
 
+	it('refuses to start once network facts may be in a condition, a release before them reading the ranges alone', () => {
+		const at = MIGRATIONS.findIndex(
+			(migration) => migration.id === '2026-11-13-proxy-network-facts-fence'
+		);
+		expect(at).toBeGreaterThan(-1);
+		const records = MIGRATIONS.slice(0, at + 1).map((migration) => ({
+			id: migration.id,
+			appliedAt: new Date(),
+			checksum: checksumOf(migration)
+		}));
+
+		const older = compare(MIGRATIONS.slice(0, at), records);
+
+		expect(older.status).toBe('ahead');
+		expect(older.unknown).toEqual(['2026-11-13-proxy-network-facts-fence']);
+	});
+
 	it('fails to read a rule with conditions rather than reading past them', () => {
 		expect(() => documentOf('behindProxyApps', PreviousApp, stored)).toThrow(
 			/does not match its schema/

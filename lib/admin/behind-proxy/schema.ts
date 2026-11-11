@@ -49,8 +49,50 @@ export const TimeWindowBody = t.Object(
 	},
 	closed
 );
+/*
+ * The network facts part of "From where" (specs/129 data-model §7): categories to keep out, countries to keep in or
+ * out, and what a matching address leads to. Codes and uniqueness are the service's to check, so each refusal names
+ * the value.
+ */
+const NetworkFactsBody = t.Object(
+	{
+		categories: t.Array(
+			t.Union([t.Literal('tor'), t.Literal('vpn'), t.Literal('hosting')]),
+			{ maxItems: 3 }
+		),
+		countries: t.Optional(
+			t.Object(
+				{
+					mode: t.Union([t.Literal('only'), t.Literal('not')]),
+					codes: t.Array(t.String({ minLength: 2, maxLength: 2 }), {
+						minItems: 1,
+						maxItems: 250
+					})
+				},
+				closed
+			)
+		),
+		outcome: t.Union([
+			t.Object({ kind: t.Literal('refuse') }, closed),
+			t.Object(
+				{
+					kind: t.Literal('sign_in_again'),
+					maxAgeMinutes: t.Number({ minimum: 5, maximum: 1440, multipleOf: 1 }),
+					withCode: t.Optional(t.Boolean())
+				},
+				closed
+			)
+		])
+	},
+	closed
+);
 const NetworkBody = t.Object(
-	{ kind: t.Literal('network'), only: RangeLines, not: RangeLines },
+	{
+		kind: t.Literal('network'),
+		only: RangeLines,
+		not: RangeLines,
+		facts: t.Optional(NetworkFactsBody)
+	},
 	closed
 );
 const TimeBody = t.Object(

@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'dcaa1b994aaa';
+export const source = 'b61f6001714a';
 
 export default {
 	questions: {
@@ -613,7 +613,71 @@ export default {
 				'在收到带密钥和公网地址的检查之前，无法保存网络条件，因此一次保存不会把所有人挡在外面。',
 				'条件沿路径向下累加：/ 上的条件适用于其下的每个路径。',
 				'VPN 或住宅代理仍然可以绕过列表。它能拖慢攻击者，但无法阻止。',
+				'超级管理员开启 FoxTrust 的网络信息后，“From where” 还可以挡住 Tor、商业 VPN、托管服务和其他国家。符合条件的地址会被拒绝，或被要求重新登录。下一个答案说明如何设置。',
 				'FoxAuth 控制台永远不受这些条件限制。所有套餐均可使用。'
+			]
+		},
+		networkfacts: {
+			title: '不让 Tor、VPN 和其他国家访问某个路径',
+			sentence:
+				'在代理后应用某个路径的“From where”中加入网络信息：不允许来自 Tor、商业 VPN 或托管服务，并且只允许来自您选择的国家。服务器从 FoxTrust 签名的快照中得知一个地址是什么，从不把地址发送到任何地方。',
+			protocol: 'Forward auth · 签名的 IP 快照（FoxTrust）· DB-IP 国家数据',
+			problemCaption: '任何人都可以通过 Tor 尝试打开您的管理页面。',
+			fixCaption: 'Tor、VPN 和其他国家进不来。',
+			lanes: {
+				browser: '浏览器',
+				proxy: '您的代理',
+				proxied: '您的应用',
+				fox: 'FoxAuth',
+				foxtrust: 'FoxTrust'
+			},
+			steps: [
+				{
+					label: '签名的快照',
+					text: '您的服务器从 FoxTrust 下载关于互联网地址的快照：每天一个完整文件，每小时一次更新。使用之前，服务器会验证签名。'
+				},
+				{
+					label: '通过 Tor 打开 /admin',
+					text: '某人通过 Tor 打开您应用的 /admin。请求先到达您的代理。'
+				},
+				{
+					label: '询问并附上地址',
+					text: '您的代理询问项目，并附上它看到的地址和项目的代理密钥。'
+				},
+				{
+					label: '查找地址',
+					text: '项目在服务器自己的快照副本中查找这个地址。地址不会被发送到任何地方。'
+				},
+				{
+					label: '不能从这里打开',
+					text: '快照把这个地址标记为 Tor 出口，因此项目在登录之前就拒绝。'
+				},
+				{
+					label: '在家里打开',
+					text: '在家里，在您允许的国家，同样的请求来自一个普通地址。'
+				},
+				{
+					label: '是的，这是 Anna',
+					text: '地址通过了。项目检查其余规则，并回答“是”。'
+				},
+				{
+					label: '带 X-Auth-* 标头',
+					text: '您的代理把请求转给您的应用。'
+				}
+			],
+			sees: [
+				'来自 Tor、列表中的 VPN、托管服务或其他国家：一个说明无法从所在位置打开该页面的页面',
+				'或者，如果您这样选择：重新登录，如果您要求，还需要输入验证码',
+				'来自允许国家的普通地址：应用，和以前一样'
+			],
+			goodToKnow: [
+				'由超级管理员在 Settings → Integrations 中开启“Network facts from FoxTrust”。之后每台服务器每天下载一个约 13 MB 的文件，每小时下载一次更新。',
+				'用户的地址只在您的服务器内部比较。FoxTrust 只知道文件被下载了。',
+				'商业 VPN 只包括 FoxTrust 列出的 VPN 服务，不包括公司自己的 VPN。托管服务或云还包括内容分发网络，以及一些公司在云中的出口。iCloud Private Relay 不会被挡住。',
+				'国家数据来自 DB-IP（IP Geolocation by DB-IP，CC BY 4.0）。国家未知的地址无法通过“Only from”，但可以通过“Not from”。',
+				'符合条件的地址会被拒绝，或者在登录早于您选择的分钟数时被要求重新登录；勾选后还需要身份验证器应用中的验证码。在代理处检查的 API 只能拒绝。',
+				'如果下载已关闭，或快照已超过 26 小时，该路径会关闭，直到加载新的快照，控制台会标出这一点。Check access 会显示快照中关于某个地址的信息。',
+				'和地址列表一样，您的代理必须连同项目的代理密钥一起传递它看到的地址。所有套餐均可使用。'
 			]
 		},
 		proxyfresh: {

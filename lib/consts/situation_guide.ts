@@ -31,7 +31,8 @@ export type GuideFlag =
 	| 'clientIdMetadataDocument'
 	| 'plans'
 	| 'attackReports'
-	| 'attackerList';
+	| 'attackerList'
+	| 'networkFacts';
 
 /* The ApplicationConfig key each switch is read from. */
 export const GUIDE_FLAG_SETTINGS: Readonly<Record<GuideFlag, string>> = {
@@ -51,7 +52,8 @@ export const GUIDE_FLAG_SETTINGS: Readonly<Record<GuideFlag, string>> = {
 	clientIdMetadataDocument: 'clientIdMetadataDocument.enabled',
 	plans: 'plans.enabled',
 	attackReports: 'attackReports.enabled',
-	attackerList: 'attackerList.enabled'
+	attackerList: 'attackerList.enabled',
+	networkFacts: 'networkFacts.enabled'
 };
 
 /*
@@ -86,7 +88,8 @@ export const GUIDE_FLAG_PANES: Readonly<Record<GuideFlag, GuideSettingsPane>> =
 		clientIdMetadataDocument: 'endpoints',
 		plans: 'plans',
 		attackReports: 'integrations',
-		attackerList: 'integrations'
+		attackerList: 'integrations',
+		networkFacts: 'integrations'
 	};
 
 /* `changeAddress` is the project's own `can.changeAddress`: narrower than `edit` (lib/admin/auth/can.ts). */
@@ -1450,6 +1453,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			caption: 'A stolen password works from anywhere.'
 		},
 		fixCaption: 'Only your network gets in.',
+		next: 'networkfacts',
 		sees: {
 			kind: 'none',
 			lines: [
@@ -1467,12 +1471,107 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'A network condition cannot be saved until a check has arrived with the key and a public address, so one save cannot lock everyone out.',
 			'Conditions add up down the paths: a condition on / applies to every path under it.',
 			'A VPN or a residential proxy can still get around a list. It slows an attacker down; it does not stop one.',
+			'When a super administrator turns on network facts from FoxTrust, “From where” can also keep out Tor, commercial VPNs, hosting and other countries. A matching address is refused, or asked to sign in again. The next answer shows how.',
 			'The FoxAuth console is never behind these conditions. It is on every plan.'
 		],
 		prompt: prompt(
 			'Let people open my app behind the proxy only from my office network, 203.0.113.0/24.\nIssue the project’s proxy key in the console, add the lines the app’s Connect page gives to my proxy, then add a network condition to the rule for /.',
 			'behind_proxy_app_update with rules[].conditions',
 			'Issue the proxy key in the console: an agent never receives it.'
+		)
+	},
+	{
+		id: 'networkfacts',
+		tab: 'product',
+		title: 'Keep Tor, VPNs and other countries away from a path',
+		sentence:
+			'Add network facts to “From where” on a path of an app behind your proxy: not from Tor, a commercial VPN or hosting, and only from the countries you choose. Your server learns what an address is from FoxTrust’s signed snapshot, and never sends the address anywhere.',
+		protocol:
+			'Forward auth · Signed IP snapshot (FoxTrust) · DB-IP country data',
+		lanes: lanes('browser', 'proxy', 'proxied', 'fox', 'foxtrust'),
+		steps: [
+			step(
+				'foxtrust',
+				'fox',
+				'Signed snapshot',
+				'Your server downloads FoxTrust’s snapshot of what is known about internet addresses: a full file once a day and an update every hour. It checks the signature before using it.'
+			),
+			step(
+				'browser',
+				'proxy',
+				'Opens /admin over Tor',
+				'Someone opens /admin of your app through Tor. The request reaches your proxy first.'
+			),
+			step(
+				'proxy',
+				'fox',
+				'Asks, with the address',
+				'Your proxy asks the project and passes the address it saw, with the project’s proxy key.'
+			),
+			step(
+				'fox',
+				'fox',
+				'Looks the address up',
+				'The project looks the address up in the server’s own copy of the snapshot. The address is not sent anywhere.'
+			),
+			step(
+				'fox',
+				'browser',
+				'Not from where you are',
+				'The snapshot marks the address as a Tor exit, so the project says no, before any sign-in.',
+				'refusal'
+			),
+			step(
+				'browser',
+				'proxy',
+				'Opens it from home',
+				'At home, in a country you allow, the same request comes from an ordinary address.'
+			),
+			step(
+				'fox',
+				'proxy',
+				'Yes, this is Anna',
+				'The address passes. The project checks the rest of your rules and answers yes.'
+			),
+			step(
+				'proxy',
+				'proxied',
+				'With X-Auth-* headers',
+				'Your proxy lets the request through to your app.'
+			)
+		],
+		problem: {
+			at: 'proxied',
+			mark: 'open',
+			caption: 'Anyone can try your admin pages over Tor.'
+		},
+		fixCaption: 'Tor, VPNs and other countries stay out.',
+		sees: {
+			kind: 'none',
+			lines: [
+				'From Tor, a listed VPN, hosting or another country: a page saying the page cannot be opened from where they are',
+				'Or, if you chose it: a new sign-in, with a code if you asked for one',
+				'From an ordinary address in a country you allow: the app, as before'
+			]
+		},
+		needs: { flags: ['networkFacts'], role: 'edit' },
+		action: {
+			kind: 'form',
+			target: { area: 'applications', query: { situation: 'behindProxy' } }
+		},
+		goodToKnow: [
+			'A super administrator turns on “Network facts from FoxTrust” in Settings → Integrations. Each server then downloads a file of about 13 MB once a day and an update every hour.',
+			'People’s addresses are only compared inside your server. FoxTrust learns only that the file was downloaded.',
+			'Commercial VPN covers only the VPN services FoxTrust lists, not a company VPN. Hosting or a cloud also covers content networks and some companies’ own exits. iCloud Private Relay is not kept out.',
+			'Countries come from DB-IP (IP Geolocation by DB-IP, CC BY 4.0). An address with no known country is refused by “Only from” and passes “Not from”.',
+			'A matching address is refused, or asked to sign in again within the minutes you choose, with a code from an authenticator app if you tick it. An API checked at the proxy can only refuse.',
+			'If the download is off or the snapshot is more than 26 hours old, the path is closed until a fresh one loads, and the console marks it. Check access shows what the snapshot says about an address.',
+			'Your proxy must pass the address it saw with the project’s proxy key, as for a list of networks. It is on every plan.'
+		],
+		prompt: prompt(
+			'Keep Tor, commercial VPNs and hosting away from /admin of my app behind the proxy, and let people open the whole app only from Germany and Austria.\nCheck that network facts are current for the app. Then add a network condition with a facts part to the rule for /admin (categories tor, vpn and hosting) and one to the rule for / (countries: only DE and AT), each refusing a matching address.',
+			'behind_proxy_app_get (addresses.networkFacts says whether they are current), then behind_proxy_app_update with a facts part on a network condition in rules[].conditions',
+			'Network facts are an instance setting for a super administrator: networkFacts.enabled. To explain a refusal, look the address up with network_facts_lookup.'
 		)
 	},
 	{

@@ -1137,10 +1137,25 @@ export const ApplicationConfig = {
 	 *
 	 * Off by default. Usable only with attackReports.enabled, because the list is built from what instances
 	 *   report (validateConfiguration refuses the combination). The only switch: there is no environment
-	 *   variable, and the publication and its keys are constants (lib/consts/attacker_list.ts). A list that is
-	 *   missing or out of date refuses nobody.
+	 *   variable, and the publication and its keys are constants (lib/consts/foxtrust_publication.ts). A list
+	 *   that is missing or out of date refuses nobody.
 	 */
-	'attackerList.enabled': false
+	'attackerList.enabled': false,
+	/*
+	 * networkFacts.enabled
+	 *
+	 * title: Network facts from FoxTrust, for "From where" at the proxy
+	 *
+	 * description: Each server process downloads FoxTrust's signed snapshot (a full file a day, about 13 MB,
+	 *   and an hourly update against it; specs/129), checks it, and keeps it in memory. Conditions at the proxy
+	 *   can then keep Tor, commercial VPNs, hosting or clouds, or countries out of a path. The address of a
+	 *   person is only compared inside this server and never sent anywhere.
+	 *
+	 * Off by default; free on every plan. The only switch: there is no environment variable, and the
+	 *   publication and its keys are constants. The opposite of the attacker list on failure: facts that are off,
+	 *   not loaded yet or more than 26 hours old are unknown, and a condition on them closes its path.
+	 */
+	'networkFacts.enabled': false
 	/*
 	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
 	 *

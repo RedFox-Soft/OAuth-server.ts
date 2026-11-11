@@ -84,6 +84,17 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		}
 	}
 
+	async raiseNetworkFactsBuiltAt(builtAt: string): Promise<void> {
+		const state = this.state;
+		if (!state) return;
+		if (
+			state.networkFactsBuiltAt === undefined ||
+			state.networkFactsBuiltAt < builtAt
+		) {
+			state.networkFactsBuiltAt = builtAt;
+		}
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		return this.state ? structuredClone(this.state) : null;
 	}

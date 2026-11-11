@@ -11,10 +11,14 @@ import {
 	APP_ORDER,
 	evaluate,
 	inOrder,
+	judgeNetwork,
 	type Condition,
 	type ConditionKind,
 	type ConditionResult,
-	type Facts
+	type Facts,
+	type FactsVerdict,
+	type FreshCondition,
+	type NetworkFacts
 } from './conditions.js';
 
 export type BaseWho =
@@ -66,6 +70,7 @@ export type Reason =
 	| 'unsafe_value'
 	| 'rate_limited'
 	| 'not_from_network'
+	| 'network_facts_unknown'
 	| 'outside_hours'
 	| 'attribute_mismatch'
 	| 'sign_in_again';
@@ -76,6 +81,12 @@ export interface ConditionOutcome {
 	from: string;
 	result: ConditionResult;
 	condition: Condition;
+	/* A network condition (specs/129): which part decided, the facts verdict, and the sign-in a match asks for. */
+	network?: {
+		part: 'ranges' | 'facts' | null;
+		verdict: FactsVerdict | null;
+		asks: FreshCondition | null;
+	};
 }
 
 export interface Decision {
@@ -91,6 +102,8 @@ export interface Decision {
 	maxAgeSeconds?: number;
 	/* For a fresh sign-in: the sign-in must include a code from an authenticator app (specs/128). */
 	requireCode?: true;
+	/* A refusal by "From where": by its ranges, or by the network facts of the address (specs/129). */
+	networkPart?: 'ranges' | 'facts';
 }
 
 /* The "who" a rule decides with, its conditions set aside. */
@@ -282,6 +295,8 @@ export interface DecideInput {
 	at?: number | null;
 	/* The app's time zone. */
 	timeZone?: string | null;
+	/* The network facts of `address` (specs/129); absent when nobody looked them up. */
+	network?: NetworkFacts;
 	/* The console's "Check access": an input it was not given is unknown, and every condition is judged. */
 	explain?: boolean;
 }
@@ -317,15 +332,28 @@ function judge(
 		at: input.at ?? null,
 		timeZone: input.timeZone ?? null,
 		person: input.person,
+		...(input.network ? { network: input.network } : {}),
 		explain: input.explain ?? false
 	};
 	return inOrder(gatherConditions(rules, path), APP_ORDER).map(
-		({ from, condition }) => ({
-			kind: condition.kind,
-			from,
-			result: evaluate(condition, facts),
-			condition
-		})
+		({ from, condition }) => {
+			if (condition.kind !== 'network') {
+				return {
+					kind: condition.kind,
+					from,
+					result: evaluate(condition, facts),
+					condition
+				};
+			}
+			const { result, part, verdict, asks } = judgeNetwork(condition, facts);
+			return {
+				kind: condition.kind,
+				from,
+				result,
+				condition,
+				network: { part, verdict, asks }
+			};
+		}
 	);
 }
 
@@ -338,15 +366,47 @@ function failed(judged: readonly ConditionOutcome[], kind: ConditionKind) {
 }
 
 /*
+ * A "From where" refusal (specs/129 research R10): ranges first, then facts nobody can vouch for, then a matching
+ * address the condition refuses. A match that asks for a sign-in instead is not a refusal; it is judged with the fresh
+ * conditions below.
+ */
+function networkRefusal(
+	judged: readonly ConditionOutcome[]
+): Pick<Decision, 'reason' | 'networkPart'> | null {
+	const refusing = judged.filter(
+		(c) => c.kind === 'network' && c.result === 'fail' && !c.network?.asks
+	);
+	if (refusing.length === 0) return null;
+	if (refusing.some((c) => c.network?.part !== 'facts')) {
+		return { reason: 'not_from_network', networkPart: 'ranges' };
+	}
+	if (refusing.some((c) => c.network?.verdict === 'unknown')) {
+		return { reason: 'network_facts_unknown', networkPart: 'facts' };
+	}
+	return { reason: 'not_from_network', networkPart: 'facts' };
+}
+
+/* The fresh conditions of a path: its own, and the sign-ins its matching network facts ask for. */
+function freshOf(
+	judged: readonly ConditionOutcome[]
+): { condition: FreshCondition; result: ConditionResult }[] {
+	return judged.flatMap((c) => {
+		if (c.condition.kind === 'fresh') {
+			return [{ condition: c.condition, result: c.result }];
+		}
+		const asks = c.network?.asks;
+		return asks ? [{ condition: asks, result: c.result }] : [];
+	});
+}
+
+/*
  * What a sign-in for a path must meet (specs/128 research R3): the shortest interval of its fresh conditions, and a code
  * whenever any of them wants one, even one that holds today, because the sign-in replaces the app's session.
  */
 function signInAsked(
 	judged: readonly ConditionOutcome[]
 ): Pick<Decision, 'maxAgeSeconds' | 'requireCode'> {
-	const fresh = judged.flatMap((c) =>
-		c.condition.kind === 'fresh' ? [c.condition] : []
-	);
+	const fresh = freshOf(judged).map((c) => c.condition);
 	if (fresh.length === 0) return {};
 	return {
 		maxAgeSeconds: Math.min(...fresh.map((c) => c.maxAgeMinutes)) * 60,
@@ -379,7 +439,7 @@ export function decide(input: DecideInput): Decision {
 	const decided = (
 		outcome: Outcome,
 		reason: Reason,
-		extra: Pick<Decision, 'maxAgeSeconds' | 'requireCode'> = {}
+		extra: Pick<Decision, 'maxAgeSeconds' | 'requireCode' | 'networkPart'> = {}
 	): Decision => ({
 		outcome,
 		reason,
@@ -391,7 +451,12 @@ export function decide(input: DecideInput): Decision {
 	if (who.kind === 'public') return decided('allow', 'public');
 	if (who.kind === 'none') return decided('deny', 'rule_no_one');
 	/* Where and when come before any session, so a refusal by them never asks for a password first (R2). */
-	if (failed(judged, 'network')) return decided('deny', 'not_from_network');
+	const refusal = networkRefusal(judged);
+	if (refusal) {
+		return decided('deny', refusal.reason, {
+			networkPart: refusal.networkPart
+		});
+	}
 	if (failed(judged, 'time')) return decided('deny', 'outside_hours');
 	/*
 	 * A first sign-in to a path that asks for a recent one, or for a code, asks for them at once (specs/128 research
@@ -407,9 +472,7 @@ export function decide(input: DecideInput): Decision {
 	}
 	if (failed(judged, 'attribute')) return decided('deny', 'attribute_mismatch');
 	/* Last: sending someone to sign in again is pointless if anything above would still refuse them (S10). */
-	const stale = judged.filter(
-		(c) => c.condition.kind === 'fresh' && c.result === 'fail'
-	);
+	const stale = freshOf(judged).filter((c) => c.result === 'fail');
 	if (stale.length > 0) {
 		return decided('sign_in', 'sign_in_again', signInAsked(judged));
 	}

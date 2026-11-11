@@ -310,6 +310,19 @@ groups:
         verdict: us
         why: 'Keycloak has most of these conditions, but in two separate places, and your app runs a policy enforcer for the time and address rules. Here they sit on one rule for a path or an API, and your proxy has them checked.'
         note: 'The Authorization Services guide says "You can use this type of policy to define time conditions for your permissions." The administration guide says "The option Max Age in the condition determines how long (how much seconds) the subsequent authentication level is valid."'
+      - dimension: 'Tor, VPNs, hosting and countries at your proxy'
+        us:
+          {
+            status: flag,
+            text: "Behind networkFacts.enabled, off by default, on every plan. A rule for a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads FoxTrust's signed snapshot, about 13 MB a day plus an update every hour, and compares people's addresses only with its own copy. A matching address is refused or, on an app, asked to sign in again. A snapshot more than 26 hours old closes those paths until a fresh one loads."
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy, and no built-in condition on the country or the kind of network of an address. A JavaScript policy deployed to the server can read the client's IP address, so a lookup in data you supply is code you write."
+          }
+        verdict: us
+        why: 'With Keycloak, knowing that an address is a Tor exit or in another country takes your own code and your own data. Here it is a choice on the rule, from a signed snapshot the server keeps current.'
   - label: Licence and cost
     rows:
       - dimension: Licence

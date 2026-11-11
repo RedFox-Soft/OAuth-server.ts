@@ -12,8 +12,10 @@ import { answer, withReason } from './answers.js';
 import { signAssertion } from './assertion.js';
 import { believedAddress, type Believed } from './believed_address.js';
 import { minuteOfWeek, nextOpeningOfAll } from './clock.js';
+import { factsForBelieved } from '../network_facts/lookup.js';
 import {
 	canonicalPath,
+	conditionsOf,
 	decide,
 	hasControlCharacter,
 	type Decision,
@@ -24,6 +26,7 @@ import {
 	closedPage,
 	deniedPage,
 	networkDeniedPage,
+	networkFactsPage,
 	type AddressCause
 } from './pages.js';
 import {
@@ -308,6 +311,21 @@ function conditionPage(
 	).language;
 	const host = new URL(app.address).host;
 	const zone = app.timeZone ?? null;
+	if (
+		decision.reason === 'network_facts_unknown' ||
+		(decision.reason === 'not_from_network' && decision.networkPart === 'facts')
+	) {
+		return withReason(
+			networkFactsPage({
+				host,
+				reason: decision.reason,
+				language,
+				zone,
+				known: decision.reason === 'not_from_network'
+			}),
+			decision.reason
+		);
+	}
 	if (decision.reason === 'not_from_network') {
 		return withReason(
 			networkDeniedPage({ host, reason: decision.reason, language, zone }),
@@ -336,7 +354,11 @@ function refused(
 ): Response {
 	const { reason } = decision;
 	if (!navigation || statusOnly) return denied(reason);
-	if (reason === 'not_from_network' || reason === 'outside_hours') {
+	if (
+		reason === 'not_from_network' ||
+		reason === 'network_facts_unknown' ||
+		reason === 'outside_hours'
+	) {
 		return conditionPage(ctx, decision, person);
 	}
 	if (!person) return denied(reason);
@@ -437,6 +459,10 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 				}
 			: null,
 		address: believed.address,
+		network: factsForBelieved(
+			believed.address,
+			app.rules.flatMap((rule) => conditionsOf(rule.who))
+		),
 		at: Date.now(),
 		timeZone: app.timeZone ?? null
 	});

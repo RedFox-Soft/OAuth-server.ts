@@ -1,7 +1,8 @@
 import type { TimeWindow } from '../../../../behind_proxy/clock.js';
 import type {
 	Condition,
-	ConditionKind
+	ConditionKind,
+	NetworkFactsPart
 } from '../../../../behind_proxy/conditions.js';
 import type { Loosened } from '../../../../behind_proxy/condition_widening.js';
 
@@ -90,6 +91,50 @@ export function freshText(minutes: number): string {
 	return `${String(minutes)} min`;
 }
 
+const CATEGORY_WORDS = {
+	tor: 'Tor',
+	vpn: 'a VPN',
+	hosting: 'hosting'
+} as const;
+
+function countryNames(codes: readonly string[]): string {
+	let names: Intl.DisplayNames | null = null;
+	try {
+		names = new Intl.DisplayNames(['en'], { type: 'region' });
+	} catch {
+		names = null;
+	}
+	return or(codes.map((code) => names?.of(code) ?? code));
+}
+
+/* "not from Tor, a VPN or hosting", "only from Germany or Austria", and what a match leads to (specs/129 FR-026). */
+export function factsText(facts: NetworkFactsPart): string {
+	const parts: string[] = [];
+	if (facts.categories.length > 0) {
+		parts.push(
+			`not from ${or(facts.categories.map((c) => CATEGORY_WORDS[c]))}`
+		);
+	}
+	if (facts.countries) {
+		parts.push(
+			`${facts.countries.mode === 'only' ? 'only from' : 'not from'} ${countryNames(facts.countries.codes)}`
+		);
+	}
+	const outcome = facts.outcome;
+	const what =
+		outcome.kind === 'refuse'
+			? ''
+			: ` (otherwise sign in again${outcome.withCode ? ' with a code' : ''} within ${freshText(outcome.maxAgeMinutes)})`;
+	return `${parts.join(', ')}${what}`;
+}
+
+/* Whether a condition names countries, so the DB-IP attribution goes beside it (FR-025). */
+export function namesCountries(condition: Condition): boolean {
+	return (
+		condition.kind === 'network' && condition.facts?.countries !== undefined
+	);
+}
+
 export function conditionText(
 	condition: Condition,
 	nameOf: (groupId: string) => string | null = () => null
@@ -99,6 +144,7 @@ export function conditionText(
 			const parts: string[] = [];
 			if (condition.only.length > 0) parts.push(`from ${or(condition.only)}`);
 			if (condition.not.length > 0) parts.push(`not from ${or(condition.not)}`);
+			if (condition.facts) parts.push(factsText(condition.facts));
 			return parts.join(', ');
 		}
 		case 'time':

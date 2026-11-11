@@ -1,3 +1,5 @@
+import { networkFactsSummary } from '../../network_facts/state.js';
+import { now } from '../../telemetry/clock.js';
 import {
 	getBehindProxyAppStore,
 	getBucketGroupStore
@@ -460,7 +462,9 @@ export async function viewApps(
 			provenAt: iso(app.addressProvenAt),
 			forgedAt: iso(app.addressForgedAt),
 			last: lastAddressFlagsOf(`app:${app._id}`),
-			networkConditionsSupported: ADDRESSES_SUPPORTED[app.proxyKind]
+			networkConditionsSupported: ADDRESSES_SUPPORTED[app.proxyKind],
+			/* Whether network facts can be judged now (specs/129 FR-009, FR-028): the editor and the path warnings. */
+			networkFacts: networkFactsSummary(now().getTime())
 		},
 		signUpsOpen
 	}));

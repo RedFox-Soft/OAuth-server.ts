@@ -27,9 +27,17 @@ export interface CodeConditionPreview {
 	paths: string[];
 }
 
+/*
+ * A fresh condition with a code, or a network facts part whose matching addresses are asked for a sign-in with one
+ * (specs/129 FR-022): either way some people reaching the path are asked for a code they may not have.
+ */
 function asksForCode(rules: readonly BehindProxyRule[], path: string): boolean {
 	return gatherConditions(rules, path).some(
-		({ condition }) => condition.kind === 'fresh' && condition.withCode === true
+		({ condition }) =>
+			(condition.kind === 'fresh' && condition.withCode === true) ||
+			(condition.kind === 'network' &&
+				condition.facts?.outcome.kind === 'sign_in_again' &&
+				condition.facts.outcome.withCode === true)
 	);
 }
 

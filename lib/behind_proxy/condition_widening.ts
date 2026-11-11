@@ -1,5 +1,9 @@
 import { weekBitmap } from './clock.js';
-import type { Condition, ConditionKind } from './conditions.js';
+import type {
+	Condition,
+	ConditionKind,
+	NetworkFactsPart
+} from './conditions.js';
 import { coveredBy, overlapsNotPublic, parseRanges } from './net.js';
 
 /*
@@ -23,6 +27,44 @@ function rangesWithin(
 ): boolean {
 	const outer = parseRanges(wide);
 	return parseRanges(narrow).every((range) => coveredBy(range, outer));
+}
+
+/*
+ * Whether a network facts part admits no address `before` refuses (specs/129 data-model §9). Unknown facts close
+ * either the same way, so only what a known address meets is compared: categories kept out, countries, and what a
+ * match leads to.
+ */
+function factsAtLeastAsStrict(
+	before: NetworkFactsPart | undefined,
+	after: NetworkFactsPart | undefined
+): boolean {
+	if (!before) return true;
+	if (!after) return false;
+	if (!before.categories.every((c) => after.categories.includes(c))) {
+		return false;
+	}
+	const was = before.countries;
+	const now = after.countries;
+	if (was) {
+		if (!now) return false;
+		if (was.mode === 'only') {
+			if (now.mode !== 'only') return false;
+			if (!now.codes.every((code) => was.codes.includes(code))) return false;
+		} else if (now.mode === 'not') {
+			if (!was.codes.every((code) => now.codes.includes(code))) return false;
+		} else if (now.codes.some((code) => was.codes.includes(code))) {
+			/* "Only from" admits no address without a country, so it is stricter than "not from" unless it names one. */
+			return false;
+		}
+	}
+	const a = before.outcome;
+	const b = after.outcome;
+	if (b.kind === 'refuse') return true;
+	if (a.kind === 'refuse') return false;
+	return (
+		b.maxAgeMinutes <= a.maxAgeMinutes &&
+		(a.withCode !== true || b.withCode === true)
+	);
 }
 
 /* Whether `after` admits no request `before` refuses, for two conditions of one kind. */
@@ -50,7 +92,12 @@ function atLeastAsStrict(
 					parseRanges(after.only).every(
 						(range) => !overlapsNotPublic(range) || coveredBy(range, before0)
 					));
-			return onlyHolds && notHolds && privateHolds;
+			return (
+				onlyHolds &&
+				notHolds &&
+				privateHolds &&
+				factsAtLeastAsStrict(before.facts, after.facts)
+			);
 		}
 		case 'time': {
 			if (after.kind !== 'time' || !sameZone) return false;

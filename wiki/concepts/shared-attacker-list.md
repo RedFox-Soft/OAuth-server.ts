@@ -19,7 +19,8 @@ or refusal (`UserBucket.passwordGuessing`). The module is `lib/attacker_list/`.
 - `attackerListPass` (`lib/attacker_list/fetch.ts`) follows FoxTrust's verification order: signed manifest →
   `attackers["1"]` → file and detached Ed25519 signature → size and sha256 → header (`kind`, `format` 1, `version`,
   `validUntil` in the future, `builtAt` later than both the held list and the stored one). The publication and the
-  pinned keys are constants (`lib/consts/attacker_list.ts`), passed as defaulted arguments only so a test can sign
+  pinned keys are constants (`lib/consts/foxtrust_publication.ts` since spec 129, shared with [[network-facts]];
+  the transport and signature check are `lib/foxtrust/`), passed as defaulted arguments only so a test can sign
   with its own key; no setting or environment variable overrides them.
 - No lease and no stored bytes: nothing is shared but `TelemetryState.attackerListBuiltAt`, raised atomically
   (`raiseAttackerListBuiltAt`, `$max`/`GREATEST`), written **before** the list is used, so a restart still refuses an

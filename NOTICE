@@ -32,3 +32,18 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+--------------------------------------------------------------------------------
+
+Data downloaded at run time
+
+While a super administrator has "Network facts from FoxTrust" on, each server
+process downloads FoxTrust's signed snapshot of internet addresses. It is not
+part of this software and is not distributed with it. FoxTrust names these
+sources of the facts this server reads:
+
+- Countries: DB-IP IP to Country Lite (https://db-ip.com), licensed under the
+  Creative Commons Attribution 4.0 International License (CC BY 4.0).
+  IP Geolocation by DB-IP.
+- Hosting, cloud and VPN networks: the X4BNet lists
+  (https://github.com/X4BNet/lists_vpn), MIT License.

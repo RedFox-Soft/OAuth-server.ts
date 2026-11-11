@@ -38,6 +38,7 @@ import {
 } from '../admin/federation/schema.js';
 import { PublishedSettingsBody } from '../admin/settings/schema.js';
 import { UpdateSmtpBody } from '../admin/settings/smtp/schema.js';
+import { NetworkFactsLookupBody } from '../admin/network_facts/schema.js';
 import {
 	CreatePlanBody,
 	SetProjectPlanBody,
@@ -899,6 +900,32 @@ const catalogue = [
 			"The state of FoxTrust's list of addresses seen guessing passwords in the server process that answers: whether it is on, `state` (off, not-yet, current, out-of-date, unknown-format), the list held (version, build time, validity, number of addresses), the last check and acceptance, the last persisting problem, and how many projects count or refuse with it. Never an address. Turned on and off with settings_update (`attackerList.enabled`, which needs `attackReports.enabled`); each project chooses what it does with the list through project_update (`passwordGuessing`)."
 	},
 	{
+		tool: 'network_facts_status_get',
+		method: 'GET',
+		path: '/admin/api/settings/network-facts',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"The state of FoxTrust's network facts in the server process that answers: whether the download is on, `state` (off, not-yet, current, stale — stale and off close every path with a network facts condition), the snapshot held (full and update versions, build time, age, number of ranges), the last check and acceptance, the last persisting problem, and how many records could not be read. Turned on and off with settings_update (`networkFacts.enabled`); conditions use it through the `facts` part of a `network` condition (behind_proxy_app_update, resource_update)."
+	},
+	{
+		tool: 'network_facts_lookup',
+		method: 'POST',
+		path: '/admin/api/network-facts/lookup',
+		action: 'networkfacts.lookup',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: NetworkFactsLookupBody,
+		querySchema: null,
+		pathParams: [],
+		summary:
+			"What this server's copy of FoxTrust's snapshot says about one IP address: `facts.known` false when the download is off or the snapshot is more than 26 hours old (a network facts condition then closes its path), otherwise its categories among tor, vpn and hosting (hosting covers clouds) and its country (two letters; IP Geolocation by DB-IP, CC BY 4.0), or neither when nothing is known about it. Use it to explain why a network facts condition at the proxy refused someone. The address is only compared on this server, never sent anywhere; the lookup is recorded in the audit trail without it."
+	},
+	{
 		tool: 'jwks_list',
 		method: 'GET',
 		path: '/admin/api/jwks',
@@ -1059,7 +1086,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'resourceId'],
 		summary:
-			"Change a declared resource's name, scopes, scope descriptions, token format or lifetime, who checks its tokens, or its tools table. `scopeDescriptions` replaces the whole map; changing `scopes` without it drops the descriptions of removed scopes, and a scope a tool row still needs cannot be removed. `checkedBy` is `server` or `proxy` (the operator's reverse proxy checks each request's token before passing it on). `tools` replaces the whole tools table the proxy applies to an MCP server: `rows` (each a tool `name` and every one of this API's `scopes` it needs), `otherTools` (`refuse` or `token`: a tool no row lists) and `withoutMethod` (`refuse` or `token`: a client that does not say which tool it calls); with no rows every tool needs only a valid token. `tools.access` says who may call the API at all, before the table, for an API the proxy checks: `conditions`, at most one of each kind — group (`groups`, project group ids), attribute, network and time as on an app's rule — and `timeZone` for a time condition; a token that stands for no person (an application's own token, a pairwise client's, one issued before sign-in times were recorded) fails group and attribute conditions, and the answer's `warnings` names those applications. High-consequence when it sets `checkedBy` or `tools`, which change who reaches the API: describe it and confirm before running. The identifier itself cannot be amended: it is the audience of every token already issued, so replacing it is a delete and a fresh declaration.",
+			"Change a declared resource's name, scopes, scope descriptions, token format or lifetime, who checks its tokens, or its tools table. `scopeDescriptions` replaces the whole map; changing `scopes` without it drops the descriptions of removed scopes, and a scope a tool row still needs cannot be removed. `checkedBy` is `server` or `proxy` (the operator's reverse proxy checks each request's token before passing it on). `tools` replaces the whole tools table the proxy applies to an MCP server: `rows` (each a tool `name` and every one of this API's `scopes` it needs), `otherTools` (`refuse` or `token`: a tool no row lists) and `withoutMethod` (`refuse` or `token`: a client that does not say which tool it calls); with no rows every tool needs only a valid token. `tools.access` says who may call the API at all, before the table, for an API the proxy checks: `conditions`, at most one of each kind — group (`groups`, project group ids), attribute, network and time as on an app's rule, a network condition's `facts` taking only `{ kind: 'refuse' }` as its outcome — and `timeZone` for a time condition; a token that stands for no person (an application's own token, a pairwise client's, one issued before sign-in times were recorded) fails group and attribute conditions, and the answer's `warnings` names those applications. High-consequence when it sets `checkedBy` or `tools`, which change who reaches the API: describe it and confirm before running. The identifier itself cannot be amended: it is the audience of every token already issued, so replacing it is a delete and a fresh declaration.",
 		highWhenSets: ['checkedBy', 'tools']
 	},
 	{
@@ -1933,7 +1960,7 @@ const catalogue = [
 		 */
 		highWhenSets: ['rules', 'address', 'timeZone'],
 		summary:
-			"Rename an app behind a proxy, change its address or proxy kind, replace its rules, or set its timeZone (an IANA name such as Europe/Moscow, or null). rules replaces the whole list and must keep exactly one rule for /; each path is a plain path such as /admin (no ?, #, *, %, ; or backslash, compared ignoring letter case), at most 50 rules. A rule's who is groups (with project group ids), project (everyone in the project), public (no sign-in; subtree: true covers every path beneath) or none. The most specific rule decides who; a groups or project rule may also carry conditions, at most one of each kind, and the conditions of every path above it apply too: network (`only` and `not`, lists of addresses or CIDR ranges, at most 100 together; saving one is refused with 409 proxy_address_unproven until the project's proxy has sent its proxy key and a public address), time (`windows`, each `days` 0=Monday..6 and `start`/`end` minutes from midnight on the quarter hour, end before start running past midnight; needs timeZone), attribute (`attribute` department, division, organization, costCenter, employeeNumber, title or claim:<key>, and `values`; refused with 409 attribute_matches_nobody when nobody has it) and fresh (`maxAgeMinutes` 5-1440: ask to sign in again when the sign-in is older; `withCode: true` asks for a sign-in with a code from an authenticator app within that time — people without one are asked to set one up or turned away, people who sign in through a provider are turned away). Asking for a code on a path that did not ask for one answers a preview of how many people that reaches (`consequences`, `expect`, `paths`); call again with the same rules, `confirm: true` and that `expect` to apply it, and it needs the right to manage the project's people."
+			"Rename an app behind a proxy, change its address or proxy kind, replace its rules, or set its timeZone (an IANA name such as Europe/Moscow, or null). rules replaces the whole list and must keep exactly one rule for /; each path is a plain path such as /admin (no ?, #, *, %, ; or backslash, compared ignoring letter case), at most 50 rules. A rule's who is groups (with project group ids), project (everyone in the project), public (no sign-in; subtree: true covers every path beneath) or none. The most specific rule decides who; a groups or project rule may also carry conditions, at most one of each kind, and the conditions of every path above it apply too: network (`only` and `not`, lists of addresses or CIDR ranges, at most 100 together; saving one is refused with 409 proxy_address_unproven until the project's proxy has sent its proxy key and a public address; an optional `facts` adds FoxTrust's network facts: `categories` to keep out among tor, vpn and hosting (hosting covers clouds), optional `countries` `{ mode: 'only' | 'not', codes }` of two-letter codes, and `outcome` `{ kind: 'refuse' }` or `{ kind: 'sign_in_again', maxAgeMinutes, withCode? }` (sign_in_again only on an app; withCode is previewed like a fresh condition's); with `facts` the ranges may be empty; adding or changing `facts` while settings `networkFacts.enabled` is off is refused with 409 network_facts_off, and while the download is off or its snapshot is more than 26 hours old such a condition closes its path; explain a refusal with network_facts_lookup), time (`windows`, each `days` 0=Monday..6 and `start`/`end` minutes from midnight on the quarter hour, end before start running past midnight; needs timeZone), attribute (`attribute` department, division, organization, costCenter, employeeNumber, title or claim:<key>, and `values`; refused with 409 attribute_matches_nobody when nobody has it) and fresh (`maxAgeMinutes` 5-1440: ask to sign in again when the sign-in is older; `withCode: true` asks for a sign-in with a code from an authenticator app within that time — people without one are asked to set one up or turned away, people who sign in through a provider are turned away). Asking for a code on a path that did not ask for one answers a preview of how many people that reaches (`consequences`, `expect`, `paths`); call again with the same rules, `confirm: true` and that `expect` to apply it, and it needs the right to manage the project's people."
 	},
 	{
 		tool: 'behind_proxy_app_delete',

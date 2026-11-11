@@ -175,6 +175,17 @@ export const en = {
 			body: 'If your team uses a VPN, connect to it and reload this page.',
 			reason: 'Reason: {reason}, at {time}'
 		},
+		/* Network facts at the proxy (specs/129): never names the source, the category or the country. */
+		networkFacts: {
+			title: "You can't open {host} from where you are",
+			body: "This page isn't available from your network or your country. If you think this is wrong, contact the people who run {host}.",
+			reason: 'Reason: {reason}, at {time}'
+		},
+		networkFactsUnknown: {
+			title: "{host} can't be opened right now",
+			body: 'Try again later. If this goes on, contact the people who run {host}.',
+			reason: 'Reason: {reason}, at {time}'
+		},
 		closed: {
 			title: '{host} is closed now',
 			opens: 'It opens again on {when} ({zone}), {inTime}.',

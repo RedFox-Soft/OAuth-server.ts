@@ -11,10 +11,17 @@ import type {
 import { canonicalTimeZone } from '../behind_proxy/clock.js';
 import {
 	isSelectableAttribute,
+	MAX_FRESH_MINUTES,
 	MAX_RANGE_LINES,
+	MIN_FRESH_MINUTES,
 	type Condition,
-	type ConditionKind
+	type ConditionKind,
+	type NetworkCategory,
+	type NetworkFactsPart
 } from '../behind_proxy/conditions.js';
+import { ApplicationConfig } from '../configs/application.js';
+import { isCountryCode } from '../consts/countries.js';
+import { MAX_COUNTRIES, NETWORK_CATEGORIES } from '../consts/network_facts.js';
 import { formatRange, parseRange } from '../behind_proxy/net.js';
 import { AdminError } from './auth/rbac.js';
 
@@ -29,8 +36,21 @@ import { AdminError } from './auth/rbac.js';
  * A condition as a body carries it (lib/admin/behind-proxy/schema.ts), written out structurally because the
  * schema's static type reaches this module through Elysia's copy of TypeBox and not this one.
  */
+export interface NetworkFactsInput {
+	categories: string[];
+	countries?: { mode: 'only' | 'not'; codes: string[] };
+	outcome:
+		| { kind: 'refuse' }
+		| { kind: 'sign_in_again'; maxAgeMinutes: number; withCode?: boolean };
+}
+
 export type ConditionInput =
-	| { kind: 'network'; only: string[]; not: string[] }
+	| {
+			kind: 'network';
+			only: string[];
+			not: string[];
+			facts?: NetworkFactsInput;
+	  }
 	| {
 			kind: 'time';
 			windows: { days: number[]; start: number; end: number }[];
@@ -91,6 +111,87 @@ async function projectGroupIds(
 }
 
 /*
+ * The network facts part as stored (specs/129 data-model §7): categories in one order, countries upper case and
+ * sorted, the code stored only when on. On an API only Refuse: a token check has no sign-in to ask for (FR-021).
+ */
+function networkFactsFrom(
+	input: NetworkFactsInput,
+	target: 'app' | 'api',
+	where: string,
+	field: string
+): NetworkFactsPart {
+	const categories: NetworkCategory[] = [];
+	for (const category of input.categories) {
+		const known = NETWORK_CATEGORIES.find((c) => c === category);
+		if (!known) {
+			throw refuse(
+				`${where}: ${category} is not a network fact; use tor, vpn or hosting`,
+				field
+			);
+		}
+		if (!categories.includes(known)) categories.push(known);
+	}
+	categories.sort(
+		(a, b) => NETWORK_CATEGORIES.indexOf(a) - NETWORK_CATEGORIES.indexOf(b)
+	);
+	let countries: NetworkFactsPart['countries'];
+	if (input.countries) {
+		const codes = [
+			...new Set(input.countries.codes.map((c) => c.trim().toUpperCase()))
+		];
+		for (const code of codes) {
+			if (!isCountryCode(code)) {
+				throw refuse(
+					`${where}: ${code} is not a country code; use two letters such as DE`,
+					field
+				);
+			}
+		}
+		if (codes.length === 0 || codes.length > MAX_COUNTRIES) {
+			throw refuse(
+				`${where}: list between 1 and ${String(MAX_COUNTRIES)} countries`,
+				field
+			);
+		}
+		countries = { mode: input.countries.mode, codes: codes.sort() };
+	}
+	if (categories.length === 0 && !countries) {
+		throw refuse(
+			`${where}: choose at least one network or country to keep out or in`,
+			field
+		);
+	}
+	let outcome: NetworkFactsPart['outcome'];
+	if (input.outcome.kind === 'refuse') {
+		outcome = { kind: 'refuse' };
+	} else {
+		if (target === 'api') {
+			throw refuse(
+				`${where}: an API can only refuse a matching address; there is no sign-in to ask for`,
+				field
+			);
+		}
+		const minutes = input.outcome.maxAgeMinutes;
+		if (
+			!Number.isInteger(minutes) ||
+			minutes < MIN_FRESH_MINUTES ||
+			minutes > MAX_FRESH_MINUTES
+		) {
+			throw refuse(
+				`${where}: sign in again within ${String(MIN_FRESH_MINUTES)} minutes to 24 hours`,
+				field
+			);
+		}
+		outcome = {
+			kind: 'sign_in_again',
+			maxAgeMinutes: minutes,
+			...(input.outcome.withCode === true ? { withCode: true as const } : {})
+		};
+	}
+	return { categories, ...(countries ? { countries } : {}), outcome };
+}
+
+/*
  * The conditions as they are stored, or a refusal. `where` names the place for the message (`/admin and below`, the
  * API's name); `field` is the body field the console puts the message on.
  */
@@ -98,7 +199,8 @@ export async function conditionsFrom(
 	bucket: UserBucket,
 	input: readonly ConditionInput[],
 	where: string,
-	field: string
+	field: string,
+	target: 'app' | 'api' = 'app'
 ): Promise<Condition[]> {
 	const seen = new Set<ConditionKind>();
 	const out: Condition[] = [];
@@ -114,8 +216,14 @@ export async function conditionsFrom(
 			case 'network': {
 				const only = canonicalRanges(condition.only, where, field);
 				const not = canonicalRanges(condition.not, where, field);
-				if (only.length + not.length === 0) {
-					throw refuse(`${where}: list at least one address or range`, field);
+				const facts = condition.facts
+					? networkFactsFrom(condition.facts, target, where, field)
+					: undefined;
+				if (only.length + not.length === 0 && !facts) {
+					throw refuse(
+						`${where}: list at least one address, range, network or country`,
+						field
+					);
 				}
 				if (only.length + not.length > MAX_RANGE_LINES) {
 					throw refuse(
@@ -123,7 +231,7 @@ export async function conditionsFrom(
 						field
 					);
 				}
-				out.push({ kind: 'network', only, not });
+				out.push({ kind: 'network', only, not, ...(facts ? { facts } : {}) });
 				break;
 			}
 			case 'time': {
@@ -259,6 +367,23 @@ export async function assertConditionsUsable(
 			!before.some((old) => JSON.stringify(old) === JSON.stringify(condition))
 	);
 	for (const condition of changed) {
+		if (
+			condition.kind === 'network' &&
+			condition.facts &&
+			!ApplicationConfig['networkFacts.enabled'] &&
+			!before.some(
+				(old) =>
+					old.kind === 'network' &&
+					JSON.stringify(old.facts) === JSON.stringify(condition.facts)
+			)
+		) {
+			/* Saved ones stay when the download goes off (FR-015); a new or changed one waits for it. */
+			throw new AdminError(
+				409,
+				`${where}: network facts are off on this server, so this condition would close the path. A super administrator turns them on in Settings → Integrations.`,
+				{ field, code: 'network_facts_off' }
+			);
+		}
 		if (condition.kind === 'network') {
 			const { provenAt, forgedAt } = proof;
 			if (!provenAt || (forgedAt && forgedAt >= provenAt)) {

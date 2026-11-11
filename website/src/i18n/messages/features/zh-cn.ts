@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '8298b9feb17d';
+export const source = 'cb26a32a273c';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -213,6 +213,10 @@ export default {
 				proxyConditions: {
 					title: '在你的代理处设置条件：网络、时间、属性、近期登录',
 					body: '代理后应用的某个路径，或由代理检查令牌的 API，可以添加条件：只允许或不允许来自你的地址范围、按你选择的时区设置开放时间、部门等属性、API 的用户组，以及应用的“登录不超过 N 分钟”（也可以要求使用身份验证器应用中的验证码）。条件只会收紧访问，并沿路径向下累加。代理会连同项目的密钥一起传递它看到的地址，因此浏览器无法自选地址。控制台在保存前可以检查示例，并在任何放宽访问的更改之前请求确认。'
+				},
+				proxyNetworkFacts: {
+					title: '在你的代理处使用网络信息：Tor、VPN、托管服务、国家',
+					body: '开启 FoxTrust 签名的快照后，代理后应用的某个路径，或由代理检查的 API，可以挡住 Tor、商业 VPN 以及托管服务和云，并允许或拒绝所选的国家。每台服务器每天下载约 13 MB，每小时下载一次更新，验证签名，并且只把用户的地址与自己的副本比较，因此不会把任何地址发送到任何地方。符合条件的地址会被拒绝；在应用上也可以改为要求重新登录，并可要求验证码。超过 26 小时的快照会关闭这些路径，直到加载新的快照。所有套餐免费。国家数据：IP Geolocation by DB-IP，CC BY 4.0。'
 				},
 				clientIdMetadataDocument: {
 					title: '客户端身份文档',

@@ -1,3 +1,5 @@
+import { networkFactsSummary } from '../../network_facts/state.js';
+import { now } from '../../telemetry/clock.js';
 import { Elysia } from 'elysia';
 import { uriPathParams } from 'lib/plugins/uri_path_params.js';
 
@@ -287,7 +289,9 @@ function addressesOfApi(
 		provenAt: api.proxyAddressProvenAt?.toISOString() ?? null,
 		forgedAt: api.proxyAddressForgedAt?.toISOString() ?? null,
 		last: lastAddressFlagsOf(`api:${checkIdOf(api.identifier)}`),
-		networkConditionsSupported: true
+		networkConditionsSupported: true,
+		/* Whether network facts can be judged now (specs/129 FR-009, FR-028). */
+		networkFacts: networkFactsSummary(now().getTime())
 	};
 }
 
@@ -522,7 +526,8 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					bucket,
 					access.conditions,
 					existing.name,
-					'tools'
+					'tools',
+					'api'
 				);
 				const timeZone =
 					access.timeZone === undefined || access.timeZone === null

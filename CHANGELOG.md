@@ -9,6 +9,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Where a connection comes from, at your proxy** (spec 129). A super administrator can turn on "Network facts from
+  FoxTrust" in Settings → Integrations. Each server process then downloads FoxTrust's signed snapshot (about 13 MB a
+  day plus hourly updates) and checks its signature; people's addresses are only compared here and never sent. "From
+  where" on a path of an app behind your proxy, or on an API checked there, can then keep out Tor, commercial VPNs, or
+  hosting and clouds, and allow or keep out countries, either refusing a matching address or, on an app, asking it to
+  sign in again (optionally with a code). With the download off or more than 26 hours old, such a path is closed and
+  the console says why. Check access looks an address up in the server's own copy. Free on every plan. Run
+  `db:migrate`; an older release then refuses to start against the database.
+
 ## [1.7.0] - 2026-11-11
 
 People can turn on two-step verification for their own account, and an administrator can ask for a code from an

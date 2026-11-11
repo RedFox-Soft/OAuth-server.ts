@@ -20,12 +20,14 @@ A condition says "and only if". It never lets anyone in who was not let in befor
 | Condition                | What it checks                                                  | For        |
 | ------------------------ | --------------------------------------------------------------- | ---------- |
 | **From where**           | the address is in one of your ranges, or in none of them        | apps, APIs |
+| **Network facts**        | the address is not Tor, a VPN or hosting, or is in your country | apps, APIs |
 | **When**                 | the moment is inside your hours, in a time zone you choose      | apps, APIs |
 | **Attribute**            | the person's department, title or another field is one of yours | apps, APIs |
 | **Groups**               | the person is in one of your groups                             | APIs       |
 | **Ask to sign in again** | the person signed in no more than N minutes ago                 | apps       |
 
-An app's groups are already in its rule for each path, so groups are a condition only for an API.
+An app's groups are already in its rule for each path, so groups are a condition only for an API. Network facts are
+a part of **From where**, not a condition of their own.
 
 Values inside one condition combine with "or": "from the office or from the VPN". Different conditions combine with
 "and": "from the office, and in working hours". A rule holds at most one condition of each kind.
@@ -43,6 +45,8 @@ The project decides in a fixed order:
 2. Whether the person has signed in, may sign in, and is in the rule's groups.
 3. **Attribute**.
 4. **Ask to sign in again**, last. Nobody is sent to sign in only to be refused afterwards.
+
+Network facts that ask for a new sign-in instead of refusing are judged with **Ask to sign in again**, last.
 
 ## From where: let your proxy pass the address {#from-where}
 
@@ -98,13 +102,101 @@ The key and the address are set in each of the three places that call the check.
   page says when your proxy reports one.
 - A CDN in front of your proxy is not supported, except Cloudflare when your proxy accepts connections only from
   Cloudflare's addresses.
-- The address is only compared with your ranges. It is not logged and not kept.
+- The address is only compared with your ranges and, with network facts, looked up in your server's own copy of
+  FoxTrust's snapshot. It is not logged, not kept and not sent anywhere.
 
 A VPN or a residential proxy can still get around a list of ranges. A network condition slows an attacker down. It
-does not stop one.
+does not stop one. Network facts keep out the VPN services FoxTrust lists, but a residential proxy still gets through.
 
 For an API, the address is the machine that calls it. Hosted assistants call from their own cloud, not from the
 person's network.
+
+## Network facts: Tor, VPNs, hosting and countries {#network-facts}
+
+A list of ranges names addresses you know. Network facts say what an address is, even one you have never seen: an exit
+of the Tor network, a commercial VPN, a data centre, or a country. They are an optional second part of **From where**,
+on a path of an app and on an API. They need the proxy key and the address from the steps above, like a list of
+ranges.
+
+### Turn on the download {#network-facts-download}
+
+Network facts come from FoxTrust, an IP reputation service. FoxTrust publishes a signed snapshot of what it knows about
+internet addresses. Your server downloads the snapshot and checks it itself.
+
+1. A super administrator opens **Settings → Integrations** and turns on **Network facts from FoxTrust**. It is off by
+   default. It is free on every plan.
+2. Each server process then downloads a full file of about 13 MB once a day and an update every hour. It looks for a
+   new file every 5 minutes. It uses a file only after checking its size, its checksum and FoxTrust's signature.
+3. The card under the setting shows when the snapshot was built, its age, how many address ranges it holds, and the
+   last failure, if there was one.
+
+People's addresses are never sent to FoxTrust or anywhere else. Your server only compares them with its own copy.
+FoxTrust learns only that the file was downloaded.
+
+### What you can keep out {#network-facts-categories}
+
+Under **Network facts from FoxTrust**, tick what a path should keep out:
+
+| Choice                 | What it covers                                                                                           |
+| ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Tor**                | The exits of the Tor network.                                                                            |
+| **Commercial VPN**     | Only the VPN services FoxTrust lists. A company's own VPN is not one of them.                            |
+| **Hosting or a cloud** | Data centres and clouds. They also carry content networks and some companies' own exits to the internet. |
+
+iCloud Private Relay is not offered, and its addresses pass. FoxTrust does not count them as a VPN or as hosting.
+
+### Countries {#network-facts-countries}
+
+Choose **Only from** or **Not from**, then the countries. One condition holds one of the two lists, with up to 250
+countries.
+
+- An address with no known country fails **Only from** and passes **Not from**.
+- An address of your proxy's own private network has no country, so **Only from** refuses it. **Not from** passes it,
+  for categories and countries alike.
+- Region and city are not used.
+
+Countries come from DB-IP. Wherever the console shows a country, it also shows the line the data's licence asks for:
+[IP Geolocation by DB-IP](https://db-ip.com), CC BY 4.0.
+
+### What a matching address leads to {#network-facts-outcome}
+
+Choose what happens when an address matches:
+
+- **Refused.** Before any sign-in, the person sees a page titled "You can't open app.example.com from where you are".
+  The page names no source, category or country. Your proxy gets `403` with `X-Auth-Reason: not_from_network`.
+- **Asked to sign in again within N minutes**, for an app only. A person whose sign-in is older than N is sent to sign
+  in again. N is from 5 minutes to a day. Tick **with a code from an authenticator app** to ask for a code too. The
+  console then shows the same count of people as for [a code on Ask to sign in again](#with-code).
+
+An address that does not match is never asked. What FoxTrust knows about a network can be wrong, and asking for a new
+sign-in is gentler than refusing. An API checked at the proxy can only refuse, because a token check has no sign-in to
+ask for.
+
+The rule's line says it in words, for example "not from Tor, a VPN or hosting" or "only from Germany or Austria".
+
+### When the facts are unknown {#network-facts-unknown}
+
+The server cannot say what an address is while the download is off, before the first snapshot loads, and when the
+loaded snapshot was built more than 26 hours ago. Then every path with network facts is closed, whatever its outcome.
+
+- The person sees a page titled "app.example.com can't be opened right now". Your proxy gets `403` with
+  `X-Auth-Reason: network_facts_unknown`.
+- The console marks each such path with the reason.
+- When a fresh snapshot loads, the paths open again on their own.
+
+A failed download changes nothing at once. The server keeps using the last good snapshot until it is 26 hours old.
+
+Network facts can be added or changed only while the download is on. A condition saved earlier stays saved when the
+download is turned off, and closes its path.
+
+### Check an address {#network-facts-check}
+
+In **Check access**, type the address from the person's message. The console looks it up in your server's own copy and
+shows its categories and its country, or says FoxTrust knows nothing about it, with the snapshot's age. The address is not
+sent anywhere. With no address typed, network facts show "?".
+
+An agent sets network facts with `behind_proxy_app_update` or `resource_update`, as `facts` on a `network` condition.
+It explains a refusal with `network_facts_lookup`.
 
 ## When: opening hours {#when}
 
@@ -178,6 +270,6 @@ once. The FoxAuth console itself is never behind these conditions, so a rule can
 
 The first release with conditions marks the database so that an older release refuses to start against it. An older
 release could not enforce conditions, so it must not run. The first release with a code at the proxy marks it again,
-for the same reason. You cannot roll back below this release. During a rolling
+for the same reason, and so does the first release with network facts. You cannot roll back below this release. During a rolling
 deploy, an older process still running answers an error for an app or an API with conditions until it is replaced. It
 never lets a request through.

@@ -34,11 +34,17 @@ import {
 } from '../../../../behind_proxy/access_check.js';
 import {
 	APP_ORDER,
-	type Condition
+	type Condition,
+	type NetworkFacts
 } from '../../../../behind_proxy/conditions.js';
-import { ConditionsEditor } from './ConditionsEditor.js';
+import { ConditionsEditor, DbIpAttribution } from './ConditionsEditor.js';
 import { useCodeConsent, withConsent } from '../applications/codeConsent.js';
-import { conditionText, KIND_LABELS, loosenedText } from './conditionsText.js';
+import {
+	conditionText,
+	KIND_LABELS,
+	loosenedText,
+	namesCountries
+} from './conditionsText.js';
 import {
 	baseWho,
 	widenings,
@@ -50,6 +56,7 @@ import {
 } from '../../../../behind_proxy/decide.js';
 import {
 	addressesProven,
+	networkFactsClosed,
 	behindProxyApi,
 	hostOfAddress,
 	pathText,
@@ -541,6 +548,13 @@ export function AccessTab({
 									.join(' · ')}
 							</Typography.Text>
 						)}
+						{rule.conditions.some(namesCountries) && <DbIpAttribution />}
+						{rule.conditions.some((c) => c.kind === 'network' && c.facts) &&
+							networkFactsClosed(app.addresses.networkFacts) !== null && (
+								<Tag color="red">
+									{networkFactsClosed(app.addresses.networkFacts)}
+								</Tag>
+							)}
 						{writable && (
 							<Button
 								size="small"
@@ -659,6 +673,7 @@ export function AccessTab({
 						}}
 						countUrl={`/admin/api/projects/${encodeURIComponent(bucketId)}/attribute-matches`}
 						disabled={!writable}
+						networkFactsOn={app.addresses.networkFacts?.state !== 'off'}
 						unavailable={
 							addressesProven(app.addresses)
 								? {}
@@ -747,6 +762,47 @@ function momentOf(value: string): number {
 	return Number.isNaN(at) ? Date.now() : at;
 }
 
+/* The lookup route's answer (specs/129 contracts/admin-and-proxy.md). */
+interface FactsAnswer {
+	facts: NetworkFacts;
+	state: 'off' | 'not-yet' | 'current' | 'stale';
+	ageSeconds: number | null;
+}
+
+const CATEGORY_NAMES = {
+	tor: 'a Tor exit',
+	vpn: 'a commercial VPN',
+	hosting: 'hosting or a cloud'
+} as const;
+
+/* What the snapshot says about the address, in words. */
+function factsLine(answer: FactsAnswer): string {
+	const facts = answer.facts;
+	if (!facts.known) {
+		return answer.state === 'off'
+			? 'Network facts are off on this server, so nothing is known about this address.'
+			: 'Network facts are out of date on this server, so nothing is known about this address.';
+	}
+	const parts: string[] = [];
+	if (facts.categories.length > 0) {
+		parts.push(facts.categories.map((c) => CATEGORY_NAMES[c]).join(', '));
+	}
+	if (facts.country !== null) {
+		let name = facts.country;
+		try {
+			name =
+				new Intl.DisplayNames(['en'], { type: 'region' }).of(facts.country) ??
+				name;
+		} catch {
+			name = facts.country;
+		}
+		parts.push(`in ${name}`);
+	}
+	return parts.length === 0
+		? 'FoxTrust knows nothing about this address.'
+		: `FoxTrust: ${parts.join(', ')}.`;
+}
+
 function AccessCheck({
 	bucketId,
 	app,
@@ -764,6 +820,37 @@ function AccessCheck({
 }) {
 	const [address, setAddress] = useState('');
 	const [from, setFrom] = useState('');
+	/*
+	 * What the server's copy of FoxTrust's snapshot says about `from` (specs/129 FR-027), asked only when some rule has
+	 * network facts: the decision runs here and cannot hold the snapshot.
+	 */
+	const [lookedUp, setLookedUp] = useState<{
+		address: string;
+		answer: FactsAnswer;
+	} | null>(null);
+	const wantsFacts = app.rules.some((rule) =>
+		(rule.conditions ?? []).some((c) => c.kind === 'network' && c.facts)
+	);
+	useEffect(() => {
+		const typedFrom = from.trim();
+		if (!wantsFacts || typedFrom === '') return;
+		let current = true;
+		const timer = setTimeout(() => {
+			void request<FactsAnswer>('POST', '/admin/api/network-facts/lookup', {
+				address: typedFrom
+			}).then((result) => {
+				if (current && result.ok) {
+					setLookedUp({ address: typedFrom, answer: result.data });
+				}
+			});
+		}, 400);
+		return () => {
+			current = false;
+			clearTimeout(timer);
+		};
+	}, [from, wantsFacts]);
+	const facts =
+		lookedUp && lookedUp.address === from.trim() ? lookedUp.answer : null;
 	const [moment, setMoment] = useState('');
 	const [signedInAgo, setSignedInAgo] = useState(0);
 	/* Unset until the operator ticks it: then it follows whether the chosen person holds an authenticator app. */
@@ -828,6 +915,7 @@ function AccessCheck({
 		address: typed,
 		person,
 		from: from.trim() === '' ? null : from.trim(),
+		...(facts ? { network: facts.facts } : {}),
 		at
 	};
 	const saved = typed
@@ -877,7 +965,11 @@ function AccessCheck({
 			case 'ambiguous_path':
 				return 'The app could read this path differently (an encoded slash or dot, a backslash, a semicolon), so it is refused before any rule.';
 			case 'not_from_network':
-				return 'The address is not one the conditions let in, so it is refused before anyone signs in.';
+				return decision.networkPart === 'facts'
+					? 'FoxTrust’s snapshot puts this address in a network or country the conditions keep out, so it is refused before anyone signs in.'
+					: 'The address is not one the conditions let in, so it is refused before anyone signs in.';
+			case 'network_facts_unknown':
+				return 'Network facts are off or out of date on this server, so a path that relies on them is closed for everyone.';
 			case 'outside_hours':
 				return 'It is outside the hours the conditions allow.';
 			case 'attribute_mismatch':
@@ -1020,6 +1112,23 @@ function AccessCheck({
 						Signed in with a code from an authenticator app
 					</Checkbox>
 				</Flex>
+				{wantsFacts && facts && (
+					<Flex
+						vertical
+						gap={2}
+					>
+						<Typography.Text>
+							{factsLine(facts)} Snapshot{' '}
+							{facts.ageSeconds === null
+								? 'not loaded'
+								: `${String(Math.floor(facts.ageSeconds / 60))} minutes old`}
+							, this server&apos;s copy; the address was not sent anywhere.
+						</Typography.Text>
+						{facts.facts.known && facts.facts.country !== null && (
+							<DbIpAttribution />
+						)}
+					</Flex>
+				)}
 				{!typed && (
 					<Typography.Text type="secondary">
 						Paste an address from the browser and choose a person to see whether

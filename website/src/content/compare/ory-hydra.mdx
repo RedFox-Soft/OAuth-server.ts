@@ -244,6 +244,19 @@ groups:
         verdict: us
         why: 'With Ory a condition on address or hours at the proxy is a service you write, called by Oathkeeper, a second product. Here it is a field on the rule in the console.'
         note: 'The Oathkeeper authorizer page lists `allow`, `deny`, `keto_engine_acp_ory`, `remote` and `remote_json`. The remote_json authorizer "makes a HTTP POST request to a remote endpoint with a JSON body."'
+      - dimension: 'Tor, VPNs, hosting and countries at your proxy'
+        us:
+          {
+            status: flag,
+            text: "Behind networkFacts.enabled, off by default, on every plan. A rule for a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads FoxTrust's signed snapshot, about 13 MB a day plus an update every hour, and compares people's addresses only with its own copy. A matching address is refused or, on an app, asked to sign in again. A snapshot more than 26 hours old closes those paths until a fresh one loads."
+          }
+        them:
+          {
+            status: no,
+            text: 'Not in Hydra. Ory Oathkeeper, a separate Ory product, has no authorizer that knows the country or the kind of network of an address. Its remote authorizer can call a service you write that does.'
+          }
+        verdict: us
+        why: 'With Ory, keeping Tor or a country out is a service you write and feed with data, called by a second product. Here it is a choice on the rule.'
       - dimension: Licence
         us:
           {

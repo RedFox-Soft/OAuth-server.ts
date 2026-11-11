@@ -106,6 +106,17 @@ console-bundled), so the fact `signedInWithCode` is computed server-side; the co
   audience ignores the path's other conditions, so the counts are an upper bound.
 - Turning it off is a loosening (`atLeastAsStrict` requires `!before.withCode || after.withCode`).
 
+## Network facts in "From where" (spec 129)
+
+The network condition may carry `facts`: FoxTrust categories to keep out (tor, vpn, hosting with cloud), countries
+"only from" or "not from", and an outcome, Refuse or (apps only) Sign in again within N, optionally with a code. A
+Refuse match is decided with the ranges, before any session; a sign-in-again match joins the fresh conditions
+(`freshOf`, `decide.ts`), so the sign-in, the callback's code check and the code pages above serve it unchanged.
+Facts that are off, not loaded, older than 26 hours or unreadable fail every such condition: the opposite of the
+attacker list, and the reason the proxy answers `network_facts_unknown`. An address with no record has no category
+and no country, so a non-public address passes "not from" categories and countries, unlike "Not from" ranges. Saving
+`facts` while the download is off is 409 `network_facts_off`. Download, reader and lookup: [[network-facts]].
+
 ## Attributes a person cannot set
 
 Selectable: the enterprise profile fields, `title` and `claim:<key>`, except the claims federation copies in and the
@@ -116,7 +127,9 @@ server's own (`NOT_SELECTABLE_CLAIMS`, `conditions.ts`). A condition nobody in t
 
 `widenings()` probes paths for "who" as before and, per probe path, compares the gathered conditions kind by kind
 (`condition_widening.ts`): ranges by coverage, windows by a 10 080-minute bitmap (a zone change always widens), values
-by subset, `maxAgeMinutes` by order and `withCode` as a flag that may only stay or appear. Sound, not exact: it may ask once too often, never too rarely (property test C28).
+by subset, `maxAgeMinutes` by order and `withCode` as a flag that may only stay or appear; network `facts` by
+categories kept (a superset), countries (an "only" list may only shrink, a "not" list only grow, "not" → "only" only
+when disjoint) and outcome (Refuse is never looser; a sign-in again only shorter, its code only kept or added). Sound, not exact: it may ask once too often, never too rarely (property test C28).
 
 ## Rollback fails closed
 
@@ -125,7 +138,8 @@ A rule with conditions is stored as `who: { kind: 'conditional', who, conditions
 `2026-11-06-proxy-conditions-fence` makes an older release refuse to start and its `db:migrate` exit 1. Cost: no
 rollback below this release, and during a rolling deploy older processes answer errors for conditioned apps and APIs.
 Spec 128 adds `2026-11-12-proxy-code-condition-fence` for `withCode`, which the closed fresh-condition schema of an older
-release refuses.
+release refuses. Spec 129 adds `2026-11-13-proxy-network-facts-fence` for `facts`, with which the ranges may be empty
+and an older release would otherwise let everyone through.
 
 ## Related
 

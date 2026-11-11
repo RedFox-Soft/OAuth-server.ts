@@ -1,5 +1,9 @@
 import { canSignIn } from '../end_users/can_sign_in.js';
-import { attributesOfRecord, type Condition } from './conditions.js';
+import {
+	attributesOfRecord,
+	type Condition,
+	type NetworkFacts
+} from './conditions.js';
 import {
 	decide,
 	withConditions,
@@ -101,6 +105,8 @@ export interface AccessCheckInput {
 	person: Person | null;
 	/* What conditions are judged on (specs/124); a null input is one the administrator did not give. */
 	from?: string | null;
+	/* What the server's snapshot says about `from` (specs/129), asked of the lookup route; absent: not checked. */
+	network?: NetworkFacts;
 	at?: number | null;
 	timeZone?: string | null;
 }
@@ -115,6 +121,7 @@ export function checkAccess({
 	address,
 	person,
 	from = null,
+	network,
 	at = null,
 	timeZone = null
 }: AccessCheckInput): Decision {
@@ -124,6 +131,7 @@ export function checkAccess({
 		rawPath: targetOf(address).rawPath,
 		person,
 		address: from,
+		...(network ? { network } : {}),
 		at,
 		timeZone,
 		explain: true

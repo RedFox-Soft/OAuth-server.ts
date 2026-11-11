@@ -126,6 +126,16 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		`;
 	}
 
+	async raiseNetworkFactsBuiltAt(builtAt: string): Promise<void> {
+		const handle = sql();
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(doc, '{networkFactsBuiltAt}', to_jsonb(${builtAt}::text))
+			WHERE id = ${this.stateId}
+			  AND (doc->>'networkFactsBuiltAt' IS NULL OR doc->>'networkFactsBuiltAt' < ${builtAt})
+		`;
+	}
+
 	async read(): Promise<TelemetryState | null> {
 		const handle = sql();
 		const rows = await handle`

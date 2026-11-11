@@ -722,7 +722,13 @@ export const TelemetryState = t.Object({
 	 * The `builtAt` of the last FoxTrust attacker list any process of this instance accepted (specs/125). Kept so
 	 * an older signed list is refused after a restart too; only ever raised.
 	 */
-	attackerListBuiltAt: t.Optional(t.String())
+	attackerListBuiltAt: t.Optional(t.String()),
+	/*
+	 * The build time of the newest FoxTrust network facts any process of this instance accepted (specs/129 research
+	 * R1): the later of the full file's and its update's. Kept so an older signed pair is refused after a restart
+	 * too; only ever raised.
+	 */
+	networkFactsBuiltAt: t.Optional(t.String())
 });
 export type TelemetryState = Static<typeof TelemetryState>;
 
@@ -755,6 +761,8 @@ export interface TelemetryStateStoreInstance {
 	 * can never lower it. Called after instanceId(), which guarantees the document exists.
 	 */
 	raiseAttackerListBuiltAt(builtAt: string): Promise<void>;
+	/* The same for `networkFactsBuiltAt` (specs/129). */
+	raiseNetworkFactsBuiltAt(builtAt: string): Promise<void>;
 	read(): Promise<TelemetryState | null>;
 }
 
@@ -1486,11 +1494,49 @@ export const TimeWindowSchema = t.Object(
 	},
 	closed
 );
+/*
+ * The network facts part of "From where" (specs/129 data-model §7). Closed at every level: a release that predates a
+ * field refuses the record rather than reading the ranges alone and letting everyone through.
+ */
+const NetworkFactsSchema = t.Object(
+	{
+		categories: t.Array(
+			t.Union([t.Literal('tor'), t.Literal('vpn'), t.Literal('hosting')]),
+			{ maxItems: 3, uniqueItems: true }
+		),
+		countries: t.Optional(
+			t.Object(
+				{
+					mode: t.Union([t.Literal('only'), t.Literal('not')]),
+					codes: t.Array(t.String({ pattern: '^[A-Z]{2}$' }), {
+						minItems: 1,
+						maxItems: 250,
+						uniqueItems: true
+					})
+				},
+				closed
+			)
+		),
+		outcome: t.Union([
+			t.Object({ kind: t.Literal('refuse') }, closed),
+			t.Object(
+				{
+					kind: t.Literal('sign_in_again'),
+					maxAgeMinutes: t.Integer({ minimum: 5, maximum: 1440 }),
+					withCode: t.Optional(t.Literal(true))
+				},
+				closed
+			)
+		])
+	},
+	closed
+);
 const NetworkConditionSchema = t.Object(
 	{
 		kind: t.Literal('network'),
 		only: t.Array(t.String({ maxLength: 60 }), { maxItems: 100 }),
-		not: t.Array(t.String({ maxLength: 60 }), { maxItems: 100 })
+		not: t.Array(t.String({ maxLength: 60 }), { maxItems: 100 }),
+		facts: t.Optional(NetworkFactsSchema)
 	},
 	closed
 );

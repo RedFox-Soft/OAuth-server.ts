@@ -1830,6 +1830,26 @@ const proxyCodeConditionFence: Migration = {
 	postgres: { noop: true, reason: PROXY_CODE_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/129 research R14). "From where" may now hold a part judged on FoxTrust's network facts,
+ * with ranges that may be empty. A release that predates it refuses the record its closed condition schema does not
+ * know, and one that read it anyway would decide on the ranges alone and let everyone through. Recording this
+ * migration makes the startup gate of every older release see a database that is ahead, and refuse it.
+ */
+const PROXY_NETWORK_FACTS_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than network facts at the proxy refuses to start against a database that may hold a condition on them.';
+
+const proxyNetworkFactsFence: Migration = {
+	id: '2026-11-13-proxy-network-facts-fence',
+	description:
+		'Mark the database as holding conditions at the proxy on where a connection comes from (Tor, VPN, hosting, country), so that an older release refuses to start against it rather than letting everyone through',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: PROXY_NETWORK_FACTS_FENCE_REASON },
+	postgres: { noop: true, reason: PROXY_NETWORK_FACTS_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1845,5 +1865,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	planConnectedServicesLimit,
 	proxyConditionsFence,
 	appRequiresCodeFence,
-	proxyCodeConditionFence
+	proxyCodeConditionFence,
+	proxyNetworkFactsFence
 ];

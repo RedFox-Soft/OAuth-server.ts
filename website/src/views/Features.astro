@@ -148,6 +148,7 @@ const groups = [
 		{ ...administration.behindProxy },
 		{ ...administration.proxyApi },
 		{ ...administration.proxyConditions },
+		{ ...administration.proxyNetworkFacts, flag: 'networkFacts.enabled' },
 		{ ...administration.clientIdMetadataDocument, flag: 'clientIdMetadataDocument.enabled' },
 		{ ...administration.registration, flag: 'registration.enabled', spec: rfc('7591') },
 		{

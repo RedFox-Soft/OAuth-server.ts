@@ -109,7 +109,9 @@ export const REPORTED_SETTINGS: readonly string[] = [
 	/* Whether this server feeds the attack reports; the receiver cannot otherwise tell "no attacks" from "off". */
 	'attackReports.enabled',
 	/* How many instances take the list back is the measure of whether it is worth building. */
-	'attackerList.enabled'
+	'attackerList.enabled',
+	/* How many instances keep anonymising networks or countries out of a path decides whether the snapshot stays free. */
+	'networkFacts.enabled'
 ];
 
 export const UNREPORTED_SETTINGS: Readonly<Record<string, string>> = {

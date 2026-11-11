@@ -213,6 +213,19 @@ groups:
         verdict: us
         why: 'With ZITADEL a condition is a service you write and run, called by an Action. Here it is a field on the rule for a path or an API, and your proxy has it checked.'
         note: 'The Actions v2 guide lists the use case "Implement IP blocking or rate limiting based on API usage patterns," and says "interruptOnError" must be true for a target to interrupt the execution.'
+      - dimension: 'Tor, VPNs, hosting and countries at your proxy'
+        us:
+          {
+            status: flag,
+            text: "Behind networkFacts.enabled, off by default, on every plan. A rule for a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads FoxTrust's signed snapshot, about 13 MB a day plus an update every hour, and compares people's addresses only with its own copy. A matching address is refused or, on an app, asked to sign in again. A snapshot more than 26 hours old closes those paths until a fresh one loads."
+          }
+        them:
+          {
+            status: no,
+            text: 'No check endpoint for a proxy, and no built-in condition on the country or the kind of network of an address. An Actions v2 target you run can stop a call by its IP address, with data you supply.'
+          }
+        verdict: us
+        why: 'With ZITADEL the lookup and its data are yours to run. Here they are a choice on the rule, from a signed snapshot the server keeps current.'
       - dimension: Managed hosting
         us:
           {
