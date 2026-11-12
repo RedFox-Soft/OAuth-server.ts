@@ -1,9 +1,11 @@
+import { configuration } from '../../../configs/application.ts';
 import { satisfiesAcr, sl1, sl1Exempt } from '../../../sl1/rules.ts';
 import {
 	codeRequiredAndMissing,
 	proxyAsksForCode,
 	REQUIRE_CODE_DESCRIPTION
 } from '../../../client_policy/require_code.ts';
+import { API_CODE_DESCRIPTION } from '../../../resources/sign_in_requirement.ts';
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
 import { Prompt, type CheckPartial } from '../prompt.js';
@@ -14,6 +16,34 @@ import {
 	CREATE_PROMPT,
 	CREATE_PROMPT_REASON
 } from '../../../consts/prompt_create.ts';
+
+/* The first requested API with a sign-in requirement this check is about, and its identifier. */
+function requiringApi(
+	oidc: OIDCContext<PipelineParams>,
+	about: (signIn: { code: boolean; maxAgeSeconds?: number }) => boolean
+): string | undefined {
+	for (const [identifier, server] of Object.entries(oidc.resourceServers)) {
+		if (server.signIn && about(server.signIn)) return identifier;
+	}
+	return undefined;
+}
+
+/* The shortest sign-in age the requested APIs allow, in seconds, with the API that sets it. */
+function strictestApiMaxAge(
+	oidc: OIDCContext<PipelineParams>
+): { maxAge: number; api: string } | undefined {
+	let found: { maxAge: number; api: string } | undefined;
+	for (const [identifier, server] of Object.entries(oidc.resourceServers)) {
+		const maxAge = server.signIn?.maxAgeSeconds;
+		if (
+			maxAge !== undefined &&
+			(found === undefined || maxAge < found.maxAge)
+		) {
+			found = { maxAge, api: identifier };
+		}
+	}
+	return found;
+}
 
 class LoginPromt extends Prompt {
 	name = 'login';
@@ -84,6 +114,31 @@ class LoginPromt extends Prompt {
 					return true;
 				}
 				return false;
+			}
+		},
+		{
+			reason: 'resource_max_age',
+			description: 'End-User authentication could not be obtained',
+			/*
+			 * A requested API asks its people to sign in again every so often (specs/130 research R4), read from the
+			 * declaration, never from the request: the client may not know to ask. Its own reason rather than a written
+			 * `max_age`, which would reach the ID token and the proxy's notice; the details carry the age so a provider
+			 * sign-in is asked for a fresh one too.
+			 */
+			check: (oidc) => {
+				const strictest = strictestApiMaxAge(oidc);
+				if (strictest === undefined) return false;
+				if (!oidc.session.payload.accountId) return true;
+				return (
+					oidc.session.past(strictest.maxAge) &&
+					(!oidc.result || !oidc.result.login)
+				);
+			},
+			details: (oidc) => {
+				const strictest = strictestApiMaxAge(oidc);
+				return strictest === undefined
+					? {}
+					: { apiMaxAge: strictest.maxAge, api: strictest.api };
 			}
 		},
 		{
@@ -227,6 +282,25 @@ class LoginPromt extends Prompt {
 				codeRequiredAndMissing(oidc.client, oidc.acr) ||
 				proxyAsksForCode(oidc.client, oidc.params.acr_values, oidc.acr),
 			details: () => ({ requireCode: true })
+		},
+		{
+			reason: 'resource_code',
+			description: API_CODE_DESCRIPTION,
+			/*
+			 * A requested API requires a sign-in with a code (specs/130 research R4): the same page and the same set-up as
+			 * an application's requirement, through CODE_REASONS, with the API named instead of the app.
+			 */
+			error: 'unmet_authentication_requirements',
+			check: (oidc) =>
+				requiringApi(
+					oidc,
+					(signIn) =>
+						signIn.code && oidc.acr !== configuration.acrMap.multi_factor
+				) !== undefined,
+			details: (oidc) => ({
+				requireCode: true,
+				api: requiringApi(oidc, (signIn) => signIn.code)
+			})
 		}
 	];
 }

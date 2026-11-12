@@ -31,6 +31,7 @@ import {
 	type AddressesView
 } from '../behind-proxy/appView.js';
 import { KIND_LABELS } from '../behind-proxy/conditionsText.js';
+import { signInEveryText } from './ResourceSignInFields.js';
 import { groupsApi, type GroupView } from '../groups/groupShared.js';
 
 interface ToolsForm {
@@ -63,9 +64,12 @@ export function ToolsDrawer({
 	tools,
 	checkedBy,
 	addresses,
+	signIn,
 	onClose,
 	onSaved
 }: {
+	/* The API's sign-in requirement (specs/130), shown here and changed in the API's own form. */
+	signIn?: { requireCode: boolean; signInEveryMinutes: number | null };
 	bucketId: string;
 	/* The API's own admin address, `…/resources/:resourceId`. */
 	url: string;
@@ -224,6 +228,22 @@ export function ToolsDrawer({
 				{byProxy && (
 					<>
 						<Typography.Title level={5}>Who can call it</Typography.Title>
+						{signIn &&
+							(signIn.requireCode || signIn.signInEveryMinutes !== null) && (
+								<Typography.Paragraph type="secondary">
+									{[
+										signIn.requireCode
+											? 'A sign-in with a code from an authenticator app is required.'
+											: null,
+										signIn.signInEveryMinutes !== null
+											? `${signInEveryText(signIn.signInEveryMinutes)}.`
+											: null
+									]
+										.filter(Boolean)
+										.join(' ')}{' '}
+									Change it in Edit…
+								</Typography.Paragraph>
+							)}
 						<ConditionsEditor
 							conditions={conditions}
 							kinds={API_ORDER}

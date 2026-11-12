@@ -80,6 +80,8 @@ type IntrospectedPayload = {
 	'x5t#S256'?: string;
 	groups?: string[];
 	groupsSource?: string;
+	acr?: string;
+	authTime?: number;
 };
 
 // The JSON answer (the JWT form is built from it by the handler).
@@ -174,7 +176,14 @@ async function renderTokenResponse(
 		jti: payload.jti !== params.token ? payload.jti : undefined,
 		aud: payload.aud,
 		scope: payload.scope || undefined,
-		token_type: payload.kind !== 'RefreshToken' ? token.tokenType : undefined
+		token_type: payload.kind !== 'RefreshToken' ? token.tokenType : undefined,
+		/*
+		 * How and when the person signed in (RFC 9470 §6.2), as the token carries it: what lets an API that checks its
+		 * own tokens hold them to its sign-in requirement (specs/130 research R8). Never invented for a token without.
+		 */
+		acr: typeof payload.acr === 'string' ? payload.acr : undefined,
+		auth_time:
+			typeof payload.authTime === 'number' ? payload.authTime : undefined
 	};
 
 	if (payload.accountId) {

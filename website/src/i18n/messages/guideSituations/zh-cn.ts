@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'b61f6001714a';
+export const source = 'f8d509f511ce';
 
 export default {
 	questions: {
@@ -562,7 +562,8 @@ export default {
 				'智能体要查找的描述文档（protected resource metadata）由项目自己发布，所以你的 MCP 服务器不需要为登录提供任何东西。',
 				'被撤销的令牌在代理处仍然有效，直到它过期，除非这个 API 签发的是不透明（opaque）令牌。请把令牌有效期设得短一些。',
 				'绑定到密钥的令牌（DPoP 或证书）会被代理拒绝，因为代理无法检查这个密钥。',
-				'确保只能通过你的代理访问 MCP 服务器。没有条件时，任何能登录这个项目的人都能获得它的令牌。所有方案都可以使用。'
+				'确保只能通过你的代理访问 MCP 服务器。没有条件时，任何能登录这个项目的人都能获得它的令牌。所有方案都可以使用。',
+				'如果要在智能体连接之前要求输入身份验证器应用中的验证码，或者定期要求重新登录，请在该 API 的 Edit 表单中设置。'
 			]
 		},
 		proxynetwork: {
@@ -874,6 +875,51 @@ export default {
 				'对于在你的代理之后的应用，请改为在路径的 “Ask to sign in again” 条件上勾选 “with a code from an authenticator app”。'
 			],
 			actionLabel: '打开应用'
+		},
+		apicode: {
+			title: '连接 MCP 服务器或 API 时要求验证码',
+			sentence:
+				'只有当智能体所代表的用户使用身份验证器应用中的验证码登录之后，智能体才能连接你的 MCP 服务器。用户还需要按你选择的频率重新登录。',
+			protocol: 'OAuth 2.0 Step Up Authentication Challenge (RFC 9470)',
+			problemCaption: '被盗的密码就能让智能体连接到你的 MCP 服务器。',
+			fixCaption: '只有带验证码的登录才能让智能体连接。',
+			lanes: {
+				person: '用户',
+				agent: 'AI 智能体',
+				fox: 'FoxAuth',
+				mcp: '你的 MCP 服务器'
+			},
+			steps: [
+				{
+					label: '连接',
+					text: '智能体向 FoxAuth 申请用于你的 MCP 服务器的令牌。'
+				},
+				{
+					label: '密码和验证码',
+					text: '无论智能体请求了什么，FoxAuth 都会先要求用户输入密码，再输入身份验证器应用中的验证码。'
+				},
+				{
+					label: '用于你的服务器的令牌',
+					text: '令牌中写明这次登录包含了验证码。'
+				},
+				{
+					label: '调用工具',
+					text: '你的服务器或你的代理只接受登录时输入过验证码的令牌。'
+				}
+			],
+			sees: [
+				'登录页面上有一行文字写出你的 MCP 服务器的名称',
+				'输入密码后再输入身份验证器应用中的验证码',
+				'如果没有，会看到一个可以设置并继续的页面'
+			],
+			goodToKnow: [
+				'在该 API 的 Edit 表单中打开 “Require a code from an authenticator app”。“Ask to sign in again every” 要求用户至少按这个频率重新连接。保存前，你会看到这会影响哪些人。',
+				'并不是每个应用都会主动要求用户重新登录。在 Claude Code 中，用户要在 /mcp 中重新连接服务器。在 claude.ai 中，用户会看到 Connect 卡片。ChatGPT 和 Codex 可能只显示一个错误。请用你的用户实际使用的应用试一试。',
+				'如果应用在重新登录之后没有继续，用户需要让它再试一次。',
+				'没有验证码时建立的连接会在下一次续期时停止，用户需要带验证码重新登录。',
+				'不代表任何人的应用，以及通过断言（assertion）登录的方式，都无法连接。通过身份提供方登录的人无法在这里输入验证码。'
+			],
+			actionLabel: '打开 API 列表'
 		},
 		knownguessers: {
 			title: '阻止已知地址猜测密码',

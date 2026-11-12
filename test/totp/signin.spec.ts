@@ -233,7 +233,7 @@ describe('second factor at sign-in (US3)', () => {
 		expect(res.location).toBeNull();
 	});
 
-	it('refuses a code that was already spent, inside its own window', async () => {
+	it('refuses a code that was already spent, inside its own window, saying it was just used', async () => {
 		const email = `replay-${Math.random()}@x.io`;
 		await seedEnrolled(requiredBucketId, email);
 		const code = currentCode();
@@ -248,7 +248,9 @@ describe('second factor at sign-in (US3)', () => {
 			code
 		});
 		expect(replay.status).toBe(400);
-		expect(replay.text).toContain(INVALID_CODE);
+		expect(replay.text).toContain(
+			'This code was just used. Wait for the next one.'
+		);
 	});
 
 	it('accepts a code from the adjacent step, tolerating clock drift', async () => {

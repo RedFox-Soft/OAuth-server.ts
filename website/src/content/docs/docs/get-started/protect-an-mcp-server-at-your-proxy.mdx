@@ -222,6 +222,108 @@ There is nothing to switch on, and it is on every plan.
 To let only some groups call the API, or only from your network or in your hours, see [Add conditions at your
 proxy](/docs/get-started/add-conditions-at-your-proxy/).
 
+## Ask for a code or a recent sign-in {#require-a-code-or-a-recent-sign-in}
+
+A token says that someone signed in to the project. It does not say how. So a stolen password is enough to connect an
+agent to your MCP server. Two settings in the API's edit form change that. Open the project's **APIs** tab and choose
+**Edit…** on the API's row:
+
+- **Require a code from an authenticator app.** A token for this API is issued only after a sign-in in which the
+  person typed a code from an authenticator app, such as Google Authenticator.
+- **Ask to sign in again every.** Choose every day, every 7 days, every 14 days, or **Custom**: a whole number of
+  hours or days, from 1 hour to 14 days. The person behind a token must have signed in no longer ago than that.
+
+You can set one, the other or both. They work on any API, whoever checks its tokens: your proxy or the API's own
+server. An agent can set them through the admin MCP server, with `requireCode` and `signInEveryMinutes` in
+`resource_declare` and `resource_update`. They are free on every plan.
+
+### What FoxAuth does {#what-foxauth-does}
+
+There is a standard answer an API sends to ask for a stronger or more recent sign-in: `401` with
+`error="insufficient_user_authentication"` (RFC 9470). On 2026-11-12, no MCP client we looked at understood it. But
+every client asks for a new token when it gets a `401`. FoxAuth issues that token, so it makes the requirement hold
+itself:
+
+- When a person signs in to get a token for this API, FoxAuth asks for the code, whatever the client asked for. When
+  the person's sign-in is older than allowed, FoxAuth asks them to sign in again.
+- The sign-in page has a line that names the API, such as "Files asks for a code from an authenticator app to
+  connect." or "Files asks you to sign in again every day to stay connected."
+- A person with no authenticator app can set one up inside the same sign-in, if the project lets people set one up
+  themselves.
+- Every way of getting a token for a person checks the requirement: the authorization code, the device flow, CIBA
+  and the refresh token.
+- A renewal with a refresh token that would not meet the requirement is refused with `invalid_grant`. The refresh
+  token is not spent. The client then starts a new sign-in, and the person's other connections keep working.
+- At your proxy, the check judges each token by the sign-in it came from. A token that falls short gets `401` with
+  `WWW-Authenticate: Bearer error="insufficient_user_authentication"` and `acr_values="…"` or `max_age="…"`. This is
+  the standard challenge, for the clients that learn it. `X-Auth-Reason` is `code_required` or `sign_in_not_fresh`.
+- Token introspection returns `acr` and `auth_time`, so an API that checks its own tokens can apply the same rule.
+
+An API that checks its own tokens decides about the tokens it already holds. A token issued before you turned the
+requirement on keeps working there until it expires, unless your server checks `acr` and `auth_time` in the token.
+Its renewal is refused either way.
+
+### Who cannot connect {#who-cannot-connect}
+
+Some tokens stand for no sign-in that FoxAuth saw. No new sign-in can fix them, so they are refused, not asked to sign
+in again:
+
+- **An app that acts for no one.** An app that gets tokens for itself, with the client credentials grant, gets no
+  token for this API. At your proxy, such a token gets `403`.
+- **A sign-in by assertion.** A token from the JWT bearer grant, identity assertions or ID-JAG is refused too. The
+  person signed in somewhere else, and FoxAuth cannot tell how.
+
+People who sign in through a provider, such as Google or your company's identity provider, are a third case. They
+cannot type a code at FoxAuth. So when the API requires a code, the sign-in page tells them they cannot connect this
+way. When the API only asks them to sign in again, FoxAuth sends them to the provider for a new sign-in. The provider
+decides how to do that, and FoxAuth cannot confirm that they signed in again.
+
+### Before you save: whom it affects {#before-you-save}
+
+Turning a requirement on, or shortening the time, first shows you whom it affects:
+
+- how many of the people who can reach the API have no authenticator app;
+- how many sign in only through a provider;
+- how many have a live connection that includes this API.
+
+It also names the apps that can no longer connect: those that act for no one, and those that sign in by assertion.
+The counts start with "Up to", because FoxAuth does not record who uses each API. You confirm the change with these
+numbers. An agent gets the same numbers: the first call answers `409` `confirmationRequired`, and the agent repeats
+it with `confirm: true`.
+
+If you upgrade an instance to this release, run `bun run db:migrate` first. After that, an older release refuses to
+start against the database, so it cannot issue tokens that skip the code.
+
+## What your people see in each app {#what-your-people-see-in-each-app}
+
+FoxAuth refuses the old token or its renewal, and asks at the next sign-in. What a person sees in between depends on
+the app they use. The table comes from each app's code, documentation and issue tracker, as we read them on
+2026-11-12. We have not yet tried each app live. Try it with the apps your people use before you rely on it.
+
+| App                       | What the person sees                                                                                                      | What they do                                                                                                 |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Claude Code               | It renews the token and tries once more. Then it marks the server as needing authentication.                              | Run `/mcp`, choose the server, then **Re-authenticate**. The call does not carry on by itself, so ask again. |
+| claude.ai, Claude Desktop | A Connect card and a sign-in window. This is documented for an invalid token. We have not yet seen it for this challenge. | Choose **Connect** and sign in.                                                                              |
+| ChatGPT                   | Perhaps only an error.                                                                                                    | Reconnect the connector in ChatGPT's settings.                                                               |
+| Codex                     | It may try the refused renewal again and again.                                                                           | Reconnect the server.                                                                                        |
+| VS Code (GitHub Copilot)  | A sign-in window. Several calls at once can open several windows.                                                         | Sign in in one window. A code typed again in another says "This code was just used. Wait for the next one."  |
+| Cursor, Zed, Gemini CLI   | The server is marked as needing authentication.                                                                           | Re-authenticate the server by hand.                                                                          |
+
+If an app does not carry on after the new sign-in, ask it to try again.
+
+## Try it {#try-it}
+
+1. Declare an MCP server as in [step 1](#declare-the-api) and configure your proxy, or take one you already have.
+2. Choose **Edit…** on its row and turn on **Require a code from an authenticator app**. Read whom it affects, and
+   save.
+3. Connect your MCP client to the server. The sign-in page names the API and asks for a code after the password. If
+   you have no authenticator app, set one up there.
+4. Call a tool. It works.
+5. Choose **Edit…** again. Set **Ask to sign in again every** to **Custom**, 1 hour, and save.
+6. An hour later, call a tool again. The next renewal is refused, and your client asks you to sign in again, or does
+   what the table above says for it.
+7. If the app does not carry on after the new sign-in, ask it to try again.
+
 <Aside type="tip">
 	A web app people open in a browser, with no sign-in of its own, goes behind
 	the proxy differently. See [Put sign-in in front of a web

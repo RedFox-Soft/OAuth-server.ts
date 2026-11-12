@@ -292,7 +292,12 @@ describe('MCP tool catalogue', () => {
 			'client_update',
 			'federation_provider_create',
 			'federation_provider_update',
-			/* Who checks an API's tokens, and which scopes each of its tools needs at the proxy (specs/123). */
+			/* Whether a new API requires a sign-in with a code or a recent one (specs/130). */
+			'resource_declare',
+			/*
+			 * Who checks an API's tokens, which scopes each of its tools needs at the proxy (specs/123), and how its people
+			 * must have signed in (specs/130).
+			 */
 			'resource_update'
 		]);
 		for (const tool of sometimes) {

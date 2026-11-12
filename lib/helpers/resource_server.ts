@@ -21,12 +21,19 @@ export type ResourceServerJwt = {
 	};
 };
 
+/*
+ * How the person behind a token for this resource must have signed in (specs/130 research R2): with a code, and no
+ * longer ago than `maxAgeSeconds`. Only a declared API carries it; every grant and the sign-in read it from here.
+ */
+export type ResourceSignIn = { code: boolean; maxAgeSeconds?: number };
+
 export type ResourceServerInfo = {
 	scope: string;
 	audience?: string;
 	accessTokenFormat?: 'jwt' | 'opaque';
 	accessTokenTTL?: number;
 	jwt?: ResourceServerJwt;
+	signIn?: ResourceSignIn;
 };
 
 /*
@@ -64,6 +71,7 @@ export default class ResourceServer {
 	accessTokenTTL: ResourceServerInfo['accessTokenTTL'];
 	accessTokenFormat: ResourceServerInfo['accessTokenFormat'];
 	jwt: ResourceServerInfo['jwt'];
+	signIn: ResourceServerInfo['signIn'];
 
 	constructor(identifier: string, data: ResourceServerInfo) {
 		assertResourceServerInfo(identifier, data);
@@ -73,6 +81,7 @@ export default class ResourceServer {
 		this.accessTokenTTL = data.accessTokenTTL;
 		this.accessTokenFormat = data.accessTokenFormat;
 		this.jwt = data.jwt;
+		this.signIn = data.signIn;
 	}
 
 	get scopes() {

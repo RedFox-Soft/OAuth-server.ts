@@ -1665,6 +1665,16 @@ export const ProtectedResource = t.Object({
 	checkedBy: t.Optional(t.Union([t.Literal('server'), t.Literal('proxy')])),
 	/* Which scopes each MCP tool needs when the proxy checks the tokens; absent or with no rows, none beyond a valid token. */
 	tools: t.Optional(ToolsTable),
+	/*
+	 * How the person behind a token for this API must have signed in (specs/130 research R1): with a code from an
+	 * authenticator app, and no longer ago than this many minutes. Absent means no requirement. Set only by the admin
+	 * routes, and enforced by the authorization server at every grant for a person and at the proxy's check, so it
+	 * holds whoever checks this API's tokens.
+	 */
+	requireCode: t.Optional(t.Literal(true)),
+	signInEveryMinutes: t.Optional(
+		t.Number({ minimum: 60, maximum: 20160, multipleOf: 60 })
+	),
 	/* As an app's `addressProvenAt` and `addressForgedAt` (specs/124 research R6). */
 	proxyAddressProvenAt: t.Optional(t.Date()),
 	proxyAddressForgedAt: t.Optional(t.Date()),
@@ -1687,6 +1697,9 @@ export type ProtectedResourcePatch = Partial<
 > & {
 	/* `null` removes the API's exchanging application (specs/118 R3). */
 	exchangedBy?: string | null;
+	/* `false` and `null` remove the requirement (specs/130); never stored as such. */
+	requireCode?: boolean;
+	signInEveryMinutes?: number | null;
 };
 
 export interface ProtectedResourceStoreInstance {
@@ -1702,6 +1715,8 @@ export interface ProtectedResourceStoreInstance {
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
+		requireCode?: boolean;
+		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource>;
 	find(
 		namespace: string,

@@ -1850,6 +1850,26 @@ const proxyNetworkFactsFence: Migration = {
 	postgres: { noop: true, reason: PROXY_NETWORK_FACTS_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/130 research R11). An API may now require a sign-in with a code, or a recent one, in two
+ * fields at the top level of its record. That level is an open schema, so a release that predates them would read the
+ * record, ignore both, and issue tokens to anyone. Recording this migration makes the startup gate of every older
+ * release see a database that is ahead, and refuse it.
+ */
+const API_SIGN_IN_REQUIREMENT_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than sign-in requirements on APIs refuses to start against a database that may hold one.';
+
+const apiSignInRequirementFence: Migration = {
+	id: '2026-11-14-api-sign-in-requirement-fence',
+	description:
+		'Mark the database as holding APIs that may require a sign-in with a code or a recent sign-in, so that an older release refuses to start against it rather than issuing tokens that ignore the requirement',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: API_SIGN_IN_REQUIREMENT_FENCE_REASON },
+	postgres: { noop: true, reason: API_SIGN_IN_REQUIREMENT_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1866,5 +1886,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	proxyConditionsFence,
 	appRequiresCodeFence,
 	proxyCodeConditionFence,
-	proxyNetworkFactsFence
+	proxyNetworkFactsFence,
+	apiSignInRequirementFence
 ];

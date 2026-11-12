@@ -1,3 +1,7 @@
+import {
+	requirementFields,
+	requirementPatch
+} from '../resource_requirement.js';
 import type {
 	ProtectedResource,
 	ProtectedResourcePatch,
@@ -29,6 +33,8 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
+		requireCode?: boolean;
+		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource> {
 		const _id = declarationId(data.namespace, data.identifier);
 		if (this.resources.has(_id)) {
@@ -50,6 +56,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			accessTokenTTL: data.accessTokenTTL ?? 900,
 			trailingSlashSignificant: data.trailingSlashSignificant ?? false,
 			...(data.checkedBy ? { checkedBy: data.checkedBy } : {}),
+			...requirementFields(data),
 			createdAt: now,
 			updatedAt: now
 		};
@@ -79,8 +86,10 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	): Promise<ProtectedResource | null> {
 		const resource = this.resources.get(declarationId(namespace, identifier));
 		if (!resource) return null;
-		const { exchangedBy, ...rest } = patch;
-		Object.assign(resource, rest, { updatedAt: new Date() });
+		const { exchangedBy, requireCode, signInEveryMinutes, ...rest } = patch;
+		const requirement = requirementPatch({ requireCode, signInEveryMinutes });
+		Object.assign(resource, rest, requirement.set, { updatedAt: new Date() });
+		for (const key of requirement.unset) delete resource[key];
 		if (exchangedBy === null) delete resource.exchangedBy;
 		else if (exchangedBy !== undefined) resource.exchangedBy = exchangedBy;
 		return resource;

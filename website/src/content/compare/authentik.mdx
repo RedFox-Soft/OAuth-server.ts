@@ -12,6 +12,7 @@ sources:
   - https://docs.goauthentik.io/add-secure-apps/providers/proxy/header_authentication/
   - https://docs.goauthentik.io/customize/policies/types/geoip/
   - https://docs.goauthentik.io/install-config/geoip/
+  - https://docs.goauthentik.io/add-secure-apps/flows-stages/stages/authenticator_validate/
 bottomLine: 'Pick authentik if you are replacing an SSO estate that speaks SAML, LDAP or RADIUS as well as OIDC. If the applications are your own and what you need is an OAuth 2.1 authorization server with the banking-grade profiles and no enterprise tier to buy, pick FoxAuth.'
 chooseThem:
   - 'Your estate has applications that speak SAML, LDAP or RADIUS alongside OpenID Connect.'
@@ -220,6 +221,20 @@ groups:
         verdict: different
         why: 'authentik reads country and ASN from a database it ships, with no download to turn on. FoxAuth adds Tor, commercial VPN and hosting as categories, from a snapshot updated every hour, and can ask for a new sign-in instead of refusing.'
         note: 'The GeoIP policy page says the policy can "detect impossible travel patterns." The GeoIP page says "GeoIP is bundled and does not require any additional setup."'
+      - dimension: 'A code or a recent sign-in for one API or MCP server'
+        us:
+          {
+            status: yes,
+            text: 'Any API or MCP server a project declares can require a sign-in with a code from an authenticator app, a sign-in no older than a time you choose from 1 hour to 14 days, or both. The authorization server holds it: the sign-in for that API asks for the code or a new sign-in, whatever the client asked for, and a refresh that falls short is refused without spending the refresh token, so the client starts a new sign-in. A token your proxy checks that falls short gets the RFC 9470 insufficient_user_authentication challenge. Introspection returns acr and auth_time. On every plan.'
+          }
+        them:
+          {
+            status: yes,
+            text: "An Authenticator validation stage in a flow asks for a second factor, and its last validation threshold skips the question if the person used one within a time window. A flow belongs to a sign-in or to an application's provider, not to an API a token is for."
+          }
+        verdict: different
+        why: 'authentik asks for a second factor in a flow, for a sign-in or an application. FoxAuth sets it on the API the token is for, so every app that connects to it is held to it, renewals included.'
+        note: 'The Authenticator validation stage page says the threshold lets it "skip validation if the user has successfully used a compatible device within the configured time window."'
       - dimension: Licence
         us:
           {

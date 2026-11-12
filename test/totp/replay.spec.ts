@@ -50,7 +50,7 @@ describe('a second-factor code used more than once', () => {
 
 		expect(outcomes.filter((outcome) => outcome.ok)).toHaveLength(1);
 		expect(
-			outcomes.filter((outcome) => !outcome.ok && outcome.reason === 'invalid')
+			outcomes.filter((outcome) => !outcome.ok && outcome.reason === 'reused')
 		).toHaveLength(5);
 	});
 
@@ -63,7 +63,7 @@ describe('a second-factor code used more than once', () => {
 		});
 		expect(await verifyForAccount(BUCKET, accountId, code)).toEqual({
 			ok: false,
-			reason: 'invalid'
+			reason: 'reused'
 		});
 	});
 

@@ -51,6 +51,14 @@ export const ACTIONS = {
 		cancelText: 'Keep editing'
 	},
 
+	// Turns machines, assertion sign-ins and people without a code away from an API (specs/130): asked with the counts.
+	'resource.signIn.confirm': {
+		class: 'C2',
+		title: (t) => `Change how people sign in to use ${t}?`,
+		okText: 'Save the requirement',
+		cancelText: 'Keep editing'
+	},
+
 	'resource.declare': { class: 'C0' },
 	'resource.edit': { class: 'C0' },
 	// The bucket's own applications may hold tokens for it, so the question names them (specs/085).

@@ -26,6 +26,7 @@ import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import { assertSignInMeets } from '../../resources/sign_in_requirement.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { resourceTokenGroups } from '../../bucket_groups/claim.js';
 import { issuerFor } from '../../configs/issuer.js';
@@ -88,6 +89,34 @@ export const handler = async function refreshTokenHandler(
 	oidc.entity('RefreshToken', refreshToken);
 	oidc.entity('Grant', grant);
 	oidc.entity('Account', account);
+
+	/*
+	 * The resource is resolved, and an API's sign-in requirement judged (specs/130 research R5), before the token is
+	 * rotated. A refusal after rotation would leave the presented token spent, and the client's retry with it would read
+	 * as reuse and revoke the person's whole sign-in; refused here, the token is untouched and still renews for any
+	 * other resource of the same grant.
+	 */
+	const scope = oidc.params.scope
+		? oidc.requestParamScopes
+		: refreshToken.scopes;
+	/*
+	 * A no-op today: authorization_details is absent from the strict /token body schema, so the
+	 * parameter can never be present here and the grant-level checks written for RFC 9396 §6 are
+	 * unreachable. Kept as the seam §6 support plugs into rather than deleted and re-added — see
+	 * specs/015-rar-end-to-end/research.md R19.
+	 */
+	await checkRar(oidc);
+	const resource = await resolveResource(oidc, refreshToken, undefined, scope);
+	const resourceServer = resource
+		? new ResourceServer(
+				resource,
+				await getResourceServerInfo(oidc, resource, oidc.client)
+			)
+		: undefined;
+	assertSignInMeets(resourceServer, {
+		acr: refreshToken.payload.acr,
+		authTime: refreshToken.payload.authTime
+	});
 
 	const reused = async () =>
 		new InvalidGrant((await revokeReused(oidc, refreshToken)).reason);
@@ -173,25 +202,8 @@ export const handler = async function refreshTokenHandler(
 		at.payload.gty = `${at.payload.gty} ${gty}`;
 	}
 
-	const scope = oidc.params.scope
-		? oidc.requestParamScopes
-		: refreshToken.scopes;
-	/*
-	 * A no-op today: authorization_details is absent from the strict /token body schema, so the
-	 * parameter can never be present here and the grant-level checks written for RFC 9396 §6 are
-	 * unreachable. Kept as the seam §6 support plugs into rather than deleted and re-added — see
-	 * specs/015-rar-end-to-end/research.md R19.
-	 */
-	await checkRar(oidc);
-	const resource = await resolveResource(oidc, refreshToken, undefined, scope);
-
-	if (resource) {
-		const resourceServerInfo = await getResourceServerInfo(
-			oidc,
-			resource,
-			oidc.client
-		);
-		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
+	if (resource && resourceServer) {
+		at.resourceServer = resourceServer;
 		at.payload.scope = grant.getResourceScopeFiltered(
 			resource,
 			[...scope].filter(Set.prototype.has.bind(at.resourceServer.scopes))

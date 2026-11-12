@@ -264,6 +264,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   in `lib/consts/attack_report_fields.ts`; an attack is counted by one synchronous `noteAttack` beside the
   refusal, only when a credential was presented, and its address never goes to a log line or a bus event.
   → `instance-telemetry.md`, `attack-reports.md`
+- **An API's sign-in requirement** — a code, or a recent sign-in, declared on the API and enforced by this server,
+  never by the client: judged on the sign-in's own `acr` and `auth_time` through `signInRequirementUnmet`, at the
+  sign-in, at every grant for a person, at a refresh before it rotates, and at the proxy; a token no sign-in can fix
+  (a machine's, an assertion's) is refused, never asked to sign in again. → `api-sign-in-requirement.md`
 - **FoxTrust's network facts** — downloaded and verified per process through `lib/foxtrust/` with the same pinned keys,
   never an older pair than one accepted, and they fail CLOSED: off, not loaded or more than 26 hours old is
   `{ known: false }`, which closes every path with a network facts condition. Looked up only for the address the check

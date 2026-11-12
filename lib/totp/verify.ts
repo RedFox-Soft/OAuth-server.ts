@@ -38,7 +38,7 @@ export type Outcome =
 	| { ok: true }
 	| {
 			ok: false;
-			reason: 'invalid' | 'throttled' | 'not_enrolled';
+			reason: 'invalid' | 'throttled' | 'not_enrolled' | 'reused';
 			/* This wrong code used up the short window, the first time today: the person is to be told. */
 			exhausted?: true;
 	  };
@@ -123,8 +123,13 @@ export async function verifyForAccount(
 		{ accountId, exp: now + SPENT_STEP_TTL_SECONDS },
 		SPENT_STEP_TTL_SECONDS
 	);
+	/*
+	 * The right code, already spent: another sign-in window took it moments ago (specs/130 research R10). Still a
+	 * failure, counted in both windows, but named, so a person with two windows open is not told they mistyped. It
+	 * tells a guesser nothing: only a code that was valid seconds ago reaches here.
+	 */
 	if (!spent) {
-		return { ok: false, reason: 'invalid' };
+		return { ok: false, reason: 'reused' };
 	}
 
 	/*

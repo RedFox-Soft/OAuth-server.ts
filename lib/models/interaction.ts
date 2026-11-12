@@ -25,7 +25,10 @@ const PendingPrompt = t.Object({
 			missingResourceScopes: t.Optional(
 				t.Record(t.String(), t.Array(t.String()))
 			),
-			rar: t.Optional(t.Array(t.Unknown()))
+			rar: t.Optional(t.Array(t.Unknown())),
+			/* The API that asks for a code or a recent sign-in, and the age it allows in seconds (specs/130). */
+			api: t.Optional(t.String()),
+			apiMaxAge: t.Optional(t.Number())
 		},
 		{ additionalProperties: true }
 	)

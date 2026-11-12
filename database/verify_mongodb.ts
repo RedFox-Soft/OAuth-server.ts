@@ -1,3 +1,4 @@
+import { verifyApiSignInRequirement } from './verify_api_sign_in_requirement.js';
 import { createHash } from 'node:crypto';
 
 import { STORE_AREAS } from '../lib/consts/storage_inventory.js';
@@ -731,6 +732,7 @@ await verifyOutsideServers(
 	adapter('AssertionUsage'),
 	check
 );
+await verifyApiSignInRequirement(resources, check);
 await verifyBehindProxy(
 	new BehindProxyAppStore(),
 	adapter('BehindProxySession'),

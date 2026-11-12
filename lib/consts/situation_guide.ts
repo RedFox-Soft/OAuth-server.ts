@@ -1392,7 +1392,8 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'The project publishes the description agents look for (the protected resource metadata), so your MCP server serves nothing for sign-in.',
 			'A revoked token keeps working at the proxy until it expires, unless the API issues opaque tokens. Keep the lifetime short.',
 			'Tokens bound to a key (DPoP or a certificate) are refused at the proxy, because the proxy cannot check the key.',
-			'Make sure your MCP server is reachable only through your proxy. Without a condition, anyone who can sign in to the project can get a token for it. It is on every plan.'
+			'Make sure your MCP server is reachable only through your proxy. Without a condition, anyone who can sign in to the project can get a token for it. It is on every plan.',
+			'To ask for a code from an authenticator app, or a new sign-in every so often, before an agent connects, set it in the API’s Edit form.'
 		],
 		prompt: prompt(
 			'Check tokens for my MCP server at https://mcp.example.com/mcp in my reverse proxy (work out Caddy, Traefik or nginx from my configuration), so the server needs no auth code.\nDeclare it in FoxAuth as an API whose tokens the proxy checks (checkedBy proxy), with its scopes. Then set its tools table: each tool and the scopes it needs. Add the configuration its Connect gives to my proxy.',
@@ -1911,6 +1912,75 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Make my billing application in FoxAuth require a code from an authenticator app, and tell me first how many people that affects.',
 			'client_update (requireCode)',
 			'Make my app show a helpful page when it receives unmet_authentication_requirements.'
+		)
+	},
+	{
+		id: 'apicode',
+		tab: 'product',
+		title: 'Ask for a code to connect an MCP server or API',
+		sentence:
+			'An agent connects to your MCP server only after its person signs in with a code from an authenticator app, and signs in again as often as you choose.',
+		protocol: 'OAuth 2.0 Step Up Authentication Challenge (RFC 9470)',
+		lanes: lanes('person', 'agent', 'fox', 'mcp'),
+		steps: [
+			step(
+				'agent',
+				'fox',
+				'Connect',
+				'The agent asks FoxAuth for a token for your MCP server.'
+			),
+			step(
+				'person',
+				'fox',
+				'Password and code',
+				'FoxAuth asks the person for the password, then a code from the app, whatever the agent asked for.'
+			),
+			step(
+				'fox',
+				'agent',
+				'Token for your server',
+				'The token says the sign-in included a code.',
+				'token'
+			),
+			step(
+				'agent',
+				'mcp',
+				'Calls a tool',
+				'Your server, or your proxy, accepts only a token whose sign-in had a code.'
+			)
+		],
+		problem: {
+			at: 'mcp',
+			mark: 'password',
+			caption: 'A stolen password connects an agent to your MCP server.',
+			lanes: ['person', 'mcp']
+		},
+		fixCaption: 'Only a sign-in with a code connects an agent.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'A line on the sign-in page that names your MCP server',
+				'A code from an authenticator app after the password',
+				'Without one, a page that offers to set one up and continue'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open APIs',
+			target: { area: 'apis' }
+		},
+		goodToKnow: [
+			'Turn it on in the API’s Edit form, under "Require a code from an authenticator app". "Ask to sign in again every" asks people to reconnect at least that often. Before it saves, you see whom it affects.',
+			'Not every app asks people to sign in again on its own. In Claude Code they reconnect the server in /mcp. In claude.ai they get a Connect card. ChatGPT and Codex may only show an error. Try it with the apps your people use.',
+			'If an app does not carry on after the new sign-in, the person asks it to try again.',
+			'A connection made without a code stops at its next renewal, and its person signs in again with one.',
+			'Apps that act for no one, and sign-ins by assertion, cannot connect. People who sign in through a provider cannot give a code here.'
+		],
+		prompt: prompt(
+			'Make my MCP server in FoxAuth require a sign-in with a code from an authenticator app, and tell me first whom that affects.',
+			'resource_update (requireCode, signInEveryMinutes)',
+			'If my MCP server checks its own tokens, make it refuse a token whose acr is not the multi-factor value FoxAuth names.'
 		)
 	},
 	{

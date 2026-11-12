@@ -123,6 +123,26 @@ export const en = {
 	},
 
 	/*
+	 * An API the app connects to requires a sign-in with a code, or a recent one (specs/130). The API is named: the
+	 * project declared it. The app never is, unless the project stands behind it.
+	 */
+	apiNotices: {
+		codeAsked: '{api} asks for a code from an authenticator app to connect.',
+		everyHour: '{api} asks you to sign in again every hour to stay connected.',
+		everyDay: '{api} asks you to sign in again every day to stay connected.',
+		everyHours: {
+			one: '{api} asks you to sign in again every {count} hour to stay connected.',
+			other:
+				'{api} asks you to sign in again every {count} hours to stay connected.'
+		},
+		everyDays: {
+			one: '{api} asks you to sign in again every {count} day to stay connected.',
+			other:
+				'{api} asks you to sign in again every {count} days to stay connected.'
+		}
+	},
+
+	/*
 	 * An application that requires a code from an authenticator app, reached by a sign-in that gave none (specs/127).
 	 * The app is named only where the page may name it (the masthead rule); a value is always a value.
 	 */
@@ -148,6 +168,8 @@ export const en = {
 	errors: {
 		invalidCredentials: 'Invalid username or password',
 		invalidCode: 'Invalid code',
+		/* A code accepted moments ago, typed again: another sign-in window used it (specs/130 research R10). */
+		codeJustUsed: 'This code was just used. Wait for the next one.',
 		passwordsDiffer: 'Passwords do not match',
 		mailLimited:
 			'Too many emails were requested from your network in the last hour. Please try again later.',

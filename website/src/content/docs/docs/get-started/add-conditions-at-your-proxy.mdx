@@ -27,7 +27,9 @@ A condition says "and only if". It never lets anyone in who was not let in befor
 | **Ask to sign in again** | the person signed in no more than N minutes ago                 | apps       |
 
 An app's groups are already in its rule for each path, so groups are a condition only for an API. Network facts are
-a part of **From where**, not a condition of their own.
+a part of **From where**, not a condition of their own. An API has no **Ask to sign in again** condition. Instead, its
+own edit form can require a code from an authenticator app or a recent sign-in: see [Ask for a code or a recent
+sign-in](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
 
 Values inside one condition combine with "or": "from the office or from the VPN". Different conditions combine with
 "and": "from the office, and in working hours". A rule holds at most one condition of each kind.
@@ -169,8 +171,9 @@ Choose what happens when an address matches:
   console then shows the same count of people as for [a code on Ask to sign in again](#with-code).
 
 An address that does not match is never asked. What FoxTrust knows about a network can be wrong, and asking for a new
-sign-in is gentler than refusing. An API checked at the proxy can only refuse, because a token check has no sign-in to
-ask for.
+sign-in is gentler than refusing. On an API checked at the proxy, network facts can only refuse: a token check has no
+browser to send to a sign-in. An API can still ask for a code or a recent sign-in, through its own settings: see [Ask
+for a code or a recent sign-in](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
 
 The rule's line says it in words, for example "not from Tor, a VPN or hosting" or "only from Germany or Austria".
 

@@ -92,6 +92,26 @@ describe('a client credentials token for a declared resource', () => {
 		expect(res.status).toBe(200);
 	});
 
+	// specs/130: a token for nobody never meets a sign-in requirement, so the API refuses it rather than loop.
+	it('is refused when the resource requires a sign-in with a code or a recent one', async () => {
+		const store = getProtectedResourceStore();
+		await store.update(ROOT_NAMESPACE, AUDIENCE, { signInEveryMinutes: 60 });
+		try {
+			const res = await tokenAs('client', 'secret');
+
+			expect(res.status).toBe(400);
+			expect(res.error?.value).toMatchObject({
+				error: 'invalid_target',
+				error_description:
+					"this API accepts only tokens from a person's sign-in"
+			});
+		} finally {
+			await store.update(ROOT_NAMESPACE, AUDIENCE, {
+				signInEveryMinutes: null
+			});
+		}
+	});
+
 	it('is refused to an application that registered itself in the declaring bucket', async () => {
 		const res = await tokenAs('self-registered', 'self-registered-secret');
 

@@ -323,6 +323,19 @@ groups:
           }
         verdict: us
         why: 'With Keycloak, knowing that an address is a Tor exit or in another country takes your own code and your own data. Here it is a choice on the rule, from a signed snapshot the server keeps current.'
+      - dimension: 'A code or a recent sign-in for one API or MCP server'
+        us:
+          {
+            status: yes,
+            text: 'Any API or MCP server a project declares can require a sign-in with a code from an authenticator app, a sign-in no older than a time you choose from 1 hour to 14 days, or both. The authorization server holds it: the sign-in for that API asks for the code or a new sign-in, whatever the client asked for, and a refresh that falls short is refused without spending the refresh token, so the client starts a new sign-in. A token your proxy checks that falls short gets the RFC 9470 insufficient_user_authentication challenge. Introspection returns acr and auth_time. On every plan.'
+          }
+        them:
+          {
+            status: yes,
+            text: "A step-up flow asks for a second factor by the level of authentication (acr) a client requests, and a condition's Max Age says how long a level stays valid. The level is requested by, or set on, the client application, not on the API a token is for."
+          }
+        verdict: different
+        why: "Keycloak's step-up has levels and flows of its own, but the client asks for the level. Here the API asks, so an MCP client that knows nothing of levels is still held to it."
   - label: Licence and cost
     rows:
       - dimension: Licence

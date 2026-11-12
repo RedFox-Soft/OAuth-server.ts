@@ -31,6 +31,11 @@ export interface CodeRequiredPageProps {
 	email?: string;
 	/* As the sign-in button names the provider; present for the provider variants. */
 	provider?: string;
+	/*
+	 * An API that requires the code (specs/130), by the name its project declared: the heading names it, and the way
+	 * back names no app, since the app the person came from is not the one asking.
+	 */
+	api?: string;
 	logoSrc?: string;
 	switcher?: SwitcherProps;
 	face: SignInFace;
@@ -41,17 +46,19 @@ export function CodeRequiredPage({
 	variant,
 	email = '',
 	provider = '',
+	api,
 	logoSrc = DEFAULT_LOGO,
 	switcher,
 	face
 }: CodeRequiredPageProps) {
 	const T = SIGN_IN_TEXTS[useLanguage()].codeRequired;
-	const app = face.app?.name;
+	const app = api === undefined ? face.app?.name : undefined;
 	const service = face.service;
-	const heading = app ? (
+	const asking = api ?? app;
+	const heading = asking ? (
 		<Message
 			t={T.headingApp}
-			values={{ app }}
+			values={{ app: asking }}
 		/>
 	) : (
 		T.headingAny

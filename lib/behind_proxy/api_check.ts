@@ -10,6 +10,14 @@ import { readBearer, type BearerRefusal } from './bearer.js';
 import { believedAddress } from './believed_address.js';
 import { noteAddress } from './usage.js';
 import { decideTool, decodeMcpName, hasControlCharacter } from './tools.js';
+import { configuration } from '../configs/application.js';
+import epochTime from '../helpers/epoch_time.js';
+import { signInOf } from '../resources/registry.js';
+import {
+	CHALLENGE_CODE_DESCRIPTION,
+	CHALLENGE_RECENT_DESCRIPTION,
+	signInRequirementUnmet
+} from '../resources/sign_in_requirement.js';
 import {
 	chargeApp,
 	chargeUnknown,
@@ -68,15 +76,31 @@ function emitDecision(
 	});
 }
 
+/* RFC 6750 §3's characters for a quoted value: printable ASCII without `"` or `\`. */
+function quotable(value: string): boolean {
+	for (let i = 0; i < value.length; i++) {
+		const c = value.charCodeAt(i);
+		if (c < 0x20 || c > 0x7e || c === 0x22 || c === 0x5c) return false;
+	}
+	return true;
+}
+
 /* The `WWW-Authenticate` of a refusal about the token (RFC 6750 §3), always naming where the metadata is. */
-function challenge(
+export function challenge(
 	metadataUrl: string,
 	parameters: Record<string, string> = {}
 ): string {
 	const pairs = Object.entries({
 		...parameters,
 		resource_metadata: metadataUrl
-	}).map(([name, value]) => `${name}="${value}"`);
+	})
+		/*
+		 * Only RFC 6750 §3's characters, so no value can close its quotes and add a parameter, and none outside Latin-1
+		 * can make the header unbuildable, which would answer 500 (specs/130 research R7). A parameter with anything else
+		 * is left out: every value here is a server constant, a declared scope or the metadata address.
+		 */
+		.filter(([, value]) => quotable(value))
+		.map(([name, value]) => `${name}="${value}"`);
 	return `Bearer ${pairs.join(', ')}`;
 }
 
@@ -193,6 +217,50 @@ async function evaluate({
 			clientId: presented.clientId
 		});
 		return refused(accessRefused);
+	}
+	/*
+	 * How the person behind the token signed in (specs/130 research R6), after the conditions no new sign-in could
+	 * change and before the tools table, judged on the token's own facts. A token with no sign-in time stands for
+	 * nobody a sign-in could fix, so it is refused rather than asked to sign in again: a machine asked that would loop.
+	 */
+	const signIn = signInOf(api);
+	if (signIn) {
+		if (presented.signedInAt === null) {
+			emitDecision(addressed, 'refuse', 'no_person', {
+				clientId: presented.clientId
+			});
+			return refused('no_person');
+		}
+		const unmet = signInRequirementUnmet(
+			signIn,
+			{ acr: presented.acr, authTime: presented.signedInAt },
+			epochTime()
+		);
+		if (unmet) {
+			const reason = unmet.code ? 'code_required' : 'sign_in_not_fresh';
+			emitDecision(addressed, 'refuse', reason, {
+				clientId: presented.clientId
+			});
+			return answer(
+				401,
+				reason,
+				{
+					'WWW-Authenticate': challenge(metadataUrl, {
+						error: 'insufficient_user_authentication',
+						error_description: unmet.code
+							? CHALLENGE_CODE_DESCRIPTION
+							: CHALLENGE_RECENT_DESCRIPTION,
+						...(unmet.code
+							? { acr_values: configuration.acrMap.multi_factor }
+							: {}),
+						...(unmet.recent && signIn.maxAgeSeconds !== undefined
+							? { max_age: String(signIn.maxAgeSeconds) }
+							: {})
+					})
+				},
+				reason
+			);
+		}
 	}
 	/*
 	 * The tools table (research R6). The headers mirror a body the proxy never sees, so they decide only for a

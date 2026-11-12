@@ -3,6 +3,8 @@ import { decodeJwt } from 'jose';
 
 import bootstrap, { changeClient, seedAccount } from '../test_helper.js';
 import { ISSUER } from 'lib/configs/env.js';
+import { getProtectedResourceStore } from 'lib/adapters/index.ts';
+import { ROOT_NAMESPACE } from 'lib/resources/namespace.ts';
 import { shaped } from 'test/shape.js';
 import {
 	OAuthError,
@@ -106,6 +108,19 @@ describe('a plain assertion presented with the JWT bearer grant', () => {
 			expect(refusal(res)).toBe('invalid_grant');
 		} finally {
 			await restore();
+		}
+	});
+
+	// specs/130: an API that requires a code or a recent sign-in never meets one from an outside assertion.
+	it('is refused with invalid_grant when the API requires a sign-in with a code', async () => {
+		const store = getProtectedResourceStore();
+		await store.update(ROOT_NAMESPACE, PROFILE_API, { requireCode: true });
+		try {
+			const res = await asMigrator(await plain(), { scope: 'profile.read' });
+
+			expect(refusal(res)).toBe('invalid_grant');
+		} finally {
+			await store.update(ROOT_NAMESPACE, PROFILE_API, { requireCode: false });
 		}
 	});
 

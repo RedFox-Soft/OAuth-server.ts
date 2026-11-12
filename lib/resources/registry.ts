@@ -1,5 +1,6 @@
 import { adapter, getProtectedResourceStore } from '../adapters/index.js';
 import type { ProtectedResource } from '../adapters/types.js';
+import type { ResourceSignIn } from '../helpers/resource_server.js';
 import { canonicalizeResourceIdentifier } from './canonical.js';
 
 /*
@@ -20,6 +21,20 @@ export interface DeclaredResourceInfo {
 	readonly scope: string;
 	readonly accessTokenFormat: 'jwt' | 'opaque';
 	readonly accessTokenTTL: number;
+	readonly signIn?: ResourceSignIn;
+}
+
+/* The record's sign-in requirement as the token path reads it, or undefined when it has none (specs/130 R2). */
+export function signInOf(
+	resource: Pick<ProtectedResource, 'requireCode' | 'signInEveryMinutes'>
+): ResourceSignIn | undefined {
+	const code = resource.requireCode === true;
+	const minutes = resource.signInEveryMinutes;
+	if (!code && minutes === undefined) return undefined;
+	return {
+		code,
+		...(minutes === undefined ? {} : { maxAgeSeconds: minutes * 60 })
+	};
 }
 
 /*
@@ -72,6 +87,7 @@ export async function resolveDeclaredResource(
 ): Promise<DeclaredResourceInfo | undefined> {
 	const resource = await findDeclaredResource(identifier, namespace);
 	if (!resource) return undefined;
+	const signIn = signInOf(resource);
 
 	return {
 		audience: resource.identifier,
@@ -82,7 +98,8 @@ export async function resolveDeclaredResource(
 		 */
 		scope: resource.scopes.join(' '),
 		accessTokenFormat: resource.tokenFormat,
-		accessTokenTTL: resource.accessTokenTTL
+		accessTokenTTL: resource.accessTokenTTL,
+		...(signIn ? { signIn } : {})
 	};
 }
 

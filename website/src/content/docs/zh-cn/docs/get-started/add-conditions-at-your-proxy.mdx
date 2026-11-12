@@ -1,7 +1,7 @@
 ---
 title: 在代理处添加条件
 description: '只允许从您的网络、只在工作时间、只允许某个部门，或只在近期登录之后，进入代理后的应用或 API。'
-source: a29811b1f161
+source: 7639cbc98465
 sidebar:
   order: 9
 ---
@@ -24,7 +24,7 @@ import ProxyRecipe from '../../../../../components/ProxyRecipe.astro';
 | **Groups**               | 此人属于您的某个用户组                             | API       |
 | **Ask to sign in again** | 此人在 N 分钟之内登录过                            | 应用      |
 
-应用的用户组已经写在每个路径的规则里，因此只有 API 才把用户组作为条件。网络信息是 **From where** 的一部分，不是单独的条件。
+应用的用户组已经写在每个路径的规则里，因此只有 API 才把用户组作为条件。网络信息是 **From where** 的一部分，不是单独的条件。API 没有 **Ask to sign in again** 条件，但可以在它自己的编辑表单中要求身份验证器应用中的验证码或近期登录：请参阅[连接时要求验证码或近期登录](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in)。
 
 同一个条件内的值用“或”组合：“来自办公室或来自 VPN”。不同的条件用“且”组合：“来自办公室，且在工作时间”。每条规则每种条件最多一个。
 
@@ -134,7 +134,7 @@ iCloud Private Relay 不在选项中，它的地址可以通过。FoxTrust 不�
 - **Refused**。在任何登录之前，此人会看到一个标题为“You can't open app.example.com from where you are”的页面，以他的语言显示。页面不会提到来源、类别或国家。您的代理会收到 `403` 和 `X-Auth-Reason: not_from_network`。
 - **Asked to sign in again within N minutes**，只适用于应用。登录早于 N 分钟的人会被转去重新登录。N 从 5 分钟到一天。勾选 **with a code from an authenticator app**，还会要求输入验证码。此时控制台会显示与[在 Ask to sign in again 中要求验证码](#with-code)相同的人数。
 
-不符合条件的地址不会被要求任何操作。FoxTrust 对某个网络的判断可能有误，而要求重新登录比直接拒绝更温和。在代理处检查的 API 只能拒绝，因为检查令牌时没有可以要求的登录。
+不符合条件的地址不会被要求任何操作。FoxTrust 对某个网络的判断可能有误，而要求重新登录比直接拒绝更温和。对于在代理处检查的 API，网络信息只能拒绝，因为检查令牌时没有可以送去登录的浏览器。不过 API 仍然可以通过它自己的设置要求验证码或近期登录：请参阅[连接时要求验证码或近期登录](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in)。
 
 规则那一行会用文字描述条件，例如“not from Tor, a VPN or hosting”或“only from Germany or Austria”。
 

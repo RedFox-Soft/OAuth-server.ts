@@ -410,3 +410,5 @@ Operations:
 ## [2026-11-12] update | [[network-facts]] — measured on the live publication after FoxTrust 040: RSS +24.5 MB per pair, +43.3 MB during a swap, about 60 MB of downloads a day; the reader now walks the tree on 32-bit words instead of a bigint per bit (6x faster lookups, no heap growth).
 
 ## [2026-11-12] update | [[token-checks-at-your-proxy]] — an MCP header sent twice reached the tools table joined with ", ", so `tools/call` twice passed as an uncovered method without the row's scopes; a comma in any of the three MCP headers is now `bad_mcp_header`.
+
+## [2026-11-12] add | [[api-sign-in-requirement]] — spec 130: an API can require a sign-in with a code and a recent sign-in; FoxAuth enforces it at the sign-in (`resource_code`, `resource_max_age`), at every grant, at a refresh before rotation, and at the proxy (RFC 9470 challenge, 403 for machines); introspection reports acr and auth_time; a reused code is named. Corrected [[token-checks-at-your-proxy]] (the console does not call `decideTool`), [[totp-second-factor]] and [[authentication-context-reporting]].

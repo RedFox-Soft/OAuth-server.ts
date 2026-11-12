@@ -93,6 +93,18 @@ export const zhHans: SignInTexts = {
 		codeAsked: '您要登录的应用需要身份验证器应用中的验证码。'
 	},
 
+	apiNotices: {
+		codeAsked: '{api} 需要身份验证器应用中的验证码才能连接。',
+		everyHour: '{api} 要求您每小时重新登录一次，以保持连接。',
+		everyDay: '{api} 要求您每天重新登录一次，以保持连接。',
+		everyHours: {
+			other: '{api} 要求您每 {count} 小时重新登录一次，以保持连接。'
+		},
+		everyDays: {
+			other: '{api} 要求您每 {count} 天重新登录一次，以保持连接。'
+		}
+	},
+
 	codeRequired: {
 		headingApp: '{app} 需要身份验证器应用中的验证码',
 		headingAny: '您要登录的应用需要身份验证器应用中的验证码',
@@ -113,6 +125,7 @@ export const zhHans: SignInTexts = {
 	errors: {
 		invalidCredentials: '用户名或密码无效',
 		invalidCode: '验证码无效',
+		codeJustUsed: '此验证码刚刚已被使用。请等待下一个验证码。',
 		passwordsDiffer: '两次输入的密码不一致',
 		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。',
 		passwordTooShort: {

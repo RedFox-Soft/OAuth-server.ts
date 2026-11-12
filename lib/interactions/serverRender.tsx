@@ -312,6 +312,8 @@ export async function codeRequiredServer(
 		variant: CodeRequiredVariant;
 		email?: string;
 		provider?: string;
+		/* The API that requires the code, by its declared name (specs/130); the page then names it, not the app. */
+		api?: string;
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
@@ -319,19 +321,20 @@ export async function codeRequiredServer(
 		face?: SignInFace;
 	}
 ) {
-	const { variant, email, provider, switcher } = options;
+	const { variant, email, provider, api, switcher } = options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	const logoSrc = versionedAsset('logo.svg');
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
 		SIGN_IN_TEXTS[language].titles.codeRequired,
-		{ uid, variant, email, provider, logoSrc, switcher, face },
+		{ uid, variant, email, provider, api, logoSrc, switcher, face },
 		<CodeRequiredPage
 			uid={uid}
 			variant={variant}
 			email={email}
 			provider={provider}
+			api={api}
 			logoSrc={logoSrc}
 			switcher={switcher}
 			face={face}

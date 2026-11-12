@@ -1,3 +1,7 @@
+import {
+	requirementFields,
+	requirementPatch
+} from '../resource_requirement.js';
 import { db } from './db.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS } from '../../consts/storage_inventory.js';
@@ -56,6 +60,8 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
+		requireCode?: boolean;
+		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource> {
 		const now = new Date();
 		const resource: ProtectedResource = {
@@ -72,6 +78,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			accessTokenTTL: data.accessTokenTTL ?? 900,
 			trailingSlashSignificant: data.trailingSlashSignificant ?? false,
 			...(data.checkedBy ? { checkedBy: data.checkedBy } : {}),
+			...requirementFields(data),
 			createdAt: now,
 			updatedAt: now
 		};
@@ -110,16 +117,24 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		identifier: string,
 		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null> {
-		const { exchangedBy, ...rest } = patch;
+		const { exchangedBy, requireCode, signInEveryMinutes, ...rest } = patch;
+		const requirement = requirementPatch({ requireCode, signInEveryMinutes });
+		const unset = [
+			...requirement.unset,
+			...(exchangedBy === null ? ['exchangedBy'] : [])
+		];
 		const result = await this.collection.findOneAndUpdate(
 			{ _id: declarationId(namespace, identifier) },
 			{
 				$set: {
 					...rest,
+					...requirement.set,
 					...(typeof exchangedBy === 'string' ? { exchangedBy } : {}),
 					updatedAt: new Date()
 				},
-				...(exchangedBy === null ? { $unset: { exchangedBy: '' } } : {})
+				...(unset.length > 0
+					? { $unset: Object.fromEntries(unset.map((key) => [key, ''])) }
+					: {})
 			},
 			{ returnDocument: 'after' }
 		);

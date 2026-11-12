@@ -12,6 +12,7 @@ import { consentWaived } from '../../shared/consent_waiver.js';
 import { getUserStore } from '../../adapters/index.js';
 import { languageFromCookieHeader } from '../../i18n/cookie.js';
 import { CREATE_PROMPT_REASON } from '../../consts/prompt_create.js';
+import { asksForCode, CODE_REASONS } from '../../consts/code_reasons.js';
 import {
 	acceptLanguageRanges,
 	resolveLanguage,
@@ -31,14 +32,13 @@ const ACR_REASONS = new Set([
 	'essential_acr',
 	'essential_acrs',
 	'sl1_acr_values',
-	'second_factor'
+	...CODE_REASONS
 ]);
 /*
- * The application requires a code (specs/127). After a sign-in that gave none, the person is shown a page that says
- * so and offers what can help (setting one up in this same sign-in, a password instead of a provider), rather than
- * being handed back to the application with an error it may not explain.
+ * The application or a requested API requires a code (specs/127, specs/130). After a sign-in that gave none, the
+ * person is shown a page that says so and offers what can help (setting one up in this same sign-in, a password
+ * instead of a provider), rather than being handed back to the application with an error it may not explain.
  */
-const SECOND_FACTOR_REASON = 'second_factor';
 export const CODE_REQUIRED_PAGE = 'code-required';
 const isAcrReason = (reason: string) => ACR_REASONS.has(reason);
 
@@ -135,8 +135,7 @@ export default async function interactions(oidc: OIDCContext<PipelineParams>) {
 	 * prompt can legitimately be satisfied by a further interaction.
 	 */
 	const refused =
-		oidc.result?.login !== undefined &&
-		prompt.reasons.includes(SECOND_FACTOR_REASON);
+		oidc.result?.login !== undefined && asksForCode(prompt.reasons);
 	if (oidc.result?.login && prompt.reasons.some(isAcrReason) && !refused) {
 		throw new errors.UnmetAuthenticationRequirements(
 			failedCheck.error_description

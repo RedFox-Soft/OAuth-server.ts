@@ -1,4 +1,6 @@
 import { networkFactsSummary } from '../../network_facts/state.js';
+import { apiSignInPreview, type ApiSignInPreview } from './sign_in_preview.js';
+import { sameExpect } from '../buckets/sign_in_preview.js';
 import { now } from '../../telemetry/clock.js';
 import { Elysia } from 'elysia';
 import { uriPathParams } from 'lib/plugins/uri_path_params.js';
@@ -250,10 +252,18 @@ function resourceView(
 	bucket: UserBucket
 ): Omit<
 	ProtectedResource,
-	'bucketId' | 'checkedBy' | 'proxyAddressProvenAt' | 'proxyAddressForgedAt'
+	| 'bucketId'
+	| 'checkedBy'
+	| 'proxyAddressProvenAt'
+	| 'proxyAddressForgedAt'
+	| 'requireCode'
+	| 'signInEveryMinutes'
 > & {
 	projectId: string;
 	checkedBy: 'server' | 'proxy';
+	/* The API's sign-in requirement (specs/130), always stated. */
+	requireCode: boolean;
+	signInEveryMinutes: number | null;
 	connection: ResourceConnection;
 	addresses?: ReturnType<typeof addressesOfApi>;
 } {
@@ -265,6 +275,8 @@ function resourceView(
 	return {
 		...shown,
 		checkedBy: rest.checkedBy ?? 'server',
+		requireCode: rest.requireCode === true,
+		signInEveryMinutes: rest.signInEveryMinutes ?? null,
 		projectId: bucketId,
 		...(rest.checkedBy === 'proxy' ? { addresses: addressesOfApi(rest) } : {}),
 		connection: resourceConnection(
@@ -325,6 +337,33 @@ function acceptedTools(tools: ToolsTable, scopes: readonly string[]) {
 	return result.tools;
 }
 
+/*
+ * The 409 a sign-in requirement answers until it is confirmed with the counts it previewed (specs/130): the protocol of
+ * the application's requirement, so the console and an agent consent the same way. Null when the change may go ahead.
+ */
+function consentRefused(
+	preview: ApiSignInPreview | null,
+	confirm: boolean | undefined,
+	expect: Readonly<Record<string, number | undefined>> | undefined
+) {
+	if (!preview) return null;
+	if (confirm !== true) {
+		return { confirmationRequired: true as const, ...preview };
+	}
+	if (!sameExpect(expect, preview.expect)) {
+		return {
+			error: 'admin_error' as const,
+			message:
+				expect === undefined
+					? 'confirm with the counts of the preview you reviewed (expect)'
+					: 'what this change affects changed since you reviewed it',
+			...preview,
+			confirmationRequired: true as const
+		};
+	}
+	return null;
+}
+
 function scopeOf(bucket: UserBucket, namespace: string) {
 	return {
 		bucketId: bucket._id,
@@ -366,7 +405,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	})
 	.post(
 		'/admin/api/projects/:id/resources',
-		async ({ admin, params, body, set }) => {
+		async ({ admin, params, body, set, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 
@@ -395,6 +434,13 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				});
 			}
 			await assertApiRoom(ctx, bucket);
+			/* Before the audit entry, so nothing is recorded for a change that was only described (specs/130). */
+			const refusal = consentRefused(
+				await apiSignInPreview(bucket, identifier, undefined, body),
+				body.confirm,
+				body.expect
+			);
+			if (refusal) return status(409, refusal);
 
 			await recordAdminAudit(
 				ctx,
@@ -414,7 +460,9 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					tokenFormat: body.tokenFormat,
 					accessTokenTTL: body.accessTokenTTL,
 					trailingSlashSignificant: body.trailingSlashSignificant,
-					checkedBy: body.checkedBy
+					checkedBy: body.checkedBy,
+					requireCode: body.requireCode,
+					signInEveryMinutes: body.signInEveryMinutes
 				});
 				set.status = 201;
 				return resourceView(resource, await tokensIssuer(bucket), bucket);
@@ -478,7 +526,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 	)
 	.patch(
 		'/admin/api/projects/:id/resources/:resourceId',
-		async ({ admin, params, body }) => {
+		async ({ admin, params, body, status }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
 			const namespace = namespaceOf(bucket);
@@ -580,6 +628,17 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				if (why) throw new AdminError(400, why, { field: 'exchangedBy' });
 			}
 
+			/*
+			 * Turning a sign-in requirement on, or shortening it, is consented to with the numbers it was previewed with
+			 * (specs/130 research R9), after validation and before the audit entry.
+			 */
+			const refusal = consentRefused(
+				await apiSignInPreview(bucket, identifier, existing, body),
+				body.confirm,
+				body.expect
+			);
+			if (refusal) return status(409, refusal);
+
 			// After validation: an entry for a request about to be refused as malformed would describe a
 			// change nobody attempted.
 			await recordAdminAudit(ctx, 'resource.update', identifier, {
@@ -592,7 +651,12 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 						: {})
 			});
 
-			const { tools: _edgeTools, ...unchanged } = body;
+			const {
+				tools: _edgeTools,
+				confirm: _confirm,
+				expect: _expect,
+				...unchanged
+			} = body;
 			const updated = await getProtectedResourceStore().update(
 				namespace,
 				identifier,

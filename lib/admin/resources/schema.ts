@@ -69,6 +69,21 @@ const ToolsTableBody = t.Object(
 	{ additionalProperties: false }
 );
 
+/*
+ * An API's sign-in requirement (specs/130 research R1): a code from an authenticator app, and a sign-in no older than
+ * this many minutes, whole hours from one hour to fourteen days (a refresh token and a session last fourteen days, so
+ * longer would change nothing). Turning either on is previewed and confirmed with `confirm` and `expect`.
+ */
+const SignInEveryMinutes = t.Number({
+	minimum: 60,
+	maximum: 20160,
+	multipleOf: 60
+});
+const ConsentFields = {
+	confirm: t.Optional(t.Boolean()),
+	expect: t.Optional(t.Record(t.String(), t.Number()))
+};
+
 export const CreateResourceBody = t.Object(
 	{
 		identifier: t.String({ minLength: 1 }),
@@ -80,7 +95,10 @@ export const CreateResourceBody = t.Object(
 			t.Number({ minimum: 30, maximum: 86400, multipleOf: 1 })
 		),
 		trailingSlashSignificant: t.Optional(t.Boolean()),
-		checkedBy: t.Optional(CheckedBy)
+		checkedBy: t.Optional(CheckedBy),
+		requireCode: t.Optional(t.Boolean()),
+		signInEveryMinutes: t.Optional(SignInEveryMinutes),
+		...ConsentFields
 	},
 	/*
 	 * Closed on purpose, and not the framework default. TypeBox objects admit unknown keys unless told
@@ -118,7 +136,11 @@ export const UpdateResourceBody = t.Object(
 			t.Union([t.String({ minLength: 1, maxLength: 512 }), t.Null()])
 		),
 		checkedBy: t.Optional(CheckedBy),
-		tools: t.Optional(ToolsTableBody)
+		tools: t.Optional(ToolsTableBody),
+		requireCode: t.Optional(t.Boolean()),
+		/* `null` removes the requirement. */
+		signInEveryMinutes: t.Optional(t.Union([SignInEveryMinutes, t.Null()])),
+		...ConsentFields
 	},
 	/*
 	 * Closed for a sharper reason than the body above: with unknown keys admitted, a caller naming

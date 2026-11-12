@@ -14,6 +14,7 @@ import { member } from '../../helpers/_/object.js';
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
 import { machineTokenPermitted } from '../../resources/registry.js';
+import { API_MACHINE_DESCRIPTION } from '../../resources/sign_in_requirement.js';
 import { namespaceOf } from '../../resources/namespace.js';
 import { ClientCredentials } from 'lib/models/client_credentials.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
@@ -126,6 +127,10 @@ export async function clientCredentials(
 			throw new InvalidTarget(
 				'the client is not permitted to access this resource'
 			);
+		}
+		/* An API that requires a person's sign-in (specs/130 research R5): a token for nobody never meets it. */
+		if (resourceServer.signIn) {
+			throw new InvalidTarget(API_MACHINE_DESCRIPTION);
 		}
 		token.resourceServer = resourceServer;
 		token.payload.scope =

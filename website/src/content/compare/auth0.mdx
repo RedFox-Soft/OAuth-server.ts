@@ -24,6 +24,7 @@ sources:
   - https://auth0.com/docs/secure/multi-factor-authentication/adaptive-mfa
   - https://auth0.com/docs/secure/tenant-access-control-list
   - https://auth0.com/docs/secure/tenant-access-control-list/use-curated-blocklists
+  - https://auth0.com/docs/secure/multi-factor-authentication/step-up-authentication/configure-step-up-authentication-for-apis
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -325,6 +326,20 @@ groups:
         verdict: different
         why: 'Auth0 knows more kinds of network and judges them at its own service, on an Enterprise plan. FoxAuth judges them on every request your proxy sends, path by path, on every plan, and can ask for a new sign-in instead of refusing.'
         note: 'The curated blocklists page lists auth0.tor, "IP addresses identified as active TOR exit nodes," and auth0.vpn, "IP addresses originating from commercial Virtual Private Network (VPN) providers." The Tenant ACL page says "Customers on an Enterprise plan can create 1 Tenant ACL."'
+      - dimension: 'A code or a recent sign-in for one API or MCP server'
+        us:
+          {
+            status: yes,
+            text: 'Any API or MCP server a project declares can require a sign-in with a code from an authenticator app, a sign-in no older than a time you choose from 1 hour to 14 days, or both. The authorization server holds it: the sign-in for that API asks for the code or a new sign-in, whatever the client asked for, and a refresh that falls short is refused without spending the refresh token, so the client starts a new sign-in. A token your proxy checks that falls short gets the RFC 9470 insufficient_user_authentication challenge. Introspection returns acr and auth_time. On every plan.'
+          }
+        them:
+          {
+            status: yes,
+            text: 'Step-up for an API is code: a post-login Action reads the requested scope or the client and calls api.multifactor.enable to ask for MFA, and the API checks the new token. No setting on an API requires MFA or a maximum sign-in age.'
+          }
+        verdict: us
+        why: 'With Auth0, asking for MFA before one API is code you write in an Action, run at sign-in. Here it is a setting on the API, held at every token request, renewals included.'
+        note: 'The step-up guide for APIs says "an Action is used to challenge the user to authenticate with MFA."'
       - dimension: Refusing password sign-ins from known password-guessing addresses
         us:
           {

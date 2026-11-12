@@ -20,6 +20,7 @@ import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import { assertSignInMeets } from '../../resources/sign_in_requirement.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { resourceTokenGroups } from '../../bucket_groups/claim.js';
 import { issuerFor } from '../../configs/issuer.js';
@@ -170,6 +171,11 @@ export const handler = async function deviceCodeHandler(
 			oidc.client
 		);
 		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
+		/* The API's sign-in requirement (specs/130), for a code issued before it was set or a sign-in that missed it. */
+		assertSignInMeets(at.resourceServer, {
+			acr: code.payload.acr,
+			authTime: code.payload.authTime
+		});
 		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
 		/* The user's groups, when the authorization granted them (specs/071 research R9). */
 		Object.assign(

@@ -40,6 +40,14 @@ export type Presented =
 			 * is the pairwise value for a pairwise client and the client itself for a machine.
 			 */
 			accountId: string | null;
+			/*
+			 * When and how the sign-in behind the token happened (specs/130 research R6): `auth_time` in seconds and the
+			 * authentication context, as the token itself carries them, or null. A machine's or an assertion's token has
+			 * no sign-in time; a renewed one keeps its original sign-in's. Facts of the token, never of the person, so a
+			 * pairwise token with no `accountId` is still judged on them.
+			 */
+			signedInAt: number | null;
+			acr: string | null;
 	  }
 	| { ok: false; reason: BearerRefusal };
 
@@ -49,6 +57,10 @@ type Api = Pick<ProtectedResource, 'identifier' | 'namespace' | 'bucketId'>;
 
 function refused(reason: BearerRefusal): Presented {
 	return { ok: false, reason };
+}
+
+function secondsOrNull(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
 
 function scopesOf(scope: unknown): { scope: string; scopes: Set<string> } {
@@ -123,7 +135,9 @@ async function fromJwt(token: string, api: Api): Promise<Presented> {
 		subject: sub,
 		clientId,
 		...scopesOf(payload.scope),
-		accountId: await personOfJwt(payload, sub, clientId)
+		accountId: await personOfJwt(payload, sub, clientId),
+		signedInAt: secondsOrNull(payload.auth_time),
+		acr: typeof payload.acr === 'string' ? payload.acr : null
 	};
 }
 
@@ -204,16 +218,16 @@ async function fromRecord(token: string, api: Api): Promise<Presented> {
 			subject = await pairwiseIdentifier(subject, client);
 		}
 	}
+	const person = record instanceof AccessToken ? record.payload : undefined;
 	return {
 		ok: true,
 		subject,
 		clientId: payload.clientId,
 		...scopesOf(payload.scope),
 		/* A machine token is a record of its own kind, and never stands for a person. */
-		accountId:
-			record instanceof AccessToken && payload.accountId
-				? payload.accountId
-				: null
+		accountId: person && payload.accountId ? payload.accountId : null,
+		signedInAt: secondsOrNull(person?.authTime),
+		acr: typeof person?.acr === 'string' ? person.acr : null
 	};
 }
 

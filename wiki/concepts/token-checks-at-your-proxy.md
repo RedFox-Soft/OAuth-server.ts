@@ -87,8 +87,13 @@ In proxy mode the vouching diagnostic fetches nothing and answers `servedByProje
 
 ## Tools by MCP header
 
-`decideTool` (`lib/behind_proxy/tools.ts:102`) is pure and import-free. The check and the console's Tools drawer
-use it, and the test drives one table through both. With an empty table, only the token is checked.
+`decideTool` (`lib/behind_proxy/tools.ts`) is pure and import-free. The check uses it; the console's Access drawer
+does not call it (corrected 2026-11-12: it imports only `toolWidenings` and the protocol constant), and the test
+drives one table through both the function and the live check. With an empty table, only the token is checked.
+
+An API's sign-in requirement (a code, or a recent sign-in) is judged before the tools table and after the access
+conditions, on the presented token's own `acr` and `auth_time`, and answered with RFC 9470's
+`insufficient_user_authentication` (spec 130, [[api-sign-in-requirement]]).
 
 - **The headers.** MCP 2026-07-28 puts `Mcp-Method` on every client message and `Mcp-Name` on `tools/call`,
   `resources/read` and `prompts/get`. That revision also makes the server refuse a request whose headers and body

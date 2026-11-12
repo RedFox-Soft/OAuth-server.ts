@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **An API that requires a code or a recent sign-in** (spec 130). Any API or MCP server of a project can require a
+  sign-in with a code from an authenticator app, and a new sign-in every day, 7 or 14 days, or a custom interval.
+  No MCP client understands the standard step-up challenge yet, so FoxAuth enforces it itself: the sign-in for a
+  token asks for the code or a new sign-in whatever the client asked, every grant refuses a token whose sign-in
+  falls short, a renewal is refused without spending it, and the proxy answers RFC 9470's
+  `insufficient_user_authentication`. Apps that act for no one and sign-ins by assertion cannot connect. Turning it on
+  shows first whom it affects. Introspection now reports `acr` and `auth_time`, and a code typed twice says it was
+  just used. Free on every plan. Run `db:migrate`; an older release then refuses to start against the database.
+
 - **Where a connection comes from, at your proxy** (spec 129). A super administrator can turn on "Network facts from
   FoxTrust" in Settings → Integrations. Each server process then downloads FoxTrust's signed snapshot (about 13 MB a
   day plus hourly updates) and checks its signature; people's addresses are only compared here and never sent. "From

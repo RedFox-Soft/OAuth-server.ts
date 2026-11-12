@@ -11,6 +11,7 @@ sources:
   - https://www.ory.com/docs/oathkeeper
   - https://www.ory.com/docs/oathkeeper/pipeline/authn
   - https://www.ory.com/docs/oathkeeper/api-access-rules
+  - https://www.ory.com/docs/kratos/mfa/step-up-authentication
 bottomLine: 'Pick Ory Hydra if you already have an identity system and want a hardened, Apache-licensed OAuth server sitting in front of it. Pick FoxAuth if you would rather not build a login and consent application before issuing your first token.'
 chooseThem:
   - 'You already run your own user store and login UI, and want an OAuth server that stays out of it.'
@@ -257,6 +258,19 @@ groups:
           }
         verdict: us
         why: 'With Ory, keeping Tor or a country out is a service you write and feed with data, called by a second product. Here it is a choice on the rule.'
+      - dimension: 'A code or a recent sign-in for one API or MCP server'
+        us:
+          {
+            status: yes,
+            text: 'Any API or MCP server a project declares can require a sign-in with a code from an authenticator app, a sign-in no older than a time you choose from 1 hour to 14 days, or both. The authorization server holds it: the sign-in for that API asks for the code or a new sign-in, whatever the client asked for, and a refresh that falls short is refused without spending the refresh token, so the client starts a new sign-in. A token your proxy checks that falls short gets the RFC 9470 insufficient_user_authentication challenge. Introspection returns acr and auth_time. On every plan.'
+          }
+        them:
+          {
+            status: no,
+            text: 'Not in Hydra: the login application you build decides how a person signs in and sets acr. In Ory Kratos, required_aal applies to the whole project, and your app starts a login with aal=aal2 before a sensitive action. No requirement is set per API.'
+          }
+        verdict: us
+        why: 'With Ory, asking for a second factor before one API is logic in your login app. Here it is a setting on the API, and the authorization server holds every token request to it.'
       - dimension: Licence
         us:
           {

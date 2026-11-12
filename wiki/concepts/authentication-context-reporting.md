@@ -4,7 +4,7 @@ title: "Reporting the authentication context a sign-in satisfied"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-13
-updated: 2026-11-11
+updated: 2026-11-12
 graph:
   node_type: concept
   relationships:
@@ -168,6 +168,9 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
   mask, as they set `amr`, whenever the sign-in recorded them, and both are advertised whatever the stored
   claims setting holds. A backchannel authentication whose integration reported neither still yields
   neither: the server never invents a context.
+- **Introspection reports it too** (spec 130, 2026-11-12): an active token that carries `acr` and `auth_time` is
+  introspected with both (RFC 9470 §6.2), so an API that checks its own tokens can hold them to the sign-in
+  requirement it declared ([[api-sign-in-requirement]]). A renewed token reports its original sign-in.
 
 ## Related
 

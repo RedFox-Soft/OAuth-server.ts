@@ -181,7 +181,9 @@ import { buildUILoginPath, buildUIPath } from './buildUIPath.js';
 import type { Language } from '../i18n/languages.js';
 import { lookup } from '../i18n/languages.js';
 import { formatDate, formatMinutesAgo } from '../i18n/format.js';
-import { text } from '../i18n/message.js';
+import { plural, text } from '../i18n/message.js';
+import { asksForCode } from '../consts/code_reasons.js';
+import { API_CODE_DESCRIPTION } from '../resources/sign_in_requirement.js';
 import { isBehindProxyClient } from '../behind_proxy/client.js';
 import { uiLocalesRanges } from '../i18n/resolve.js';
 import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
@@ -1134,9 +1136,84 @@ function codeAskedNotice(
 		: T.codeAsked;
 }
 
-/* An interaction that stopped because the application requires a code this sign-in did not give (specs/127). */
+/*
+ * An interaction that stopped because the application (specs/127) or a requested API (specs/130) requires a code this
+ * sign-in did not give.
+ */
 function refusalOf(interaction: Interaction): boolean {
+	return asksForCode(interaction.payload.prompt?.reasons ?? []);
+}
+
+/*
+ * The API a sign-in is asked a code or a recent sign-in for (specs/130 research R14), by the name its project declared
+ * it under: the project stands behind it, so the page may name it. Undefined when no API asked, or it is gone.
+ */
+async function apiAsking(
+	interaction: Interaction
+): Promise<string | undefined> {
+	const api = interaction.payload.prompt?.details.api;
+	const bucketId = interaction.payload.bucketId;
+	if (typeof api !== 'string' || bucketId === undefined) return undefined;
+	const bucket = await getBucketStore().find(bucketId);
+	if (!bucket) return undefined;
+	return (await findDeclaredResource(api, namespaceOf(bucket)))?.name;
+}
+
+/* Whether the application itself requires the code (specs/127), as against only a requested API (specs/130). */
+function appRequiresCode(interaction: Interaction): boolean {
 	return (interaction.payload.prompt?.reasons ?? []).includes('second_factor');
+}
+
+/*
+ * The API the refusal page names, when only an API asks for the code: an application's own requirement is its own
+ * page's subject (specs/127), whatever an API also asks.
+ */
+async function apiRefusing(
+	interaction: Interaction
+): Promise<{ api: string } | Record<string, never>> {
+	if (appRequiresCode(interaction)) return {};
+	const api = await apiAsking(interaction);
+	return api === undefined ? {} : { api };
+}
+
+/* "every day", "every 7 days", "every 12 hours", in the page's language, about the API that asks. */
+function apiSignInEveryNotice(
+	language: Language,
+	api: string,
+	seconds: number
+): string {
+	const T = SIGN_IN_TEXTS[language].apiNotices;
+	const hours = Math.max(1, Math.round(seconds / 3600));
+	if (hours % 24 === 0) {
+		const days = hours / 24;
+		return days === 1
+			? text(T.everyDay, { api })
+			: text(plural(T.everyDays, days, language), { api, count: days });
+	}
+	return hours === 1
+		? text(T.everyHour, { api })
+		: text(plural(T.everyHours, hours, language), { api, count: hours });
+}
+
+/*
+ * Why the login page appears for an API (specs/130): it asks for a code, or for a sign-in every so often. The only
+ * explanation a person gets in the middle of a conversation with an agent, which will not tell them.
+ */
+function apiNotice(
+	interaction: Interaction,
+	api: string | undefined
+): string | undefined {
+	if (api === undefined) return undefined;
+	const reasons = interaction.payload.prompt?.reasons ?? [];
+	const language = languageOf(interaction);
+	if (reasons.includes('resource_code')) {
+		return text(SIGN_IN_TEXTS[language].apiNotices.codeAsked, { api });
+	}
+	const maxAge = interaction.payload.prompt?.details.apiMaxAge;
+	if (reasons.includes('resource_max_age') && typeof maxAge === 'number') {
+		return apiSignInEveryNotice(language, api, maxAge);
+	}
+	return undefined;
 }
 
 /*
@@ -1230,15 +1307,30 @@ function freshSignInParams(interaction: Interaction): Record<string, string> {
 	const prompts =
 		typeof params.prompt === 'string' ? params.prompt.split(' ') : [];
 	const out: Record<string, string> = {};
-	if (prompts.includes('login') || reasons.includes('max_age')) {
+	const apiMaxAge = reasons.includes('resource_max_age')
+		? interaction.payload.prompt?.details.apiMaxAge
+		: undefined;
+	if (
+		prompts.includes('login') ||
+		reasons.includes('max_age') ||
+		typeof apiMaxAge === 'number'
+	) {
 		out.prompt = 'login';
 	}
-	if (
-		typeof params.max_age === 'string' ||
-		typeof params.max_age === 'number'
-	) {
-		out.max_age = String(params.max_age);
-	}
+	/*
+	 * The stricter of what the request asked and what a requested API asks (specs/130 research R4): a provider is never
+	 * asked for a looser sign-in than the API's.
+	 */
+	const asked = Number(params.max_age);
+	const ages = [
+		...(typeof params.max_age === 'string' || typeof params.max_age === 'number'
+			? Number.isFinite(asked)
+				? [asked]
+				: []
+			: []),
+		...(typeof apiMaxAge === 'number' ? [apiMaxAge] : [])
+	];
+	if (ages.length > 0) out.max_age = String(Math.min(...ages));
 	return out;
 }
 
@@ -1444,7 +1536,8 @@ export const ui = new Elysia()
 				notice:
 					resolveNotice(query.notice, languageOf(interaction)) ??
 					freshSignInNotice(interaction) ??
-					codeAskedNotice(interaction, look.face),
+					codeAskedNotice(interaction, look.face) ??
+					apiNotice(interaction, await apiAsking(interaction)),
 				/*
 				 * Back from a provider that was cancelled or refused: the notice says so, and the provider may be one
 				 * of those folded away (specs/105), so the fold opens. The notice does not name the provider, so it
@@ -1725,10 +1818,12 @@ export const ui = new Elysia()
 				await addressedBucketOf(interaction)
 			);
 			const branded = await signInLook(interaction, bucketId);
-			const refuse = () =>
+			const refuse = (reused = false) =>
 				totpServer(uid, {
 					mode: 'verify',
-					errorMessage: invalidCode(interaction),
+					errorMessage: reused
+						? SIGN_IN_TEXTS[languageOf(interaction)].errors.codeJustUsed
+						: invalidCode(interaction),
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'totp'),
@@ -1759,10 +1854,13 @@ export const ui = new Elysia()
 				};
 				await interaction.persist();
 				/*
-				 * One answer for every failure — wrong, replayed, and throttled alike. A distinct "too many
-				 * attempts" would confirm to someone guessing that the account is real and that their
-				 * guesses are landing, which is the whole of what they wanted to learn.
+				 * One answer for every failure — wrong and throttled alike. A distinct "too many attempts" would
+				 * confirm to someone guessing that the account is real and that their guesses are landing, which is
+				 * the whole of what they wanted to learn. A code typed again after another window used it is named
+				 * (specs/130): only someone who held a valid code can reach that, and it is the second window of an
+				 * agent's sign-in, not a mistake, so it is not reported as an attack either.
 				 */
+				if (outcome.reason === 'reused') return refuse(true);
 				noteAttack(request, 'signin_failures');
 				return refuse();
 			}
@@ -2064,7 +2162,8 @@ export const ui = new Elysia()
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, CODE_REQUIRED_PAGE),
-				...(await lookNamingApp(interaction, bucketId))
+				...(await lookNamingApp(interaction, bucketId)),
+				...(await apiRefusing(interaction))
 			});
 		}
 	)
@@ -2077,7 +2176,9 @@ export const ui = new Elysia()
 			interaction.payload.result = {
 				...(interaction.payload.result ?? {}),
 				error: 'unmet_authentication_requirements',
-				error_description: REQUIRE_CODE_DESCRIPTION
+				error_description: appRequiresCode(interaction)
+					? REQUIRE_CODE_DESCRIPTION
+					: API_CODE_DESCRIPTION
 			};
 			return resume(interaction, cookie, { route, request });
 		},

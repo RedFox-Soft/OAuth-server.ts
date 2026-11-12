@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'cb26a32a273c';
+export const source = '1932d7c9e1a2';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -217,6 +217,10 @@ export default {
 				proxyNetworkFacts: {
 					title: '在你的代理处使用网络信息：Tor、VPN、托管服务、国家',
 					body: '开启 FoxTrust 签名的快照后，代理后应用的某个路径，或由代理检查的 API，可以挡住 Tor、商业 VPN 以及托管服务和云，并允许或拒绝所选的国家。每台服务器每天下载约 13 MB，每小时下载一次更新，验证签名，并且只把用户的地址与自己的副本比较，因此不会把任何地址发送到任何地方。符合条件的地址会被拒绝；在应用上也可以改为要求重新登录，并可要求验证码。超过 26 小时的快照会关闭这些路径，直到加载新的快照。所有套餐免费。国家数据：IP Geolocation by DB-IP，CC BY 4.0。'
+				},
+				apiSignInRequirement: {
+					title: '要求验证码或近期登录的 API 或 MCP 服务器',
+					body: '项目声明的任何 API 或 MCP 服务器，都可以要求使用身份验证器应用中的验证码登录，或要求登录时间不超过一天、7 天、14 天或你设定的时长（最短 1 小时），也可以两者都要求。令牌由 FoxAuth 签发，所以无论客户端请求了什么，FoxAuth 都会自己要求输入验证码或重新登录，并在为用户获取令牌的每一种方式上检查这一要求，包括刷新。不满足要求的续期会被拒绝，但刷新令牌不会被用掉，因此客户端会开始新的登录。在你的代理处，不满足要求的令牌会收到标准的 insufficient_user_authentication 质询（RFC 9470）。不代表任何人的应用和通过断言（assertion）登录的方式都无法连接。保存前，控制台会显示这会影响哪些人。所有套餐免费。'
 				},
 				clientIdMetadataDocument: {
 					title: '客户端身份文档',

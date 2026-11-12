@@ -27,7 +27,9 @@ function isPreview(body: unknown): body is Preview {
  * the operator read, and a count that moved in between is asked again (the Sign-in tab's protocol, useSignInSave).
  * Answers null when the operator kept editing.
  */
-export function useCodeConsent(of: 'application' | 'path' = 'application') {
+export function useCodeConsent(
+	of: 'application' | 'path' | 'api' = 'application'
+) {
 	const confirm = useConfirm();
 
 	return async function send<T>(
@@ -50,7 +52,9 @@ export function useCodeConsent(of: 'application' | 'path' = 'application') {
 			const agreed =
 				of === 'path'
 					? await confirm('behindProxy.codeCondition.confirm', asked)
-					: await confirm('client.requireCode.confirm', asked);
+					: of === 'api'
+						? await confirm('resource.signIn.confirm', asked)
+						: await confirm('client.requireCode.confirm', asked);
 			return agreed ? send(go, name, preview.expect) : null;
 		}
 		return result;

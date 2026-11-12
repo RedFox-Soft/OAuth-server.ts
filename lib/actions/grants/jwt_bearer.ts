@@ -20,6 +20,7 @@ import { AccessToken } from '../../models/access_token.js';
 import { isScimResourceOf } from '../../provisioning/token_policy.js';
 import { namespaceOf } from '../../resources/namespace.js';
 import { resolveDeclaredResource } from '../../resources/registry.js';
+import { API_PERSON_DESCRIPTION } from '../../resources/sign_in_requirement.js';
 import { personNamedBy } from '../../assertions/person.js';
 import { noteProviderAssertionUse } from '../../assertions/usage.js';
 import {
@@ -180,6 +181,13 @@ export async function jwtBearer(
 	);
 	if (!declared) throw new InvalidTarget();
 	const resourceServer = new ResourceServer(identifier, declared);
+	/*
+	 * An API that requires a code or a recent sign-in (specs/130 research R5): an assertion carries no sign-in this server
+	 * saw, whatever it says about one, so it never meets either.
+	 */
+	if (resourceServer.signIn) {
+		throw new InvalidGrant(API_PERSON_DESCRIPTION);
+	}
 
 	const offered = [...resourceServer.scopes].filter(Boolean);
 	const ceiling = ceilingOf(verified, identifier);

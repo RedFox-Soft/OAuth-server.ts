@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-11-11
+updated: 2026-11-12
 graph:
   node_type: concept
   relationships:
@@ -244,7 +244,11 @@ An app behind the proxy cannot carry `signIn.requireCode`: it signs in through t
 `proxy.<bucketId>` client, one per project, and a code is wanted per path. So the fresh sign-in condition of a path
 gets a flag instead, `withCode` ([[conditions-at-your-proxy]]). The proxy's sign-in sends `acr_values` with the
 multi-factor value, and `proxyAsksForCode` (beside `codeRequiredAndMissing`) makes it binding for that client only, at
-the same `second_factor` check, so the refusal page, the in-sign-in set-up and "Return" are the ones above. It also
+the same `second_factor` check, so the refusal page, the in-sign-in set-up and "Return" are the ones above. Spec 130
+adds `resource_code` for an API that requires a code; it joins `second_factor` in `CODE_REASONS`
+(`lib/consts/code_reasons.ts`), so the same page and set-up serve it, naming the API ([[api-sign-in-requirement]]).
+A code typed again after another window used it now says "This code was just used" (`reason: 'reused'`) and is not
+reported as an attack. It also
 sends `max_age`, because the condition, unlike the application setting, has a freshness: a code typed yesterday does
 not open a path that asks for one within 15 minutes.
 

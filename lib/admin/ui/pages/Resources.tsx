@@ -37,6 +37,15 @@ import {
 import type { ToolsTableView } from '../../../behind_proxy/tools.js';
 import { ProxyConnect } from './resources/ProxyConnect.js';
 import { ToolsDrawer } from './resources/ToolsDrawer.js';
+import {
+	everyFields,
+	everyMinutes,
+	ResourceSignInFields,
+	signInEveryText,
+	type EveryChoice,
+	type EveryUnit
+} from './resources/ResourceSignInFields.js';
+import { useCodeConsent, withConsent } from './applications/codeConsent.js';
 import type { AddressesView } from './behind-proxy/appView.js';
 
 /*
@@ -87,6 +96,9 @@ interface ResourceView {
 	/* Whether the API's own server checks its tokens (spec 107) or the operator's proxy asks this project (specs/123). */
 	checkedBy: CheckedBy;
 	tools?: ToolsTableView;
+	/* How the person behind a token must have signed in (specs/130). */
+	requireCode: boolean;
+	signInEveryMinutes: number | null;
 	/* What the proxy's checks showed about the addresses it passes (specs/124); only when the proxy checks. */
 	addresses?: AddressesView;
 	/* What the API itself must serve and check, as the server states it (spec 107). */
@@ -128,6 +140,10 @@ interface FormValues {
 	checkedBy: CheckedBy;
 	/* Edit only; '' for none. */
 	exchangedBy?: string;
+	requireCode?: boolean;
+	every?: EveryChoice;
+	customAmount?: number;
+	customUnit?: EveryUnit;
 }
 
 const DEFAULT_VALUES: FormValues = {
@@ -137,7 +153,10 @@ const DEFAULT_VALUES: FormValues = {
 	tokenFormat: 'jwt',
 	accessTokenTTL: 900,
 	trailingSlashSignificant: false,
-	checkedBy: 'server'
+	checkedBy: 'server',
+	requireCode: false,
+	every: 'off',
+	customUnit: 'days'
 };
 
 function splitScopes(raw: string): string[] {
@@ -425,6 +444,8 @@ export function Resources({
 	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
 	const formatValue = useWatched(form, 'tokenFormat') ?? 'jwt';
 	const checkedByValue = useWatched(form, 'checkedBy') ?? 'server';
+	const everyValue = useWatched(form, 'every');
+	const signInConsent = useCodeConsent('api');
 
 	// Every state write follows an await, so the mount effect calls this without setting
 	// `loading` first; `load` is the reload, which does.
@@ -502,7 +523,10 @@ export function Resources({
 			accessTokenTTL: row.accessTokenTTL,
 			trailingSlashSignificant: row.trailingSlashSignificant,
 			checkedBy: row.checkedBy,
-			exchangedBy: row.exchangedBy ?? ''
+			exchangedBy: row.exchangedBy ?? '',
+			requireCode: row.requireCode,
+			customUnit: 'days',
+			...everyFields(row.signInEveryMinutes)
 		});
 		setOpen(true);
 	}
@@ -517,6 +541,24 @@ export function Resources({
 		 * sent: it is the audience of every token already minted for this resource, so replacing it is
 		 * a delete and a fresh declaration rather than a rename.
 		 */
+		const editingRow = rows.find((row) => row.identifier === editing);
+		const requireCode = values.requireCode === true;
+		const signInEveryMinutes = everyMinutes(values);
+		/* Sent only when it changed, so an edit of anything else is never previewed or audited as one (specs/130). */
+		const requirement =
+			mode === 'create'
+				? {
+						...(requireCode ? { requireCode } : {}),
+						...(signInEveryMinutes === null ? {} : { signInEveryMinutes })
+					}
+				: {
+						...(requireCode !== (editingRow?.requireCode ?? false)
+							? { requireCode }
+							: {}),
+						...(signInEveryMinutes !== (editingRow?.signInEveryMinutes ?? null)
+							? { signInEveryMinutes }
+							: {})
+					};
 		const body =
 			mode === 'create'
 				? {
@@ -552,12 +594,17 @@ export function Resources({
 				? base
 				: `${base}/${encodeURIComponent(editing as string)}`;
 		setSaving(true);
-		const result = await request(
-			mode === 'create' ? 'POST' : 'PATCH',
-			url,
-			body
+		const result = await signInConsent(
+			(consent) =>
+				request(
+					mode === 'create' ? 'POST' : 'PATCH',
+					url,
+					withConsent({ ...body, ...requirement }, consent)
+				),
+			values.name
 		);
 		setSaving(false);
+		if (result === null) return;
 		if (!result.ok) {
 			feedback.failed(result, form);
 			return;
@@ -711,6 +758,14 @@ export function Resources({
 											Tokens checked by your proxy
 										</Typography.Text>
 									)}
+									{(row.requireCode || row.signInEveryMinutes !== null) && (
+										<Space size={4}>
+											{row.requireCode && <Tag>Code required</Tag>}
+											{row.signInEveryMinutes !== null && (
+												<Tag>{signInEveryText(row.signInEveryMinutes)}</Tag>
+											)}
+										</Space>
+									)}
 									{row.exchangedBy && (
 										<Typography.Text type="secondary">
 											Tokens exchanged by{' '}
@@ -848,6 +903,10 @@ export function Resources({
 					tools={toolsOf.tools}
 					checkedBy={toolsOf.checkedBy}
 					addresses={toolsOf.addresses}
+					signIn={{
+						requireCode: toolsOf.requireCode,
+						signInEveryMinutes: toolsOf.signInEveryMinutes
+					}}
 					onClose={() => setToolsOf(null)}
 					onSaved={() => {
 						setToolsOf(null);
@@ -1020,6 +1079,10 @@ export function Resources({
 							/>
 						</Form.Item>
 					)}
+					<ResourceSignInFields
+						checkedBy={checkedByValue}
+						every={everyValue}
+					/>
 					{/*
 					 * FR-012: the check does not look a self-contained token's grant up on every request, so at the proxy
 					 * a revoked one keeps working until it expires. Said here, where the format and lifetime are chosen.

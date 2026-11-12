@@ -1,3 +1,7 @@
+import {
+	requirementFields,
+	requirementPatch
+} from '../resource_requirement.js';
 import { sql, type Tx } from './db.js';
 import { docOf } from './json.js';
 import { isUniqueViolation } from './sqlState.js';
@@ -35,6 +39,8 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		accessTokenTTL?: number;
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
+		requireCode?: boolean;
+		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource> {
 		const now = new Date();
 		const resource: ProtectedResource = {
@@ -51,6 +57,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 			accessTokenTTL: data.accessTokenTTL ?? 900,
 			trailingSlashSignificant: data.trailingSlashSignificant ?? false,
 			...(data.checkedBy ? { checkedBy: data.checkedBy } : {}),
+			...requirementFields(data),
 			createdAt: now,
 			updatedAt: now
 		};
@@ -103,13 +110,18 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null> {
 		const handle = sql();
-		const { exchangedBy, ...rest } = patch;
+		const { exchangedBy, requireCode, signInEveryMinutes, ...rest } = patch;
+		const requirement = requirementPatch({ requireCode, signInEveryMinutes });
 		const merged = {
 			...rest,
+			...requirement.set,
 			...(typeof exchangedBy === 'string' ? { exchangedBy } : {}),
 			updatedAt: new Date()
 		};
-		const dropped = exchangedBy === null ? ['exchangedBy'] : [];
+		const dropped: string[] = [
+			...requirement.unset,
+			...(exchangedBy === null ? ['exchangedBy'] : [])
+		];
 		const rows = await handle`
 			UPDATE ${handle(this.area)} SET doc = (doc || ${merged}) - ${handle.array(dropped, 'text')}
 			WHERE id = ${declarationId(namespace, identifier)}

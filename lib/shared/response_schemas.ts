@@ -88,6 +88,9 @@ export const IntrospectionResponse = t.Union([
 			iss: t.Optional(t.String()),
 			jti: t.Optional(t.String()),
 			sid: t.Optional(t.String()),
+			/* RFC 9470 §6.2: how and when the person behind the token signed in (specs/130). */
+			acr: t.Optional(t.String()),
+			auth_time: t.Optional(t.Number()),
 			cnf: t.Optional(t.Record(t.String(), t.String())),
 			authorization_details: t.Optional(t.Array(t.Unknown())),
 			/* specs/071: the user's groups recorded in a resource-bound token, or where to fetch them. */

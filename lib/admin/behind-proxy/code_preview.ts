@@ -66,7 +66,7 @@ function people(n: number, one: string, many: string): string {
  * Members of the groups, each person once, read through the people list's own filters: those without an authenticator,
  * or everyone when password sign-in is off and nobody could give a code.
  */
-async function groupMembers(
+export async function groupMembers(
 	bucketId: string,
 	groupIds: Iterable<string>,
 	withoutAuthenticatorOnly: boolean
