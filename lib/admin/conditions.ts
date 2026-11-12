@@ -6,6 +6,7 @@ import {
 import type {
 	ApiAccess,
 	BehindProxyWho,
+	RowCondition,
 	UserBucket
 } from '../adapters/types.js';
 import { canonicalTimeZone } from '../behind_proxy/clock.js';
@@ -311,6 +312,16 @@ export function apiConditionsOf(
 	conditions: readonly Condition[]
 ): ApiCondition[] {
 	return conditions.filter((c): c is ApiCondition => c.kind !== 'fresh');
+}
+
+/* A tool row's conditions as stored; the body's schema already allows only group, network and time on a row. */
+export function rowConditionsOf(
+	conditions: readonly Condition[]
+): RowCondition[] {
+	return conditions.filter(
+		(c): c is RowCondition =>
+			c.kind === 'group' || c.kind === 'network' || c.kind === 'time'
+	);
 }
 
 /* An app rule's conditions as stored; the body's schema already allows no group condition on an app. */

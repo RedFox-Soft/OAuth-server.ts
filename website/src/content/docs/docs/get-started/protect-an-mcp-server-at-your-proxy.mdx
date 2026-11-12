@@ -136,7 +136,7 @@ When a request is let through, the proxy adds these headers:
 
 ## 5. Say which scopes each tool needs {#tools}
 
-Without a tools table, any valid token may call any tool. To set one, choose **Tools…** on the API's row.
+Without a tools table, any valid token may call any tool. To set one, choose **Access…** on the API's row.
 
 An MCP client following the MCP specification of 2026-07-28 names what it does in two headers: `Mcp-Method` (such as
 `tools/call`) and `Mcp-Name` (the tool). The check reads them, so the table can say which scopes each tool needs:
@@ -159,7 +159,8 @@ Two choices sit under the table:
 
 - **Any other tool**: a tool the table does not list is refused, or needs only a valid token. Refused is the default.
 - **Clients too old to say which tool they call**: a client that sends no `Mcp-Method`, or speaks a protocol older
-  than 2026-07-28, is refused by default. You can let them in, but then they can call any tool.
+  than 2026-07-28, is refused by default. You can let them in, but then they can call any tool. Once a tool has
+  conditions of its own, you cannot: see [Old apps are refused](#tool-conditions-old-apps).
 
 ### What the table does not cover {#what-the-table-does-not-cover}
 
@@ -194,9 +195,9 @@ no token and is let through, so your MCP server answers it.
 
 ### Anyone who can sign in to the project can get a token {#who-can-get-a-token}
 
-This mode checks the token, not who the person is. Anyone who can sign in to the project can get a token for this
-API, and limiting it to groups is not part of this mode. To limit who may call it, limit who can sign in to the
-project.
+Anyone who can sign in to the project can get a token for this API. To limit who may call it, add conditions to the
+API, as [Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/#api) shows, or to one of its
+tools, as [Conditions on one tool](#tool-conditions) shows. You can also limit who can sign in to the project.
 
 ## 6. Check that it works {#check-that-it-works}
 
@@ -220,7 +221,93 @@ project.
 There is nothing to switch on, and it is on every plan.
 
 To let only some groups call the API, or only from your network or in your hours, see [Add conditions at your
-proxy](/docs/get-started/add-conditions-at-your-proxy/).
+proxy](/docs/get-started/add-conditions-at-your-proxy/). To do that for one tool only, read on.
+
+## Conditions on one tool {#tool-conditions}
+
+The API's own conditions hold for every tool. Sometimes one tool needs more. Say only the Ops group may call
+`delete_files`, or `export_billing` may be called only from the office network in working hours. Every other tool
+stays as open as before.
+
+Choose **Access…** on the API's row. In the tools table, choose **Add conditions** under the tool. A tool takes three
+kinds of condition, with the same controls as the API's own:
+
+- **Groups**: the person is in one of the groups you choose.
+- **From where**: the address is in your ranges, or not in them. It can also keep out what FoxTrust's network facts
+  name, such as Tor. Your proxy must pass people's addresses, as [From
+  where](/docs/get-started/add-conditions-at-your-proxy/#from-where) shows.
+- **When**: the days and the hours, in the API's one time zone.
+
+A tool holds at most four conditions. It takes no attribute and no new sign-in. A code or a recent sign-in is set for
+the whole API: see [Ask for a code or a recent sign-in](#require-a-code-or-a-recent-sign-in).
+
+### How a tool's conditions add up {#tool-conditions-add-up}
+
+- A tool's conditions are added to the API's own. They never replace them and never loosen them. If the API lets in
+  only Staff and `delete_files` only Ops, a person must be in both groups to call `delete_files`.
+- Under the tool, the editor shows the API's conditions as coming from the API. You cannot remove them there.
+- The check decides in this order: the API's conditions, the API's sign-in requirement, the MCP headers, the tool's
+  scopes, and then the tool's conditions.
+- A token without the tool's scopes gets `insufficient_scope`, as before. It learns nothing about the tool's
+  conditions.
+- A tool can have conditions and no scope. Every tool in the table needs at least one scope or one condition.
+- Only a `tools/call` that names the tool is judged on its conditions. Listing the tools and starting a session are
+  not.
+
+Removing a tool's condition, or loosening it, lets more calls through. So the console lists what loosens and asks you
+to confirm before it saves. Adding a condition saves at once.
+
+### What a refused call looks like {#tool-conditions-refused}
+
+A call that does not meet the tool's conditions gets `403`. `X-Auth-Reason` says why:
+
+| Reason                  | What it means                                                                         |
+| ----------------------- | ------------------------------------------------------------------------------------- |
+| `not_in_group`          | The person is not in the tool's groups, or not in the API's.                          |
+| `not_from_network`      | The address is not one the conditions let in, or your proxy passed none it can trust. |
+| `network_facts_unknown` | Network facts are off or older than 26 hours, so a condition that needs them refuses. |
+| `outside_hours`         | The call came outside the hours, in the API's time zone.                              |
+| `no_person`             | The token stands for no person, such as a token an app got for itself.                |
+| `cannot_sign_in`        | The person is locked or deactivated.                                                  |
+
+A refused call is never a `401`, and the person is never asked to sign in again. A new sign-in does not put anyone in
+a group or in the office. The answer names neither the tool nor its conditions.
+
+### What a tool condition cannot stop {#tool-conditions-limit}
+
+Your proxy sees the request's headers, not its body. The tool's name comes from the `Mcp-Name` header the app sends.
+
+A tool condition stops an app that names the tool it calls honestly. A stolen token in an app that lies about the tool
+is stopped only by your MCP server checking the headers against the body, which MCP 2026-07-28 servers must do. To keep
+someone out of the whole API, use the API's own conditions or its sign-in requirement.
+
+So a tool condition guards against an agent's mistake. It is not a lock against someone who holds a stolen token.
+
+### Old apps are refused {#tool-conditions-old-apps}
+
+An app too old to say which tool it calls cannot be held to one tool's conditions. That is an app that sends no
+`Mcp-Method` header, or speaks an MCP protocol older than 2026-07-28. So once any tool has conditions, **Clients too
+old to say which tool they call** must be **Refuse them**. The console turns **Let them in** off, and a save that asks
+for it is refused with `422`. Today many apps are such apps: the [table below](#what-your-people-see-in-each-app) says
+which.
+
+A new or renamed tool on your MCP server is not in the table yet. It gets the **Any other tool** answer until you add
+it.
+
+### Check access {#tool-conditions-check-access}
+
+The **Access…** drawer has a **Check access** card. Choose a person, or **No person: an app acting for itself**. Then
+choose the scopes the app's token holds, the tool it calls or another request, an address and a time. When the API
+requires a code or a recent sign-in, also say whether the sign-in had a code and when it happened.
+
+The card answers **Allowed**, **Refused** or **Asked to sign in again**, with the reason in plain words. It answers for
+the saved table and for the one you are editing. When it lacks something it needs, it answers **Not known** and names
+what is missing. It runs the same decision as the check at your proxy, in your browser. No server decides for
+it, and nothing is written to the audit trail. When a condition needs network facts, the card looks the address up in
+your server's own copy.
+
+An agent sets a tool's conditions with `resource_update`, as `conditions` on a row of `tools`. Conditions on one tool
+are free on every plan.
 
 ## Ask for a code or a recent sign-in {#require-a-code-or-a-recent-sign-in}
 
@@ -297,17 +384,21 @@ start against the database, so it cannot issue tokens that skip the code.
 ## What your people see in each app {#what-your-people-see-in-each-app}
 
 FoxAuth refuses the old token or its renewal, and asks at the next sign-in. What a person sees in between depends on
-the app they use. The table comes from each app's code, documentation and issue tracker, as we read them on
-2026-11-12. We have not yet tried each app live. Try it with the apps your people use before you rely on it.
+the app they use. The last column says whether the app names the tool it calls, as MCP 2026-07-28 asks. An app that
+does not is refused by an API whose tools have [conditions of their own](#tool-conditions-old-apps). The table comes
+from each app's code, documentation and issue tracker, as we read them on 2026-11-12. We have not yet tried each app
+live. Try it with the apps your people use before you rely on it.
 
-| App                       | What the person sees                                                                                                      | What they do                                                                                                 |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Claude Code               | It renews the token and tries once more. Then it marks the server as needing authentication.                              | Run `/mcp`, choose the server, then **Re-authenticate**. The call does not carry on by itself, so ask again. |
-| claude.ai, Claude Desktop | A Connect card and a sign-in window. This is documented for an invalid token. We have not yet seen it for this challenge. | Choose **Connect** and sign in.                                                                              |
-| ChatGPT                   | Perhaps only an error.                                                                                                    | Reconnect the connector in ChatGPT's settings.                                                               |
-| Codex                     | It may try the refused renewal again and again.                                                                           | Reconnect the server.                                                                                        |
-| VS Code (GitHub Copilot)  | A sign-in window. Several calls at once can open several windows.                                                         | Sign in in one window. A code typed again in another says "This code was just used. Wait for the next one."  |
-| Cursor, Zed, Gemini CLI   | The server is marked as needing authentication.                                                                           | Re-authenticate the server by hand.                                                                          |
+| App                       | What the person sees                                                                                                      | What they do                                                                                                 | Says which tool it calls (MCP 2026-07-28) |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ----------------------------------------- |
+| Claude Code               | It renews the token and tries once more. Then it marks the server as needing authentication.                              | Run `/mcp`, choose the server, then **Re-authenticate**. The call does not carry on by itself, so ask again. | Yes                                       |
+| claude.ai, Claude Desktop | A Connect card and a sign-in window. This is documented for an invalid token. We have not yet seen it for this challenge. | Choose **Connect** and sign in.                                                                              | Not checked                               |
+| ChatGPT                   | Perhaps only an error.                                                                                                    | Reconnect the connector in ChatGPT's settings.                                                               | Not checked                               |
+| Codex                     | It may try the refused renewal again and again.                                                                           | Reconnect the server.                                                                                        | No                                        |
+| VS Code (GitHub Copilot)  | A sign-in window. Several calls at once can open several windows.                                                         | Sign in in one window. A code typed again in another says "This code was just used. Wait for the next one."  | No                                        |
+| Cursor, Zed, Gemini CLI   | The server is marked as needing authentication.                                                                           | Re-authenticate the server by hand.                                                                          | No                                        |
+
+Goose, from version 1.48.0, also names the tool it calls.
 
 If an app does not carry on after the new sign-in, ask it to try again.
 

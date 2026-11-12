@@ -1,6 +1,10 @@
 import { t } from 'elysia';
 
-import { ApiConditionBody, TimeZoneBody } from '../behind-proxy/schema.js';
+import {
+	ApiConditionBody,
+	RowConditionBody,
+	TimeZoneBody
+} from '../behind-proxy/schema.js';
 
 /*
  * Bodies for the protected-resource routes.
@@ -38,8 +42,10 @@ const ScopeDescriptions = t.Record(t.String(), ScopeDescriptionBody);
 const CheckedBy = t.Union([t.Literal('server'), t.Literal('proxy')]);
 
 /*
- * An API's tools table, replaced whole. Bounds a schema can say are said here; which scopes a row may name, and
- * that names are unique, are the handler's (lib/resources/tools_table.ts), which names the offending row.
+ * An API's tools table, replaced whole, row conditions included. Bounds a schema can say are said here; which scopes a
+ * row may name, that names are unique and that a row needs a scope or a condition are the handler's
+ * (lib/resources/tools_table.ts), which names the offending row. `access.conditions` may be empty to hold only the
+ * time zone the rows read their hours in (specs/131 research R2).
  */
 const ToolsTableBody = t.Object(
 	{
@@ -47,7 +53,11 @@ const ToolsTableBody = t.Object(
 			t.Object(
 				{
 					name: t.String({ minLength: 1, maxLength: 128 }),
-					scopes: t.Array(t.String())
+					scopes: t.Array(t.String()),
+					/* Who, from where and when, on top of the API's own conditions (specs/131). */
+					conditions: t.Optional(
+						t.Array(RowConditionBody, { minItems: 1, maxItems: 4 })
+					)
 				},
 				{ additionalProperties: false }
 			),
@@ -59,7 +69,7 @@ const ToolsTableBody = t.Object(
 		access: t.Optional(
 			t.Object(
 				{
-					conditions: t.Array(ApiConditionBody, { minItems: 1, maxItems: 4 }),
+					conditions: t.Array(ApiConditionBody, { minItems: 0, maxItems: 4 }),
 					timeZone: t.Optional(TimeZoneBody)
 				},
 				{ additionalProperties: false }

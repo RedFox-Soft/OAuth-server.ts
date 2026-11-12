@@ -260,11 +260,17 @@ A condition about the person needs a token that stands for a person. These do no
 When you save, the console names the applications whose tokens will be turned away. A person who is locked or
 deactivated is refused at once. A person removed from a group is refused within a minute.
 
+One tool of an MCP server can carry conditions of its own: groups, **From where** and **When**. They are added to the
+API's conditions and never replace them. A call that fails them is refused, never asked to sign in again. See
+[Conditions on one tool](/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions), which also says what
+such a condition cannot stop.
+
 ## Check before you save {#check}
 
 **Check access** on the app's Access tab takes an address in the app, a person, a network address, a moment and how
 long ago the person signed in. It lists every condition in the order the project decides them, each with ✓, ✗ or ?.
-An input you leave empty shows "?".
+An input you leave empty shows "?". An API's **Access…** drawer has a **Check access** card of its own: see [Check
+access](/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions-check-access).
 
 A change that lets more people in asks first and lists what loosens, path by path. A change that only narrows saves at
 once. The FoxAuth console itself is never behind these conditions, so a rule cannot lock you out of it.

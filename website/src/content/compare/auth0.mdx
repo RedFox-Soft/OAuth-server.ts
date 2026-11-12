@@ -25,6 +25,7 @@ sources:
   - https://auth0.com/docs/secure/tenant-access-control-list
   - https://auth0.com/docs/secure/tenant-access-control-list/use-curated-blocklists
   - https://auth0.com/docs/secure/multi-factor-authentication/step-up-authentication/configure-step-up-authentication-for-apis
+  - https://auth0.com/ai/docs/mcp/get-started/secure-mcp-server-with-auth0-fga
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -340,6 +341,20 @@ groups:
         verdict: us
         why: 'With Auth0, asking for MFA before one API is code you write in an Action, run at sign-in. Here it is a setting on the API, held at every token request, renewals included.'
         note: 'The step-up guide for APIs says "an Action is used to challenge the user to authenticate with MFA."'
+      - dimension: 'Conditions on one MCP tool: groups, network, hours'
+        us:
+          {
+            status: yes,
+            text: "On an MCP server your proxy checks, one tool can carry its own groups, address ranges or FoxTrust's network facts, and hours. They are added to the API's own conditions and judged after the tool's scopes, and a call that fails them gets 403 with the reason. Once a tool has conditions, apps too old to say which tool they call are refused. The proxy reads the tool from the MCP 2026-07-28 request headers, so a stolen token in an app that lies about the tool is stopped only by an MCP server that checks the headers against the body. Check access in the console answers with the same decision the check runs. On every plan."
+          }
+        them:
+          {
+            status: yes,
+            text: "Auth0's quickstart models each tool in Auth0 FGA, a separate authorization service. A user, a role or a group can be granted a tool, and a grant can be time-limited and expire. The MCP server's own code asks FGA which tools a person may use. No condition on the network or on hours is documented."
+          }
+        verdict: different
+        why: 'Auth0 FGA can hold richer rules for each tool, but your MCP server asks it in its own code. Here the rule sits on the tool in the console, your proxy has it checked, and it can name a network or hours.'
+        note: 'The FGA quickstart says "Users inherit permissions through group membership," "Access is automatically revoked when the time expires," and "The server queries FGA on each connection to determine available tools."'
       - dimension: Refusing password sign-ins from known password-guessing addresses
         us:
           {

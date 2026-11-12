@@ -95,7 +95,9 @@ export type AdminErrorCode =
 	| 'network_facts_off'
 	/* Text that is no IP address, where one was asked for (specs/129). */
 	| 'invalid_address'
-	| 'attribute_matches_nobody';
+	| 'attribute_matches_nobody'
+	/* A tool row with conditions while apps too old to name their tool are let in (specs/131 research R3). */
+	| 'old_clients_with_tool_conditions';
 
 export class AdminError extends Error {
 	/*

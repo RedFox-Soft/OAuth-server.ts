@@ -251,9 +251,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   with the app's address, never used to choose anything, and the address a proxy reports is never the caller's. The
   app session is an account-owned record behind a host-only `__Host-` cookie, so every revocation path ends it; codes
   of `proxy.<bucketId>` are redeemed only inside the check, never at `/token`. The decision is one pure function the
-  console shares. An API's check reads a token as the API would, never reads a grant for a JWT, refuses a token bound
+  console shares: `decide` for an app, `decideApiCall` for an API. An API's check reads a token as the API would, never reads a grant for a JWT, refuses a token bound
   to a key, and trusts MCP headers only from 2026-07-28 clients. A person's address is read only with a valid project
-  proxy key and one strict `X-Forwarded-For`, and only compared; conditions accumulate down the paths; an older release
+  proxy key and one strict `X-Forwarded-For`, and only compared; conditions accumulate down the paths, and from an API to its tool rows, never replacing the API's;
+  a tool row's conditions refuse apps too old to name their tool; an older release
   must fail closed on them. A condition asking for a code is judged on the app session's acr and checked again on the
   redeemed code, never on what the sign-in request said. → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`,
   `conditions-at-your-proxy.md`

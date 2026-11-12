@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 
 import { configuration } from 'lib/configs/application.ts';
 import { signInRequirementUnmet } from 'lib/resources/sign_in_requirement.ts';
+import { requirementUnmet } from 'lib/resources/sign_in_rule.ts';
 
 const NOW = 1_800_000_000;
 const HOUR = 3600;
@@ -62,6 +63,32 @@ describe("whether a sign-in meets an API's requirement", () => {
 									? { code: missesCode, recent: tooOld }
 									: null
 						});
+					}
+				}
+			}
+		}
+	});
+
+	it('is answered the same by the rule the console bundles, given whether the sign-in had a code', () => {
+		for (const code of [false, true]) {
+			for (const maxAgeSeconds of [undefined, HOUR]) {
+				for (const acr of contexts) {
+					for (const authTime of times) {
+						const signIn = {
+							code,
+							...(maxAgeSeconds ? { maxAgeSeconds } : {})
+						};
+
+						expect(
+							requirementUnmet(
+								signIn,
+								{
+									withCode: acr === configuration.acrMap.multi_factor,
+									authTime
+								},
+								NOW
+							)
+						).toEqual(signInRequirementUnmet(signIn, { acr, authTime }, NOW));
 					}
 				}
 			}

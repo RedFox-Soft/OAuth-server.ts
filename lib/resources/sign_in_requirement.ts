@@ -2,6 +2,7 @@ import { configuration } from '../configs/application.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import { InvalidGrant } from '../helpers/errors.ts';
 import type { ResourceSignIn } from '../helpers/resource_server.ts';
+import { requirementUnmet, type UnmetRequirement } from './sign_in_rule.ts';
 
 /*
  * Whether a sign-in meets an API's sign-in requirement (specs/130 research R3). The one answer the login prompt, every
@@ -20,11 +21,11 @@ export interface SignInFacts {
 	readonly authTime: number | null | undefined;
 }
 
-export interface UnmetRequirement {
-	/* A code from an authenticator app is required and the sign-in had none. */
-	readonly code: boolean;
-	/* A sign-in no older than the requirement is needed and this one is older, or its time is unknown. */
-	readonly recent: boolean;
+export type { UnmetRequirement };
+
+/* Whether a sign-in with this authentication context included a code from an authenticator app. */
+export function hadCode(acr: string | null | undefined): boolean {
+	return acr === configuration.acrMap.multi_factor;
 }
 
 export function signInRequirementUnmet(
@@ -32,18 +33,11 @@ export function signInRequirementUnmet(
 	facts: SignInFacts,
 	nowSeconds: number
 ): UnmetRequirement | null {
-	if (!signIn) return null;
-	const code = signIn.code && facts.acr !== configuration.acrMap.multi_factor;
-	const maxAge = signIn.maxAgeSeconds;
-	const authTime = facts.authTime;
-	const recent =
-		maxAge !== undefined &&
-		!(
-			typeof authTime === 'number' &&
-			Number.isFinite(authTime) &&
-			nowSeconds - authTime <= maxAge
-		);
-	return code || recent ? { code, recent } : null;
+	return requirementUnmet(
+		signIn,
+		{ withCode: hadCode(facts.acr), authTime: facts.authTime },
+		nowSeconds
+	);
 }
 
 /* What a refusal says at the token endpoint and to the client a sign-in hands back. Fixed ASCII, no names. */

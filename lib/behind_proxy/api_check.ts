@@ -5,18 +5,19 @@ import { apiMetadataUrlOf } from './api_address.js';
 import { addressedApi, type AddressedApi } from './api_find.js';
 import { answer, type ApiReason } from './answers.js';
 import { getProtectedResourceStore } from '../adapters/index.js';
-import { accessRefusal } from './api_person.js';
+import { conditionsInPlay, decideApiCall } from './api_decision.js';
+import { personFacts } from './api_person.js';
+import { factsForBelieved } from '../network_facts/lookup.js';
 import { readBearer, type BearerRefusal } from './bearer.js';
 import { believedAddress } from './believed_address.js';
 import { noteAddress } from './usage.js';
-import { decideTool, decodeMcpName, hasControlCharacter } from './tools.js';
+import { hasControlCharacter } from './tools.js';
 import { configuration } from '../configs/application.js';
-import epochTime from '../helpers/epoch_time.js';
 import { signInOf } from '../resources/registry.js';
 import {
 	CHALLENGE_CODE_DESCRIPTION,
 	CHALLENGE_RECENT_DESCRIPTION,
-	signInRequirementUnmet
+	hadCode
 } from '../resources/sign_in_requirement.js';
 import {
 	chargeApp,
@@ -207,37 +208,72 @@ async function evaluate({
 		},
 		believed.flags
 	);
-	const accessRefused = await accessRefusal(
-		api,
-		presented.accountId,
-		believed.address
-	);
-	if (accessRefused) {
-		emitDecision(addressed, 'refuse', accessRefused, {
-			clientId: presented.clientId
-		});
-		return refused(accessRefused);
-	}
 	/*
-	 * How the person behind the token signed in (specs/130 research R6), after the conditions no new sign-in could
-	 * change and before the tools table, judged on the token's own facts. A token with no sign-in time stands for
-	 * nobody a sign-in could fix, so it is refused rather than asked to sign in again: a machine asked that would loop.
+	 * Everything after the token is one pure decision the console's "Check access" shares (specs/131 research R4): the
+	 * API's own conditions, its sign-in requirement, the tools table and the named row's conditions. Here only what
+	 * it is handed is looked up, and only when a condition in play needs it (research R6).
 	 */
-	const signIn = signInOf(api);
-	if (signIn) {
-		if (presented.signedInAt === null) {
-			emitDecision(addressed, 'refuse', 'no_person', {
+	const headers = {
+		method: request.headers.get('mcp-method'),
+		name: request.headers.get('mcp-name'),
+		protocolVersion: request.headers.get('mcp-protocol-version')
+	};
+	const view = { signIn: signInOf(api), tools: api.tools };
+	const inPlay = conditionsInPlay(view, headers);
+	const network = factsForBelieved(believed.address, inPlay);
+	const decided = decideApiCall(view, {
+		token: {
+			scopes: presented.scopes,
+			signedInAt: presented.signedInAt,
+			signedInWithCode: hadCode(presented.acr)
+		},
+		headers,
+		person: await personFacts(api, presented.accountId, inPlay),
+		address: believed.address,
+		...(network ? { network } : {}),
+		at: Date.now(),
+		explain: false
+	});
+	switch (decided.outcome) {
+		case 'allow': {
+			emitDecision(addressed, 'allow', 'allowed', {
+				tool: decided.tool,
 				clientId: presented.clientId
 			});
-			return refused('no_person');
+			return answer(200, 'allowed', identity);
 		}
-		const unmet = signInRequirementUnmet(
-			signIn,
-			{ acr: presented.acr, authTime: presented.signedInAt },
-			epochTime()
-		);
-		if (unmet) {
+		case 'refuse': {
+			emitDecision(addressed, 'refuse', decided.reason, {
+				tool: decided.tool,
+				clientId: presented.clientId
+			});
+			return refused(decided.reason);
+		}
+		case 'insufficient': {
+			emitDecision(addressed, 'refuse', 'insufficient_scope', {
+				tool: decided.tool,
+				clientId: presented.clientId
+			});
+			return answer(
+				403,
+				'insufficient_scope',
+				{
+					'WWW-Authenticate': challenge(metadataUrl, {
+						error: 'insufficient_scope',
+						scope: decided.needed.join(' ')
+					})
+				},
+				'insufficient_scope'
+			);
+		}
+		case 'sign_in': {
+			/*
+			 * How the person signed in (specs/130 research R6): a person's token whose sign-in does not meet the API's
+			 * requirement is asked for a new one, in RFC 9470's words.
+			 */
+			const { unmet } = decided;
 			const reason = unmet.code ? 'code_required' : 'sign_in_not_fresh';
+			const maxAgeSeconds = view.signIn?.maxAgeSeconds;
 			emitDecision(addressed, 'refuse', reason, {
 				clientId: presented.clientId
 			});
@@ -253,54 +289,18 @@ async function evaluate({
 						...(unmet.code
 							? { acr_values: configuration.acrMap.multi_factor }
 							: {}),
-						...(unmet.recent && signIn.maxAgeSeconds !== undefined
-							? { max_age: String(signIn.maxAgeSeconds) }
+						...(unmet.recent && maxAgeSeconds !== undefined
+							? { max_age: String(maxAgeSeconds) }
 							: {})
 					})
 				},
 				reason
 			);
 		}
+		case 'unknown':
+			/* Only the console's explain mode answers this; the check never asks for it. */
+			throw new Error('the check judged a request with an unknown input');
 	}
-	/*
-	 * The tools table (research R6). The headers mirror a body the proxy never sees, so they decide only for a
-	 * client whose server must have checked them against it; `decideTool` sends every other client to the
-	 * administrator's choice for old clients.
-	 */
-	const mcpName = request.headers.get('mcp-name');
-	const decided = decideTool({
-		table: api.tools,
-		method: request.headers.get('mcp-method'),
-		name: mcpName,
-		protocolVersion: request.headers.get('mcp-protocol-version'),
-		scopes: presented.scopes
-	});
-	const decoded = mcpName === null ? null : decodeMcpName(mcpName);
-	const detail = {
-		tool: decoded && !decoded.bad ? decoded.name : null,
-		clientId: presented.clientId
-	};
-	if (decided.outcome === 'insufficient') {
-		emitDecision(addressed, 'refuse', 'insufficient_scope', detail);
-		return answer(
-			403,
-			'insufficient_scope',
-			{
-				'WWW-Authenticate': challenge(metadataUrl, {
-					error: 'insufficient_scope',
-					scope: decided.needed.join(' ')
-				})
-			},
-			'insufficient_scope'
-		);
-	}
-	if (decided.outcome === 'refuse') {
-		emitDecision(addressed, 'refuse', decided.reason, detail);
-		return refused(decided.reason);
-	}
-
-	emitDecision(addressed, 'allow', 'allowed', detail);
-	return answer(200, 'allowed', identity);
 }
 
 export async function answerApiCheck(

@@ -20,10 +20,12 @@ import { expectStatus } from './helpers.ts';
  * copied as it came.
  */
 
+/* A row may carry conditions as the admin body names them (specs/131): `groups`, not group ids. */
 export interface ToolsBody {
-	rows: { name: string; scopes: string[] }[];
+	rows: { name: string; scopes: string[]; conditions?: unknown[] }[];
 	otherTools: 'refuse' | 'token';
 	withoutMethod: 'refuse' | 'token';
+	access?: { conditions: unknown[]; timeZone?: string };
 }
 
 export const ApiView = Type.Object({

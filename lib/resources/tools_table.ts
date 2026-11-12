@@ -31,7 +31,7 @@ export function validateToolsTable(
 		};
 	}
 	const seen = new Set<string>();
-	for (const { name, scopes: needed } of tools.rows) {
+	for (const { name, scopes: needed, conditions } of tools.rows) {
 		if (
 			name === '' ||
 			name.length > MAX_TOOL_NAME ||
@@ -47,10 +47,11 @@ export function validateToolsTable(
 			return { ok: false, message: `the tool ${shown(name)} is listed twice` };
 		}
 		seen.add(name);
-		if (needed.length === 0) {
+		/* A row with conditions may need no scope (specs/131): "only Ops may call it" is a whole rule. */
+		if (needed.length === 0 && (conditions?.length ?? 0) === 0) {
 			return {
 				ok: false,
-				message: `the tool ${shown(name)} needs at least one scope`
+				message: `the tool ${shown(name)} needs a scope or a condition`
 			};
 		}
 		if (new Set(needed).size !== needed.length) {
@@ -70,9 +71,12 @@ export function validateToolsTable(
 	return {
 		ok: true,
 		tools: {
-			rows: tools.rows.map(({ name, scopes: needed }) => ({
+			rows: tools.rows.map(({ name, scopes: needed, conditions }) => ({
 				name,
-				scopes: [...needed]
+				scopes: [...needed],
+				...(conditions && conditions.length > 0
+					? { conditions: [...conditions] }
+					: {})
 			})),
 			otherTools: tools.otherTools,
 			withoutMethod: tools.withoutMethod

@@ -1588,9 +1588,13 @@ export const ApiConditionSchema = t.Union([
 	NetworkConditionSchema,
 	TimeConditionSchema
 ]);
+/*
+ * Empty only to hold the zone the API's tool rows read their hours in (specs/131 research R2): one API, one clock,
+ * whether or not the API has conditions of its own.
+ */
 export const ApiAccess = t.Object(
 	{
-		conditions: t.Array(ApiConditionSchema, { minItems: 1, maxItems: 4 }),
+		conditions: t.Array(ApiConditionSchema, { minItems: 0, maxItems: 4 }),
 		timeZone: t.Optional(t.String({ maxLength: 64 }))
 	},
 	closed
@@ -1598,14 +1602,32 @@ export const ApiAccess = t.Object(
 export type ApiAccess = Static<typeof ApiAccess>;
 
 /*
- * An API's tools table (specs/123): each listed MCP tool needs every scope of its row; a tool the table does not
- * list, and a client too old to say which method it calls, are refused unless the administrator chose otherwise.
+ * What one tool row may add to the API's own conditions (specs/131 research R1): who, from where, when. No attribute,
+ * and no fresh sign-in, which on one tool needs a mark this server does not keep yet.
+ */
+export const RowConditionSchema = t.Union([
+	GroupConditionSchema,
+	NetworkConditionSchema,
+	TimeConditionSchema
+]);
+export type RowCondition = Static<typeof RowConditionSchema>;
+
+/*
+ * An API's tools table (specs/123): each listed MCP tool needs every scope of its row, and every condition of its row
+ * on top of the API's (specs/131); a tool the table does not list, and a client too old to say which method it calls,
+ * are refused unless the administrator chose otherwise.
  */
 export const ToolsTable = t.Object(
 	{
 		rows: t.Array(
 			t.Object(
-				{ name: t.String(), scopes: t.Array(t.String()) },
+				{
+					name: t.String(),
+					scopes: t.Array(t.String()),
+					conditions: t.Optional(
+						t.Array(RowConditionSchema, { minItems: 1, maxItems: 4 })
+					)
+				},
 				{ additionalProperties: false }
 			)
 		),

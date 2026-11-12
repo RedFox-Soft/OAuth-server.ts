@@ -271,6 +271,20 @@ groups:
           }
         verdict: us
         why: 'With Ory, asking for a second factor before one API is logic in your login app. Here it is a setting on the API, and the authorization server holds every token request to it.'
+      - dimension: 'Conditions on one MCP tool: groups, network, hours'
+        us:
+          {
+            status: yes,
+            text: "On an MCP server your proxy checks, one tool can carry its own groups, address ranges or FoxTrust's network facts, and hours. They are added to the API's own conditions and judged after the tool's scopes, and a call that fails them gets 403 with the reason. Once a tool has conditions, apps too old to say which tool they call are refused. The proxy reads the tool from the MCP 2026-07-28 request headers, so a stolen token in an app that lies about the tool is stopped only by an MCP server that checks the headers against the body. Check access in the console answers with the same decision the check runs. On every plan."
+          }
+        them:
+          {
+            status: no,
+            text: 'Not in Hydra. Ory Oathkeeper, a separate Ory product, matches an access rule by URL and method only. Every MCP call is a POST to the same URL, so a rule cannot name one tool.'
+          }
+        verdict: us
+        why: 'With Ory, a rule for one tool is code in your MCP server. Here it is a field on the tool in the console, read from the MCP headers at your proxy.'
+        note: 'The Oathkeeper access rules page says a rule''s match has "url" and "methods".'
       - dimension: Licence
         us:
           {

@@ -30,12 +30,15 @@ import {
 	networkFactsClosed,
 	type AddressesView
 } from '../behind-proxy/appView.js';
-import { KIND_LABELS } from '../behind-proxy/conditionsText.js';
-import { signInEveryText } from './ResourceSignInFields.js';
+import { conditionText, KIND_LABELS } from '../behind-proxy/conditionsText.js';
+import { CLIENTS_PAGE, signInEveryText } from './ResourceSignInFields.js';
+import { ToolRowConditions } from './ToolRowConditions.js';
+import { ApiCheckAccess } from './ApiCheckAccess.js';
+import type { ApiView } from '../../../../behind_proxy/api_decision.js';
 import { groupsApi, type GroupView } from '../groups/groupShared.js';
 
 interface ToolsForm {
-	rows: { name: string; scopes: string[] }[];
+	rows: { name: string; scopes: string[]; conditions?: Condition[] }[];
 	otherTools: Choice;
 	withoutMethod: Choice;
 }
@@ -44,11 +47,19 @@ function formOf(tools: ToolsTableView | undefined): ToolsForm {
 	return {
 		rows: (tools?.rows ?? []).map((row) => ({
 			name: row.name,
-			scopes: [...row.scopes]
+			scopes: [...row.scopes],
+			conditions: (row.conditions ?? []).map((c) => ({ ...c }))
 		})),
 		otherTools: tools?.otherTools ?? 'refuse',
 		withoutMethod: tools?.withoutMethod ?? 'refuse'
 	};
+}
+
+/* The edge names a group condition's groups `groups`, as an app's rule does. */
+function edgeConditions(conditions: readonly Condition[]) {
+	return conditions.map((c) =>
+		c.kind === 'group' ? { kind: 'group', groups: c.groupIds } : c
+	);
 }
 
 /*
@@ -101,6 +112,39 @@ export function ToolsDrawer({
 	);
 	const [groups, setGroups] = useState<GroupView[]>([]);
 	const [warnings, setWarnings] = useState<string[]>([]);
+	const nameOf = (id: string) =>
+		groups.find((g) => g.id === id)?.displayName ?? null;
+	/* A tool with conditions cannot be held to them by an app too old to name it (specs/131 research R3). */
+	const toolConditions = (rows ?? []).some(
+		(row) => (row.conditions ?? []).length > 0
+	);
+	const inherited = conditions.map((c) => ({
+		from: 'the API',
+		text: conditionText(c, nameOf)
+	}));
+	const networkUnavailable = addressesProven(addresses)
+		? {}
+		: {
+				network: `${KIND_LABELS.network} is available once your proxy shows it passes people's addresses: finish "Your proxy passes people's addresses" in this API's Connect first.`
+			};
+	const savedView: ApiView = {
+		...(signIn && (signIn.requireCode || signIn.signInEveryMinutes !== null)
+			? {
+					signIn: {
+						code: signIn.requireCode,
+						...(signIn.signInEveryMinutes !== null
+							? { maxAgeSeconds: signIn.signInEveryMinutes * 60 }
+							: {})
+					}
+				}
+			: {}),
+		...(tools ? { tools } : {})
+	};
+	const values = Form.useWatch([], form) as ToolsForm | undefined;
+	const editedView: ApiView | null =
+		values?.rows !== undefined
+			? { ...savedView, tools: tableOf({ ...formOf(tools), ...values }) }
+			: null;
 	useEffect(() => {
 		if (!byProxy) return;
 		void request<{ groups: GroupView[] }>('GET', groupsApi(bucketId)).then(
@@ -110,15 +154,19 @@ export function ToolsDrawer({
 		);
 	}, [bucketId, byProxy]);
 
-	async function save(values: ToolsForm) {
-		const after: ToolsTableView = {
+	function tableOf(values: ToolsForm): ToolsTableView {
+		return {
 			rows: values.rows.map((row) => ({
 				name: row.name,
-				scopes: row.scopes
+				scopes: row.scopes,
+				...(byProxy && (row.conditions ?? []).length > 0
+					? { conditions: row.conditions }
+					: {})
 			})),
 			otherTools: values.otherTools,
 			withoutMethod: values.withoutMethod,
-			...(byProxy && conditions.length > 0
+			/* Kept with only a zone too: the tool rows read their hours in it (specs/131 research R2). */
+			...(byProxy && (conditions.length > 0 || zone)
 				? {
 						access: {
 							conditions,
@@ -127,6 +175,10 @@ export function ToolsDrawer({
 					}
 				: {})
 		};
+	}
+
+	async function save(values: ToolsForm) {
+		const after = tableOf(values);
 		const widenings = toolWidenings(tools, after);
 		if (widenings.length > 0) {
 			const agreed = await confirm('resource.tools.widen', {
@@ -137,18 +189,22 @@ export function ToolsDrawer({
 		}
 		setSaving(true);
 		try {
-			/* The edge names a group condition's groups `groups`, as an app's rule does. */
-			const body = after.access
-				? {
-						...after,
-						access: {
-							...after.access,
-							conditions: after.access.conditions.map((c) =>
-								c.kind === 'group' ? { kind: 'group', groups: c.groupIds } : c
-							)
+			const body = {
+				...after,
+				rows: after.rows.map((row) =>
+					row.conditions
+						? { ...row, conditions: edgeConditions(row.conditions) }
+						: row
+				),
+				...(after.access
+					? {
+							access: {
+								...after.access,
+								conditions: edgeConditions(after.access.conditions)
+							}
 						}
-					}
-				: after;
+					: {})
+			};
 			const result = await request<{
 				warnings?: { machineClients: string[]; pairwiseClients: string[] };
 			}>('PATCH', url, { tools: body });
@@ -256,13 +312,7 @@ export function ToolsDrawer({
 							countUrl={`/admin/api/projects/${encodeURIComponent(bucketId)}/attribute-matches`}
 							disabled={false}
 							networkFactsOn={addresses?.networkFacts?.state !== 'off'}
-							unavailable={
-								addressesProven(addresses)
-									? {}
-									: {
-											network: `${KIND_LABELS.network} is available once your proxy shows it passes people's addresses: finish "Your proxy passes people's addresses" in this API's Connect first.`
-										}
-							}
+							unavailable={networkUnavailable}
 							onChange={(next) => {
 								setRefusal(null);
 								setConditions(next);
@@ -311,7 +361,8 @@ export function ToolsDrawer({
 							>
 								{fields.length === 0 ? (
 									<Typography.Text type="secondary">
-										No tools listed. Every tool needs only a valid token.
+										No tools listed. Every tool needs only a valid token, and
+										the two choices below apply only once a tool is listed.
 									</Typography.Text>
 								) : (
 									<Flex gap={8}>
@@ -333,54 +384,106 @@ export function ToolsDrawer({
 								{fields.map((field) => (
 									<Flex
 										key={field.key}
-										gap={8}
-										align="start"
+										vertical
+										gap={4}
 									>
-										<Form.Item
-											name={[field.name, 'name']}
-											style={{ flex: 1, marginBottom: 0 }}
-											rules={[{ required: true, message: 'Name the tool' }]}
+										<Flex
+											gap={8}
+											align="start"
 										>
-											<Input
-												placeholder="search_files"
-												aria-label="Tool name"
+											<Form.Item
+												name={[field.name, 'name']}
+												style={{ flex: 1, marginBottom: 0 }}
+												rules={[{ required: true, message: 'Name the tool' }]}
+											>
+												<Input
+													placeholder="search_files"
+													aria-label="Tool name"
+												/>
+											</Form.Item>
+											<Form.Item
+												name={[field.name, 'scopes']}
+												style={{ flex: 1.4, marginBottom: 0 }}
+												dependencies={[['rows', field.name, 'conditions']]}
+												rules={[
+													({ getFieldValue }) => ({
+														validator(_rule, value: string[] | undefined) {
+															/* A row with conditions may need no scope (specs/131). */
+															const own = getFieldValue([
+																'rows',
+																field.name,
+																'conditions'
+															]) as Condition[] | undefined;
+															return (value ?? []).length > 0 ||
+																(own ?? []).length > 0
+																? Promise.resolve()
+																: Promise.reject(
+																		new Error(
+																			'Pick a scope, or give the tool a condition'
+																		)
+																	);
+														}
+													})
+												]}
+											>
+												<Select
+													mode="multiple"
+													options={scopeOptions}
+													placeholder={
+														(rows?.[field.name]?.conditions ?? []).length > 0
+															? 'None: its conditions only'
+															: 'Scopes of this API'
+													}
+													aria-label="Scopes it needs"
+												/>
+											</Form.Item>
+											<Button
+												type="text"
+												icon={<DeleteOutlined />}
+												aria-label="Remove this tool"
+												onClick={() => remove(field.name)}
 											/>
-										</Form.Item>
-										<Form.Item
-											name={[field.name, 'scopes']}
-											style={{ flex: 1.4, marginBottom: 0 }}
-											rules={[
-												{
-													required: true,
-													type: 'array',
-													min: 1,
-													message: 'Pick at least one scope'
-												}
-											]}
-										>
-											<Select
-												mode="multiple"
-												options={scopeOptions}
-												placeholder="Scopes of this API"
-												aria-label="Scopes it needs"
-											/>
-										</Form.Item>
-										<Button
-											type="text"
-											icon={<DeleteOutlined />}
-											aria-label="Remove this tool"
-											onClick={() => remove(field.name)}
-										/>
+										</Flex>
+										{byProxy && (
+											<Form.Item
+												name={[field.name, 'conditions']}
+												style={{ marginBottom: 8 }}
+											>
+												<ToolRowConditions
+													inherited={inherited}
+													timeZone={zone}
+													onTimeZone={setZone}
+													groups={groups.map((g) => ({
+														id: g.id,
+														displayName: g.displayName
+													}))}
+													countUrl={`/admin/api/projects/${encodeURIComponent(bucketId)}/attribute-matches`}
+													networkFactsOn={
+														addresses?.networkFacts?.state !== 'off'
+													}
+													unavailable={networkUnavailable}
+													nameOf={nameOf}
+												/>
+											</Form.Item>
+										)}
 									</Flex>
 								))}
 								<div>
 									<Button
 										icon={<PlusOutlined />}
-										onClick={() => add({ name: '', scopes: [] })}
+										onClick={() =>
+											add({ name: '', scopes: [], conditions: [] })
+										}
 									>
 										Add tool
 									</Button>
 								</div>
+								{fields.length > 0 && (
+									<Typography.Text type="secondary">
+										A new or renamed tool on your MCP server gets the &quot;Any
+										other tool&quot; answer until you add it here.
+									</Typography.Text>
+								)}
 							</Flex>
 						)}
 					</Form.List>
@@ -412,13 +515,37 @@ export function ToolsDrawer({
 									{ value: 'refuse', label: 'Refuse them' },
 									{
 										value: 'token',
-										label: 'Let them in: they can call any tool'
+										label: 'Let them in: they can call any tool',
+										disabled: toolConditions
 									}
 								]}
 							/>
 						</Form.Item>
+						{toolConditions && (
+							<Typography.Paragraph type="secondary">
+								A tool here has conditions, and an app too old to say which tool
+								it calls can&apos;t be held to them, so such apps are refused.
+								Today that includes many apps:{' '}
+								<Typography.Link
+									href={CLIENTS_PAGE}
+									target="_blank"
+								>
+									see which apps say which tool they call
+								</Typography.Link>
+								.
+							</Typography.Paragraph>
+						)}
 					</div>
 				</Form>
+
+				{byProxy && (
+					<ApiCheckAccess
+						bucketId={bucketId}
+						scopes={scopes}
+						saved={savedView}
+						edited={editedView}
+					/>
+				)}
 
 				<Alert
 					type="info"

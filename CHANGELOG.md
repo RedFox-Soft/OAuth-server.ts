@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Conditions on one MCP tool** (spec 131). On an API checked at the proxy, one tool can be limited to some groups,
+  some networks (address ranges or FoxTrust's network facts) and some hours, on top of the API's own conditions and
+  after the tool's scopes; every other tool stays as it was. A refused call is a plain 403. A tool may need a
+  condition and no scope. Apps too old to say which tool they call are refused once a tool has conditions. The
+  Access drawer gains "Check access", which answers with the decision the proxy check runs. A tool condition stops
+  an app that names its tool honestly; the console says what it does not stop. Free on every plan. Run `db:migrate`.
 - **An API that requires a code or a recent sign-in** (spec 130). Any API or MCP server of a project can require a
   sign-in with a code from an authenticator app, and a new sign-in every day, 7 or 14 days, or a custom interval.
   No MCP client understands the standard step-up challenge yet, so FoxAuth enforces it itself: the sign-in for a

@@ -150,6 +150,7 @@ const groups = [
 		{ ...administration.proxyConditions },
 		{ ...administration.proxyNetworkFacts, flag: 'networkFacts.enabled' },
 		{ ...administration.apiSignInRequirement, spec: rfc('9470') },
+		{ ...administration.apiToolConditions },
 		{ ...administration.clientIdMetadataDocument, flag: 'clientIdMetadataDocument.enabled' },
 		{ ...administration.registration, flag: 'registration.enabled', spec: rfc('7591') },
 		{

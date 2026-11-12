@@ -1,4 +1,5 @@
 import { verifyApiSignInRequirement } from './verify_api_sign_in_requirement.js';
+import { verifyApiToolConditions } from './verify_api_tool_conditions.js';
 import { createHash, randomBytes } from 'node:crypto';
 import { unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -988,6 +989,7 @@ await verifyOutsideServers(
 	check
 );
 await verifyApiSignInRequirement(resources, check);
+await verifyApiToolConditions(resources, check);
 await verifyBehindProxy(
 	new BehindProxyAppStore(),
 	adapter('BehindProxySession'),

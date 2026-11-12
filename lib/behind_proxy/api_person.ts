@@ -4,8 +4,8 @@ import { getUserStore } from '../adapters/index.js';
 import type { ProtectedResource } from '../adapters/types.js';
 import { groupIdsOfUser } from '../bucket_groups/service.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
-import { factsForBelieved } from '../network_facts/lookup.js';
-import { decideAccess, type AccessRefusal } from './conditions.js';
+import type { ApiPerson } from './api_decision.js';
+import type { Condition } from './conditions.js';
 import { attributesOf } from './session.js';
 
 /*
@@ -21,47 +21,35 @@ const standings = new QuickLRU<
 	{ groupIds: string[]; attributes: Record<string, string> }
 >({ maxSize: 10_000, maxAge: STANDING_MS });
 
-export type AccessDecision = AccessRefusal | 'cannot_sign_in' | null;
-
-export async function accessRefusal(
-	api: Pick<ProtectedResource, 'bucketId' | 'tools'>,
+/*
+ * The person behind a token, for the conditions a request is judged on (specs/131 research R6): the API's own and the
+ * named tool row's. Read only when one of them is about the person; null when the token names nobody of this project.
+ */
+export async function personFacts(
+	api: Pick<ProtectedResource, 'bucketId'>,
 	accountId: string | null,
-	address: string | null
-): Promise<AccessDecision> {
-	const access = api.tools?.access;
-	if (!access || access.conditions.length === 0) return null;
-	const aboutPerson = access.conditions.some(
+	conditions: readonly Condition[]
+): Promise<ApiPerson | null> {
+	const aboutPerson = conditions.some(
 		(c) => c.kind === 'group' || c.kind === 'attribute'
 	);
-	let person: {
-		groupIds: string[];
-		attributes: Record<string, string>;
-	} | null = null;
-	if (aboutPerson && accountId) {
-		/* The person is looked up only in the API's own project: a token never names someone of another. */
-		const user = await getUserStore(api.bucketId).find(accountId);
-		if (user) {
-			if (!canSignIn(user)) return 'cannot_sign_in';
-			const key = `${api.bucketId}:${accountId}`;
-			person = standings.get(key) ?? null;
-			if (!person) {
-				person = {
-					groupIds: [...(await groupIdsOfUser(api.bucketId, user._id))],
-					attributes: attributesOf(user)
-				};
-				standings.set(key, person);
-			}
-		}
+	if (!aboutPerson || !accountId) return null;
+	/* The person is looked up only in the API's own project: a token never names someone of another. */
+	const user = await getUserStore(api.bucketId).find(accountId);
+	if (!user) return null;
+	if (!canSignIn(user)) {
+		return { groupIds: [], attributes: {}, canSignIn: false };
 	}
-	const network = factsForBelieved(address, access.conditions);
-	return decideAccess(access.conditions, {
-		address,
-		at: Date.now(),
-		timeZone: access.timeZone ?? null,
-		person,
-		...(network ? { network } : {}),
-		explain: false
-	});
+	const key = `${api.bucketId}:${accountId}`;
+	let standing = standings.get(key);
+	if (!standing) {
+		standing = {
+			groupIds: [...(await groupIdsOfUser(api.bucketId, user._id))],
+			attributes: attributesOf(user)
+		};
+		standings.set(key, standing);
+	}
+	return { ...standing, canSignIn: true };
 }
 
 /* Test-only: forgets the kept groups and attributes, as a minute passing would. */

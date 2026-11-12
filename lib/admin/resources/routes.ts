@@ -64,6 +64,7 @@ import {
 	assertConditionsUsable,
 	conditionsFrom,
 	personConditionWarnings,
+	rowConditionsOf,
 	timeZoneFrom
 } from '../conditions.js';
 import type { VouchingStatus } from '../../resources/vouching.js';
@@ -337,6 +338,138 @@ function acceptedTools(tools: ToolsTable, scopes: readonly string[]) {
 	return result.tools;
 }
 
+type ToolsBody = NonNullable<(typeof UpdateResourceBody)['static']['tools']>;
+
+/* A row as the console and an agent name it, for messages: the name in quotes, anything unprintable spelled out. */
+function toolPlace(name: string): string {
+	return `the tool ${JSON.stringify(name)}`;
+}
+
+/*
+ * A tools table as it will be stored, or a refusal (specs/123, specs/124, specs/131 research R3): the rows with their
+ * conditions in stored form, the API's own conditions, and the one zone both read their hours in. A row condition, like
+ * the API's, is the proxy's to apply, and a client too old to name its tool cannot be held to one, so a table with any
+ * row condition refuses such clients.
+ */
+async function acceptedToolsBody(
+	bucket: UserBucket,
+	existing: ProtectedResource,
+	body: ToolsBody,
+	checkedBy: 'server' | 'proxy',
+	scopes: readonly string[]
+): Promise<{
+	tools: ToolsTable;
+	warnings?: { machineClients: string[]; pairwiseClients: string[] };
+}> {
+	const rows: ToolsTable['rows'] = [];
+	for (const row of body.rows) {
+		const conditions =
+			row.conditions === undefined
+				? []
+				: rowConditionsOf(
+						await conditionsFrom(
+							bucket,
+							row.conditions,
+							toolPlace(row.name),
+							'tools',
+							'api'
+						)
+					);
+		rows.push({
+			name: row.name,
+			scopes: row.scopes,
+			...(conditions.length > 0 ? { conditions } : {})
+		});
+	}
+	const table = acceptedTools(
+		{ rows, otherTools: body.otherTools, withoutMethod: body.withoutMethod },
+		scopes
+	);
+	const rowConditions = table.rows.flatMap((row) => row.conditions ?? []);
+	const access = body.access;
+	/* Conditions at the proxy are the proxy's to apply; on a server-checked API they would decide nothing. */
+	if (
+		(access?.conditions.length || rowConditions.length > 0) &&
+		checkedBy !== 'proxy'
+	) {
+		throw new AdminError(
+			422,
+			'access conditions apply only to an API whose tokens your proxy checks',
+			{ field: 'tools' }
+		);
+	}
+	if (rowConditions.length > 0 && table.withoutMethod === 'token') {
+		throw new AdminError(
+			422,
+			"an app too old to say which tool it calls can't be held to one tool's conditions; choose to refuse those apps, or remove the tool's conditions",
+			{ field: 'tools', code: 'old_clients_with_tool_conditions' }
+		);
+	}
+	const conditions = access
+		? await conditionsFrom(
+				bucket,
+				access.conditions,
+				existing.name,
+				'tools',
+				'api'
+			)
+		: [];
+	const timeZone =
+		access?.timeZone === undefined || access.timeZone === null
+			? null
+			: timeZoneFrom(access.timeZone, 'tools');
+	if (
+		timeZone === null &&
+		[...conditions, ...rowConditions].some((c) => c.kind === 'time')
+	) {
+		throw new AdminError(
+			422,
+			'a time condition needs the time zone its hours are read in',
+			{ field: 'tools' }
+		);
+	}
+	const proof = {
+		provenAt: existing.proxyAddressProvenAt,
+		forgedAt: existing.proxyAddressForgedAt
+	};
+	await assertConditionsUsable(
+		bucket,
+		existing.tools?.access?.conditions ?? [],
+		conditions,
+		proof,
+		existing.name,
+		'tools'
+	);
+	for (const row of table.rows) {
+		await assertConditionsUsable(
+			bucket,
+			existing.tools?.rows.find((saved) => saved.name === row.name)
+				?.conditions ?? [],
+			row.conditions ?? [],
+			proof,
+			toolPlace(row.name),
+			'tools'
+		);
+	}
+	/* Kept only when it says something: a condition, or the zone the rows read their hours in. */
+	const tools: ToolsTable =
+		conditions.length > 0 || timeZone !== null
+			? {
+					...table,
+					access: {
+						conditions: apiConditionsOf(conditions),
+						...(timeZone === null ? {} : { timeZone })
+					}
+				}
+			: table;
+	const aboutPerson = [...conditions, ...rowConditions].some(
+		(c) => c.kind === 'group' || c.kind === 'attribute'
+	);
+	return aboutPerson
+		? { tools, warnings: await personConditionWarnings(bucket._id) }
+		: { tools };
+}
+
 /*
  * The 409 a sign-in requirement answers until it is confirmed with the counts it previewed (specs/130): the protocol of
  * the application's requirement, so the console and an agent consent the same way. Null when the change may go ahead.
@@ -547,71 +680,16 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			if (scopeDescriptions && !attributes.includes('scopeDescriptions')) {
 				attributes.push('scopeDescriptions');
 			}
-			let tools =
+			const { tools, warnings } =
 				body.tools === undefined
-					? undefined
-					: acceptedTools(
-							{
-								rows: body.tools.rows,
-								otherTools: body.tools.otherTools,
-								withoutMethod: body.tools.withoutMethod
-							},
+					? { tools: undefined, warnings: undefined }
+					: await acceptedToolsBody(
+							bucket,
+							existing,
+							body.tools,
+							body.checkedBy ?? existing.checkedBy ?? 'server',
 							effectiveScopes
 						);
-			const access = body.tools?.access;
-			let warnings:
-				{ machineClients: string[]; pairwiseClients: string[] } | undefined;
-			if (tools && access) {
-				/* Conditions at the proxy are the proxy's to apply; on a server-checked API they would decide nothing. */
-				if ((body.checkedBy ?? existing.checkedBy ?? 'server') !== 'proxy') {
-					throw new AdminError(
-						422,
-						'access conditions apply only to an API whose tokens your proxy checks',
-						{ field: 'tools' }
-					);
-				}
-				const conditions = await conditionsFrom(
-					bucket,
-					access.conditions,
-					existing.name,
-					'tools',
-					'api'
-				);
-				const timeZone =
-					access.timeZone === undefined || access.timeZone === null
-						? null
-						: timeZoneFrom(access.timeZone, 'tools');
-				if (timeZone === null && conditions.some((c) => c.kind === 'time')) {
-					throw new AdminError(
-						422,
-						'a time condition needs the time zone its hours are read in',
-						{ field: 'tools' }
-					);
-				}
-				await assertConditionsUsable(
-					bucket,
-					existing.tools?.access?.conditions ?? [],
-					conditions,
-					{
-						provenAt: existing.proxyAddressProvenAt,
-						forgedAt: existing.proxyAddressForgedAt
-					},
-					existing.name,
-					'tools'
-				);
-				tools = {
-					...tools,
-					access: {
-						conditions: apiConditionsOf(conditions),
-						...(timeZone === null ? {} : { timeZone })
-					}
-				};
-				if (
-					conditions.some((c) => c.kind === 'group' || c.kind === 'attribute')
-				) {
-					warnings = await personConditionWarnings(bucket._id);
-				}
-			}
 			if (scopes !== undefined && body.tools === undefined) {
 				const orphan = orphanedBy(existing.tools, effectiveScopes);
 				if (orphan) {

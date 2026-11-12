@@ -33,8 +33,10 @@ so the console says that in plain words and links to the site's client table. Ge
 
 ## One answer everywhere
 
-`signInRequirementUnmet(signIn, { acr, authTime }, now)` (`lib/resources/sign_in_requirement.ts:30`) answers
-`{ code, recent }` or null. A missing or non-finite `authTime` is never recent: `undefined` arithmetic is `NaN`, and
+`signInRequirementUnmet(signIn, { acr, authTime }, now)` (`lib/resources/sign_in_requirement.ts`) answers
+`{ code, recent }` or null. Since spec 131 its arithmetic is `requirementUnmet` in the import-free
+`lib/resources/sign_in_rule.ts`, given whether the sign-in had a code, so the console's "Check access" bundles the same
+rule; the wrapper maps `acr` to that flag (`hadCode`). A missing or non-finite `authTime` is never recent: `undefined` arithmetic is `NaN`, and
 every comparison with `NaN` is false, which would read as a pass. The requirement reaches every token path through the
 descriptor the path already builds: `signInOf` (`lib/resources/registry.ts:28`) fills `ResourceServer.signIn`, so no
 check reads the store again.
@@ -54,7 +56,7 @@ Two login-prompt reasons (`lib/helpers/interaction_policy/prompts/login.ts:120`,
 
 ## Every grant
 
-`assertSignInMeets` (`lib/resources/sign_in_requirement.ts:73`) after the resource server is built in the
+`assertSignInMeets` (`lib/resources/sign_in_requirement.ts:67`) after the resource server is built in the
 authorization code, device and CIBA grants. jwt-bearer (ID-JAG, plain assertions) and client credentials are refused
 for such an API outright (`jwt_bearer.ts:188`, `client_credentials.ts:132`): an assertion carries no sign-in this
 server saw, and a machine token stands for no one. Token exchange issues no access token of this server.
@@ -68,7 +70,7 @@ for any other resource.
 
 ## At the proxy
 
-`lib/behind_proxy/api_check.ts:226`: after the access conditions (a refusal no new sign-in could change comes first)
+`decideApiCall` (`lib/behind_proxy/api_decision.ts`, spec 131), which the check calls: after the access conditions (a refusal no new sign-in could change comes first)
 and before the tools table, so it holds for every request whatever MCP method it names. `Presented` carries the token's
 own `signedInAt` and `acr` (`lib/behind_proxy/bearer.ts:49`), from the JWT or the opaque record, never from the
 person: a pairwise JWT has no `accountId` and is still judged. No sign-in time → `403 no_person`, never a `401`
@@ -76,7 +78,7 @@ person: a pairwise JWT has no `accountId` and is still judged. No sign-in time �
 `acr_values` (the configured multi-factor value) and/or `max_age`, and `X-Auth-Reason` `code_required` or
 `sign_in_not_fresh`, the app check's own reasons.
 
-`challenge()` (`api_check.ts:89`) keeps only parameters whose value is RFC 6750 §3 text (`quotable`, `:80`). Bun
+`challenge()` (`api_check.ts:90`) keeps only parameters whose value is RFC 6750 §3 text (`quotable`, `:81`). Bun
 throws building a header with a value outside Latin-1 (that was a `500`), and a quote let a value add a parameter.
 
 ## Around it
@@ -94,5 +96,5 @@ throws building a header with a value outside Latin-1 (that was a `500`), and a 
 
 ## Not here (later specs)
 
-Conditions on one MCP tool; a fresh sign-in before one tool (it needs a server-side mark so a refresh fails only for
+A fresh sign-in before one tool (it needs a server-side mark so a refresh fails only for
 that tool); the API's own console page; verifying a provider's own `auth_time`.

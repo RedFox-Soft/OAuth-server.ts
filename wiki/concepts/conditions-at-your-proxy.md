@@ -66,6 +66,12 @@ the person in the API's project, applies `canSignIn` uncached (an API has no ses
 only groups and attributes for 60 s (`api_person.ts`). API conditions live in `tools.access` of the closed
 `ToolsTable`.
 
+**Conditions also accumulate from an API to one tool row** (spec 131): a row of the tools table may carry its own
+group, network or time conditions, judged after its scopes and on top of the API's, by the one pure decision
+`decideApiCall` the console's "Check access" shares ([[token-checks-at-your-proxy]]). The person is read only when the
+API's or the named row's conditions are about a person (`personFacts`, `api_person.ts`), and `canSignIn` is now a fact
+handed to the decision rather than a refusal of its own. Rows read their hours in `tools.access.timeZone`.
+
 ## Fresh sign-in
 
 The app session records `authTime`/`acr`/`amr` from the redeemed code. A stale sign-in is `sign_in` with
@@ -139,7 +145,9 @@ A rule with conditions is stored as `who: { kind: 'conditional', who, conditions
 rollback below this release, and during a rolling deploy older processes answer errors for conditioned apps and APIs.
 Spec 128 adds `2026-11-12-proxy-code-condition-fence` for `withCode`, which the closed fresh-condition schema of an older
 release refuses. Spec 129 adds `2026-11-13-proxy-network-facts-fence` for `facts`, with which the ranges may be empty
-and an older release would otherwise let everyone through.
+and an older release would otherwise let everyone through. Spec 131 adds `2026-11-15-api-tool-conditions-fence`: a
+tool row with conditions (and possibly no scope) and an `access` with no condition but a zone are refused by an older
+release's closed schema at every check.
 
 ## Related
 

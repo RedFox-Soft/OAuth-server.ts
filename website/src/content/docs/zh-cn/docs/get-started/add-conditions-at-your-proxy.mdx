@@ -1,7 +1,7 @@
 ---
 title: 在代理处添加条件
 description: '只允许从您的网络、只在工作时间、只允许某个部门，或只在近期登录之后，进入代理后的应用或 API。'
-source: 7639cbc98465
+source: 0f878be849d7
 sidebar:
   order: 9
 ---
@@ -199,9 +199,11 @@ iCloud Private Relay 不在选项中，它的地址可以通过。FoxTrust 不�
 
 保存时，控制台会列出令牌将被拒绝的应用名称。被锁定或停用的人会立即被拒绝。被移出用户组的人会在一分钟内被拒绝。
 
+MCP 服务器的某一个工具可以带有自己的条件：用户组、**From where** 和 **When**。这些条件加在 API 的条件之上，永远不会取代它们。不满足这些条件的调用会被拒绝，而不会被要求重新登录。请参阅[单个工具的条件](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions)，那里也说明了这种条件挡不住什么。
+
 ## 保存前先检查 {#check}
 
-应用 Access 选项卡上的 **Check access** 接受应用中的地址、某个人、网络地址、某个时刻，以及此人登录了多久。它按项目判断的顺序列出每个条件，并标上 ✓、✗ 或 ?。您留空的输入会显示“?”。
+应用 Access 选项卡上的 **Check access** 接受应用中的地址、某个人、网络地址、某个时刻，以及此人登录了多久。它按项目判断的顺序列出每个条件，并标上 ✓、✗ 或 ?。您留空的输入会显示“?”。API 的 **Access…** 抽屉里也有自己的 **Check access** 卡片：请参阅[检查访问](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions-check-access)。
 
 让更多人进入的更改会先请求确认，并逐个路径列出放宽了什么。只收紧访问的更改会立即保存。FoxAuth 控制台本身永远不受这些条件限制，因此规则不会把您挡在控制台之外。
 

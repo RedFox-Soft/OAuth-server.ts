@@ -241,6 +241,19 @@ groups:
         verdict: us
         why: 'ZITADEL can require a second factor, and say how often it is checked again, for every sign-in. Here one API can ask for it while the rest of the project stays as it is.'
         note: 'The default settings page says the Multi-factor Login Check Lifetime "specifies after which period a user has to revalidate the Multi-factor during the login process."'
+      - dimension: 'Conditions on one MCP tool: groups, network, hours'
+        us:
+          {
+            status: yes,
+            text: "On an MCP server your proxy checks, one tool can carry its own groups, address ranges or FoxTrust's network facts, and hours. They are added to the API's own conditions and judged after the tool's scopes, and a call that fails them gets 403 with the reason. Once a tool has conditions, apps too old to say which tool they call are refused. The proxy reads the tool from the MCP 2026-07-28 request headers, so a stolen token in an app that lies about the tool is stopped only by an MCP server that checks the headers against the body. Check access in the console answers with the same decision the check runs. On every plan."
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy, and no rule for one MCP tool is documented. ZITADEL's API examples check roles per endpoint in the API's own code."
+          }
+        verdict: us
+        why: 'With ZITADEL a rule for one tool is code in your MCP server. Here it is a field on the tool in the console, and your proxy has it checked.'
       - dimension: Managed hosting
         us:
           {

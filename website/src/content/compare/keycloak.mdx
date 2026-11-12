@@ -17,6 +17,7 @@ sources:
   - https://www.keycloak.org/docs/latest/server_development/index.html
   - https://www.keycloak.org/2020/08/sunsetting-louketo-project.adoc.html
   - https://oauth2-proxy.github.io/oauth2-proxy/configuration/overview
+  - https://www.keycloak.org/docs/latest/authorization_services/index.html
 bottomLine: 'Pick Keycloak if you need SAML, LDAP federation or certified FAPI today. FoxAuth is the better fit for a team that writes TypeScript, wants OAuth 2.1 behaviour as the default, or wants an AI agent administering the server through the same audited path a human uses.'
 chooseThem:
   - 'You need SAML as well as OpenID Connect.'
@@ -336,6 +337,20 @@ groups:
           }
         verdict: different
         why: "Keycloak's step-up has levels and flows of its own, but the client asks for the level. Here the API asks, so an MCP client that knows nothing of levels is still held to it."
+      - dimension: 'Conditions on one MCP tool: groups, network, hours'
+        us:
+          {
+            status: yes,
+            text: "On an MCP server your proxy checks, one tool can carry its own groups, address ranges or FoxTrust's network facts, and hours. They are added to the API's own conditions and judged after the tool's scopes, and a call that fails them gets 403 with the reason. Once a tool has conditions, apps too old to say which tool they call are refused. The proxy reads the tool from the MCP 2026-07-28 request headers, so a stolen token in an app that lies about the tool is stopped only by an MCP server that checks the headers against the body. Check access in the console answers with the same decision the check runs. On every plan."
+          }
+        them:
+          {
+            status: no,
+            text: "No check endpoint for a proxy, and Keycloak's MCP guide describes no rule for one tool. Authorization Services can protect resources of your own with group-based and time-based policies, applied by a policy enforcer in your app. So a rule for one tool is a resource you model in Keycloak and enforce in the MCP server's code."
+          }
+        verdict: us
+        why: 'With Keycloak a rule for one tool is a resource you model and a policy enforcer you run in the MCP server. Here it is a field on the tool in the console, and your proxy has it checked.'
+        note: 'The Authorization Services guide says a group-based policy defines that "a set of one or more groups (and their hierarchies) is permitted to access an object," and that policy enforcers "enforce authorization decisions at the resource server side."'
   - label: Licence and cost
     rows:
       - dimension: Licence

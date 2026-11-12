@@ -140,6 +140,11 @@ export const ApiConditionBody = t.Union([
 	NetworkBody,
 	TimeBody
 ]);
+/*
+ * What one row of an API's tools table may add (specs/131 research R1): who, from where, when. No attribute, and no
+ * fresh sign-in, which on one tool needs a mark this server does not keep yet.
+ */
+export const RowConditionBody = t.Union([GroupBody, NetworkBody, TimeBody]);
 /* An IANA zone, or null to clear it. */
 export const TimeZoneBody = t.Union([t.String({ maxLength: 64 }), t.Null()]);
 

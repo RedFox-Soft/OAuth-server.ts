@@ -1388,7 +1388,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		action: { kind: 'form', target: { area: 'apis', query: { declare: '1' } } },
 		goodToKnow: [
 			'When you declare the API, answer “Who checks tokens?” with “Your proxy”. Its Connect gives the configuration for Caddy, Traefik or nginx, ready to paste.',
-			'Access… on the API’s row says which scopes each tool needs, and who may call the API at all: some groups, an attribute, a network, some hours. A client that lacks a scope is told exactly which scopes to ask for.',
+			'Access… on the API’s row says which scopes each tool needs, and who may call the API at all: some groups, an attribute, a network, some hours. One tool can have its own groups, network or hours on top. A client that lacks a scope is told exactly which scopes to ask for.',
 			'The project publishes the description agents look for (the protected resource metadata), so your MCP server serves nothing for sign-in.',
 			'A revoked token keeps working at the proxy until it expires, unless the API issues opaque tokens. Keep the lifetime short.',
 			'Tokens bound to a key (DPoP or a certificate) are refused at the proxy, because the proxy cannot check the key.',
@@ -1981,6 +1981,71 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Make my MCP server in FoxAuth require a sign-in with a code from an authenticator app, and tell me first whom that affects.',
 			'resource_update (requireCode, signInEveryMinutes)',
 			'If my MCP server checks its own tokens, make it refuse a token whose acr is not the multi-factor value FoxAuth names.'
+		)
+	},
+	{
+		id: 'apitool',
+		tab: 'product',
+		title: 'Let only some people use one MCP tool',
+		sentence:
+			'One tool of your MCP server, such as delete_files, can be called only by the groups you choose, from the networks and in the hours you choose. Every other tool stays as open as before.',
+		protocol: 'Forward auth · MCP 2026-07-28 request headers',
+		lanes: lanes('agent', 'proxy', 'fox', 'mcp'),
+		steps: [
+			step(
+				'agent',
+				'proxy',
+				'Calls delete_files',
+				'The agent calls one tool of your MCP server and names it, as MCP 2026-07-28 asks.'
+			),
+			step(
+				'proxy',
+				'fox',
+				'Asks the project',
+				'Your proxy asks the project to check the token and the tool.'
+			),
+			step(
+				'fox',
+				'proxy',
+				'403: not for this tool',
+				'The person is not in the groups that may call delete_files, so the project says no. Their other tools still work.',
+				'refusal'
+			),
+			step(
+				'agent',
+				'mcp',
+				'Calls search_files',
+				'The same agent calls another tool, and your proxy lets it through.'
+			)
+		],
+		problem: {
+			at: 'mcp',
+			mark: 'open',
+			caption: 'Anyone who may use your MCP server may call every tool.',
+			lanes: ['agent', 'mcp']
+		},
+		fixCaption: 'One tool answers only to the people you choose.',
+		sees: {
+			kind: 'none',
+			lines: ['Nobody sees a new page', 'The agent says the tool was refused']
+		},
+		needs: { room: 'apis', role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open APIs',
+			target: { area: 'apis' }
+		},
+		goodToKnow: [
+			'Set it in Access… on the API’s row: open the tool and add its conditions. They add to the API’s own conditions and never replace them.',
+			'A tool condition stops an app that names the tool it calls honestly. A stolen token in an app that lies about the tool is stopped only by your MCP server checking the headers against the body, which MCP 2026-07-28 servers must do. To keep someone out of the whole API, use the API’s own conditions or its sign-in requirement.',
+			'Apps too old to say which tool they call are refused once a tool has conditions. Today that is many apps; the site’s client table says which.',
+			'A new or renamed tool on your server gets the “Any other tool” answer until you add it to the table.',
+			'Check access, in the same drawer, shows what the check would answer for a person, a tool, an address and a time.'
+		],
+		prompt: prompt(
+			'In FoxAuth, let only the Ops group call the delete_files tool of my MCP server, which my proxy checks. Keep every other tool as it is, and refuse apps too old to say which tool they call.',
+			'resource_update (tools: a row with conditions, withoutMethod refuse)',
+			'Make sure my MCP server refuses a request whose Mcp-Method or Mcp-Name header differs from its body.'
 		)
 	},
 	{

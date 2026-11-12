@@ -1,27 +1,58 @@
 import { beforeAll, describe, expect, it } from 'bun:test';
 
 import bootstrap from '../test_helper.js';
-import { decideTool, toolWidenings } from 'lib/behind_proxy/tools.ts';
+import { decideApiCall } from 'lib/behind_proxy/api_decision.ts';
+import { toolWidenings, type ToolsTableView } from 'lib/behind_proxy/tools.ts';
+import type { Condition } from 'lib/behind_proxy/conditions.ts';
 import { world, type World } from './helpers.ts';
 import {
 	apiCheck,
 	bearer,
 	declareApi,
 	jwtFor,
-	type ApiCheck
+	type ApiCheck,
+	type ToolsBody
 } from './api_helpers.ts';
 import { ROWS, TABLE, tableFor, type Row } from './api_decision_table.ts';
 
-/* What the console's decision says for a row, in the check's own words. */
+/* A table as the console holds it: these rows carry no conditions. */
+function viewOf(table: ToolsBody): ToolsTableView {
+	return {
+		rows: table.rows.map(({ name, scopes }) => ({ name, scopes })),
+		otherTools: table.otherTools,
+		withoutMethod: table.withoutMethod
+	};
+}
+
+/* What the console's "Check access" says for a row, in the check's own words: the one decision both ask (specs/131). */
 function decidedFor(row: Row): { status: number; reason: string } {
-	const decision = decideTool({
-		table: tableFor(row),
-		method: row.mcpMethod ?? null,
-		name: row.mcpName ?? null,
-		protocolVersion:
-			row.protocolVersion === undefined ? '2026-07-28' : row.protocolVersion,
-		scopes: new Set(row.scopes.split(' ').filter(Boolean))
-	});
+	const table = tableFor(row);
+	const decision = decideApiCall(
+		{
+			tools: {
+				rows: table.rows.map(({ name, scopes }) => ({ name, scopes })),
+				otherTools: table.otherTools,
+				withoutMethod: table.withoutMethod
+			}
+		},
+		{
+			token: {
+				scopes: new Set(row.scopes.split(' ').filter(Boolean)),
+				signedInAt: null,
+				signedInWithCode: false
+			},
+			headers: {
+				method: row.mcpMethod ?? null,
+				name: row.mcpName ?? null,
+				protocolVersion:
+					row.protocolVersion === undefined ? '2026-07-28' : row.protocolVersion
+			},
+			person: null,
+			address: null,
+			at: Date.now(),
+			explain: true
+		}
+	);
 	switch (decision.outcome) {
 		case 'allow':
 			return { status: 200, reason: 'allowed' };
@@ -29,6 +60,9 @@ function decidedFor(row: Row): { status: number; reason: string } {
 			return { status: 403, reason: 'insufficient_scope' };
 		case 'refuse':
 			return { status: 403, reason: decision.reason };
+		case 'sign_in':
+		case 'unknown':
+			return { status: 0, reason: decision.outcome };
 	}
 }
 
@@ -226,7 +260,95 @@ describe("an API's tools table", () => {
 				[]
 			]
 		])('%s is reported as each widening it makes', (_what, after, expected) => {
-			expect(toolWidenings(TABLE, after)).toEqual(expected);
+			expect(toolWidenings(viewOf(TABLE), viewOf(after))).toEqual(expected);
 		});
+	});
+
+	describe("a change to a tool's conditions", () => {
+		const OPS: Condition = { kind: 'group', groupIds: ['ops'] };
+		const HOURS: Condition = {
+			kind: 'time',
+			windows: [{ days: [0, 1, 2, 3, 4], start: 540, end: 1080 }]
+		};
+		const guarded = (
+			conditions: ToolsTableView['rows'][number]['conditions'],
+			otherTools: 'refuse' | 'token' = 'refuse',
+			timeZone = 'UTC'
+		): ToolsTableView => ({
+			rows: [
+				{
+					name: 'delete_files',
+					scopes: [],
+					...(conditions ? { conditions } : {})
+				}
+			],
+			otherTools,
+			withoutMethod: 'refuse',
+			access: { conditions: [], timeZone }
+		});
+
+		it.each<[string, ToolsTableView, ToolsTableView, string[]]>([
+			[
+				'a group removed from the tool',
+				guarded([OPS, HOURS]),
+				guarded([HOURS]),
+				[
+					'delete_files is no longer limited as strictly by the groups that may call it.'
+				]
+			],
+			[
+				'a wider window of hours',
+				guarded([HOURS]),
+				guarded([
+					{
+						kind: 'time',
+						windows: [{ days: [0, 1, 2, 3, 4, 5, 6], start: 540, end: 1080 }]
+					}
+				]),
+				[
+					'delete_files is no longer limited as strictly by the hours it may be called in.'
+				]
+			],
+			[
+				'another time zone for a tool with hours',
+				guarded([HOURS]),
+				guarded([HOURS], 'refuse', 'Asia/Tokyo'),
+				[
+					'delete_files is no longer limited as strictly by the hours it may be called in.'
+				]
+			],
+			[
+				'a guarded tool removed while any other tool needs only a token',
+				guarded([OPS], 'token'),
+				{
+					...guarded([OPS], 'token'),
+					rows: [{ name: 'search_files', scopes: ['files:read'] }]
+				},
+				['delete_files now needs only a valid token.']
+			],
+			[
+				'a condition added to a tool',
+				guarded([HOURS]),
+				guarded([OPS, HOURS]),
+				[]
+			],
+			[
+				'a new tool with a condition',
+				guarded([OPS]),
+				{
+					...guarded([OPS]),
+					rows: [
+						...guarded([OPS]).rows,
+						{ name: 'export_billing', scopes: [], conditions: [OPS] }
+					]
+				},
+				[]
+			]
+		])(
+			'%s is reported as each widening it makes',
+			(_what, before, after, expected) => {
+				expect(toolWidenings(before, after)).toEqual(expected);
+			}
+		);
 	});
 });

@@ -1870,6 +1870,25 @@ const apiSignInRequirementFence: Migration = {
 	postgres: { noop: true, reason: API_SIGN_IN_REQUIREMENT_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/131 research R10). A row of an API's tools table may now carry conditions and no scope,
+ * and an API's access may hold only a time zone. A release that predates them reads such a record with a closed schema
+ * and fails on it at every check of that API; recording this migration makes it refuse to start instead.
+ */
+const API_TOOL_CONDITIONS_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than conditions on one MCP tool refuses to start against a database that may hold one.';
+
+const apiToolConditionsFence: Migration = {
+	id: '2026-11-15-api-tool-conditions-fence',
+	description:
+		'Mark the database as holding APIs whose tool rows may carry conditions of their own, so that an older release refuses to start against it rather than failing every check of such an API',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: API_TOOL_CONDITIONS_FENCE_REASON },
+	postgres: { noop: true, reason: API_TOOL_CONDITIONS_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1887,5 +1906,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	appRequiresCodeFence,
 	proxyCodeConditionFence,
 	proxyNetworkFactsFence,
-	apiSignInRequirementFence
+	apiSignInRequirementFence,
+	apiToolConditionsFence
 ];

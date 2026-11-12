@@ -87,13 +87,30 @@ In proxy mode the vouching diagnostic fetches nothing and answers `servedByProje
 
 ## Tools by MCP header
 
-`decideTool` (`lib/behind_proxy/tools.ts`) is pure and import-free. The check uses it; the console's Access drawer
-does not call it (corrected 2026-11-12: it imports only `toolWidenings` and the protocol constant), and the test
-drives one table through both the function and the live check. With an empty table, only the token is checked.
+Everything after the token is one pure decision, `decideApiCall` (`lib/behind_proxy/api_decision.ts`, spec 131): the
+API's access conditions, then its sign-in requirement, then `decideTool` (`lib/behind_proxy/tools.ts`: headers, old
+clients, method, listing, the row's scopes), then the named row's own conditions. The check (`api_check.ts`) keeps only
+the I/O around it: the bearer, the believed address, and the person and network facts, looked up only when the
+conditions in play need them (`conditionsInPlay`). The console's "Check access" card in the Access drawer
+(`ApiCheckAccess.tsx`) calls the same function in the browser, with `explain: true`, where a condition whose input was
+not given is `unknown` rather than a refusal; the check never passes `explain`. `api_tools.spec.ts` drives one table
+through both the function and the live check. With an empty table, only the token is checked, and the two choices
+under it (other tools, old clients) do nothing.
 
 An API's sign-in requirement (a code, or a recent sign-in) is judged before the tools table and after the access
 conditions, on the presented token's own `acr` and `auth_time`, and answered with RFC 9470's
-`insufficient_user_authentication` (spec 130, [[api-sign-in-requirement]]).
+`insufficient_user_authentication` (spec 130, [[api-sign-in-requirement]]). Its arithmetic lives in the
+import-free `lib/resources/sign_in_rule.ts` so the console can bundle it.
+
+- **Conditions on one tool (spec 131).** A row may carry up to four conditions of its own (group, network, time; the
+  stored shapes of the API's), on top of the API's and never replacing them, judged after the row's scopes, so a
+  token without the scope learns nothing of them. A refusal is a plain `403` with the API conditions' words, never a
+  `401`: no new sign-in fixes a group or an hour. A row may hold conditions and no scope; it needs one or the other.
+  Rows read their hours in `tools.access.timeZone`, so `access.conditions` may be empty to hold only the zone. A
+  table with any row condition and `withoutMethod: 'token'` is refused at save (422
+  `old_clients_with_tool_conditions`): an old client cannot be held to one tool's conditions, and a union of all rows'
+  conditions would quietly tighten access for most clients. A tool condition is only as true as `Mcp-Name`, so it
+  stops an honest app, not a thief; the console says so under every row's conditions.
 
 - **The headers.** MCP 2026-07-28 puts `Mcp-Method` on every client message and `Mcp-Name` on `tools/call`,
   `resources/read` and `prompts/get`. That revision also makes the server refuse a request whose headers and body
@@ -123,9 +140,9 @@ in the http context that re-adds the captured challenge on a 403 only (`lib/behi
 Caddy and Traefik return the check's whole answer on any non-2xx.
 
 A CORS preflight (`OPTIONS` with `Access-Control-Request-Method`) passes before any token is read, with every
-identity header empty (`lib/behind_proxy/api_check.ts:115`). A browser never attaches a credential to one.
+identity header empty (`lib/behind_proxy/api_check.ts:151`). A browser never attaches a credential to one.
 
-The limiter is spec 122's, keyed `api:<checkId>` (`api_check.ts:92`).
+The limiter is spec 122's, keyed `api:<checkId>` (`api_check.ts:128`).
 
 ## Known limitations
 

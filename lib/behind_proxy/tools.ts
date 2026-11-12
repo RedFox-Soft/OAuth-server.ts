@@ -1,6 +1,7 @@
 /*
- * What an API's tools table decides about one request (specs/123 research R6, R13). Pure, importing only the pure modules beside it: the check
- * and the console's Tools drawer read the same function, so what the drawer says a table does is what it does.
+ * What an API's tools table decides about one request (specs/123 research R6, R13). Pure, importing only the pure
+ * modules beside it: `decideApiCall` (api_decision.ts) composes it with the API's conditions and sign-in requirement,
+ * and both the check and the console's "Check access" ask that one function.
  *
  * The decision rests on the MCP 2026-07-28 request headers, which mirror the JSON-RPC body: `Mcp-Method` names the
  * method and `Mcp-Name` the tool. The proxy never sees the body, so a header is only as true as the server's own
@@ -14,7 +15,10 @@ export type Choice = 'refuse' | 'token';
 
 export interface ToolRow {
 	readonly name: string;
+	/* Possibly empty when the row has conditions (specs/131). */
 	readonly scopes: readonly string[];
+	/* Who, from where and when, on top of the API's own conditions (specs/131). */
+	readonly conditions?: readonly Condition[];
 }
 
 export interface ToolsTableView {
@@ -39,10 +43,11 @@ const KIND_WORDS: Record<ConditionKind, string> = {
 export type ToolRefusal =
 	'bad_mcp_header' | 'old_client' | 'tool_unnamed' | 'tool_not_listed';
 
+/* `row`: the listed row the request named, so its conditions can be judged next (specs/131). */
 export type ToolDecision =
-	| { outcome: 'allow' }
+	| { outcome: 'allow'; row?: ToolRow }
 	| { outcome: 'refuse'; reason: ToolRefusal }
-	| { outcome: 'insufficient'; needed: readonly string[] };
+	| { outcome: 'insufficient'; needed: readonly string[]; row: ToolRow };
 
 /* The first revision whose servers must refuse a request whose headers and body disagree. */
 export const HEADER_VALIDATING_VERSION = '2026-07-28';
@@ -150,8 +155,8 @@ export function decideTool(request: ToolRequest): ToolDecision {
 			: { outcome: 'refuse', reason: 'tool_not_listed' };
 	}
 	return row.scopes.every((scope) => scopes.has(scope))
-		? { outcome: 'allow' }
-		: { outcome: 'insufficient', needed: row.scopes };
+		? { outcome: 'allow', row }
+		: { outcome: 'insufficient', needed: row.scopes, row };
 }
 
 /*
@@ -185,6 +190,9 @@ function rowWidenings(
 	}
 	const lines: string[] = [];
 	const afterOther = after?.otherTools ?? 'refuse';
+	/* Rows read their hours in the API's one zone (specs/131 research R2), so a new zone loosens a row's hours too. */
+	const sameZone =
+		(before?.access?.timeZone ?? null) === (after?.access?.timeZone ?? null);
 	for (const row of was) {
 		const kept = now.find((candidate) => candidate.name === row.name);
 		if (!kept) {
@@ -196,6 +204,15 @@ function rowWidenings(
 		const dropped = row.scopes.filter((scope) => !kept.scopes.includes(scope));
 		if (dropped.length > 0) {
 			lines.push(`${row.name} no longer needs ${dropped.join(', ')}.`);
+		}
+		for (const { kind } of loosenedConditions(
+			row.conditions ?? [],
+			kept.conditions ?? [],
+			sameZone
+		)) {
+			lines.push(
+				`${row.name} is no longer limited as strictly by ${KIND_WORDS[kind]}.`
+			);
 		}
 	}
 	if (before?.otherTools !== 'token' && afterOther === 'token') {

@@ -235,6 +235,20 @@ groups:
         verdict: different
         why: 'authentik asks for a second factor in a flow, for a sign-in or an application. FoxAuth sets it on the API the token is for, so every app that connects to it is held to it, renewals included.'
         note: 'The Authenticator validation stage page says the threshold lets it "skip validation if the user has successfully used a compatible device within the configured time window."'
+      - dimension: 'Conditions on one MCP tool: groups, network, hours'
+        us:
+          {
+            status: yes,
+            text: "On an MCP server your proxy checks, one tool can carry its own groups, address ranges or FoxTrust's network facts, and hours. They are added to the API's own conditions and judged after the tool's scopes, and a call that fails them gets 403 with the reason. Once a tool has conditions, apps too old to say which tool they call are refused. The proxy reads the tool from the MCP 2026-07-28 request headers, so a stolen token in an app that lies about the tool is stopped only by an MCP server that checks the headers against the body. Check access in the console answers with the same decision the check runs. On every plan."
+          }
+        them:
+          {
+            status: no,
+            text: 'No rule for one MCP tool is documented. Policies bound to the application decide access at the outpost, for the whole application, and the proxy provider documents no rule per path.'
+          }
+        verdict: us
+        why: 'With authentik a policy covers the whole application. Here one tool of an MCP server can be held to its own groups, network and hours, on top of the API.'
+        note: 'The header authentication page says "Access control uses the policies bound to the application being accessed."'
       - dimension: Licence
         us:
           {

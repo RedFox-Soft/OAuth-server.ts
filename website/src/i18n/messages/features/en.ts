@@ -227,6 +227,10 @@ export default {
 						'An API or MCP server that asks for a code or a recent sign-in',
 					body: 'Any API or MCP server a project declares can require a sign-in with a code from an authenticator app, a sign-in no older than a day, 7 days, 14 days or your own value from 1 hour, or both. FoxAuth issues the tokens, so it asks for the code or the new sign-in itself, whatever the client asked for, and checks it on every way of getting a token for a person, refresh included. A renewal that falls short is refused without spending the refresh token, so the client starts a new sign-in. At your proxy, a token that falls short gets the standard insufficient_user_authentication challenge (RFC 9470). Apps that act for no one and sign-ins by assertion cannot connect. Before you save, the console shows whom it affects. Free on every plan.'
 				},
+				apiToolConditions: {
+					title: 'Conditions on one MCP tool',
+					body: "On an MCP server your proxy checks, one tool can carry conditions of its own: groups, address ranges or FoxTrust's network facts, and hours in the API's time zone. They are added to the API's own conditions and never replace them, and they are judged after the tool's scopes. A call that fails them gets a plain 403 with the reason, never a request to sign in again. A tool may have conditions and no scope. Once a tool has conditions, apps too old to say which tool they call are refused. A tool condition stops an app that names its tool honestly. A stolen token in an app that lies about the tool is stopped only by your MCP server checking the headers against the body. Check access in the console answers for a person, scopes, a tool, an address and a time, with the same decision the check runs. Free on every plan."
+				},
 				clientIdMetadataDocument: {
 					title: 'Client identity documents',
 					body: 'A client_id can be an HTTPS URL that names a JSON document describing the client. The server retrieves and validates the document on demand and never stores it. The MCP authorization specification names this mechanism first for a client with no prior relationship to the server.'
