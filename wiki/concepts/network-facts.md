@@ -4,7 +4,7 @@ title: "FoxTrust's network facts in \"From where\" at the proxy"
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-11
-updated: 2026-11-11
+updated: 2026-11-12
 ---
 
 # FoxTrust's network facts in "From where" at the proxy
@@ -75,6 +75,18 @@ never `risk`, `level` or `reasons`: refusing on a verdict alone is the GDPR Art.
 
 ## Measurements
 
-Owed after FoxTrust 040 is deployed (spec 129 T054): memory across a full replacement, lookup time, a day's traffic,
-the size of the 23:50 update. Measured on `f20261111` before 040: categories alone 2.85 MB, country alone 8.5 MB,
-both 10.3 MB, the 040 file 13.2 MB.
+Taken on 2026-11-12 with FoxAuth's own pass and reader against the live publication, after FoxTrust 040 was deployed
+(full `f20261112`, 13.19 MB, 2,125,085 ranges; update `d20261112T05`, 1.73 MB):
+
+- First load, both files: 2.5 s.
+- Process memory (RSS): +24.5 MB with one pair held, +43.3 MB with the old and new pair side by side during a
+  replacement, inside the spec's 60 MB.
+- Lookup: 0.72 µs for IPv4 and 1.15 µs for IPv6, with no memory growth across 120,000 lookups. The first version
+  walked the tree with a bigint shift per bit, 128 allocations per IPv6 lookup: 4-5 µs and the heap high-water up by
+  about 90 MB. The reader now reads the address as 32-bit words once (`lookup`, `lib/network_facts/mmdb.ts`).
+- Traffic per process, a normal day: one full file (13.2 MB) and 23 cumulative updates, each a little larger than the
+  last. Before 040 an update grew from 2.0 to 3.3 MB over a day against a 24.4 MB full file; after it the first of the
+  day was 1.7 MB, so a day is about 60 MB. The updates are cumulative by FoxTrust's design: a missed one costs
+  nothing, at the price of downloading the day's changes again every hour.
+- A change of FoxTrust's record format rewrites every record: the updates of 2026-11-11 from 23:00, made against the
+  pre-040 full file, were 13.2 MB each until the next full file. The 20 MB cap on an update leaves room for that.

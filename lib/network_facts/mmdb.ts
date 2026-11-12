@@ -47,6 +47,7 @@ const METADATA_WINDOW = 128 * 1024;
 const MAX_POINTER_DEPTH = 8;
 const MAX_NESTING = 16;
 const MAX_LEAVES_COUNTED = 50_000_000;
+const WORD = 0xffffffffn;
 
 class Malformed extends Error {}
 
@@ -288,8 +289,22 @@ export function openMmdb(bytes: Uint8Array): MmdbReader | null {
 			node = 0;
 			bits = 128;
 		}
-		for (let i = bits - 1; i >= 0 && node < nodeCount; i--) {
-			node = record(node, Number((value >> BigInt(i)) & 1n));
+		/*
+		 * The address as 32-bit words, read once: a bigint shift per bit would allocate 128 bigints for every IPv6
+		 * lookup, and every proxy check with a network facts condition makes one.
+		 */
+		const words =
+			bits === 32
+				? [Number(value & WORD)]
+				: [
+						Number((value >> 96n) & WORD),
+						Number((value >> 64n) & WORD),
+						Number((value >> 32n) & WORD),
+						Number(value & WORD)
+					];
+		for (let bit = 0; bit < bits && node < nodeCount; bit++) {
+			const word = words[bit >>> 5] ?? 0;
+			node = record(node, (word >>> (31 - (bit & 31))) & 1);
 		}
 		return node < nodeCount ? UNREADABLE : resolve(node);
 	};
@@ -302,7 +317,7 @@ export function openMmdb(bytes: Uint8Array): MmdbReader | null {
 		const node = stack.pop();
 		if (node === undefined) break;
 		visited += 1;
-		for (const bit of [0, 1]) {
+		for (let bit = 0; bit < 2; bit++) {
 			const next = record(node, bit);
 			if (next < nodeCount) {
 				if (next > node) stack.push(next);
