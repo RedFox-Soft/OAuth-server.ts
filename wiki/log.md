@@ -408,3 +408,5 @@ Operations:
 ## [2026-11-11] add | [[network-facts]] — spec 129: FoxTrust's ordinary snapshot downloaded per process through the transport now shared with the attacker list (`lib/foxtrust/`), a narrow MMDB reader, fail-closed facts, a `facts` part on the network condition with Refuse or Sign in again, a lookup route for Check access, a fence migration. Corrected [[conditions-at-your-proxy]] and [[shared-attacker-list]].
 
 ## [2026-11-12] update | [[network-facts]] — measured on the live publication after FoxTrust 040: RSS +24.5 MB per pair, +43.3 MB during a swap, about 60 MB of downloads a day; the reader now walks the tree on 32-bit words instead of a bigint per bit (6x faster lookups, no heap growth).
+
+## [2026-11-12] update | [[token-checks-at-your-proxy]] — an MCP header sent twice reached the tools table joined with ", ", so `tools/call` twice passed as an uncovered method without the row's scopes; a comma in any of the three MCP headers is now `bad_mcp_header`.

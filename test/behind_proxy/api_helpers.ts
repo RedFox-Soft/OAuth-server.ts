@@ -203,6 +203,8 @@ export interface ApiCheck {
 	mcpMethod?: string;
 	mcpName?: string;
 	protocolVersion?: string | null;
+	/* MCP headers sent a second time with the same value. */
+	twice?: readonly ('Mcp-Method' | 'Mcp-Name' | 'MCP-Protocol-Version')[];
 	omit?: readonly ('X-Forwarded-Host' | 'X-Forwarded-Method')[];
 	headers?: Record<string, string>;
 	query?: string;
@@ -229,6 +231,10 @@ export function apiCheck(input: ApiCheck): Promise<Response> {
 	const version =
 		input.protocolVersion === undefined ? '2026-07-28' : input.protocolVersion;
 	if (version !== null) headers.set('MCP-Protocol-Version', version);
+	for (const name of input.twice ?? []) {
+		const value = headers.get(name);
+		if (value !== null) headers.append(name, value);
+	}
 	return elysia.handle(
 		new Request(
 			`${apiCheckUrl(input.slug, input.identifier)}${input.query ?? ''}`,

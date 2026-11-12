@@ -35,7 +35,7 @@ function decidedFor(row: Row): { status: number; reason: string } {
 /**
  * @proves An MCP server's tools table decides each request by the method and tool the client names: a listed tool
  * needs every scope of its row and a refusal names them all, a request naming no tool needs only a valid token, and
- * a name the table cannot be asked about — another letter case, a malformed form, a client too old for the server
+ * a name the table cannot be asked about — another letter case, a malformed form, a header sent twice, a client too old for the server
  * to have checked it — is never mistaken for a listed one. The console's decision and the live check agree on every
  * row.
  */
@@ -128,6 +128,30 @@ describe("an API's tools table", () => {
 			};
 
 			const res = await send(row);
+
+			expect(res.status).toBe(403);
+			expect(res.headers.get('x-auth-reason')).toBe('bad_mcp_header');
+		}
+	);
+
+	it.each([
+		['Mcp-Method', {}],
+		['Mcp-Name', { otherTools: 'token' }],
+		['MCP-Protocol-Version', { withoutMethod: 'token' }]
+	] as const)(
+		'a request that sends %s twice is refused, never read as some other value',
+		async (header, table) => {
+			const row: Row = {
+				what: 'twice',
+				scopes: 'files:read',
+				mcpMethod: 'tools/call',
+				mcpName: 'delete_file',
+				table,
+				status: 403,
+				reason: 'bad_mcp_header'
+			};
+
+			const res = await send(row, { twice: [header] });
 
 			expect(res.status).toBe(403);
 			expect(res.headers.get('x-auth-reason')).toBe('bad_mcp_header');

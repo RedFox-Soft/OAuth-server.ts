@@ -58,6 +58,16 @@ export function hasControlCharacter(value: string): boolean {
 }
 
 /*
+ * A header sent twice reaches the check as one value joined with ", " (Fetch), so `tools/call` twice reads as
+ * something that is not `tools/call` and would pass as a method the table does not cover, while a server behind
+ * the proxy that takes the first value runs the tool. No method, protocol version or plain tool name holds a comma
+ * (a name that needs one is sent in the Base64 form), so a comma means the header came more than once.
+ */
+function sentTwice(value: string | null): boolean {
+	return value !== null && value.includes(',');
+}
+
+/*
  * An `Mcp-Name` as the client meant it. A name a header cannot carry plainly arrives as `=?base64?…?=` (markers
  * lower-case, exactly), and is compared only once decoded. A form that does not decode, or a control character on
  * either side of decoding, is refused rather than matched: a name the table cannot be asked about must not fall
@@ -117,6 +127,9 @@ export function decideTool(request: ToolRequest): ToolDecision {
 	if (!table || table.rows.length === 0) return { outcome: 'allow' };
 
 	if (method !== null && hasControlCharacter(method)) {
+		return { outcome: 'refuse', reason: 'bad_mcp_header' };
+	}
+	if (sentTwice(method) || sentTwice(name) || sentTwice(protocolVersion)) {
 		return { outcome: 'refuse', reason: 'bad_mcp_header' };
 	}
 	const decoded = name === null ? null : decodeMcpName(name);

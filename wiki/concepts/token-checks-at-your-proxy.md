@@ -4,7 +4,7 @@ title: 'Token checks at your proxy: an API or MCP server with no authorization c
 tags: [architecture, contract, gotcha, oauth, mcp]
 sources: [oauth-server-codebase]
 created: 2026-11-05
-updated: 2026-11-06
+updated: 2026-11-12
 ---
 
 # Token checks at your proxy
@@ -100,6 +100,10 @@ use it, and the test drives one table through both. With an empty table, only th
 - **Encoded names.** A name a header cannot carry plainly arrives as `=?base64?…?=`. It is decoded before matching
   (`:53`). An undecodable value, or a control character on either side of decoding, is `bad_mcp_header`, never
   "any other tool".
+- **A header sent twice is refused, never joined.** Fetch joins a repeated header with `", "`, so `tools/call` sent
+  twice once read as a method the table does not cover and passed without the row's scopes, while a server that takes
+  the first value ran the tool (fixed 2026-11-12). A comma in `Mcp-Method`, `Mcp-Name` or `MCP-Protocol-Version` is
+  `bad_mcp_header`; a name that needs one is sent in the Base64 form (`sentTwice`, `lib/behind_proxy/tools.ts`).
 - **Matching is exact.** `Delete_File` is not `delete_file`. A missing scope is a `403` with
   `error="insufficient_scope", scope="<every scope of the row>"`, so a client asks for all of them at once.
   `resources/read` and `prompts/get` are "other methods": token only, as the drawer says.

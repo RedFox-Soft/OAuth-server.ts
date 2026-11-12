@@ -131,6 +131,14 @@ export const ROWS: Row[] = [
 		reason: 'bad_mcp_header'
 	},
 	{
+		what: 'a method sent twice, which arrives joined',
+		scopes: 'files:read',
+		mcpMethod: 'tools/call, tools/call',
+		mcpName: 'delete_file',
+		status: 403,
+		reason: 'bad_mcp_header'
+	},
+	{
 		what: 'reading a resource, which the table does not cover',
 		scopes: 'files:read',
 		mcpMethod: 'resources/read',

@@ -20,6 +20,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   the console says why. Check access looks an address up in the server's own copy. Free on every plan. Run
   `db:migrate`; an older release then refuses to start against the database.
 
+### Fixed
+
+- **An MCP header sent twice no longer slips past an API's tools table.** A request that sent `Mcp-Method`,
+  `Mcp-Name` or `MCP-Protocol-Version` twice reached the check as one joined value, so `tools/call` twice read as a
+  method the table does not cover and was let through without the tool's scopes, while a server behind the proxy that
+  takes the first value ran the tool. Such a request is now refused as `bad_mcp_header`.
+
 ## [1.7.0] - 2026-11-11
 
 People can turn on two-step verification for their own account, and an administrator can ask for a code from an
