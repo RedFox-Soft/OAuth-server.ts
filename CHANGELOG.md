@@ -11,6 +11,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **An API's own console page** (spec 132). Each API in a project opens at an address of its own with three tabs, as
+  an app behind the proxy does: Connect (the proxy's configuration, or what the API must check and serve, with its
+  metadata status), Access (the sign-in requirement, the API's conditions, the tools table with each tool's
+  conditions, and Check access under them, saved in one go) and Settings (name, scopes, tokens, who checks them, and
+  removal). The Edit… and Connect dialogs and the Access… drawer are gone; declaring an API opens its page.
 - **Conditions on one MCP tool** (spec 131). On an API checked at the proxy, one tool can be limited to some groups,
   some networks (address ranges or FoxTrust's network facts) and some hours, on top of the API's own conditions and
   after the tool's scopes; every other tool stays as it was. A refused call is a plain 403. A tool may need a

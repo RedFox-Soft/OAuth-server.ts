@@ -1388,12 +1388,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		action: { kind: 'form', target: { area: 'apis', query: { declare: '1' } } },
 		goodToKnow: [
 			'When you declare the API, answer “Who checks tokens?” with “Your proxy”. Its Connect gives the configuration for Caddy, Traefik or nginx, ready to paste.',
-			'Access… on the API’s row says which scopes each tool needs, and who may call the API at all: some groups, an attribute, a network, some hours. One tool can have its own groups, network or hours on top. A client that lacks a scope is told exactly which scopes to ask for.',
+			'The Access tab of the API’s page says which scopes each tool needs, and who may call the API at all: some groups, an attribute, a network, some hours. One tool can have its own groups, network or hours on top. A client that lacks a scope is told exactly which scopes to ask for.',
 			'The project publishes the description agents look for (the protected resource metadata), so your MCP server serves nothing for sign-in.',
 			'A revoked token keeps working at the proxy until it expires, unless the API issues opaque tokens. Keep the lifetime short.',
 			'Tokens bound to a key (DPoP or a certificate) are refused at the proxy, because the proxy cannot check the key.',
 			'Make sure your MCP server is reachable only through your proxy. Without a condition, anyone who can sign in to the project can get a token for it. It is on every plan.',
-			'To ask for a code from an authenticator app, or a new sign-in every so often, before an agent connects, set it in the API’s Edit form.'
+			'To ask for a code from an authenticator app, or a new sign-in every so often, before an agent connects, set it on the Access tab of the API’s page.'
 		],
 		prompt: prompt(
 			'Check tokens for my MCP server at https://mcp.example.com/mcp in my reverse proxy (work out Caddy, Traefik or nginx from my configuration), so the server needs no auth code.\nDeclare it in FoxAuth as an API whose tokens the proxy checks (checkedBy proxy), with its scopes. Then set its tools table: each tool and the scopes it needs. Add the configuration its Connect gives to my proxy.',
@@ -1971,7 +1971,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			target: { area: 'apis' }
 		},
 		goodToKnow: [
-			'Turn it on in the API’s Edit form, under "Require a code from an authenticator app". "Ask to sign in again every" asks people to reconnect at least that often. Before it saves, you see whom it affects.',
+			'Turn it on in the Access tab of the API’s page, under "Require a code from an authenticator app". "Ask to sign in again every" asks people to reconnect at least that often. Before it saves, you see whom it affects.',
 			'Not every app asks people to sign in again on its own. In Claude Code they reconnect the server in /mcp. In claude.ai they get a Connect card. ChatGPT and Codex may only show an error. Try it with the apps your people use.',
 			'If an app does not carry on after the new sign-in, the person asks it to try again.',
 			'A connection made without a code stops at its next renewal, and its person signs in again with one.',
@@ -2036,11 +2036,11 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			target: { area: 'apis' }
 		},
 		goodToKnow: [
-			'Set it in Access… on the API’s row: open the tool and add its conditions. They add to the API’s own conditions and never replace them.',
+			'Set it on the Access tab of the API’s page: add its conditions under the tool. They add to the API’s own conditions and never replace them.',
 			'A tool condition stops an app that names the tool it calls honestly. A stolen token in an app that lies about the tool is stopped only by your MCP server checking the headers against the body, which MCP 2026-07-28 servers must do. To keep someone out of the whole API, use the API’s own conditions or its sign-in requirement.',
 			'Apps too old to say which tool they call are refused once a tool has conditions. Today that is many apps; the site’s client table says which.',
 			'A new or renamed tool on your server gets the “Any other tool” answer until you add it to the table.',
-			'Check access, in the same drawer, shows what the check would answer for a person, a tool, an address and a time.'
+			'Check access, at the bottom of the same tab, shows what the check would answer for a person, a tool, an address and a time.'
 		],
 		prompt: prompt(
 			'In FoxAuth, let only the Ops group call the delete_files tool of my MCP server, which my proxy checks. Keep every other tool as it is, and refuse apps too old to say which tool they call.',

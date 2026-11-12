@@ -50,13 +50,15 @@ export function ProxyConnect({
 	identifier,
 	check,
 	addresses,
-	onRefresh
+	onRefresh,
+	writable = true
 }: {
 	bucketId: string;
 	identifier: string;
 	check: { verifyUrl: string; metadataUrl: string };
 	addresses: AddressesView | undefined;
 	onRefresh: () => void;
+	writable?: boolean;
 }) {
 	const feedback = useFeedback();
 	const [kind, setKind] = useState<ProxyKind>('caddy');
@@ -87,7 +89,7 @@ export function ProxyConnect({
 				type="warning"
 				showIcon
 				title="Anyone who can sign in to this project can get a token for this API."
-				description="To limit who may call it — some groups, an attribute, a network, some hours — and which tools a token may call, use Access…"
+				description="To limit who may call it — some groups, an attribute, a network, some hours — and which tools a token may call, use the Access tab."
 			/>
 
 			<Flex
@@ -216,6 +218,7 @@ export function ProxyConnect({
 					address={identifier}
 					target="api"
 					onRefresh={onRefresh}
+					writable={writable}
 				/>
 			)}
 		</Flex>

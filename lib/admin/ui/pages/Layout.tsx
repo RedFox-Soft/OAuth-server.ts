@@ -42,6 +42,7 @@ import {
 	BehindProxyPage,
 	type BehindProxyTab
 } from './behind-proxy/BehindProxyPage.js';
+import { ApiPage, type ApiTab } from './resources/ApiPage.js';
 import { Groups } from './Groups.js';
 import { ScopeSwitcher } from './ScopeSwitcher.js';
 import { Buckets } from './Buckets.js';
@@ -114,6 +115,13 @@ const BEHIND_PROXY_TABS: Partial<Record<PageKey, BehindProxyTab>> = {
 	'bucket.behindProxy': 'connect',
 	'bucket.behindProxy.access': 'access',
 	'bucket.behindProxy.settings': 'settings'
+};
+
+/* One API (specs/132); the bare address is its Connect tab. */
+const API_TABS: Partial<Record<PageKey, ApiTab>> = {
+	'bucket.api': 'connect',
+	'bucket.api.access': 'access',
+	'bucket.api.settings': 'settings'
 };
 
 /*
@@ -305,6 +313,17 @@ export function Layout() {
 					bucketId={route.params.project ?? ''}
 					appId={route.params.app ?? ''}
 					tab={behindProxyTab}
+				/>
+			);
+		}
+		const apiTab = API_TABS[route.key];
+		if (apiTab) {
+			return (
+				<ApiPage
+					key={`${route.params.project ?? ''}/${route.params.api ?? ''}`}
+					bucketId={route.params.project ?? ''}
+					identifier={route.params.api ?? ''}
+					tab={apiTab}
 				/>
 			);
 		}

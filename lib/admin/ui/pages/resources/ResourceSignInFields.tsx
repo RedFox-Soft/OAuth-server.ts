@@ -49,7 +49,7 @@ export function everyMinutes(values: SignInFieldValues): number | null {
 	return values.customUnit === 'days' ? amount * 1440 : amount * 60;
 }
 
-/* "Sign in every day", "Sign in every 12 hours": the requirement in a word, for the API's row and the drawer. */
+/* "Sign in every day", "Sign in every 12 hours": the requirement in a word, for the APIs list and the API's Access tab. */
 export function signInEveryText(minutes: number): string {
 	if (minutes % 1440 === 0) {
 		const days = minutes / 1440;

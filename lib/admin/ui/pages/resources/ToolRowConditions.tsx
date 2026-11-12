@@ -25,7 +25,8 @@ export function ToolRowConditions({
 	countUrl,
 	networkFactsOn,
 	unavailable,
-	nameOf
+	nameOf,
+	disabled = false
 }: {
 	value?: Condition[];
 	onChange?: (conditions: Condition[]) => void;
@@ -38,6 +39,8 @@ export function ToolRowConditions({
 	networkFactsOn: boolean;
 	unavailable: Partial<Record<ConditionKind, ReactNode>>;
 	nameOf: (groupId: string) => string | null;
+	/* Read-only: the summary still says what the row holds. */
+	disabled?: boolean;
 }) {
 	const [open, setOpen] = useState(false);
 	const summary = value.map((c) => conditionText(c, nameOf)).join('; ');
@@ -80,7 +83,7 @@ export function ToolRowConditions({
 						onTimeZone={onTimeZone}
 						groups={groups}
 						countUrl={countUrl}
-						disabled={false}
+						disabled={disabled}
 						networkFactsOn={networkFactsOn}
 						unavailable={unavailable}
 						onChange={(next) => onChange?.(next)}

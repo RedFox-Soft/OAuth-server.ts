@@ -28,7 +28,7 @@ A condition says "and only if". It never lets anyone in who was not let in befor
 
 An app's groups are already in its rule for each path, so groups are a condition only for an API. Network facts are
 a part of **From where**, not a condition of their own. An API has no **Ask to sign in again** condition. Instead, its
-own edit form can require a code from an authenticator app or a recent sign-in: see [Ask for a code or a recent
+own Access tab can require a code from an authenticator app or a recent sign-in: see [Ask for a code or a recent
 sign-in](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
 
 Values inside one condition combine with "or": "from the office or from the VPN". Different conditions combine with
@@ -248,7 +248,7 @@ included a code and is not older than the time you chose, at most a day. The rul
 
 ## Groups and attributes for an API {#api}
 
-Choose **Access…** on the API's row. Its first section, **Who can call it**, holds the API's conditions. They apply
+Open the API's page and its **Access** tab. Its first section, **Who can call it**, holds the API's conditions. They apply
 before the tools table.
 
 A condition about the person needs a token that stands for a person. These do not, and are refused:
@@ -269,7 +269,7 @@ such a condition cannot stop.
 
 **Check access** on the app's Access tab takes an address in the app, a person, a network address, a moment and how
 long ago the person signed in. It lists every condition in the order the project decides them, each with ✓, ✗ or ?.
-An input you leave empty shows "?". An API's **Access…** drawer has a **Check access** card of its own: see [Check
+An input you leave empty shows "?". An API's **Access** tab has a **Check access** card of its own: see [Check
 access](/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions-check-access).
 
 A change that lets more people in asks first and lists what loosens, path by path. A change that only narrows saves at

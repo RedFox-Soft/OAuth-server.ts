@@ -91,9 +91,9 @@ Everything after the token is one pure decision, `decideApiCall` (`lib/behind_pr
 API's access conditions, then its sign-in requirement, then `decideTool` (`lib/behind_proxy/tools.ts`: headers, old
 clients, method, listing, the row's scopes), then the named row's own conditions. The check (`api_check.ts`) keeps only
 the I/O around it: the bearer, the believed address, and the person and network facts, looked up only when the
-conditions in play need them (`conditionsInPlay`). The console's "Check access" card in the Access drawer
-(`ApiCheckAccess.tsx`) calls the same function in the browser, with `explain: true`, where a condition whose input was
-not given is `unknown` rather than a refusal; the check never passes `explain`. `api_tools.spec.ts` drives one table
+conditions in play need them (`conditionsInPlay`). The console's "Check access" card at the bottom of the API page's
+Access tab (`ApiCheckAccess.tsx`, spec 132) calls the same function in the browser, with `explain: true`, where a
+condition whose input was not given is `unknown` rather than a refusal; the check never passes `explain`. `api_tools.spec.ts` drives one table
 through both the function and the live check. With an empty table, only the token is checked, and the two choices
 under it (other tools, old clients) do nothing.
 
@@ -128,7 +128,7 @@ import-free `lib/resources/sign_in_rule.ts` so the console can bundle it.
   `bad_mcp_header`; a name that needs one is sent in the Base64 form (`sentTwice`, `lib/behind_proxy/tools.ts`).
 - **Matching is exact.** `Delete_File` is not `delete_file`. A missing scope is a `403` with
   `error="insufficient_scope", scope="<every scope of the row>"`, so a client asks for all of them at once.
-  `resources/read` and `prompts/get` are "other methods": token only, as the drawer says.
+  `resources/read` and `prompts/get` are "other methods": token only, as the Access tab says.
 
 ## Answers and the nginx exception
 

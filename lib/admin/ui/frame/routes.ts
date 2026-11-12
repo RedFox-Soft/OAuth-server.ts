@@ -30,6 +30,9 @@ export type PageKey =
 	| 'bucket.behindProxy.access'
 	| 'bucket.behindProxy.settings'
 	| 'bucket.apis'
+	| 'bucket.api'
+	| 'bucket.api.access'
+	| 'bucket.api.settings'
 	| 'bucket.users'
 	| 'bucket.user'
 	| 'bucket.user.signIn'
@@ -148,6 +151,29 @@ export const ROUTES: readonly RouteSpec[] = [
 	{
 		key: 'bucket.apis',
 		pattern: ['projects', ':project', 'apis'],
+		section: 'projects',
+		area: 'APIs'
+	},
+	/*
+	 * One API (specs/132): the bare address is its Connect tab, as an app's is. `:api` is the identifier itself,
+	 * encoded into one segment: it is the API's id for life (the audience of its tokens), and the admin API names
+	 * it the same way.
+	 */
+	{
+		key: 'bucket.api',
+		pattern: ['projects', ':project', 'apis', ':api'],
+		section: 'projects',
+		area: 'APIs'
+	},
+	{
+		key: 'bucket.api.access',
+		pattern: ['projects', ':project', 'apis', ':api', 'access'],
+		section: 'projects',
+		area: 'APIs'
+	},
+	{
+		key: 'bucket.api.settings',
+		pattern: ['projects', ':project', 'apis', ':api', 'settings'],
 		section: 'projects',
 		area: 'APIs'
 	},
@@ -620,6 +646,16 @@ export function behindProxyHref(
 	tab?: 'access' | 'settings'
 ): string {
 	const base = `${bucketHref(bucketId, 'behind-proxy')}/${encodeURIComponent(appId)}`;
+	return tab ? `${base}/${tab}` : base;
+}
+
+/* An API declared in a project; without a tab, its Connect tab. */
+export function apiHref(
+	bucketId: string,
+	identifier: string,
+	tab?: 'access' | 'settings'
+): string {
+	const base = `${bucketHref(bucketId, 'apis')}/${encodeURIComponent(identifier)}`;
 	return tab ? `${base}/${tab}` : base;
 }
 

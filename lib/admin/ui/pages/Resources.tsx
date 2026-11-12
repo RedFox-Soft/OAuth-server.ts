@@ -17,28 +17,22 @@ import {
 	type FormInstance
 } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import {
-	OMNIBUS_SCOPES,
-	SCOPE_DESCRIPTION_MAX_LENGTH
-} from '../../../resources/scopes.js';
+import { SCOPE_DESCRIPTION_MAX_LENGTH } from '../../../resources/scopes.js';
 import { request } from '../frame/request.js';
 import { useFeedback } from '../frame/feedback.js';
 import { useConfirm } from '../frame/confirm.js';
 import { AreaToolbar } from '../frame/AreaToolbar.js';
 import { RowActions } from '../frame/RowActions.js';
 import { useQueryOffer } from '../frame/queryOffer.js';
+import { Link, useNavigate } from '../frame/router.js';
+import { apiHref } from '../frame/routes.js';
 import { EmptyState, LoadFailed } from '../frame/states.js';
 import { atLimit, type PlanView } from '../planText.js';
 import {
 	applicationName,
-	exchangeOptions,
 	type ExchangeCandidate
 } from './applications/exchange.js';
-import type { ToolsTableView } from '../../../behind_proxy/tools.js';
-import { ProxyConnect } from './resources/ProxyConnect.js';
-import { ToolsDrawer } from './resources/ToolsDrawer.js';
 import {
-	everyFields,
 	everyMinutes,
 	ResourceSignInFields,
 	signInEveryText,
@@ -46,72 +40,28 @@ import {
 	type EveryUnit
 } from './resources/ResourceSignInFields.js';
 import { useCodeConsent, withConsent } from './applications/codeConsent.js';
-import type { AddressesView } from './behind-proxy/appView.js';
+import { VouchingCell } from './resources/vouching.js';
+import {
+	CHECKED_BY_OPTIONS,
+	describedScopes,
+	describeWindow,
+	KIND_OPTIONS,
+	removalConsequences,
+	resourcesApi,
+	scopeAdvice,
+	splitScopes,
+	TOKEN_FORMAT_OPTIONS,
+	type CheckedBy,
+	type DescriptionsInput,
+	type ResourceView
+} from './resources/resourceView.js';
 
 /*
  * A bucket's APIs — its declared protected resources: the audiences this server will mint tokens for on
- * the bucket's behalf (specs/099).
- *
- * Two things on this screen are not decoration and should survive any redesign.
- *
- * The scope-list warning, because a scope list is not a menu. A client given no scope guidance
- * requests every scope the resource advertises — the MCP specification says so, and says it is
- * deliberate, since a general-purpose agent cannot choose among names it does not understand. So a
- * long list is a grant of the whole list to every client that arrives, and an operator who has not
- * been told that will write one.
- *
- * The revocation window, because the default token format is self-contained. A resource verifies such
- * a token against the published keys with no request back, which is what keeps setup to minutes — and
- * the cost is that revocation waits for expiry. Stating the resulting window next to the lifetime is
- * the difference between a chosen trade-off and a surprise.
+ * the bucket's behalf (specs/099). Each has a page of its own (specs/132); this is the list, and the form that
+ * declares a new one, which states the scope-list warning and the revocation window for the reasons the API's
+ * Settings tab gives.
  */
-
-const TOKEN_FORMAT_OPTIONS = [
-	{
-		label: 'Self-contained (verified against this server’s keys)',
-		value: 'jwt'
-	},
-	{ label: 'Opaque (checked back with this server)', value: 'opaque' }
-];
-
-type ScopeKind = 'see' | 'act';
-
-type CheckedBy = 'server' | 'proxy';
-
-const CHECKED_BY_OPTIONS: { label: string; value: CheckedBy }[] = [
-	{ label: 'Your server', value: 'server' },
-	{ label: 'Your proxy', value: 'proxy' }
-];
-
-interface ResourceView {
-	identifier: string;
-	name: string;
-	scopes: string[];
-	scopeDescriptions?: Record<string, { description: string; kind?: ScopeKind }>;
-	tokenFormat: 'jwt' | 'opaque';
-	accessTokenTTL: number;
-	trailingSlashSignificant: boolean;
-	/* The application that exchanges the access tokens this API receives for people's upstream tokens (specs/118). */
-	exchangedBy?: string;
-	/* Whether the API's own server checks its tokens (spec 107) or the operator's proxy asks this project (specs/123). */
-	checkedBy: CheckedBy;
-	tools?: ToolsTableView;
-	/* How the person behind a token must have signed in (specs/130). */
-	requireCode: boolean;
-	signInEveryMinutes: number | null;
-	/* What the proxy's checks showed about the addresses it passes (specs/124); only when the proxy checks. */
-	addresses?: AddressesView;
-	/* What the API itself must serve and check, as the server states it (spec 107). */
-	connection?: {
-		issuer: string;
-		audience: string;
-		metadata: Record<string, unknown>;
-		metadataUrl: string | null;
-		challenge: string | null;
-		/* Where the proxy asks and where the project serves the metadata; null unless the proxy checks. */
-		check: { verifyUrl: string; metadataUrl: string } | null;
-	};
-}
 
 /* How agent hosts get a client identity here, from the project's own public configuration (spec 107). */
 export interface AgentClients {
@@ -132,14 +82,12 @@ interface FormValues {
 	name: string;
 	scopes: string;
 	/* Per scope, what it lets an app do and whether it only sees; keyed by the scope as typed above. */
-	descriptions?: Record<string, { description?: string; kind?: ScopeKind }>;
+	descriptions?: DescriptionsInput;
 	tokenFormat: 'jwt' | 'opaque';
 	// InputNumber answers null once the operator clears it.
 	accessTokenTTL: number | null;
 	trailingSlashSignificant: boolean;
 	checkedBy: CheckedBy;
-	/* Edit only; '' for none. */
-	exchangedBy?: string;
 	requireCode?: boolean;
 	every?: EveryChoice;
 	customAmount?: number;
@@ -158,224 +106,6 @@ const DEFAULT_VALUES: FormValues = {
 	every: 'off',
 	customUnit: 'days'
 };
-
-function splitScopes(raw: string): string[] {
-	return raw
-		.split(/[\s,]+/)
-		.map((scope) => scope.trim())
-		.filter((scope) => scope.length > 0);
-}
-
-/*
- * What the consent page will say about each scope. A row left empty sends nothing for that scope, and the
- * page then shows it by its technical name under "not described" — honest, but no help to the person
- * deciding.
- */
-const KIND_OPTIONS: { label: string; value: ScopeKind }[] = [
-	{ label: 'Acts for the person', value: 'act' },
-	{ label: 'Only lets it see', value: 'see' }
-];
-
-function describedScopes(
-	scopes: string[],
-	descriptions: FormValues['descriptions']
-): Record<string, { description: string; kind?: ScopeKind }> {
-	const out: Record<string, { description: string; kind?: ScopeKind }> = {};
-	for (const scope of scopes) {
-		const entry = descriptions?.[scope];
-		const description = entry?.description?.trim();
-		if (!description) continue;
-		out[scope] = { description, ...(entry?.kind ? { kind: entry.kind } : {}) };
-	}
-	return out;
-}
-
-function describeWindow(seconds: number): string {
-	if (seconds % 3600 === 0) {
-		const hours = seconds / 3600;
-		return `${hours} hour${hours === 1 ? '' : 's'}`;
-	}
-	if (seconds % 60 === 0) {
-		const minutes = seconds / 60;
-		return `${minutes} minute${minutes === 1 ? '' : 's'}`;
-	}
-	return `${seconds} seconds`;
-}
-
-/*
- * What the operator is told about their scope list, computed from the same `OMNIBUS_SCOPES` the route
- * refuses. Sharing the list is the point: a console warning about a different set than the server
- * enforces would teach the wrong rule.
- */
-function scopeAdvice(raw: string): string | null {
-	const scopes = splitScopes(raw);
-	if (scopes.length === 0) return null;
-
-	const omnibus = scopes.find((scope) =>
-		OMNIBUS_SCOPES.includes(scope.toLowerCase())
-	);
-	if (omnibus) {
-		return `${omnibus} will be refused: it grants everything to every client that arrives. Name the scopes the resource actually distinguishes.`;
-	}
-	if (scopes.length > 4) {
-		return `A client given no scope guidance requests all ${scopes.length} of these at once. This list is the baseline for basic use, not a catalogue of everything the resource could ever permit.`;
-	}
-	return null;
-}
-
-interface Vouching {
-	status: 'vouched' | 'not_vouched' | 'not_checked';
-	step?: 'challenge' | 'path_inserted' | 'root';
-	reason?: string;
-	expectedIssuer: string;
-	/* The project serves the metadata itself, for an API its proxy checks (specs/123 R5): nothing was fetched. */
-	servedByProject?: boolean;
-}
-
-const STEP_LABEL: Record<NonNullable<Vouching['step']>, string> = {
-	challenge: 'the 401 challenge',
-	path_inserted: 'the path-inserted well-known address',
-	root: 'the root well-known address'
-};
-
-const REASON_LABEL: Record<string, string> = {
-	unreachable: 'the resource could not be reached',
-	blocked_address:
-		'the resource is on a private address this server does not fetch',
-	not_https: 'the resource is not served over https',
-	no_metadata: 'no protected resource metadata was found',
-	resource_mismatch: 'the metadata describes a different resource',
-	issuer_not_listed: 'the metadata does not list this server',
-	malformed: 'the metadata is not valid JSON'
-};
-
-/*
- * Whether the resource's own metadata vouches for this declaration. Fetched per row once the list is
- * on screen, so a slow resource delays its own cell and nothing else; informational, since nothing is
- * refused on it — it answers why an MCP client might not find this server.
- */
-function VouchingCell({ url }: { url: string }) {
-	const [vouching, setVouching] = useState<Vouching | null>(null);
-	const [checking, setChecking] = useState(true);
-	// Every state write follows an await, so the effect below sets nothing synchronously.
-	const fetchVouching = useCallback(
-		() =>
-			request<Vouching>('GET', url).then((result) => {
-				setVouching(result.ok ? result.data : null);
-				setChecking(false);
-			}),
-		[url]
-	);
-	useEffect(() => {
-		void fetchVouching();
-	}, [fetchVouching]);
-
-	if (checking) return <Tag>checking…</Tag>;
-	if (!vouching) return <Tag>unavailable</Tag>;
-	if (vouching.servedByProject) {
-		return (
-			<Tooltip
-				title={`Your proxy checks this API's tokens, and this project serves its metadata, naming ${vouching.expectedIssuer}.`}
-			>
-				<Tag color="green">Served by the project</Tag>
-			</Tooltip>
-		);
-	}
-	const detail =
-		vouching.status === 'vouched'
-			? `Found through ${STEP_LABEL[vouching.step ?? 'path_inserted']}.`
-			: `${REASON_LABEL[vouching.reason ?? ''] ?? 'Metadata not found'}. It must list ${vouching.expectedIssuer} in authorization_servers.`;
-	const color =
-		vouching.status === 'vouched'
-			? 'green'
-			: vouching.status === 'not_checked'
-				? 'default'
-				: 'orange';
-	const label =
-		vouching.status === 'vouched'
-			? 'found'
-			: vouching.status === 'not_checked'
-				? 'not checked'
-				: 'not found';
-	return (
-		<Tooltip title={detail}>
-			<Tag color={color}>{label}</Tag>
-		</Tooltip>
-	);
-}
-
-/*
- * What a developer protecting this API must serve and check (spec 107): the values this server's tokens for it carry,
- * the metadata document an agent host looks for, and the challenge that sends it there — each to copy as it is.
- */
-function ResourceConnectionDetails({
-	connection
-}: {
-	connection: NonNullable<ResourceView['connection']>;
-}) {
-	const copyable = (value: string) => (
-		<Typography.Text
-			code
-			copyable={{ text: value }}
-		>
-			{value}
-		</Typography.Text>
-	);
-	return (
-		<Space
-			orientation="vertical"
-			size={12}
-			style={{ width: '100%' }}
-		>
-			<div>
-				<Typography.Text strong>Issuer</Typography.Text>
-				<div>{copyable(connection.issuer)}</div>
-			</div>
-			<div>
-				<Typography.Text strong>Audience (aud) of its tokens</Typography.Text>
-				<div>{copyable(connection.audience)}</div>
-			</div>
-			{connection.metadataUrl && (
-				<div>
-					<Typography.Text strong>
-						Serve this protected resource metadata at
-					</Typography.Text>
-					<div>{copyable(connection.metadataUrl)}</div>
-					<Typography.Paragraph
-						copyable={{ text: JSON.stringify(connection.metadata, null, 2) }}
-					>
-						<pre style={{ margin: 0, whiteSpace: 'pre-wrap' }}>
-							{JSON.stringify(connection.metadata, null, 2)}
-						</pre>
-					</Typography.Paragraph>
-				</div>
-			)}
-			{connection.challenge && (
-				<div>
-					<Typography.Text strong>
-						Answer a request without a valid token with 401 and
-					</Typography.Text>
-					<div>{copyable(`WWW-Authenticate: ${connection.challenge}`)}</div>
-				</div>
-			)}
-			<div>
-				<Typography.Text strong>
-					On every request, your server checks
-				</Typography.Text>
-				<ul style={{ margin: '4px 0 0', paddingInlineStart: 20 }}>
-					<li>the token's aud is exactly {connection.audience};</li>
-					<li>its iss is {connection.issuer};</li>
-					<li>
-						its signature verifies against the keys published at{' '}
-						{connection.issuer}/jwks;
-					</li>
-					<li>it is an access token (typ at+jwt), and it has not expired;</li>
-					<li>it is never passed on to another service.</li>
-				</ul>
-			</div>
-		</Space>
-	);
-}
 
 /*
  * Where the bucket's declarations live (specs/085). An identifier is unique within a namespace: the bucket's
@@ -417,21 +147,18 @@ export function Resources({
 	onChanged?: () => void;
 }) {
 	const bucketBase = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
-	const base = `${bucketBase}/resources`;
+	const base = resourcesApi(bucketId);
 	const [namespace, setNamespace] = useState<Namespace | null>(null);
 	const writable = canEdit && (namespace === 'project' || superAdmin);
 	const [rows, setRows] = useState<ResourceView[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [loadFailed, setLoadFailed] = useState<string | null>(null);
 	const [open, setOpen] = useState(false);
-	const [mode, setMode] = useState<'create' | 'edit'>('create');
-	const [editing, setEditing] = useState<string | null>(null);
 	const [saving, setSaving] = useState(false);
 	const [form] = Form.useForm<FormValues>();
 	const feedback = useFeedback();
 	const confirm = useConfirm();
-	const [connecting, setConnecting] = useState<ResourceView | null>(null);
-	const [toolsOf, setToolsOf] = useState<ResourceView | null>(null);
+	const navigate = useNavigate();
 	const [applications, setApplications] = useState<ExchangeCandidate[]>([]);
 	/*
 	 * "My MCP server or API" in New application, and the guide's "Set this up", land here with ?declare=1 (spec 107):
@@ -462,8 +189,6 @@ export function Resources({
 					const mayDeclare =
 						canEdit && (result.data.namespace === 'project' || superAdmin);
 					if (offerDeclare(mayDeclare && room) === '1') {
-						setMode('create');
-						setEditing(null);
 						form.resetFields();
 						form.setFieldsValue(DEFAULT_VALUES);
 						setOpen(true);
@@ -498,109 +223,34 @@ export function Resources({
 			live = false;
 		};
 	}, [bucketBase]);
-	const editingExchangedBy =
-		rows.find((row) => row.identifier === editing)?.exchangedBy ?? '';
-	const editingCheckedBy =
-		rows.find((row) => row.identifier === editing)?.checkedBy ?? 'server';
 
 	function openCreateModal() {
-		setMode('create');
-		setEditing(null);
 		form.resetFields();
 		form.setFieldsValue(DEFAULT_VALUES);
-		setOpen(true);
-	}
-
-	function openEditModal(row: ResourceView) {
-		setMode('edit');
-		setEditing(row.identifier);
-		form.setFieldsValue({
-			identifier: row.identifier,
-			name: row.name,
-			scopes: row.scopes.join(' '),
-			descriptions: row.scopeDescriptions ?? {},
-			tokenFormat: row.tokenFormat,
-			accessTokenTTL: row.accessTokenTTL,
-			trailingSlashSignificant: row.trailingSlashSignificant,
-			checkedBy: row.checkedBy,
-			exchangedBy: row.exchangedBy ?? '',
-			requireCode: row.requireCode,
-			customUnit: 'days',
-			...everyFields(row.signInEveryMinutes)
-		});
 		setOpen(true);
 	}
 
 	async function submit(values: FormValues) {
 		const scopes = splitScopes(values.scopes);
 		const scopeDescriptions = describedScopes(scopes, values.descriptions);
-		// Sent only when it changed, so an edit of anything else records no change of who exchanges.
-		const exchangedBy = values.exchangedBy ?? '';
-		/*
-		 * The identifier is absent from the edit payload deliberately, and the server refuses it if
-		 * sent: it is the audience of every token already minted for this resource, so replacing it is
-		 * a delete and a fresh declaration rather than a rename.
-		 */
-		const editingRow = rows.find((row) => row.identifier === editing);
 		const requireCode = values.requireCode === true;
 		const signInEveryMinutes = everyMinutes(values);
-		/* Sent only when it changed, so an edit of anything else is never previewed or audited as one (specs/130). */
-		const requirement =
-			mode === 'create'
-				? {
-						...(requireCode ? { requireCode } : {}),
-						...(signInEveryMinutes === null ? {} : { signInEveryMinutes })
-					}
-				: {
-						...(requireCode !== (editingRow?.requireCode ?? false)
-							? { requireCode }
-							: {}),
-						...(signInEveryMinutes !== (editingRow?.signInEveryMinutes ?? null)
-							? { signInEveryMinutes }
-							: {})
-					};
-		const body =
-			mode === 'create'
-				? {
-						identifier: values.identifier,
-						name: values.name,
-						scopes,
-						...(Object.keys(scopeDescriptions).length
-							? { scopeDescriptions }
-							: {}),
-						tokenFormat: values.tokenFormat,
-						accessTokenTTL: values.accessTokenTTL ?? undefined,
-						trailingSlashSignificant: values.trailingSlashSignificant,
-						checkedBy: values.checkedBy
-					}
-				: {
-						name: values.name,
-						scopes,
-						// The whole map, so a description emptied here is removed rather than kept.
-						scopeDescriptions,
-						tokenFormat: values.tokenFormat,
-						accessTokenTTL: values.accessTokenTTL ?? undefined,
-						// Sent only when it changed, so the audit records a change of who checks only when there was one.
-						...(values.checkedBy !== editingCheckedBy
-							? { checkedBy: values.checkedBy }
-							: {}),
-						...(exchangedBy !== editingExchangedBy
-							? { exchangedBy: exchangedBy || null }
-							: {})
-					};
-
-		const url =
-			mode === 'create'
-				? base
-				: `${base}/${encodeURIComponent(editing as string)}`;
+		const body = {
+			identifier: values.identifier,
+			name: values.name,
+			scopes,
+			...(Object.keys(scopeDescriptions).length ? { scopeDescriptions } : {}),
+			tokenFormat: values.tokenFormat,
+			accessTokenTTL: values.accessTokenTTL ?? undefined,
+			trailingSlashSignificant: values.trailingSlashSignificant,
+			checkedBy: values.checkedBy,
+			...(requireCode ? { requireCode } : {}),
+			...(signInEveryMinutes === null ? {} : { signInEveryMinutes })
+		};
 		setSaving(true);
 		const result = await signInConsent(
 			(consent) =>
-				request(
-					mode === 'create' ? 'POST' : 'PATCH',
-					url,
-					withConsent({ ...body, ...requirement }, consent)
-				),
+				request<ResourceView>('POST', base, withConsent(body, consent)),
 			values.name
 		);
 		setSaving(false);
@@ -609,17 +259,14 @@ export function Resources({
 			feedback.failed(result, form);
 			return;
 		}
-		feedback.done(mode === 'create' ? 'Resource declared.' : 'Resource saved.');
+		feedback.done('Resource declared.');
 		setOpen(false);
-		if (mode === 'create') onChanged?.();
-		await load();
+		onChanged?.();
+		/* Declared, it is wired from its own page, as an app behind the proxy is (specs/132). */
+		void navigate(apiHref(bucketId, result.data.identifier));
 	}
 
 	async function remove(row: ResourceView) {
-		/*
-		 * The bucket's own applications may hold machine tokens for the resource, so the question names them
-		 * (specs/085, specs/099). A failed read leaves the question without names rather than blocking it.
-		 */
 		const clients = await request<
 			{
 				clientId: string;
@@ -627,24 +274,14 @@ export function Resources({
 				registeredDynamically?: boolean;
 			}[]
 		>('GET', `${bucketBase}/clients`);
-		const apps = clients.ok
-			? clients.data
-					.filter((c) => !c.registeredDynamically)
-					.map((c) => c.clientName || c.clientId)
-			: [];
 		const agreed = await confirm('resource.remove', {
 			target: row.name,
-			consequences: [
-				'Token issuance for this audience stops on the next request.',
-				apps.length > 0
-					? `These applications can no longer get tokens for it: ${apps.join(', ')}. Their current tokens work until they expire.`
-					: 'A live integration loses access as its current tokens expire.'
-			]
+			consequences: removalConsequences(clients.ok ? clients.data : null)
 		});
 		if (!agreed) return;
 		const result = await request(
 			'DELETE',
-			`${base}/${encodeURIComponent(row.identifier)}`
+			resourcesApi(bucketId, row.identifier)
 		);
 		if (!result.ok) {
 			feedback.failed(result);
@@ -742,16 +379,9 @@ export function Resources({
 									orientation="vertical"
 									size={0}
 								>
-									{writable ? (
-										<Typography.Link
-											strong
-											onClick={() => openEditModal(row)}
-										>
-											{row.name}
-										</Typography.Link>
-									) : (
-										<Typography.Text strong>{row.name}</Typography.Text>
-									)}
+									<Link href={apiHref(bucketId, row.identifier)}>
+										<strong>{row.name}</strong>
+									</Link>
 									<Typography.Text code>{identifier}</Typography.Text>
 									{row.checkedBy === 'proxy' && (
 										<Typography.Text type="secondary">
@@ -780,7 +410,7 @@ export function Resources({
 							key: 'vouching',
 							render: (_: unknown, row: ResourceView) => (
 								<VouchingCell
-									url={`${base}/${encodeURIComponent(row.identifier)}/vouching`}
+									url={`${resourcesApi(bucketId, row.identifier)}/vouching`}
 								/>
 							)
 						},
@@ -821,19 +451,6 @@ export function Resources({
 								</Space>
 							)
 						},
-						{
-							title: '',
-							key: 'connect',
-							render: (_: unknown, row: ResourceView) =>
-								row.connection ? (
-									<Button
-										size="small"
-										onClick={() => setConnecting(row)}
-									>
-										Connect
-									</Button>
-								) : null
-						},
 						...(writable
 							? [
 									{
@@ -843,19 +460,6 @@ export function Resources({
 											<RowActions
 												name={row.name}
 												items={[
-													{
-														key: 'edit',
-														label: 'Edit…',
-														group: 'edit',
-														onClick: () => openEditModal(row)
-													},
-													{
-														key: 'tools',
-														label:
-															row.checkedBy === 'proxy' ? 'Access…' : 'Tools…',
-														group: 'edit',
-														onClick: () => setToolsOf(row)
-													},
 													{
 														key: 'remove',
 														label: 'Remove',
@@ -873,51 +477,8 @@ export function Resources({
 			)}
 
 			<Modal
-				open={connecting !== null}
-				title={connecting ? `Connect ${connecting.name}` : 'Connect'}
-				onCancel={() => setConnecting(null)}
-				footer={null}
-				width={720}
-				destroyOnHidden
-			>
-				{connecting?.connection &&
-					(connecting.connection.check ? (
-						<ProxyConnect
-							bucketId={bucketId}
-							identifier={connecting.identifier}
-							check={connecting.connection.check}
-							addresses={connecting.addresses}
-							onRefresh={() => void load()}
-						/>
-					) : (
-						<ResourceConnectionDetails connection={connecting.connection} />
-					))}
-			</Modal>
-
-			{toolsOf && (
-				<ToolsDrawer
-					bucketId={bucketId}
-					url={`${base}/${encodeURIComponent(toolsOf.identifier)}`}
-					name={toolsOf.name}
-					scopes={toolsOf.scopes}
-					tools={toolsOf.tools}
-					checkedBy={toolsOf.checkedBy}
-					addresses={toolsOf.addresses}
-					signIn={{
-						requireCode: toolsOf.requireCode,
-						signInEveryMinutes: toolsOf.signInEveryMinutes
-					}}
-					onClose={() => setToolsOf(null)}
-					onSaved={() => {
-						setToolsOf(null);
-						void load();
-					}}
-				/>
-			)}
-
-			<Modal
 				open={open}
-				title={mode === 'create' ? 'New resource' : 'Edit resource'}
+				title="New resource"
 				onCancel={() => setOpen(false)}
 				onOk={() => form.submit()}
 				confirmLoading={saving}
@@ -937,10 +498,7 @@ export function Resources({
 						extra="The canonical URI of your MCP server, exactly as its clients will name it — for example https://mcp.example.com/mcp. No fragment. A trailing slash is dropped unless you mark it significant below."
 						rules={[{ required: true, message: 'an identifier is required' }]}
 					>
-						<Input
-							placeholder="https://mcp.example.com/mcp"
-							disabled={mode === 'edit'}
-						/>
+						<Input placeholder="https://mcp.example.com/mcp" />
 					</Form.Item>
 					{/*
 					 * Off by default because the MCP specification asks clients for the slash-free form; on, the
@@ -951,19 +509,8 @@ export function Resources({
 						valuePropName="checked"
 						extra="Only for a server that really serves a different resource at …/mcp/ than at …/mcp. When on, only the exact spelling is issued tokens."
 					>
-						<Checkbox disabled={mode === 'edit'}>
-							The trailing slash is significant
-						</Checkbox>
+						<Checkbox>The trailing slash is significant</Checkbox>
 					</Form.Item>
-					{mode === 'edit' && (
-						<Alert
-							type="info"
-							showIcon
-							style={{ marginBottom: 16 }}
-							title="The identifier cannot be changed"
-							description="It is the audience of every token already issued for this resource. Replacing it means removing this declaration and making a new one."
-						/>
-					)}
 					<Form.Item
 						name="checkedBy"
 						label="Who checks tokens?"
@@ -1061,24 +608,6 @@ export function Resources({
 							style={{ width: '100%' }}
 						/>
 					</Form.Item>
-					{mode === 'edit' && (
-						<Form.Item
-							name="exchangedBy"
-							label="Application that exchanges tokens for this API"
-							extra="The application that serves this API, when it calls a connected service for the person who called it: it presents the access tokens this API receives to obtain that person's token there."
-						>
-							<Select
-								showSearch={{ optionFilterProp: 'label' }}
-								options={[
-									{ value: '', label: 'None', disabled: false },
-									...exchangeOptions(
-										applications,
-										editingExchangedBy ? [editingExchangedBy] : []
-									)
-								]}
-							/>
-						</Form.Item>
-					)}
 					<ResourceSignInFields
 						checkedBy={checkedByValue}
 						every={everyValue}

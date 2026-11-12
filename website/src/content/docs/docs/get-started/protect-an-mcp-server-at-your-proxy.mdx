@@ -63,12 +63,12 @@ it for you. Your MCP server serves nothing for sign-in.
 3. Look at the token settings. A revoked self-contained token keeps working at the proxy until it expires (see
    [Revoked tokens](#revocation) below). So choose **Opaque**, or keep the lifetime short.
 
-You can switch an existing API to **Your proxy** in its edit form too. Tokens issued before the switch keep working
+You can switch an existing API to **Your proxy** on its **Settings** tab too. Tokens issued before the switch keep working
 until they expire.
 
 ## 2. Configure your proxy {#configure-your-proxy}
 
-Choose **Connect** on the API's row. It shows the check's address, the metadata address and the configuration for
+Open the API's page from the project's **APIs** tab. Its **Connect** tab shows the check's address, the metadata address and the configuration for
 your proxy, with your addresses filled in. Copy it from there. The examples below are the same text, built by the
 same code, for an MCP server at `https://mcp.example.com/mcp` in a project at `https://auth.example.com/acme`. Your
 API's check id takes the place of `<checkId>`.
@@ -136,7 +136,7 @@ When a request is let through, the proxy adds these headers:
 
 ## 5. Say which scopes each tool needs {#tools}
 
-Without a tools table, any valid token may call any tool. To set one, choose **Access…** on the API's row.
+Without a tools table, any valid token may call any tool. To set one, open the API's page and its **Access** tab.
 
 An MCP client following the MCP specification of 2026-07-28 names what it does in two headers: `Mcp-Method` (such as
 `tools/call`) and `Mcp-Name` (the tool). The check reads them, so the table can say which scopes each tool needs:
@@ -229,7 +229,7 @@ The API's own conditions hold for every tool. Sometimes one tool needs more. Say
 `delete_files`, or `export_billing` may be called only from the office network in working hours. Every other tool
 stays as open as before.
 
-Choose **Access…** on the API's row. In the tools table, choose **Add conditions** under the tool. A tool takes three
+On the API's **Access** tab, in the tools table, choose **Add conditions** under the tool. A tool takes three
 kinds of condition, with the same controls as the API's own:
 
 - **Groups**: the person is in one of the groups you choose.
@@ -296,7 +296,7 @@ it.
 
 ### Check access {#tool-conditions-check-access}
 
-The **Access…** drawer has a **Check access** card. Choose a person, or **No person: an app acting for itself**. Then
+The API's **Access** tab ends with a **Check access** card. Choose a person, or **No person: an app acting for itself**. Then
 choose the scopes the app's token holds, the tool it calls or another request, an address and a time. When the API
 requires a code or a recent sign-in, also say whether the sign-in had a code and when it happened.
 
@@ -312,8 +312,8 @@ are free on every plan.
 ## Ask for a code or a recent sign-in {#require-a-code-or-a-recent-sign-in}
 
 A token says that someone signed in to the project. It does not say how. So a stolen password is enough to connect an
-agent to your MCP server. Two settings in the API's edit form change that. Open the project's **APIs** tab and choose
-**Edit…** on the API's row:
+agent to your MCP server. Two settings on the API's **Access** tab change that. Open the project's **APIs** tab, then the API, then
+**Access**:
 
 - **Require a code from an authenticator app.** A token for this API is issued only after a sign-in in which the
   person typed a code from an authenticator app, such as Google Authenticator.
@@ -405,12 +405,12 @@ If an app does not carry on after the new sign-in, ask it to try again.
 ## Try it {#try-it}
 
 1. Declare an MCP server as in [step 1](#declare-the-api) and configure your proxy, or take one you already have.
-2. Choose **Edit…** on its row and turn on **Require a code from an authenticator app**. Read whom it affects, and
+2. Open its **Access** tab and turn on **Require a code from an authenticator app**. Read whom it affects, and
    save.
 3. Connect your MCP client to the server. The sign-in page names the API and asks for a code after the password. If
    you have no authenticator app, set one up there.
 4. Call a tool. It works.
-5. Choose **Edit…** again. Set **Ask to sign in again every** to **Custom**, 1 hour, and save.
+5. On the same tab, set **Ask to sign in again every** to **Custom**, 1 hour, and save.
 6. An hour later, call a tool again. The next renewal is refused, and your client asks you to sign in again, or does
    what the table above says for it.
 7. If the app does not carry on after the new sign-in, ask it to try again.

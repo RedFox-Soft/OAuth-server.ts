@@ -1,7 +1,7 @@
 ---
 title: 在代理处保护 MCP 服务器
 description: 让 Caddy、Traefik 或 nginx 代理请 FoxAuth 检查每个令牌以及每个工具需要的权限，MCP 服务器无需任何授权代码。
-source: ce8c08d7f52f
+source: 02bebc0d244f
 sidebar:
   order: 8
 ---
@@ -48,11 +48,11 @@ import ProxyRecipe from '../../../../../components/ProxyRecipe.astro';
    - **Who checks tokens?**：选择 **Your proxy**。
 3. 看一下令牌设置。被撤销的自包含令牌在代理处仍然有效，直到它过期（见下文的[被撤销的令牌](#revocation)）。所以请选择 **Opaque**，或者把有效期设得短一些。
 
-你也可以在现有 API 的编辑表单中把它切换为 **Your proxy**。切换之前签发的令牌在过期之前仍然有效。
+你也可以在现有 API 的 **Settings** 选项卡中把它切换为 **Your proxy**。切换之前签发的令牌在过期之前仍然有效。
 
 ## 2. 配置你的代理 {#configure-your-proxy}
 
-在 API 那一行点击 **Connect**。它会显示检查地址、元数据地址，以及已经填好你的地址的代理配置。请从那里复制。下面的示例是同一段文字，由同一段代码生成，对应的是项目地址为 `https://auth.example.com/acme`、MCP 服务器地址为 `https://mcp.example.com/mcp` 的情况。`<checkId>` 处会是你的 API 的检查 ID。
+从项目的 **APIs** 标签页打开该 API 的页面。它的 **Connect** 选项卡会显示检查地址、元数据地址，以及已经填好你的地址的代理配置。请从那里复制。下面的示例是同一段文字，由同一段代码生成，对应的是项目地址为 `https://auth.example.com/acme`、MCP 服务器地址为 `https://mcp.example.com/mcp` 的情况。`<checkId>` 处会是你的 API 的检查 ID。
 
 每份配置都做三件事：
 
@@ -109,7 +109,7 @@ nginx 的 `auth_request` 只理解三种回答：允许、`401` 和 `403`。遇�
 
 ## 5. 指定每个工具需要哪些权限 {#tools}
 
-没有工具表时，任何有效令牌都可以调用任何工具。要设置工具表，请在 API 那一行点击 **Access…**。
+没有工具表时，任何有效令牌都可以调用任何工具。要设置工具表，请打开该 API 的页面及其 **Access** 选项卡。
 
 遵循 2026-07-28 版 MCP 规范的 MCP 客户端会用两个请求头说明它要做什么：`Mcp-Method`（例如 `tools/call`）和 `Mcp-Name`（工具名）。检查会读取这两个请求头，所以工具表可以指定每个工具需要哪些权限：
 
@@ -177,7 +177,7 @@ nginx 的 `auth_request` 只理解三种回答：允许、`401` 和 `403`。遇�
 
 API 自己的条件对所有工具都有效。有时某一个工具需要更多限制。例如，只有 Ops 用户组可以调用 `delete_files`，或者只能在工作时间从办公室网络调用 `export_billing`。其他工具和以前一样开放。
 
-在 API 那一行选择 **Access…**。在工具表中，点击该工具下方的 **Add conditions**。一个工具可以带三种条件，控件和 API 自己的条件相同：
+在该 API 的 **Access** 选项卡的工具表中，点击该工具下方的 **Add conditions**。一个工具可以带三种条件，控件和 API 自己的条件相同：
 
 - **Groups**：此人属于你选择的某个用户组。
 - **From where**：地址在你的地址范围之内，或不在其中。它还可以挡住 FoxTrust 网络信息所指的网络，例如 Tor。你的代理必须传递用户的地址，做法见 [From where](/zh-cn/docs/get-started/add-conditions-at-your-proxy/#from-where)。
@@ -227,7 +227,7 @@ MCP 服务器上新增或改名的工具还不在工具表中。在你把它加�
 
 ### 检查访问 {#tool-conditions-check-access}
 
-**Access…** 抽屉里有一张 **Check access** 卡片。选择一个人，或者选择 **No person: an app acting for itself**（没有对应的人：应用以自己的身份行事）。然后选择应用令牌持有的权限、调用的工具或其他请求、地址和时间。如果 API 要求验证码或近期登录，还要说明登录时是否输入了验证码，以及何时登录。
+该 API 的 **Access** 选项卡最下方有一张 **Check access** 卡片。选择一个人，或者选择 **No person: an app acting for itself**（没有对应的人：应用以自己的身份行事）。然后选择应用令牌持有的权限、调用的工具或其他请求、地址和时间。如果 API 要求验证码或近期登录，还要说明登录时是否输入了验证码，以及何时登录。
 
 卡片会回答 **Allowed**（允许）、**Refused**（拒绝）或 **Asked to sign in again**（要求重新登录），并用平实的话说明原因。它会分别针对已保存的工具表和你正在编辑的工具表作答。如果缺少需要的信息，它会回答 **Not known**（未知），并说明缺少什么。卡片在你的浏览器中运行与代理处检查相同的判断。不由任何服务器替它判断，也不会写入审计记录。如果某个条件需要网络信息，卡片会在你的服务器自己的副本中查找这个地址。
 
@@ -235,7 +235,7 @@ MCP 服务器上新增或改名的工具还不在工具表中。在你把它加�
 
 ## 连接时要求验证码或近期登录 {#require-a-code-or-a-recent-sign-in}
 
-令牌只说明有人登录了这个项目，并不说明是怎样登录的。所以，一个被盗的密码就足以让智能体连接到你的 MCP 服务器。API 编辑表单中的两项设置可以改变这一点。打开项目的 **APIs** 标签页，在该 API 那一行选择 **Edit…**：
+令牌只说明有人登录了这个项目，并不说明是怎样登录的。所以，一个被盗的密码就足以让智能体连接到你的 MCP 服务器。API 的 **Access** 选项卡中的两项设置可以改变这一点。打开项目的 **APIs** 标签页，再打开该 API，然后打开 **Access**：
 
 - **Require a code from an authenticator app**。只有在用户登录时输入了身份验证器应用（例如 Google Authenticator）中的验证码之后，才会为这个 API 签发令牌。
 - **Ask to sign in again every**。选择每天、每 7 天、每 14 天，或 **Custom**：一个整数的小时数或天数，从 1 小时到 14 天。令牌所代表的用户，其登录时间不能早于这个时长。
@@ -297,10 +297,10 @@ Goose 从 1.48.0 版起也会说明自己调用的工具。
 ## 试一试 {#try-it}
 
 1. 按照[第 1 步](#declare-the-api)声明一个 MCP 服务器并配置你的代理，或者使用已有的服务器。
-2. 在它那一行选择 **Edit…**，打开 **Require a code from an authenticator app**。查看会影响哪些人，然后保存。
+2. 打开它的 **Access** 选项卡，打开 **Require a code from an authenticator app**。查看会影响哪些人，然后保存。
 3. 用你的 MCP 客户端连接这个服务器。登录页面会写出 API 的名称，并在输入密码后要求输入验证码。如果你没有身份验证器应用，可以在那里设置一个。
 4. 调用一个工具。它可以正常工作。
-5. 再次选择 **Edit…**。把 **Ask to sign in again every** 设为 **Custom**、1 小时，然后保存。
+5. 在同一个选项卡中，把 **Ask to sign in again every** 设为 **Custom**、1 小时，然后保存。
 6. 一小时后再次调用工具。下一次续期会被拒绝，你的客户端会要求你重新登录，或者按上表中对它的描述行事。
 7. 如果应用在重新登录之后没有继续，请让它再试一次。
 

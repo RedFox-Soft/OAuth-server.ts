@@ -64,7 +64,8 @@ export function ProxyAddresses({
 	verifyUrl,
 	address,
 	target,
-	onRefresh
+	onRefresh,
+	writable = true
 }: {
 	bucketId: string;
 	addresses: AddressesView;
@@ -74,6 +75,8 @@ export function ProxyAddresses({
 	address: string;
 	target: 'app' | 'api';
 	onRefresh: () => void;
+	/* Issuing and withdrawing a key are the project's to change; a read-only visitor still sees what is set up. */
+	writable?: boolean;
 }) {
 	const feedback = useFeedback();
 	const confirm = useConfirm();
@@ -226,6 +229,7 @@ export function ProxyAddresses({
 						<Button
 							size="small"
 							danger
+							disabled={!writable}
 							onClick={() => void withdraw(key)}
 						>
 							Withdraw
@@ -234,7 +238,7 @@ export function ProxyAddresses({
 				))}
 				<Button
 					style={{ alignSelf: 'flex-start' }}
-					disabled={(keys ?? []).length >= 2}
+					disabled={!writable || (keys ?? []).length >= 2}
 					onClick={() => void issue()}
 				>
 					Issue a proxy key

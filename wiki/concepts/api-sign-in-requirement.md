@@ -97,4 +97,5 @@ throws building a header with a value outside Latin-1 (that was a `500`), and a 
 ## Not here (later specs)
 
 A fresh sign-in before one tool (it needs a server-side mark so a refresh fails only for
-that tool); the API's own console page; verifying a provider's own `auth_time`.
+that tool); verifying a provider's own `auth_time`. The API's own console page came with spec 132: the requirement is
+set on its Access tab, beside the conditions it is judged with.

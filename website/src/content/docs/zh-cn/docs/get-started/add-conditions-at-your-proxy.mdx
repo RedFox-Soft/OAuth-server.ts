@@ -1,7 +1,7 @@
 ---
 title: 在代理处添加条件
 description: '只允许从您的网络、只在工作时间、只允许某个部门，或只在近期登录之后，进入代理后的应用或 API。'
-source: 0f878be849d7
+source: df7c95bee093
 sidebar:
   order: 9
 ---
@@ -24,7 +24,7 @@ import ProxyRecipe from '../../../../../components/ProxyRecipe.astro';
 | **Groups**               | 此人属于您的某个用户组                             | API       |
 | **Ask to sign in again** | 此人在 N 分钟之内登录过                            | 应用      |
 
-应用的用户组已经写在每个路径的规则里，因此只有 API 才把用户组作为条件。网络信息是 **From where** 的一部分，不是单独的条件。API 没有 **Ask to sign in again** 条件，但可以在它自己的编辑表单中要求身份验证器应用中的验证码或近期登录：请参阅[连接时要求验证码或近期登录](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in)。
+应用的用户组已经写在每个路径的规则里，因此只有 API 才把用户组作为条件。网络信息是 **From where** 的一部分，不是单独的条件。API 没有 **Ask to sign in again** 条件，但可以在它自己的 Access 选项卡中要求身份验证器应用中的验证码或近期登录：请参阅[连接时要求验证码或近期登录](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in)。
 
 同一个条件内的值用“或”组合：“来自办公室或来自 VPN”。不同的条件用“且”组合：“来自办公室，且在工作时间”。每条规则每种条件最多一个。
 
@@ -189,7 +189,7 @@ iCloud Private Relay 不在选项中，它的地址可以通过。FoxTrust 不�
 
 ## API 的用户组和属性 {#api}
 
-在 API 那一行选择 **Access…**。它的第一部分 **Who can call it** 包含 API 的条件。这些条件在工具表之前生效。
+打开该 API 的页面及其 **Access** 选项卡。它的第一部分 **Who can call it** 包含 API 的条件。这些条件在工具表之前生效。
 
 关于此人的条件需要一个代表某个人的令牌。以下令牌不代表任何人，会被拒绝：
 
@@ -203,7 +203,7 @@ MCP 服务器的某一个工具可以带有自己的条件：用户组、**From 
 
 ## 保存前先检查 {#check}
 
-应用 Access 选项卡上的 **Check access** 接受应用中的地址、某个人、网络地址、某个时刻，以及此人登录了多久。它按项目判断的顺序列出每个条件，并标上 ✓、✗ 或 ?。您留空的输入会显示“?”。API 的 **Access…** 抽屉里也有自己的 **Check access** 卡片：请参阅[检查访问](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions-check-access)。
+应用 Access 选项卡上的 **Check access** 接受应用中的地址、某个人、网络地址、某个时刻，以及此人登录了多久。它按项目判断的顺序列出每个条件，并标上 ✓、✗ 或 ?。您留空的输入会显示“?”。API 的 **Access** 选项卡上也有自己的 **Check access** 卡片：请参阅[检查访问](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#tool-conditions-check-access)。
 
 让更多人进入的更改会先请求确认，并逐个路径列出放宽了什么。只收紧访问的更改会立即保存。FoxAuth 控制台本身永远不受这些条件限制，因此规则不会把您挡在控制台之外。
 

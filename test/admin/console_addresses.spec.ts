@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'bun:test';
 import bootstrap from '../test_helper.ts';
 import { elysia } from 'lib/index.ts';
 import { ADMIN_SESSION_COOKIE } from 'lib/admin/consts.ts';
-import { ROUTES } from 'lib/admin/ui/frame/routes.ts';
+import { apiHref, resolveAddress, ROUTES } from 'lib/admin/ui/frame/routes.ts';
 import { sessionFor } from '../admin_session.ts';
 import { createAdministrator } from '../administrators.ts';
 
@@ -88,6 +88,40 @@ describe('console addresses', () => {
 			'/admin/projects/b-1/provisioning/conn-1'
 		);
 	});
+
+	/*
+	 * An API is named by its identifier, a URL, so its page's address carries slashes, a port and possibly a
+	 * significant trailing slash inside one segment (specs/132 FR-004).
+	 */
+	it.each([
+		'https://mcp.example.test/mcp',
+		'https://mcp.example.test:8443/a/b',
+		'https://api.example.test/v1/'
+	])(
+		'an API page address opens that exact API on that tab: %s',
+		async (identifier) => {
+			for (const [tab, key] of [
+				[undefined, 'bucket.api'],
+				['access', 'bucket.api.access'],
+				['settings', 'bucket.api.settings']
+			] as const) {
+				const path = apiHref('b-1', identifier, tab);
+				const resolved = resolveAddress(path);
+				expect(resolved).toMatchObject({
+					kind: 'page',
+					route: { key, params: { project: 'b-1', api: identifier } }
+				});
+				const res = await get(path, cookie);
+				expect({ path, status: res.status }).toEqual({ path, status: 200 });
+				expect(
+					resolveAddress(renderedPath(await res.text()) ?? '')
+				).toMatchObject({
+					kind: 'page',
+					route: { key, params: { project: 'b-1', api: identifier } }
+				});
+			}
+		}
+	);
 
 	it('the invitation link from the mail opens the accept page without a session', async () => {
 		const res = await get('/admin/accept-invitation?token=abc');
