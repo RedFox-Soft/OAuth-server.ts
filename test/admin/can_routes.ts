@@ -221,6 +221,13 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		on: 'bucket',
 		flag: 'manageUsers',
 		method: 'POST',
+		path: `${BUCKET}/users/:uid/activity`,
+		body: {}
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
 		path: `${BUCKET}/users/:uid/sessions/:clientId/sign-out`
 	},
 	/* Nobody named is held by the bucket, so where the right holds each person is skipped and nothing changes. */

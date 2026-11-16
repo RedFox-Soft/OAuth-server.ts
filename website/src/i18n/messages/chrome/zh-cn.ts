@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '65d0584e2611';
+export const source = '5537c741c977';
 
 export default {
 	skipToContent: '跳到正文',
@@ -35,6 +35,7 @@ export default {
 		github: 'GitHub',
 		changelog: '更新日志',
 		security: '安全',
+		peopleRecords: 'FoxAuth 记录的用户信息',
 		license: '许可证',
 		feed: '博客订阅（RSS）',
 		llms: '面向 LLM（llms.txt）',

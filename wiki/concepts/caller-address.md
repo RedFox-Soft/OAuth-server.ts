@@ -99,8 +99,10 @@ header is believed only on a connection from a proxy the choice trusts (`isTrust
 The check for an app or an API behind the operator's proxy still treats the proxy as its caller
 (`checkCallerOf`, `lib/behind_proxy/rate_limit.ts`). Spec 124 adds a second, separate address: the **person's**,
 read from `X-Forwarded-For` only when the check carries a valid project proxy key and the header holds exactly one
-strict address (`believedAddress`). That address is only compared with a network condition's ranges. It never becomes
-`callerAddressOf`, a rate-limit key, an attack report, a log line or an event field. See [[conditions-at-your-proxy]].
+strict address (`believedAddress`). That address is compared with a network condition's ranges and, when the proxy
+proves it (`proves`), kept on the person's activity ([[person-activity]]). It never becomes `callerAddressOf`, a
+rate-limit key, an attack report, a log line or an event field. A sign-in's own address on that activity is
+`callerAddressOf`, so behind a proxy this setting does not trust it is the proxy's. See [[conditions-at-your-proxy]].
 
 ## One answer per request, without `server`
 

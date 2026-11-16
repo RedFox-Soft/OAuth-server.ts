@@ -36,6 +36,7 @@ import { grantsIn, sessionsIn } from './sessions.js';
 import { lookup, type Language } from '../i18n/languages.js';
 import { storedLocaleRanges } from '../i18n/resolve.js';
 import { destroyConnectedAccountsOf } from '../connected_services/accounts.js';
+import { forgetPersonActivity } from '../person_activity/forget.js';
 
 /*
  * Every change to an end user, whichever surface it arrives through — the admin API (and MCP, which
@@ -334,6 +335,8 @@ export async function removeEndUser(
 	 * revoke.
 	 */
 	await destroyConnectedAccountsOf(bucket, id);
+	/* The same for their activity (specs/133): unowned so a lock keeps it, so only this deletion removes it. */
+	await forgetPersonActivity(bucket._id, id);
 	return cascadeForAccount(id, scopedId);
 }
 

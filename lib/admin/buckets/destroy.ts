@@ -31,6 +31,7 @@ import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { forgetBucketAddresses } from '../auth/bucketAddress.js';
 import { groupLabel } from '../groups/label.js';
 import { destroyBucketAccounts } from '../../connected_services/accounts.js';
+import { forgetProjectActivity } from '../../person_activity/forget.js';
 import { endSessionsOfApps } from '../behind-proxy/service.js';
 
 /* Who is destroying the bucket: an administrator's Delete now, or the server when the thirty days ran out. */
@@ -231,6 +232,8 @@ async function destroyClaimed(
 	 * accounts are deliberately unowned so a lock keeps them.
 	 */
 	await destroyBucketAccounts(claimed);
+	/* People's activity is unowned, so no cascade above reaches it (specs/133). */
+	await forgetProjectActivity(claimed._id);
 	/* Its groups and every membership in them; nothing outside the bucket refers to either. */
 	await getBucketGroupStore().destroyByBucket(id);
 	/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind for

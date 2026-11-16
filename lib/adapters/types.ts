@@ -1063,6 +1063,8 @@ export interface AdminAuditQuery {
 	connection?: string;
 	/* Actions starting with this text, matched literally: `bucket.key.` is every key action of a bucket. */
 	actionPrefix?: string;
+	/* Actions left out: the audited reads, for a list of what was changed (specs/133 FR-025). */
+	excludeActions?: readonly string[];
 	/* Inclusive bounds on `timestamp`; either is valid alone. */
 	from?: Date;
 	to?: Date;
@@ -2367,6 +2369,196 @@ export interface ProvisioningRefusalStoreConstructor {
 }
 
 /*
+ * A person's activity (specs/133): what this server decided about them. Every value is an enumeration of the server,
+ * an id, a path or tools-table row an administrator set, or an address the server attributed; never text a request
+ * carried (research R5, R6, R8).
+ */
+export const PersonActivityKind = t.Union([
+	t.Literal('signIn'),
+	t.Literal('app'),
+	t.Literal('api')
+]);
+export type PersonActivityKind = Static<typeof PersonActivityKind>;
+
+export const ActivityOutcome = t.Union([
+	t.Literal('let_in'),
+	t.Literal('sign_in_again'),
+	t.Literal('refused')
+]);
+export type ActivityOutcome = Static<typeof ActivityOutcome>;
+
+export const ACTIVITY_REASONS = [
+	'signed_in',
+	'wrong_password',
+	'locked',
+	'deactivated',
+	'email_unverified',
+	'wrong_code',
+	'code_required',
+	'provider_closed',
+	'not_in_group',
+	'cannot_sign_in',
+	'not_from_network',
+	'outside_hours',
+	'attribute_mismatch',
+	'network_facts_unknown',
+	'rule_no_one',
+	'ambiguous_path',
+	'unsafe_value',
+	'sign_in_again',
+	'sign_in_not_fresh',
+	'no_person',
+	'tool_not_listed',
+	'tool_unnamed',
+	'old_client',
+	'bad_mcp_header',
+	'insufficient_scope',
+	'other'
+] as const;
+export type ActivityReason = (typeof ACTIVITY_REASONS)[number];
+export const ActivityReason = t.Union(
+	ACTIVITY_REASONS.map((reason) => t.Literal(reason))
+);
+
+export const ActivityBrowser = t.Union([
+	t.Literal('chrome'),
+	t.Literal('edge'),
+	t.Literal('firefox'),
+	t.Literal('safari'),
+	t.Literal('opera'),
+	t.Literal('samsung'),
+	t.Literal('other')
+]);
+export type ActivityBrowser = Static<typeof ActivityBrowser>;
+
+export const ActivitySystem = t.Union([
+	t.Literal('windows'),
+	t.Literal('macos'),
+	t.Literal('ios'),
+	t.Literal('android'),
+	t.Literal('linux'),
+	t.Literal('chromeos'),
+	t.Literal('other')
+]);
+export type ActivitySystem = Static<typeof ActivitySystem>;
+
+export const ActivityCategory = t.Union([
+	t.Literal('tor'),
+	t.Literal('vpn'),
+	t.Literal('hosting')
+]);
+export type ActivityCategory = Static<typeof ActivityCategory>;
+
+export const ActivityPlace = t.Object({
+	/* The application signed in to, or the client of the token an API was called with. */
+	clientId: t.Optional(t.String()),
+	/* A sign-in through `proxy.<bucketId>`: the origin of its validated redirect URI, which names the app. */
+	appOrigin: t.Optional(t.String()),
+	appId: t.Optional(t.String()),
+	/* An API's canonical identifier. */
+	resource: t.Optional(t.String()),
+	/* The path of the app rule that decided, as configured; never the request's path. */
+	rule: t.Optional(t.String()),
+	/* A tools-table row name, or `*another` (lib/consts/person_activity.ts). */
+	tool: t.Optional(t.String()),
+	providerId: t.Optional(t.String())
+});
+export type ActivityPlace = Static<typeof ActivityPlace>;
+
+export const PersonActivityRow = t.Object({
+	_id: t.String(),
+	bucketId: t.String(),
+	accountId: t.String(),
+	/* The UTC day of the events, `YYYY-MM-DD`. */
+	day: t.String(),
+	kind: PersonActivityKind,
+	outcome: ActivityOutcome,
+	reason: ActivityReason,
+	place: ActivityPlace,
+	method: t.Optional(
+		t.Union([
+			t.Literal('password'),
+			t.Literal('password_code'),
+			t.Literal('provider')
+		])
+	),
+	freshness: t.Optional(
+		t.Object({
+			requireCode: t.Optional(t.Literal(true)),
+			maxAgeSeconds: t.Optional(t.Integer({ minimum: 0 }))
+		})
+	),
+	address: t.Optional(t.String()),
+	addressFrom: t.Optional(t.Union([t.Literal('sign_in'), t.Literal('proxy')])),
+	facts: t.Optional(
+		t.Object({
+			country: t.Optional(t.String()),
+			categories: t.Array(ActivityCategory)
+		})
+	),
+	device: t.Optional(
+		t.Object({ browser: ActivityBrowser, system: ActivitySystem })
+	),
+	count: t.Integer({ minimum: 1 }),
+	firstAt: t.Date(),
+	lastAt: t.Date(),
+	expiresAt: t.Date()
+});
+export type PersonActivityRow = Static<typeof PersonActivityRow>;
+
+/* Where a page of a person's timeline ended: the next page starts strictly before it. */
+export interface PersonActivityCursor {
+	lastAt: Date;
+	id: string;
+}
+
+export interface PersonActivityQuery {
+	kind?: PersonActivityKind;
+	outcome?: ActivityOutcome;
+	before?: PersonActivityCursor;
+	limit: number;
+	now: Date;
+}
+
+export interface PersonActivityPage {
+	/* Newest `lastAt` first, ties by `_id`; never a row whose `expiresAt` has passed. */
+	rows: PersonActivityRow[];
+	next: PersonActivityCursor | null;
+}
+
+export interface PersonActivityWriteResult {
+	written: number;
+	failed: number;
+}
+
+export interface PersonActivityStoreInstance {
+	/*
+	 * Adds each row: inserted the first time, and on every later write of the same `_id` its `count` added, `firstAt`
+	 * lowered, `lastAt` and `expiresAt` raised, and the address, facts and device replaced when the write carries
+	 * them. Rows go in chunks; a chunk that fails is counted as failed and never retried here, because a retried
+	 * addition counts twice (specs/133 research R11).
+	 */
+	write(rows: readonly PersonActivityRow[]): Promise<PersonActivityWriteResult>;
+	listForPerson(
+		bucketId: string,
+		accountId: string,
+		query: PersonActivityQuery
+	): Promise<PersonActivityPage>;
+	/* The days among `days` on which the project has an overflow row. */
+	overflowDays(
+		bucketId: string,
+		days: readonly string[],
+		now: Date
+	): Promise<string[]>;
+	destroyPerson(bucketId: string, accountId: string): Promise<number>;
+	destroyBucket(bucketId: string): Promise<number>;
+}
+
+export interface PersonActivityStoreConstructor {
+	new (): PersonActivityStoreInstance;
+}
+
+/*
  * A named set of one bucket's end users — what a bucket's roles always meant to be: flat, and a person may
  * be in any number of them. Kept by administrators, or owned by exactly one provisioning connection
  * (`provisionedBy`, the same field and meaning as on `User`), never both.
@@ -3102,6 +3294,16 @@ export interface ActivityStoreInstance {
 	 * insert and add `kind` to the set. Idempotent, so a repeated or concurrent call changes nothing more.
 	 */
 	mark(input: ActivityMarkInput): Promise<void>;
+	/*
+	 * Which of `periods` hold an unexpired mark of this person, read by the marks' own ids: what "Last active" on a
+	 * person's page is computed from (specs/133 research R17).
+	 */
+	markedPeriods(
+		bucketId: string,
+		accountId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]>;
 	/* An open period, counted from its marks; marks past their expiry are not counted. */
 	count(bucketId: string, period: string, at: Date): Promise<ActivityTally>;
 	/* Every bucket with marks in the period, counted. */

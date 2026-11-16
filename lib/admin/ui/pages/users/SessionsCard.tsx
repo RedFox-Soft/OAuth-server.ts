@@ -20,7 +20,8 @@ const when = (iso: string | null) =>
 
 /*
  * Where the person is signed in, and a way to end one application's access without ending the rest (specs/089
- * US3). No network address, browser or device: the server stores none, and the card does not pretend otherwise.
+ * US3). Sessions carry no network address or device; where and how the person signed in is their Activity tab
+ * (specs/133).
  */
 export function SessionsCard({
 	bucketId,

@@ -160,6 +160,24 @@ export class ActivityStore implements ActivityStoreInstance {
 		return stored;
 	}
 
+	/* By the marks' own ids, so the read is primary-key lookups and needs no index of its own. */
+	async markedPeriods(
+		bucketId: string,
+		accountId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]> {
+		if (periods.length === 0) return [];
+		const handle = sql();
+		const ids = periods.map((period) => markId(bucketId, period, accountId));
+		const rows = await handle<{ period: string }[]>`
+			SELECT doc->>'period' AS period FROM ${handle(this.marksArea)}
+			WHERE id = ANY(${handle.array(ids, 'text')}) AND expires_at > ${at}
+		`;
+		const found = new Set(rows.map((row) => row.period));
+		return periods.filter((period) => found.has(period));
+	}
+
 	private async insertIfAbsent(id: string, doc: object): Promise<void> {
 		const handle = sql();
 		await handle`

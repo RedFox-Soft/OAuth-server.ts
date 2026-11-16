@@ -35,7 +35,8 @@ export type { RefusalReason };
 
 export type Resolution =
 	| { ok: true; account: User; provisioned: boolean }
-	| { ok: false; reason: RefusalReason }
+	/* `accountId` names the closed account an `inactive` refusal is about, for that person's activity (specs/133). */
+	| { ok: false; reason: RefusalReason; accountId?: string }
 	/*
 	 * The address belongs to an account whose password somebody set without proving the address, so the
 	 * assertion may not claim it on its own. Nobody is signed in; the identity waits for that account's
@@ -310,7 +311,13 @@ export async function applyDecision(
 		case 'signin':
 			return { ok: true, account: decision.account, provisioned: false };
 		case 'refuse':
-			return { ok: false, reason: decision.reason };
+			return {
+				ok: false,
+				reason: decision.reason,
+				...(decision.reason === 'inactive' && decision.account
+					? { accountId: decision.account._id }
+					: {})
+			};
 		case 'conflict':
 			eventBus.emit('federation.link.conflict', {
 				providerId: provider.id,
@@ -334,7 +341,7 @@ export async function applyDecision(
 				const account = updated ?? decision.account;
 				return canSignIn(account)
 					? { ok: true, account, provisioned: false }
-					: { ok: false, reason: 'inactive' };
+					: { ok: false, reason: 'inactive', accountId: account._id };
 			}
 			return updated
 				? { ok: true, account: updated, provisioned: false }

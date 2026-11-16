@@ -61,6 +61,11 @@ function conditionsFor(handle: Sql, query: AdminAuditQuery) {
 	if (query.action !== undefined) {
 		and(handle`doc->>'action' = ${query.action}`);
 	}
+	if (query.excludeActions !== undefined && query.excludeActions.length > 0) {
+		and(
+			handle`NOT (doc->>'action' = ANY(${handle.array([...query.excludeActions], 'text')}))`
+		);
+	}
 	if (query.targetType !== undefined) {
 		and(handle`doc->>'targetType' = ${query.targetType}`);
 	}

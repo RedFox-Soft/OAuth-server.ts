@@ -83,7 +83,7 @@ export function useUserActions(bucketId: string) {
 					target: user.email,
 					consequences: [
 						'They cannot sign in, and every session and token they hold ends.',
-						'Their account, groups and claims are kept; Activate lets them in again.'
+						'Their account, groups, claims and activity are kept; Activate lets them in again.'
 					]
 				});
 				if (!agreed || !(await send('PATCH', user, '', { active: false }))) {
@@ -104,6 +104,7 @@ export function useUserActions(bucketId: string) {
 					target: user.email,
 					consequences: [
 						'Their sign-in sessions, consents and every issued token are destroyed immediately — they are signed out everywhere.',
+						'Their activity — sign-ins and what apps answered them — is deleted too.',
 						'The account cannot be restored.'
 					]
 				});

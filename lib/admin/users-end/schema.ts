@@ -184,3 +184,40 @@ export const AttributeMatchesQuery = t.Object(
 	},
 	{ additionalProperties: false }
 );
+
+/*
+ * A page of a person's activity (specs/133 contracts/admin-api.md §1). A POST because the read is audited, like the
+ * network facts lookup; the body only narrows what is read.
+ */
+export const UserActivityBody = t.Object(
+	{
+		kind: t.Optional(
+			t.Union([t.Literal('signIn'), t.Literal('app'), t.Literal('api')], {
+				description:
+					'Only sign-ins, only apps behind the proxy, or only APIs checked at the proxy.'
+			})
+		),
+		outcome: t.Optional(
+			t.Union(
+				[t.Literal('let_in'), t.Literal('sign_in_again'), t.Literal('refused')],
+				{ description: 'Only rows with this outcome.' }
+			)
+		),
+		before: t.Optional(
+			t.String({
+				maxLength: 200,
+				description:
+					'The `next` of the previous page, to read the page after it.'
+			})
+		),
+		limit: t.Optional(
+			t.Number({
+				minimum: 1,
+				maximum: 200,
+				multipleOf: 1,
+				description: 'Rows in the page; 50 when absent.'
+			})
+		)
+	},
+	{ additionalProperties: false }
+);

@@ -4,6 +4,7 @@ import { requestBucketFor } from '../admin/auth/bucketAddress.js';
 import type { RequestBucket } from '../configs/issuer.js';
 import { hostOfRequest } from '../consts/request_host.js';
 import { captureFault } from '../error_store/capture.js';
+import { noteAppCheck } from '../person_activity/record.js';
 import { eventBus } from '../event_bus.js';
 import { UnknownBucket } from '../helpers/errors.js';
 import { languageOfRequest } from '../i18n/request.js';
@@ -420,8 +421,9 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 
 	noteAsked(app);
 	/*
-	 * The person's address, when the proxy proves it wrote it (specs/124 FR-006). Only compared with conditions:
-	 * never the caller of this check, a rate-limit key, a log line or an event.
+	 * The person's address, when the proxy proves it wrote it (specs/124 FR-006). Compared with conditions, and kept on
+	 * the person's activity only when the proxy proved it with the project's key (specs/133 FR-010): never the caller
+	 * of this check, a rate-limit key, a log line or an event.
 	 */
 	const believed = await believedAddress(request, bucket._id);
 	noteAddress(
@@ -483,6 +485,7 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 				reason: 'unsafe_value'
 			} as const;
 			emitDecision(app, refusal, accountId);
+			noteAppCheck({ app, accountId, decision: refusal, believed });
 			return denied('unsafe_value');
 		}
 		emitDecision(app, decision, accountId);
@@ -491,6 +494,7 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 	}
 
 	emitDecision(app, decision, accountId);
+	noteAppCheck({ app, accountId, decision, believed });
 	if (decision.outcome === 'sign_in') {
 		if (navigation && !statusOnly) {
 			return startSignIn(

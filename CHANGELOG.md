@@ -11,6 +11,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **A person's activity** (spec 133). Each person's page has an Activity tab: every sign-in (application, method,
+  full network address, browser and system, FoxTrust's country and network kind when network facts are on), every
+  failed sign-in where the account was found, and every time an app behind the proxy or an API checked at it asked
+  them to sign in again or refused them, with the reason, what they saw and a link to check it now. Profile shows the
+  last sign-in, "Not let in since" and "Last active"; the old Activity list of changes is now Changes. Agents read it
+  with `project_user_activity_list`; every read is audited once per reader, person and day. **Upgrade note:** from
+  this release every project keeps full sign-in addresses for 90 days per person (kept through a lock, deleted with
+  the person and the project); tell your users, or turn it off with `personActivity.enabled`. Re-run `db:setup` or
+  `db:setup:pg`, then `db:migrate` (a fence: an older release refuses this database afterwards).
 - **An API's own console page** (spec 132). Each API in a project opens at an address of its own with three tabs, as
   an app behind the proxy does: Connect (the proxy's configuration, or what the API must check and serve, with its
   metadata status), Access (the sign-in requirement, the API's conditions, the tools table with each tool's

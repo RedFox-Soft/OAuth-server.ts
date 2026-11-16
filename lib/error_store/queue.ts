@@ -94,9 +94,9 @@ export async function drainForShutdown(timeoutMs = 2000): Promise<void> {
 /*
  * Installs the shutdown drain once.
  *
- * Idempotent because it has to be: this codebase installs no other signal handlers, and the test suite
- * imports the app repeatedly within one process — registering per import would accumulate listeners
- * until the runtime warned about a leak. `once` is used rather than `on` so a second signal cannot
+ * Idempotent because it has to be: the test suite imports the app repeatedly within one process —
+ * registering per import would accumulate listeners until the runtime warned about a leak. Sentry's
+ * reporting and people's activity install drains of their own the same way, each bounded alike. `once` is used rather than `on` so a second signal cannot
  * start a second drain.
  */
 export function installShutdownDrain(): void {

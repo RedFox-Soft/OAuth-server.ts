@@ -12,7 +12,8 @@ import { isBehindProxyClient } from '../behind_proxy/client.js';
  * the person's grants rather than their sessions, because an offline grant outlives the session that made it
  * and is still access the application holds.
  *
- * Names and times only. No network address, browser or device is stored, so none can be shown.
+ * Names and times only: sessions carry no network address, browser or device. Where and how the person signed in is
+ * their activity (lib/person_activity/, specs/133).
  */
 export interface ApplicationSession {
 	/* Null for a sign-in that has not reached any application yet. */

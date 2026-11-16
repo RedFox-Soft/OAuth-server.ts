@@ -1118,7 +1118,19 @@ export const SETTINGS_CATALOG: SettingDescriptor[] = [
 			'Keep Tor, VPNs, hosting or chosen countries out of paths at your proxy, judged on FoxTrust data',
 		type: 'boolean',
 		description:
-			'Each server process downloads FoxTrust\'s signed snapshot of what is known about internet addresses: a full file once a day (about 13 MB) and an update every hour, and checks the signature of each before using it. Projects can then add network facts to "From where" in the conditions of an app behind the proxy or an API checked at the proxy: not from Tor, a commercial VPN, or hosting and clouds, and only from or not from chosen countries. The address of a person is only compared inside this server; it is never sent to FoxTrust or anywhere else, and FoxTrust learns only that the file was downloaded (and, while usage reporting is on, this server\'s FoxAuth version). Countries come from DB-IP (CC BY 4.0). If the download is turned off, or the snapshot is more than 26 hours old, every path with a network facts condition is closed until a fresh snapshot loads. Off by default.'
+			'Each server process downloads FoxTrust\'s signed snapshot of what is known about internet addresses: a full file once a day (about 13 MB) and an update every hour, and checks the signature of each before using it. Projects can then add network facts to "From where" in the conditions of an app behind the proxy or an API checked at the proxy: not from Tor, a commercial VPN, or hosting and clouds, and only from or not from chosen countries. The address of a person is only looked up inside this server; it is never sent to FoxTrust or anywhere else, and a person’s activity keeps only the country and categories found for it, and FoxTrust learns only that the file was downloaded (and, while usage reporting is on, this server\'s FoxAuth version). Countries come from DB-IP (CC BY 4.0). If the download is turned off, or the snapshot is more than 26 hours old, every path with a network facts condition is closed until a fresh snapshot loads. Off by default.'
+	},
+
+	{
+		key: 'personActivity.enabled',
+		domain: 'diagnostics',
+		group: "People's activity",
+		label: "Record people's activity",
+		summary:
+			'Keep sign-ins and what the proxy refused, per person, for 90 days',
+		type: 'boolean',
+		description:
+			"Keeps, on each person's Activity tab: every sign-in (when, to which application, how, from which network address, FoxTrust's country and network kind when network facts are on, and the browser and system family); every failed sign-in where the account was known (a wrong password or code, a locked or deactivated account, a missing code or an unverified email address); and every time an app behind your proxy or an API checked at it asked the person to sign in again or refused them, with the reason. Never a request's path or query string, never a raw browser string, never a token. The address is the one this server attributes the caller to, the same as its rate limits: behind a proxy it does not trust (Caller address, above), every sign-in shows the proxy's address. At a proxy, a person's address is kept only when the proxy proves with the project's proxy key that it passes it; at an API, never. Each record is kept 90 days after it was last updated, survives a lock, a deactivation and Sign out everywhere, and is deleted with the person and with the project. Reading it is recorded in the audit trail once per reader, person and day. Written once a minute: a crash loses up to the last minute. On by default. Turning it off stops new recording and drops what is waiting; what is kept stays readable until it expires."
 	},
 
 	{

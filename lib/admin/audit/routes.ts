@@ -7,6 +7,7 @@ import {
 } from '../../adapters/index.js';
 import type { AdminAuditEntry, AdminAuditQuery } from '../../adapters/types.js';
 import {
+	AUDITED_READS,
 	CONNECTION_ACTOR_PREFIX,
 	ENDUSER_ACTOR_PREFIX,
 	UPSTREAM_ACTOR_PREFIX
@@ -271,6 +272,9 @@ export const auditRoutes = new Elysia({ name: 'admin-audit' })
 					? {}
 					: { viaClientId: query.viaClientId }),
 				...(query.project === undefined ? {} : { bucket: query.project }),
+				...(query.changesOnly === 'true'
+					? { excludeActions: AUDITED_READS }
+					: {}),
 				...(query.connection === undefined
 					? {}
 					: { connection: query.connection }),

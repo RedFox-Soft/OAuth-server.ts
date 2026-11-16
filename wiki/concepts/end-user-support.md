@@ -75,7 +75,8 @@ offline grant outlives its session.
 - **Last token issued** is the newest stored refresh or access token of the grant. JWT access tokens are never
   stored, so the console names it honestly and says a token an app checks by itself is invisible here.
 
-No IP or user agent: none is stored.
+Sessions carry no IP or user agent. Where and how the person signed in is their activity, kept 90 days
+([[person-activity]], spec 133).
 
 "Sign out of this app" (`endApplicationAccess`, `service.ts:496`) follows the partial logout of `end_session.ts`:
 1. back-channel logout to that client only, and the client's entry dropped from each session;

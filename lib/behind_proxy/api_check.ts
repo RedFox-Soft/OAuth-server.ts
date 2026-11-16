@@ -1,4 +1,5 @@
 import { captureFault } from '../error_store/capture.js';
+import { noteApiCheck } from '../person_activity/record.js';
 import { eventBus } from '../event_bus.js';
 import { sameHost } from './address.js';
 import { apiMetadataUrlOf } from './api_address.js';
@@ -65,7 +66,11 @@ function emitDecision(
 	{ bucket, api }: AddressedApi,
 	outcome: 'allow' | 'refuse',
 	reason: ApiReason,
-	detail: { tool?: string | null; clientId?: string | null } = {}
+	detail: {
+		tool?: string | null;
+		clientId?: string | null;
+		accountId?: string | null;
+	} = {}
 ): void {
 	eventBus.emit('behind_proxy.api_decision', {
 		bucketId: bucket._id,
@@ -73,7 +78,30 @@ function emitDecision(
 		outcome,
 		reason,
 		tool: detail.tool ?? null,
-		clientId: detail.clientId ?? null
+		clientId: detail.clientId ?? null,
+		accountId: detail.accountId ?? null
+	});
+}
+
+/*
+ * A refusal or an ask for a new sign-in, on the activity of the person the token names (specs/133 FR-004): under the
+ * API's own project, the only one a token of it can name a person of (lib/behind_proxy/api_person.ts), and never with
+ * an address — the caller here is the agent's host, not the person.
+ */
+function noteForPerson(
+	{ api }: AddressedApi,
+	presented: { accountId: string | null; clientId: string },
+	outcome: 'refused' | 'sign_in_again',
+	reason: ApiReason,
+	tool: string | null
+): void {
+	noteApiCheck({
+		api,
+		accountId: presented.accountId,
+		clientId: presented.clientId,
+		outcome,
+		reason,
+		tool
 	});
 }
 
@@ -183,8 +211,10 @@ async function evaluate({
 	/* Refused rather than sent as a header the proxy would split; no token this server signs carries one. */
 	if (Object.values(identity).some(hasControlCharacter)) {
 		emitDecision(addressed, 'refuse', 'unsafe_value', {
-			clientId: presented.clientId
+			clientId: presented.clientId,
+			accountId: presented.accountId
 		});
+		noteForPerson(addressed, presented, 'refused', 'unsafe_value', null);
 		return refused('unsafe_value');
 	}
 	/*
@@ -238,22 +268,39 @@ async function evaluate({
 		case 'allow': {
 			emitDecision(addressed, 'allow', 'allowed', {
 				tool: decided.tool,
-				clientId: presented.clientId
+				clientId: presented.clientId,
+				accountId: presented.accountId
 			});
 			return answer(200, 'allowed', identity);
 		}
 		case 'refuse': {
 			emitDecision(addressed, 'refuse', decided.reason, {
 				tool: decided.tool,
-				clientId: presented.clientId
+				clientId: presented.clientId,
+				accountId: presented.accountId
 			});
+			noteForPerson(
+				addressed,
+				presented,
+				'refused',
+				decided.reason,
+				decided.tool
+			);
 			return refused(decided.reason);
 		}
 		case 'insufficient': {
 			emitDecision(addressed, 'refuse', 'insufficient_scope', {
 				tool: decided.tool,
-				clientId: presented.clientId
+				clientId: presented.clientId,
+				accountId: presented.accountId
 			});
+			noteForPerson(
+				addressed,
+				presented,
+				'refused',
+				'insufficient_scope',
+				decided.tool
+			);
 			return answer(
 				403,
 				'insufficient_scope',
@@ -275,8 +322,10 @@ async function evaluate({
 			const reason = unmet.code ? 'code_required' : 'sign_in_not_fresh';
 			const maxAgeSeconds = view.signIn?.maxAgeSeconds;
 			emitDecision(addressed, 'refuse', reason, {
-				clientId: presented.clientId
+				clientId: presented.clientId,
+				accountId: presented.accountId
 			});
+			noteForPerson(addressed, presented, 'sign_in_again', reason, null);
 			return answer(
 				401,
 				reason,

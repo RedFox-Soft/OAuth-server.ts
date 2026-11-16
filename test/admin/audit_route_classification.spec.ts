@@ -100,8 +100,8 @@ describe('admin audit route classification', () => {
 		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(110);
-		expect(mounted).toHaveLength(113);
+		expect(auditedAdminRoutes).toHaveLength(111);
+		expect(mounted).toHaveLength(114);
 	});
 
 	it('declares each route pattern only once', () => {

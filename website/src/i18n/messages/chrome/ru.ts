@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '65d0584e2611';
+export const source = '5537c741c977';
 
 export default {
 	skipToContent: 'Перейти к содержанию',
@@ -35,6 +35,7 @@ export default {
 		github: 'GitHub',
 		changelog: 'История изменений',
 		security: 'Безопасность',
+		peopleRecords: 'Что FoxAuth хранит о людях',
 		license: 'Лицензия',
 		feed: 'RSS-лента блога',
 		llms: 'Для LLM (llms.txt)',

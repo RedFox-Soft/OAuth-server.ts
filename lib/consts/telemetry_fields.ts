@@ -111,7 +111,8 @@ export const REPORTED_SETTINGS: readonly string[] = [
 	/* How many instances take the list back is the measure of whether it is worth building. */
 	'attackerList.enabled',
 	/* How many instances keep anonymising networks or countries out of a path decides whether the snapshot stays free. */
-	'networkFacts.enabled'
+	'networkFacts.enabled',
+	'personActivity.enabled'
 ];
 
 export const UNREPORTED_SETTINGS: Readonly<Record<string, string>> = {

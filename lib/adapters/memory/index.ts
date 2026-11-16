@@ -7,6 +7,7 @@ export { GroupInvitationStore } from './groupInvitationStore.js';
 export { ProtectedResourceStore } from './protectedResourceStore.js';
 export { ProvisioningConnectionStore } from './provisioningConnectionStore.js';
 export { ProvisioningRefusalStore } from './provisioningRefusalStore.js';
+export { PersonActivityStore } from './personActivityStore.js';
 export { OutsideAuthorizationServerStore } from './outsideAuthorizationServerStore.js';
 export { BehindProxyAppStore } from './behindProxyAppStore.js';
 export { ConnectedAccountStore } from './connectedAccountStore.js';

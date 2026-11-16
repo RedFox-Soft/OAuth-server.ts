@@ -220,7 +220,7 @@ export default {
 				},
 				proxyNetworkFacts: {
 					title: 'Network facts at your proxy: Tor, VPNs, hosting, countries',
-					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and compares people's addresses only with its own copy, so no address is sent anywhere. A matching address is refused or, on an app, asked to sign in again, with a code if you ask for one. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
+					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and looks people's addresses up only in its own copy, so no address is sent anywhere. A matching address is refused or, on an app, asked to sign in again, with a code if you ask for one. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
 				},
 				apiSignInRequirement: {
 					title:
@@ -266,6 +266,10 @@ export default {
 				endUsers: {
 					title: 'End-user administration',
 					body: 'Invite a person to set their own password, mark an address verified, or sign someone out of one application and leave the others. Up to 100 people can be deactivated, activated, signed out or deleted at once, each with an audit entry of their own.'
+				},
+				personActivity: {
+					title: 'A person’s activity',
+					body: 'Each person’s page shows their sign-ins (application, method, address, browser and system), their failed sign-ins, and every time an app behind your proxy or an API refused them or asked them to sign in again, with the reason and what they saw. Kept 90 days, it survives a lock and goes with the person; reading it is audited.'
 				},
 				federation: {
 					title: 'Sign in with Google, Microsoft, Apple or GitHub',

@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = '270f32170ad8';
+export const source = '04f4345f0925';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -216,7 +216,7 @@ export default {
 				},
 				proxyNetworkFacts: {
 					title: '在你的代理处使用网络信息：Tor、VPN、托管服务、国家',
-					body: '开启 FoxTrust 签名的快照后，代理后应用的某个路径，或由代理检查的 API，可以挡住 Tor、商业 VPN 以及托管服务和云，并允许或拒绝所选的国家。每台服务器每天下载约 13 MB，每小时下载一次更新，验证签名，并且只把用户的地址与自己的副本比较，因此不会把任何地址发送到任何地方。符合条件的地址会被拒绝；在应用上也可以改为要求重新登录，并可要求验证码。超过 26 小时的快照会关闭这些路径，直到加载新的快照。所有套餐免费。国家数据：IP Geolocation by DB-IP，CC BY 4.0。'
+					body: '开启 FoxTrust 签名的快照后，代理后应用的某个路径，或由代理检查的 API，可以挡住 Tor、商业 VPN 以及托管服务和云，并允许或拒绝所选的国家。每台服务器每天下载约 13 MB，每小时下载一次更新，验证签名，并且只在自己的副本中查找用户的地址，因此不会把任何地址发送到任何地方。符合条件的地址会被拒绝；在应用上也可以改为要求重新登录，并可要求验证码。超过 26 小时的快照会关闭这些路径，直到加载新的快照。所有套餐免费。国家数据：IP Geolocation by DB-IP，CC BY 4.0。'
 				},
 				apiSignInRequirement: {
 					title: '要求验证码或近期登录的 API 或 MCP 服务器',
@@ -261,6 +261,10 @@ export default {
 				endUsers: {
 					title: '最终用户管理',
 					body: '可以邀请用户自己设置密码，可以手动把邮箱标记为已验证，也可以只让某人退出一个应用而不影响其他应用。最多可一次停用、启用、退出登录或删除 100 个用户，每个用户都有各自的审计记录。'
+				},
+				personActivity: {
+					title: '用户活动记录',
+					body: '每个用户的页面会显示其登录记录（应用、方式、地址、浏览器和系统）、失败的登录，以及代理后面的应用或 API 每次拒绝此人或要求其重新登录的情况，附带原因和此人看到的内容。保留 90 天，锁定后仍然保留，并随此人一起删除；读取记录会写入审计日志。'
 				},
 				federation: {
 					title: '使用 Google、Microsoft、Apple 或 GitHub 登录',

@@ -1,0 +1,373 @@
+import { randomUUID } from 'node:crypto';
+
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import { dayOf } from '../activity/periods.js';
+import type {
+	ActivityReason,
+	ActivityPlace,
+	PersonActivityRow,
+	ToolsTable
+} from '../adapters/types.js';
+import type { Believed } from '../behind_proxy/believed_address.js';
+import { proves } from '../behind_proxy/believed_address.js';
+import type { Decision, Reason } from '../behind_proxy/decide.js';
+import type { ApiReason } from '../behind_proxy/answers.js';
+import { parseAddress, type Address } from '../behind_proxy/net.js';
+import {
+	ApplicationConfig,
+	configuration,
+	onSettingsApplied
+} from '../configs/application.js';
+import {
+	ANOTHER_TOOL,
+	PERSON_ACTIVITY_DAYS
+} from '../consts/person_activity.js';
+import { callerAddressOf } from '../helpers/caller_address.js';
+import type { InteractionResult } from '../helpers/oidc_context.js';
+import { factsOf, formatAddress, personAddressOf } from './address.js';
+import { activityId, discard, note } from './buffer.js';
+import { deviceOf } from './device.js';
+
+/*
+ * The four places a person's activity is noted from (specs/133 contracts/recording.md). Each call is synchronous,
+ * never throws and never reads anything: it is on the path of a sign-in or a proxy check, and at the password door
+ * it must cost a found account exactly what a missing one costs (S5). Nothing is noted for the administrators'
+ * project, nor while the instance setting is off.
+ */
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+onSettingsApplied((appliedKeys) => {
+	if (
+		appliedKeys.includes('personActivity.enabled') &&
+		!ApplicationConfig['personActivity.enabled']
+	) {
+		discard();
+	}
+});
+
+function recording(bucketId: string): boolean {
+	return (
+		ApplicationConfig['personActivity.enabled'] && bucketId !== ADMIN_BUCKET_ID
+	);
+}
+
+/* The place in a fixed key order, so the same place always digests to the same row id. */
+function placeKey(place: ActivityPlace): string[] {
+	return [
+		place.clientId ?? '',
+		place.appOrigin ?? '',
+		place.appId ?? '',
+		place.resource ?? '',
+		place.rule ?? '',
+		place.tool ?? '',
+		place.providerId ?? ''
+	];
+}
+
+interface Noted {
+	bucketId: string;
+	accountId: string;
+	kind: PersonActivityRow['kind'];
+	outcome: PersonActivityRow['outcome'];
+	reason: ActivityReason;
+	place: ActivityPlace;
+	at: Date;
+	address?: { value: Address; from: 'sign_in' | 'proxy' };
+	method?: PersonActivityRow['method'];
+	freshness?: PersonActivityRow['freshness'];
+	device?: PersonActivityRow['device'];
+}
+
+function rowOf(noted: Noted): PersonActivityRow {
+	const day = dayOf(noted.at);
+	const id =
+		noted.reason === 'signed_in'
+			? randomUUID()
+			: activityId([
+					noted.bucketId,
+					noted.accountId,
+					day,
+					noted.kind,
+					noted.outcome,
+					noted.reason,
+					noted.freshness?.requireCode ? 'code' : '',
+					...placeKey(noted.place)
+				]);
+	const facts = noted.address
+		? factsOf(noted.address.value, noted.at.getTime())
+		: undefined;
+	return {
+		_id: id,
+		bucketId: noted.bucketId,
+		accountId: noted.accountId,
+		day,
+		kind: noted.kind,
+		outcome: noted.outcome,
+		reason: noted.reason,
+		place: noted.place,
+		...(noted.method === undefined ? {} : { method: noted.method }),
+		...(noted.freshness === undefined ? {} : { freshness: noted.freshness }),
+		...(noted.address
+			? {
+					address: formatAddress(noted.address.value),
+					addressFrom: noted.address.from
+				}
+			: {}),
+		...(facts === undefined ? {} : { facts }),
+		...(noted.device === undefined ? {} : { device: noted.device }),
+		count: 1,
+		firstAt: noted.at,
+		lastAt: noted.at,
+		expiresAt: new Date(noted.at.getTime() + PERSON_ACTIVITY_DAYS * DAY_MS)
+	};
+}
+
+function safely(noting: () => void): void {
+	try {
+		noting();
+	} catch (error) {
+		// Recording must never change an answer; a note that cannot be built is dropped and said so.
+		console.error('activity note dropped', { error });
+	}
+}
+
+function signInAddress(request: Request): Noted['address'] {
+	const address = personAddressOf(callerAddressOf(request));
+	return address ? { value: address, from: 'sign_in' } : undefined;
+}
+
+/* The app a sign-in through `proxy.<bucketId>` was for: its redirect URI was validated against the project's apps. */
+function signInPlace(
+	bucketId: string,
+	clientId: string | undefined,
+	redirectUri: string | undefined,
+	providerId?: string
+): ActivityPlace {
+	let appOrigin: string | undefined;
+	if (clientId === `proxy.${bucketId}` && redirectUri) {
+		try {
+			appOrigin = new URL(redirectUri).origin;
+		} catch {
+			appOrigin = undefined;
+		}
+	}
+	return {
+		...(clientId === undefined ? {} : { clientId }),
+		...(appOrigin === undefined ? {} : { appOrigin }),
+		...(providerId === undefined ? {} : { providerId })
+	};
+}
+
+type Login = NonNullable<InteractionResult['login']>;
+
+export function noteSignedIn(input: {
+	bucketId: string;
+	accountId: string;
+	clientId: string | undefined;
+	redirectUri: string | undefined;
+	login: Login;
+	request: Request;
+}): void {
+	if (!recording(input.bucketId)) return;
+	safely(() => {
+		const providerId = input.login.upstream?.providerId;
+		const method: PersonActivityRow['method'] =
+			providerId !== undefined
+				? 'provider'
+				: input.login.acr === configuration.acrMap.multi_factor
+					? 'password_code'
+					: 'password';
+		const device = deviceOf(input.request.headers.get('user-agent'));
+		note(
+			rowOf({
+				bucketId: input.bucketId,
+				accountId: input.accountId,
+				kind: 'signIn',
+				outcome: 'let_in',
+				reason: 'signed_in',
+				place: signInPlace(
+					input.bucketId,
+					input.clientId,
+					input.redirectUri,
+					providerId
+				),
+				at: new Date(),
+				address: signInAddress(input.request),
+				method,
+				...(device === undefined ? {} : { device })
+			})
+		);
+	});
+}
+
+export type SignInRefusal =
+	| 'wrong_password'
+	| 'locked'
+	| 'deactivated'
+	| 'email_unverified'
+	| 'wrong_code'
+	| 'code_required'
+	| 'provider_closed';
+
+export function noteSignInRefused(input: {
+	bucketId: string;
+	accountId: string;
+	reason: SignInRefusal;
+	clientId: string | undefined;
+	providerId?: string;
+	request: Request;
+}): void {
+	if (!recording(input.bucketId)) return;
+	safely(() => {
+		note(
+			rowOf({
+				bucketId: input.bucketId,
+				accountId: input.accountId,
+				kind: 'signIn',
+				outcome: 'refused',
+				reason: input.reason,
+				place: signInPlace(
+					input.bucketId,
+					input.clientId,
+					undefined,
+					input.providerId
+				),
+				at: new Date(),
+				address: signInAddress(input.request)
+			})
+		);
+	});
+}
+
+/*
+ * The app check's reasons a person can be refused or asked again for. Those with no person (`no_session`) or about
+ * the request rather than the person (`missing_forwarded`, `not_found`, `rate_limited`) are never noted.
+ */
+const APP_REASONS: Partial<Record<Reason, ActivityReason>> = {
+	not_in_group: 'not_in_group',
+	cannot_sign_in: 'cannot_sign_in',
+	rule_no_one: 'rule_no_one',
+	ambiguous_path: 'ambiguous_path',
+	unsafe_value: 'unsafe_value',
+	not_from_network: 'not_from_network',
+	network_facts_unknown: 'network_facts_unknown',
+	outside_hours: 'outside_hours',
+	attribute_mismatch: 'attribute_mismatch',
+	sign_in_again: 'sign_in_again'
+};
+
+export function noteAppCheck(input: {
+	app: { _id: string; bucketId: string };
+	accountId: string | null;
+	decision: Pick<
+		Decision,
+		'outcome' | 'reason' | 'rule' | 'maxAgeSeconds' | 'requireCode'
+	>;
+	believed: Believed;
+}): void {
+	const { app, accountId, decision } = input;
+	if (accountId === null || decision.outcome === 'allow') return;
+	if (!recording(app.bucketId)) return;
+	const reason = APP_REASONS[decision.reason];
+	if (reason === undefined) return;
+	safely(() => {
+		/* The person's address only when the proxy proved, with the project's key, that it passes it (FR-010). */
+		const proven =
+			input.believed.address !== null && proves(input.believed.flags)
+				? parseAddress(input.believed.address)
+				: null;
+		const freshness: PersonActivityRow['freshness'] =
+			decision.outcome === 'sign_in'
+				? {
+						...(decision.requireCode ? { requireCode: true as const } : {}),
+						...(decision.maxAgeSeconds === undefined
+							? {}
+							: { maxAgeSeconds: decision.maxAgeSeconds })
+					}
+				: undefined;
+		note(
+			rowOf({
+				bucketId: app.bucketId,
+				accountId,
+				kind: 'app',
+				outcome: decision.outcome === 'sign_in' ? 'sign_in_again' : 'refused',
+				reason,
+				place: {
+					appId: app._id,
+					...(decision.rule === null ? {} : { rule: decision.rule })
+				},
+				at: new Date(),
+				...(proven
+					? { address: { value: proven, from: 'proxy' as const } }
+					: {}),
+				...(freshness === undefined ? {} : { freshness })
+			})
+		);
+	});
+}
+
+const API_REASONS: Partial<Record<ApiReason, ActivityReason>> = {
+	cannot_sign_in: 'cannot_sign_in',
+	not_in_group: 'not_in_group',
+	attribute_mismatch: 'attribute_mismatch',
+	not_from_network: 'not_from_network',
+	network_facts_unknown: 'network_facts_unknown',
+	outside_hours: 'outside_hours',
+	no_person: 'no_person',
+	tool_not_listed: 'tool_not_listed',
+	tool_unnamed: 'tool_unnamed',
+	old_client: 'old_client',
+	bad_mcp_header: 'bad_mcp_header',
+	insufficient_scope: 'insufficient_scope',
+	unsafe_value: 'unsafe_value',
+	code_required: 'code_required',
+	sign_in_not_fresh: 'sign_in_not_fresh'
+};
+
+/*
+ * The tool an API row names (research R5): a row of the API's table, by the name the administrator gave it, or
+ * "another tool". The request's own `Mcp-Name` never reaches the store: it is the caller's text.
+ */
+export function recordedTool(
+	table: ToolsTable | undefined,
+	named: string | null
+): string | undefined {
+	if (named === null) return undefined;
+	const row = table?.rows.find((candidate) => candidate.name === named);
+	return row ? row.name : ANOTHER_TOOL;
+}
+
+export function noteApiCheck(input: {
+	api: { bucketId: string; identifier: string; tools?: ToolsTable };
+	accountId: string | null;
+	clientId: string | null;
+	outcome: 'refused' | 'sign_in_again';
+	reason: ApiReason;
+	tool: string | null;
+}): void {
+	const { api, accountId } = input;
+	if (accountId === null) return;
+	if (!recording(api.bucketId)) return;
+	const reason = API_REASONS[input.reason];
+	if (reason === undefined) return;
+	safely(() => {
+		const tool = recordedTool(api.tools, input.tool);
+		/* Never an address: the caller of an API is the agent's host, not the person (FR-010, У8). */
+		note(
+			rowOf({
+				bucketId: api.bucketId,
+				accountId,
+				kind: 'api',
+				outcome: input.outcome,
+				reason,
+				place: {
+					resource: api.identifier,
+					...(input.clientId === null ? {} : { clientId: input.clientId }),
+					...(tool === undefined ? {} : { tool })
+				},
+				at: new Date()
+			})
+		);
+	});
+}

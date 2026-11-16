@@ -112,6 +112,11 @@ const REAPED_ON_EXPIRES_AT = [
 	 */
 	'mcpConfirmation',
 	/*
+	 * A person's activity (specs/133). Like the error store, its expiry is advanced: every write moves it to 90 days
+	 * after the row's latest event, and it is personal data kept only for that long.
+	 */
+	'personActivity',
+	/*
 	 * Recorded server faults. The only area whose expiry is *advanced* rather than set once: a group's
 	 * `expiresAt` moves forward on every occurrence, so the retention window runs from when a fault was
 	 * last seen. Reaping on first-seen would delete the longest-running faults first, which is exactly

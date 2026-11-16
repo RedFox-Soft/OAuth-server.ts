@@ -107,6 +107,29 @@ export class ActivityStore implements ActivityStoreInstance {
 		}
 	}
 
+	/* By the marks' own ids, so the read is primary-key lookups and needs no index of its own. */
+	async markedPeriods(
+		bucketId: string,
+		accountId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]> {
+		if (periods.length === 0) return [];
+		const found = await this.marks
+			.find(
+				{
+					_id: {
+						$in: periods.map((period) => markId(bucketId, period, accountId))
+					},
+					expiresAt: { $gt: at }
+				},
+				{ projection: { period: 1 } }
+			)
+			.toArray();
+		const marked = new Set(found.map((mark) => mark.period));
+		return periods.filter((period) => marked.has(period));
+	}
+
 	private async tallies(match: Record<string, unknown>): Promise<TallyRow[]> {
 		return this.marks
 			.aggregate<TallyRow>([

@@ -94,7 +94,8 @@ const USER_TABS: Partial<Record<PageKey, UserTab>> = {
 	'bucket.user': 'profile',
 	'bucket.user.signIn': 'signIn',
 	'bucket.user.groups': 'groups',
-	'bucket.user.activity': 'activity'
+	'bucket.user.activity': 'activity',
+	'bucket.user.changes': 'changes'
 };
 
 /* One provisioning connection (specs/084); the bare address is its Overview, which the hold email links to. */

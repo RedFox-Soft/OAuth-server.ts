@@ -16,15 +16,20 @@ import { UserProfileTab } from './UserProfileTab.js';
 import { UserSignInTab } from './UserSignInTab.js';
 import { UserGroupsTab } from './UserGroupsTab.js';
 import { UserActivityTab } from './UserActivityTab.js';
+import { UserChangesTab } from './UserChangesTab.js';
 
-export type UserTab = 'profile' | 'signIn' | 'groups' | 'activity';
+export type UserTab = 'profile' | 'signIn' | 'groups' | 'activity' | 'changes';
 
 const TABS: { key: UserTab; segment?: string; label: string }[] = [
 	{ key: 'profile', label: 'Profile' },
 	{ key: 'signIn', segment: 'sign-in-methods', label: 'Sign-in methods' },
 	{ key: 'groups', segment: 'groups', label: 'Groups' },
-	{ key: 'activity', segment: 'activity', label: 'Activity' }
+	{ key: 'activity', segment: 'activity', label: 'Activity' },
+	{ key: 'changes', segment: 'changes', label: 'Changes' }
 ];
+
+/* The two tabs about what happened to the person, shown to those who may read them. */
+const READ_TABS: readonly UserTab[] = ['activity', 'changes'];
 
 /*
  * One person in a bucket, at an address of their own (specs/082): who they are, whether they can sign in
@@ -125,14 +130,19 @@ export function UserPage({
 		: null;
 	const name = user ? nameOf(user) : null;
 
-	const tabs = TABS.filter((t) => t.key !== 'activity' || can.edit).map(
+	/*
+	 * Reading what happened is the server's own `edit` right, before `bucketCan` folds a scheduled deletion into it: a
+	 * project on its way out is read-only, and its people's activity is exactly what may still need reading (У15).
+	 */
+	const mayRead = bucket?.can?.edit ?? true;
+	const tabs = TABS.filter((t) => !READ_TABS.includes(t.key) || mayRead).map(
 		(t) => ({
 			key: t.key,
 			label: t.label,
 			href: userHref(bucketId, userId, t.segment)
 		})
 	);
-	const shownTab = tab === 'activity' && bucket && !can.edit ? null : tab;
+	const shownTab = READ_TABS.includes(tab) && bucket && !mayRead ? null : tab;
 
 	const after = (done: boolean) => {
 		if (done) reload();
@@ -244,7 +254,9 @@ export function UserPage({
 			{loading && !user && <Skeleton active />}
 			{shownTab === null && (
 				<NoAccess
-					what="person's activity"
+					what={
+						tab === 'changes' ? 'changes to this person' : "person's activity"
+					}
 					backHref={userHref(bucketId, userId)}
 					backLabel="Go to Profile"
 				/>
@@ -279,6 +291,12 @@ export function UserPage({
 			)}
 			{bucket && user && shownTab === 'activity' && (
 				<UserActivityTab
+					bucketId={bucketId}
+					userId={userId}
+				/>
+			)}
+			{bucket && user && shownTab === 'changes' && (
+				<UserChangesTab
 					bucketId={bucketId}
 					userId={userId}
 				/>

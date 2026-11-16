@@ -159,6 +159,7 @@ const SECTION_PREFIXES: ReadonlyArray<readonly [string, SectionName]> = [
 	['/features/', 'Product'],
 	['/pricing/', 'Product'],
 	['/contact/', 'Product'],
+	['/people-records/', 'Project'],
 	['/changelog/', 'Project'],
 	['/security/', 'Project'],
 	['/license/', 'Project'],
@@ -267,6 +268,12 @@ export const STRUCTURED_COVERAGE: readonly CoverageEntry[] = [
 		requires: [],
 		reason:
 			'A form and two addresses; nothing to describe that the page does not already say.'
+	},
+	{
+		prefix: '/people-records/',
+		requires: [],
+		reason:
+			'A statement of what is kept about people, for a privacy notice to point at; not an article or a product page.'
 	},
 	{
 		prefix: '/changelog/',

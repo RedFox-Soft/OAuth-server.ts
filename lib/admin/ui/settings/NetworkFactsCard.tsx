@@ -171,7 +171,7 @@ export function NetworkFactsCard() {
 						This server downloads FoxTrust&apos;s signed snapshot of what is
 						known about internet addresses: a full file once a day (about 13 MB)
 						and an update every hour, each checked against FoxTrust&apos;s
-						signature before use. Addresses of people are only compared here and
+						signature before use. Addresses of people are looked up here and
 						never sent; FoxTrust learns only that the file was downloaded.
 						Countries: IP Geolocation by DB-IP (CC BY 4.0). Shown for the server
 						process that answered.

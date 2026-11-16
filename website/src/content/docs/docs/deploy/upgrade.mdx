@@ -91,6 +91,10 @@ upserts, so running it against an already-current database changes nothing. What
   reserved client, a new field on the administrators' project, a team the ownership model now expects.
   The reserved `admin-mcp` agent client arrived this way: an existing install has it only
   once `db:setup` has run again.
+- **Expiry of people's data.** A person's activity is kept 90 days and then removed. On MongoDB the
+  removal is the TTL index `db:setup` creates; reads never show an expired row either way. Recording
+  starts when you upgrade, so earlier activity cannot be shown
+  ([what FoxAuth records about people](/people-records/)).
 
 `db:setup` exits non-zero when a constraint it declares is not in force, so make it a gate instead
 of a fire-and-forget. The shipped `fly.toml` runs it as `release_command` and Fly aborts the deploy

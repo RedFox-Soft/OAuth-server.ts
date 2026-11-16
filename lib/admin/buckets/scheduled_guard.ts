@@ -10,6 +10,12 @@ const BUCKET = '/admin/api/projects/:id';
 const SCHEDULED_ONLY = new Set([`${BUCKET}/restore`, `${BUCKET}/purge`]);
 
 /*
+ * Reads that are POSTs because reading them is audited: a person's activity (specs/133). They change nothing in the
+ * bucket, and a project on its way out is exactly where its people's activity may still need reading.
+ */
+const AUDITED_READS = new Set([`${BUCKET}/users/:uid/activity`]);
+
+/*
  * Whether a mounted route changes a bucket or something it holds — every route beneath the bucket's own
  * path that is not a read. Keyed on the route pattern rather than listed, so a route added under the prefix
  * later is guarded without anyone remembering to (test/admin/bucket_scheduled_writes.spec.ts enumerates the
@@ -18,7 +24,7 @@ const SCHEDULED_ONLY = new Set([`${BUCKET}/restore`, `${BUCKET}/purge`]);
 export function writesIntoBucket(method: string, route: string): boolean {
 	if (method === 'GET' || method === 'HEAD') return false;
 	if (route !== BUCKET && !route.startsWith(`${BUCKET}/`)) return false;
-	return !SCHEDULED_ONLY.has(route);
+	return !SCHEDULED_ONLY.has(route) && !AUDITED_READS.has(route);
 }
 
 /* The refusal every change to a scheduled bucket gets, with the date it will be destroyed. */

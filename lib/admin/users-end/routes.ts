@@ -26,7 +26,8 @@ import {
 	LockEndUserBody,
 	UpdateEndUserBody,
 	ResetPasswordBody,
-	UserListQuery
+	UserListQuery,
+	UserActivityBody
 } from './schema.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { sendOnDemand, sendRateRefused } from '../../verification/challenge.js';
@@ -55,6 +56,8 @@ import {
 	selfServiceState
 } from '../../totp/self_service.js';
 import { applicationSessions } from '../../end_users/sessions.js';
+import { activityPage, activitySummary } from '../../person_activity/read.js';
+import { recordActivityRead } from '../../person_activity/audit.js';
 import type { InviteOutcome } from '../../password_reset/challenge.js';
 import type { AuditAction } from '../../consts/admin_audit_routes.js';
 
@@ -341,10 +344,17 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	 */
 	.get('/admin/api/projects/:id/users/:uid', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
-		await loadBucketForUsers(ctx, params.id);
+		const bucket = await loadBucketForUsers(ctx, params.id);
 		const user = await getUserStore(params.id).find(params.uid);
 		if (!user) throw new AdminError(404, 'user not found');
-		const row = await presentOne(params.id, user);
+		/*
+		 * The Profile tab's summary of the person's activity (specs/133 research R16): when they last signed in, whether
+		 * they were turned away since, when they were last active. No address, country or device, so it is unaudited.
+		 */
+		const row = {
+			...(await presentOne(params.id, user)),
+			activity: await activitySummary(bucket, user._id)
+		};
 		if (!user.lockedLocally) return row;
 		const locker = await getUserStore(ADMIN_BUCKET_ID).find(
 			user.lockedLocally.by
@@ -598,8 +608,26 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 		}
 	)
 	/*
+	 * A page of the person's activity (specs/133): their sign-ins, failed sign-ins and stops, and what apps behind the
+	 * proxy and APIs checked at it asked or refused. A POST because reading it is audited, once per reader, person and
+	 * day (FR-025), the way the network facts lookup is. A project scheduled for deletion is read like any other.
+	 */
+	.post(
+		'/admin/api/projects/:id/users/:uid/activity',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await getUserStore(params.id).find(params.uid);
+			if (!user) throw new AdminError(404, 'user not found');
+			await recordActivityRead(ctx, bucket, user._id);
+			return activityPage(bucket, user._id, body);
+		},
+		{ body: UserActivityBody }
+	)
+	/*
 	 * The applications the person is signed in to here, one row each, with when they signed in and when the
-	 * application last received a token. Names and times only — no address, browser or device is stored.
+	 * application last received a token. Names and times only: sessions carry no address, browser or device. Where and
+	 * how the person signed in is their activity, above.
 	 */
 	.get(
 		'/admin/api/projects/:id/users/:uid/sessions',

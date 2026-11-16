@@ -38,6 +38,7 @@ export type PageKey =
 	| 'bucket.user.signIn'
 	| 'bucket.user.groups'
 	| 'bucket.user.activity'
+	| 'bucket.user.changes'
 	| 'bucket.userGroups'
 	| 'bucket.userGroup'
 	| 'bucket.signIn'
@@ -207,6 +208,13 @@ export const ROUTES: readonly RouteSpec[] = [
 		pattern: ['projects', ':project', 'users', ':user', 'activity'],
 		section: 'projects',
 		area: 'Activity'
+	},
+	/* Today's list of changes made to the person; `activity` became what the person did (specs/133, У5). */
+	{
+		key: 'bucket.user.changes',
+		pattern: ['projects', ':project', 'users', ':user', 'changes'],
+		section: 'projects',
+		area: 'Changes'
 	},
 	{
 		key: 'bucket.userGroups',

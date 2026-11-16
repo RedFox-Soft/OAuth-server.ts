@@ -272,6 +272,8 @@ export type ServerEvents = ModelEvents &
 				reason: BehindProxyApiReason;
 				tool: string | null;
 				clientId: string | null;
+				/* The person the token names, as the app's decision carries it (specs/133); null for a machine's token. */
+				accountId: string | null;
 			}
 		];
 	};

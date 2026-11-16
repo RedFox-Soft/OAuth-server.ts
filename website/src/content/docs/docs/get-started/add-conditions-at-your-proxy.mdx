@@ -104,8 +104,10 @@ The key and the address are set in each of the three places that call the check.
   page says when your proxy reports one.
 - A CDN in front of your proxy is not supported, except Cloudflare when your proxy accepts connections only from
   Cloudflare's addresses.
-- The address is only compared with your ranges and, with network facts, looked up in your server's own copy of
-  FoxTrust's snapshot. It is not logged, not kept and not sent anywhere.
+- The address is compared with your ranges and, with network facts, looked up in your server's own copy of
+  FoxTrust's snapshot. It never goes to a log line and is never sent anywhere. When a path refuses a person or asks
+  them to sign in again, their Activity tab keeps the address for 90 days, because your proxy proved it with the
+  project's key ([what FoxAuth records about people](/people-records/)).
 
 A VPN or a residential proxy can still get around a list of ranges. A network condition slows an attacker down. It
 does not stop one. Network facts keep out the VPN services FoxTrust lists, but a residential proxy still gets through.
@@ -132,7 +134,7 @@ internet addresses. Your server downloads the snapshot and checks it itself.
 3. The card under the setting shows when the snapshot was built, its age, how many address ranges it holds, and the
    last failure, if there was one.
 
-People's addresses are never sent to FoxTrust or anywhere else. Your server only compares them with its own copy.
+People's addresses are never sent to FoxTrust or anywhere else. Your server only looks them up in its own copy.
 FoxTrust learns only that the file was downloaded.
 
 ### What you can keep out {#network-facts-categories}

@@ -68,9 +68,10 @@ answers NoAccess there; its accounts stay on the Administrators page until phase
 - **Groups**: one request per membership, through the group's own routes. The old edit dialog diffed groups,
   status and claims and sent several requests, so a failure halfway left the person half changed; there is
   no longer a save that spans more than one request.
-- **Activity**, for those with `can.edit`: the audit entries whose target is this person. Sign-ins are not
-  recorded per person, and changes to a group they are in are recorded against the group; the tab says the
-  first and links to Audit for the rest.
+- **Activity** and **Changes**, for those with the server's `can.edit` (before a scheduled deletion folds it in):
+  Activity is what the server decided about the person ([[person-activity]], spec 133); Changes is the audit entries
+  whose target is this person, without the audited reads (`changesOnly`). Changes to a group they are in are
+  recorded against the group; Changes links to Audit for the rest.
 
 ## The email change asks with the dialog out of the way
 

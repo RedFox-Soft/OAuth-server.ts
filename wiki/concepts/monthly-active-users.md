@@ -176,9 +176,10 @@ Rules the code holds and a reader can get wrong:
 
 The overview names administrators (contacts, personal teams' labels), never an end user who was counted:
 spec 076's "no email address" test was re-anchored to the counted accounts for that reason. Neither read is
-audited; both are MCP tools, `project_activity_get` and `activity_overview` (`lib/mcp/catalogue.ts:379`, `:392`). Nothing lists who was counted. That list was specified and deferred to the billing feature: it would be the one audited read, and
-an audited GET has no precedent — `AuditedMethod` excludes GET, and three guards and the site's "Mutations"
-section assume a GET writes nothing — so it should be a POST when it comes. Eden revives any string that
+audited; both are MCP tools, `project_activity_get` and `activity_overview` (`lib/mcp/catalogue.ts:379`, `:392`). Nothing lists who was counted. That list was specified and deferred to the billing feature, and should be an
+audited POST when it comes, as the person's activity read is since spec 133 (`AuditedMethod` excludes GET, and three
+guards and the site's "Mutations" section assume a GET writes nothing). The day and month marks are read by id for a
+person's "Last active" ([[person-activity]]). Eden revives any string that
 parses as a date, so a test reading a day's period (`2031-03-15`) through it gets a `Date`; read those
 responses as plain JSON.
 

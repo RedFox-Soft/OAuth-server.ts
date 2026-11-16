@@ -35,6 +35,7 @@ export default {
 		github: 'GitHub',
 		changelog: 'Changelog',
 		security: 'Security',
+		peopleRecords: 'What FoxAuth records about people',
 		license: 'License',
 		feed: 'Blog feed (RSS)',
 		llms: 'For LLMs (llms.txt)',

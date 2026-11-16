@@ -1889,6 +1889,28 @@ const apiToolConditionsFence: Migration = {
 	postgres: { noop: true, reason: API_TOOL_CONDITIONS_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/133 research R14). A person's activity is personal data this release deletes with the
+ * person and, on PostgreSQL, sweeps 90 days after its last write. An older release knows neither the area nor either
+ * duty: it would keep a deleted person's addresses and never sweep them. Recording this migration makes its startup
+ * gate refuse the database instead. The time it was applied is also when recording began, which the console shows.
+ */
+const PERSON_ACTIVITY_FENCE_REASON =
+	"Nothing to change on this backend: the record of this migration is its effect, so a release older than people's activity refuses to start against a database that may hold some.";
+
+export const PERSON_ACTIVITY_FENCE_ID = '2026-11-16-person-activity-fence';
+
+const personActivityFence: Migration = {
+	id: PERSON_ACTIVITY_FENCE_ID,
+	description:
+		"Mark the database as holding people's activity, so that an older release refuses to start against it rather than keeping a deleted person's sign-in addresses it can neither delete nor expire",
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: PERSON_ACTIVITY_FENCE_REASON },
+	postgres: { noop: true, reason: PERSON_ACTIVITY_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1907,5 +1929,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	proxyCodeConditionFence,
 	proxyNetworkFactsFence,
 	apiSignInRequirementFence,
-	apiToolConditionsFence
+	apiToolConditionsFence,
+	personActivityFence
 ];

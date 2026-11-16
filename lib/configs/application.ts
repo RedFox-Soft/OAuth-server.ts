@@ -1149,13 +1149,28 @@ export const ApplicationConfig = {
 	 * description: Each server process downloads FoxTrust's signed snapshot (a full file a day, about 13 MB,
 	 *   and an hourly update against it; specs/129), checks it, and keeps it in memory. Conditions at the proxy
 	 *   can then keep Tor, commercial VPNs, hosting or clouds, or countries out of a path. The address of a
-	 *   person is only compared inside this server and never sent anywhere.
+	 *   person is only looked up inside this server and never sent anywhere; a person's activity keeps the country
+	 *   and categories of the addresses it records (specs/133).
 	 *
 	 * Off by default; free on every plan. The only switch: there is no environment variable, and the
 	 *   publication and its keys are constants. The opposite of the attacker list on failure: facts that are off,
 	 *   not loaded yet or more than 26 hours old are unknown, and a condition on them closes its path.
 	 */
-	'networkFacts.enabled': false
+	'networkFacts.enabled': false,
+	/*
+	 * personActivity.enabled
+	 *
+	 * title: Record people's activity
+	 *
+	 * description: Keeps, per person, every sign-in, every failed sign-in where the account was known, and what
+	 *   apps behind the proxy and APIs checked at it asked or refused, for 90 days (specs/133). On by default: it is
+	 *   what lets an administrator answer "why can't they get in", and its writes are batched once a minute.
+	 *
+	 * The only switch, for an operator whose database cannot take it or who must not keep it: there is no
+	 *   environment variable. Turning it off stops new recording and drops what is waiting; what is kept stays
+	 *   readable until it expires.
+	 */
+	'personActivity.enabled': true
 	/*
 	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
 	 *

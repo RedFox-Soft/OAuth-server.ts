@@ -146,7 +146,8 @@ Each rule is the part that is easy to break. Read the named page before changing
   jsonb column is written as an object, never `JSON.stringify(...)`. A secret the server must read back is
   declared in `lib/consts/sealed_fields.ts` and sealed by the store decorators, never stored plaintext; a
   secret-looking field that is not is declared plaintext there with its reason. A connected account is deliberately not account-owned (a lock keeps it), so
-  a path that deletes a person, a service or a project removes its connected accounts by hand. An upstream token
+  a path that deletes a person, a service or a project removes its connected accounts by hand; a person's activity
+  is unowned for the same reason, and deleting the person or destroying the project removes it by hand. An upstream token
   leaves only through `upstream_exchange.ts` and is renewed only through `refresh.ts`'s lease, never by a direct
   refresh, and a jsonb key list is bound with `handle.array(keys, 'text')`, never `${keys}::text[]`. An agent's
   connect link acts only for the person the agent's token named, after that person's own recent sign-in, and a
@@ -253,11 +254,17 @@ Each rule is the part that is easy to break. Read the named page before changing
   of `proxy.<bucketId>` are redeemed only inside the check, never at `/token`. The decision is one pure function the
   console shares: `decide` for an app, `decideApiCall` for an API. An API's check reads a token as the API would, never reads a grant for a JWT, refuses a token bound
   to a key, and trusts MCP headers only from 2026-07-28 clients. A person's address is read only with a valid project
-  proxy key and one strict `X-Forwarded-For`, and only compared; conditions accumulate down the paths, and from an API to its tool rows, never replacing the API's;
+  proxy key and one strict `X-Forwarded-For`, compared, and kept only on that person's activity and only when the proxy
+  proves it (`proves`); conditions accumulate down the paths, and from an API to its tool rows, never replacing the API's;
   a tool row's conditions refuse apps too old to name their tool; an older release
   must fail closed on them. A condition asking for a code is judged on the app session's acr and checked again on the
   redeemed code, never on what the sign-in request said. → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`,
   `conditions-at-your-proxy.md`
+- **A person's activity** — noted only by a synchronous, never-throwing call beside the decision, never through the
+  event bus or a datastore read on the request path, and never for the administrators' project; a failed sign-in is
+  noted only where the account was already read. Nothing a request carries is stored: reasons are a closed set, a tool
+  is a tools-table row name or "another tool", a browser is a family. A write adds and is never retried; a read of the
+  timeline is an audited POST. → `person-activity.md`
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment
@@ -272,7 +279,8 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **FoxTrust's network facts** — downloaded and verified per process through `lib/foxtrust/` with the same pinned keys,
   never an older pair than one accepted, and they fail CLOSED: off, not loaded or more than 26 hours old is
   `{ known: false }`, which closes every path with a network facts condition. Looked up only for the address the check
-  believes, and handed to the decision as facts, never as the snapshot; only categories and the country are read,
+  believes, and for an address a person's activity records, and handed to the decision as facts, never as the
+  snapshot; only categories and the country are read,
   never FoxTrust's risk, level or reasons. → `network-facts.md`
 - **FoxTrust's attacker list** — the list is downloaded and verified per process against the pinned keys in
   `lib/consts/attacker_list.ts`, its build time only ever raised, and it fails open: missing, stale or unverifiable

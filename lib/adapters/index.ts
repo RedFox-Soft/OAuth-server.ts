@@ -6,6 +6,7 @@ import {
 	ProtectedResourceStore as MemoryProtectedResourceStore,
 	ProvisioningConnectionStore as MemoryProvisioningConnectionStore,
 	ProvisioningRefusalStore as MemoryProvisioningRefusalStore,
+	PersonActivityStore as MemoryPersonActivityStore,
 	OutsideAuthorizationServerStore as MemoryOutsideAuthorizationServerStore,
 	BehindProxyAppStore as MemoryBehindProxyAppStore,
 	ConnectedAccountStore as MemoryConnectedAccountStore,
@@ -52,6 +53,8 @@ import type {
 	ProvisioningConnectionStoreInstance,
 	ProvisioningRefusalStoreConstructor,
 	ProvisioningRefusalStoreInstance,
+	PersonActivityStoreConstructor,
+	PersonActivityStoreInstance,
 	OutsideAuthorizationServerStoreConstructor,
 	OutsideAuthorizationServerStoreInstance,
 	BehindProxyAppStoreConstructor,
@@ -118,6 +121,8 @@ let ProvisioningConnectionStoreClass: ProvisioningConnectionStoreConstructor =
 	MemoryProvisioningConnectionStore;
 let ProvisioningRefusalStoreClass: ProvisioningRefusalStoreConstructor =
 	MemoryProvisioningRefusalStore;
+let PersonActivityStoreClass: PersonActivityStoreConstructor =
+	MemoryPersonActivityStore;
 let OutsideAuthorizationServerStoreClass: OutsideAuthorizationServerStoreConstructor =
 	MemoryOutsideAuthorizationServerStore;
 let BehindProxyAppStoreClass: BehindProxyAppStoreConstructor =
@@ -188,6 +193,7 @@ if (backend === 'postgres') {
 	ProtectedResourceStoreClass = postgres.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = postgres.ProvisioningConnectionStore;
 	ProvisioningRefusalStoreClass = postgres.ProvisioningRefusalStore;
+	PersonActivityStoreClass = postgres.PersonActivityStore;
 	OutsideAuthorizationServerStoreClass =
 		postgres.OutsideAuthorizationServerStore;
 	BehindProxyAppStoreClass = postgres.BehindProxyAppStore;
@@ -230,6 +236,7 @@ if (backend === 'mongodb') {
 	ProtectedResourceStoreClass = mongodb.ProtectedResourceStore;
 	ProvisioningConnectionStoreClass = mongodb.ProvisioningConnectionStore;
 	ProvisioningRefusalStoreClass = mongodb.ProvisioningRefusalStore;
+	PersonActivityStoreClass = mongodb.PersonActivityStore;
 	OutsideAuthorizationServerStoreClass =
 		mongodb.OutsideAuthorizationServerStore;
 	BehindProxyAppStoreClass = mongodb.BehindProxyAppStore;
@@ -557,6 +564,15 @@ export function getProvisioningRefusalStore(): ProvisioningRefusalStoreInstance 
 	return provisioningRefusalStoreSingleton;
 }
 
+/*
+ * A person's activity (specs/133): written only by the flush of lib/person_activity/, read by the person's page.
+ */
+let personActivityStoreSingleton: PersonActivityStoreInstance | null = null;
+export function getPersonActivityStore(): PersonActivityStoreInstance {
+	personActivityStoreSingleton ??= new PersonActivityStoreClass();
+	return personActivityStoreSingleton;
+}
+
 let bucketGroupStoreSingleton: BucketGroupStoreInstance | null = null;
 export function getBucketGroupStore(): BucketGroupStoreInstance {
 	if (!bucketGroupStoreSingleton) {
@@ -719,6 +735,7 @@ export function resetStoresForTests(): void {
 	resetAdminMemoryStores();
 	protectedResourceStoreSingleton = null;
 	provisioningRefusalStoreSingleton = null;
+	personActivityStoreSingleton = null;
 	outsideAuthorizationServerStoreSingleton = null;
 	behindProxyAppStoreSingleton = null;
 	rawConnectedAccountStoreSingleton = null;

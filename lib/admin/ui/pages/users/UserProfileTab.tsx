@@ -13,8 +13,8 @@ import {
 	Tag,
 	Typography
 } from 'antd';
-import { bucketHref } from '../../frame/routes.js';
-import { useNavigate } from '../../frame/router.js';
+import { bucketHref, userHref } from '../../frame/routes.js';
+import { Link, useNavigate } from '../../frame/router.js';
 import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useConfirm } from '../../frame/confirm.js';
@@ -22,7 +22,12 @@ import type { BucketCan } from '../../frame/can.js';
 import { ClaimsDrawer } from '../../accounts/ClaimsDrawer.js';
 import type { BucketView } from '../bucketView.js';
 import type { ConnectionView } from '../ProvisioningPanel.js';
-import { nameOf, usersApi, type EndUser } from './endUser.js';
+import {
+	nameOf,
+	usersApi,
+	type ActivitySummaryView,
+	type EndUser
+} from './endUser.js';
 import { useUserActions } from './useUserActions.js';
 import { ProfileCard, profileSetClaims } from './ProfileCard.js';
 
@@ -33,6 +38,95 @@ interface AssignValues {
 }
 
 /* Whether the person can sign in now, and if not, every reason — the first question of an incident. */
+function whenWords(at: string): string {
+	const date = new Date(at);
+	const minutes = Math.round((Date.now() - date.getTime()) / 60_000);
+	const ago =
+		minutes < 1
+			? 'just now'
+			: minutes < 60
+				? `${String(minutes)} minutes ago`
+				: minutes < 48 * 60
+					? `${String(Math.round(minutes / 60))} hours ago`
+					: `${String(Math.round(minutes / 1440))} days ago`;
+	return `${date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} (${ago})`;
+}
+
+function lastActiveWords(active: ActivitySummaryView['lastActive']): string {
+	if (!active) return '—';
+	if ('day' in active) {
+		const today = new Date().toISOString().slice(0, 10);
+		if (active.day === today) return 'Today';
+		return new Date(`${active.day}T12:00:00Z`).toLocaleDateString(undefined, {
+			dateStyle: 'medium'
+		});
+	}
+	return new Date(`${active.month}-15T12:00:00Z`).toLocaleDateString(
+		undefined,
+		{
+			month: 'long',
+			year: 'numeric'
+		}
+	);
+}
+
+/*
+ * The person's activity in brief, where support starts (specs/133 FR-021): when they last signed in and how, whether
+ * anything turned them away since, and the last day they were active, token renewals counting. Never "Never":
+ * nothing recorded only means nothing since recording began.
+ */
+function activityItems(
+	bucketId: string,
+	user: EndUser
+): { key: string; label: string; children: React.ReactNode }[] {
+	const activity = user.activity;
+	if (!activity) return [];
+	const since = activity.recordingBegan
+		? `Nothing since recording began on ${new Date(activity.recordingBegan).toLocaleDateString(undefined, { dateStyle: 'medium' })}.`
+		: 'Nothing recorded yet.';
+	const last = activity.lastSignIn;
+	const items: { key: string; label: string; children: React.ReactNode }[] = [
+		{
+			key: 'lastSignIn',
+			label: 'Last signed in',
+			children: last ? (
+				<Space
+					wrap
+					size={8}
+				>
+					<span>{whenWords(last.at)}</span>
+					{last.name && <span>· {last.name}</span>}
+					{last.method && <span>· {last.method}</span>}
+					<Link href={userHref(bucketId, user._id, 'activity')}>
+						See all activity →
+					</Link>
+				</Space>
+			) : (
+				<Typography.Text type="secondary">— {since}</Typography.Text>
+			)
+		}
+	];
+	if (activity.notLetInSince) {
+		const refused = activity.notLetInSince;
+		items.push({
+			key: 'notLetInSince',
+			label: 'Not let in since',
+			children: (
+				<Typography.Text type="warning">
+					{refused.count === 1 ? 'Once' : `${String(refused.count)} times`},
+					last at {whenWords(refused.at)} · {refused.reason}
+				</Typography.Text>
+			)
+		});
+	}
+	items.push({
+		key: 'lastActive',
+		label: 'Last active',
+		children: lastActiveWords(activity.lastActive)
+	});
+	return items;
+}
+
 function signInState(user: EndUser): { can: boolean; reasons: string[] } {
 	const reasons: string[] = [];
 	if (!user.active) reasons.push('deactivated');
@@ -189,6 +283,7 @@ export function UserProfileTab({
 								</Typography.Text>
 							)
 						},
+						...activityItems(bucketId, user),
 						{
 							key: 'email',
 							label: 'Email',

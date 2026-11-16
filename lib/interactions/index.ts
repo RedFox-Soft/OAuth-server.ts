@@ -84,6 +84,7 @@ import { captureFault } from 'lib/error_store/capture.js';
 import sessionHandler from 'lib/shared/session.js';
 import respond from 'lib/actions/authorization/respond.js';
 import getResume from 'lib/actions/authorization/resume.js';
+import { noteSignInRefused, noteSignedIn } from 'lib/person_activity/record.js';
 import checkClient from 'lib/actions/authorization/check_client.js';
 import checkResource from 'lib/shared/check_resource.js';
 import assignClaims from 'lib/actions/authorization/assign_claims.js';
@@ -296,6 +297,29 @@ async function deliverToClient(
 	);
 }
 
+/*
+ * A sign-in this interaction completed, for the person's activity (specs/133 research R2). Here rather than in
+ * `resume.ts`, which never sees the request: the address and the browser are the caller's, and this is the one place
+ * both the redirect and the device flow pass. Not once a confirmation page was answered: the sign-in is not applied
+ * until it is confirmed, which comes back through here.
+ */
+function noteResumedSignIn(
+	interaction: Interaction,
+	bucketId: string,
+	login: NonNullable<Interaction['payload']['result']>['login'],
+	request: Request
+): void {
+	if (!login) return;
+	noteSignedIn({
+		bucketId,
+		accountId: login.accountId,
+		clientId: clientIdOf(interaction),
+		redirectUri: redirectUriOf(interaction),
+		login,
+		request
+	});
+}
+
 async function resume(
 	interaction: Interaction,
 	cookie: OIDCCookies,
@@ -324,13 +348,12 @@ async function resume(
 	 * The stored parameters are the ones the sign-in screen resolved its own bucket from, so the two
 	 * cannot disagree.
 	 */
-	const bucket = await issuingBucket(
-		await resolveBucketForRequest(
-			clientIdOf(interaction),
-			resourceOf(interaction),
-			await addressedBucketOf(interaction)
-		)
+	const signInBucketId = await resolveBucketForRequest(
+		clientIdOf(interaction),
+		resourceOf(interaction),
+		await addressedBucketOf(interaction)
 	);
+	const bucket = await issuingBucket(signInBucketId);
 	const oidc = new OIDCContext<PipelineParams>({
 		params: {},
 		route: 'ui.resume',
@@ -339,12 +362,14 @@ async function resume(
 	});
 
 	const setCookies = await sessionHandler(oidc);
+	const login = interaction.payload.result?.login;
 	const confirmPage = await getResume(oidc, interaction);
 	if (confirmPage) {
 		// Saved first: the sign-out confirmation this page posts to reads the state it just recorded.
 		await setCookies();
 		return confirmPage;
 	}
+	noteResumedSignIn(interaction, signInBucketId, login, request);
 	cookie._interaction.set(expiredInteractionCookie(interaction.uid));
 
 	/*
@@ -420,13 +445,12 @@ async function completeDeviceInteraction(
 	{ route, request }: { route: string; request: Request }
 ) {
 	/* Recovered from the interaction for the reason given in `resume()` above. */
-	const bucket = await issuingBucket(
-		await resolveBucketForRequest(
-			clientIdOf(interaction),
-			resourceOf(interaction),
-			await addressedBucketOf(interaction)
-		)
+	const signInBucketId = await resolveBucketForRequest(
+		clientIdOf(interaction),
+		resourceOf(interaction),
+		await addressedBucketOf(interaction)
 	);
+	const bucket = await issuingBucket(signInBucketId);
 	const oidc = new OIDCContext<PipelineParams>({
 		params: {},
 		route: 'ui.device_resume',
@@ -440,6 +464,7 @@ async function completeDeviceInteraction(
 	let restored = false;
 
 	try {
+		const login = interaction.payload.result?.login;
 		const confirmPage = await getResume(oidc, interaction);
 		if (confirmPage) {
 			// subject changed — logout confirmation self-submitting form, whose state must be saved
@@ -447,6 +472,7 @@ async function completeDeviceInteraction(
 			return confirmPage;
 		}
 		restored = true;
+		noteResumedSignIn(interaction, signInBucketId, login, request);
 
 		if (oidc.result?.error) {
 			throw errorForCode(oidc.result.error, oidc.result.error_description);
@@ -1683,6 +1709,14 @@ export const ui = new Elysia()
 			if (!validPassword) {
 				noteAttack(request, 'signin_failures');
 				noteGuessingFailure(request, guessingBucket);
+				/* The account was found, so the person's activity keeps it; synchronous, so the answer times alike. */
+				noteSignInRefused({
+					bucketId,
+					accountId: user._id,
+					reason: 'wrong_password',
+					clientId: clientIdOf(interaction),
+					request
+				});
 				return refuse();
 			}
 			/*
@@ -1694,6 +1728,13 @@ export const ui = new Elysia()
 			await clearFailures(bucketId, body.username);
 			if (guessing.decision === 'count') noteListed(bucketId, 'rightPassword');
 			if (!canSignIn(user)) {
+				noteSignInRefused({
+					bucketId,
+					accountId: user._id,
+					reason: user.lockedLocally ? 'locked' : 'deactivated',
+					clientId: clientIdOf(interaction),
+					request
+				});
 				return refuse();
 			}
 			const loginBucket = await getBucketStore().find(bucketId);
@@ -1703,6 +1744,13 @@ export const ui = new Elysia()
 			 * address is unproven — so the door has no exception to make.
 			 */
 			if (loginBucket?.emailVerificationRequired === true && !user.verified) {
+				noteSignInRefused({
+					bucketId,
+					accountId: user._id,
+					reason: 'email_unverified',
+					clientId: clientIdOf(interaction),
+					request
+				});
 				return unverifiedAtSignIn(
 					uid,
 					interaction,
@@ -1830,8 +1878,18 @@ export const ui = new Elysia()
 					...branded
 				});
 
+			const noteWrongCode = () =>
+				noteSignInRefused({
+					bucketId,
+					accountId: pending.accountId,
+					reason: 'wrong_code',
+					clientId: clientIdOf(interaction),
+					request
+				});
+
 			if (pending.attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
 				noteAttack(request, 'signin_failures');
+				noteWrongCode();
 				return refuse();
 			}
 
@@ -1862,6 +1920,7 @@ export const ui = new Elysia()
 				 */
 				if (outcome.reason === 'reused') return refuse(true);
 				noteAttack(request, 'signin_failures');
+				noteWrongCode();
 				return refuse();
 			}
 
@@ -2141,7 +2200,7 @@ export const ui = new Elysia()
 	 */
 	.get(
 		`ui/:uid/${CODE_REQUIRED_PAGE}`,
-		async ({ params: { uid }, interaction }) => {
+		async ({ params: { uid }, interaction, request }) => {
 			const bucketId = await resolveBucketForRequest(
 				clientIdOf(interaction),
 				resourceOf(interaction),
@@ -2153,6 +2212,15 @@ export const ui = new Elysia()
 			if (variant === 'signIn') {
 				return Response.redirect(buildUILoginPath(uid), 303);
 			}
+			/* The account signed in and the app turned it away for want of a code: the person's activity keeps it. */
+			noteSignInRefused({
+				bucketId,
+				accountId: refused.user._id,
+				reason: 'code_required',
+				clientId: clientIdOf(interaction),
+				providerId: refused.session.payload.upstream?.providerId,
+				request
+			});
 			return codeRequiredServer(uid, {
 				variant,
 				email: refused.user.email,
@@ -2300,6 +2368,16 @@ export const ui = new Elysia()
 			const user = await getUserStore(bucketId).find(handoff.accountId);
 			// Re-read rather than trusted from the record: an account frozen between hops must not sign in.
 			if (!user || !canSignIn(user)) {
+				if (user) {
+					noteSignInRefused({
+						bucketId,
+						accountId: user._id,
+						reason: 'provider_closed',
+						clientId,
+						providerId: handoff.link?.providerId,
+						request
+					});
+				}
 				return federationInactivePage(languageOf(interaction));
 			}
 

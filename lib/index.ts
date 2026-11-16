@@ -79,6 +79,7 @@ import { reportingState } from './telemetry/status.js';
 import { startAttackReports } from './attack_reports/scheduler.js';
 import { startAttackerList } from './attacker_list/scheduler.js';
 import { startNetworkFacts } from './network_facts/scheduler.js';
+import { startPersonActivity } from './person_activity/flush.js';
 import { attackReportsState } from './attack_reports/status.js';
 import { selectBackend } from './adapters/selectBackend.js';
 
@@ -355,6 +356,11 @@ if (process.env.NODE_ENV !== 'test') {
 	 * report. The tick does nothing while the download is off.
 	 */
 	startNetworkFacts();
+	/*
+	 * People's activity (specs/133), on every backend: written once a minute and on a stop. Under the same guard, so
+	 * a case writes when it asks (`flushPersonActivityNow`) and never on a timer of its own.
+	 */
+	startPersonActivity();
 	/*
 	 * The daily usage report (specs/113). Not on the in-memory backend: its identifier would be new at every
 	 * start and its counts mean nothing, so this guard, not the report pass, is what keeps such an instance

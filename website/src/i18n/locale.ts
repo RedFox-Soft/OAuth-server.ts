@@ -58,6 +58,7 @@ export const TRANSLATED_PAGES: readonly string[] = [
 	'/guide/',
 	'/pricing/',
 	'/contact/',
+	'/people-records/',
 	'/compare/',
 	'/blog/'
 ];

@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'ddc7ef31d7ce';
+export const source = '5f5da1d90805';
 
 export default {
 	questions: {
@@ -673,13 +673,53 @@ export default {
 			],
 			goodToKnow: [
 				'由超级管理员在 Settings → Integrations 中开启“Network facts from FoxTrust”。之后每台服务器每天下载一个约 13 MB 的文件，每小时下载一次更新。',
-				'用户的地址只在您的服务器内部比较。FoxTrust 只知道文件被下载了。',
+				'用户的地址只在您的服务器内部查找。FoxTrust 只知道文件被下载了。',
 				'商业 VPN 只包括 FoxTrust 列出的 VPN 服务，不包括公司自己的 VPN。托管服务或云还包括内容分发网络，以及一些公司在云中的出口。iCloud Private Relay 不会被挡住。',
 				'国家数据来自 DB-IP（IP Geolocation by DB-IP，CC BY 4.0）。国家未知的地址无法通过“Only from”，但可以通过“Not from”。',
 				'符合条件的地址会被拒绝，或者在登录早于您选择的分钟数时被要求重新登录；勾选后还需要身份验证器应用中的验证码。在代理处检查的 API 只能拒绝。',
 				'如果下载已关闭，或快照已超过 26 小时，该路径会关闭，直到加载新的快照，控制台会标出这一点。Check access 会显示快照中关于某个地址的信息。',
 				'和地址列表一样，您的代理必须连同项目的代理密钥一起传递它看到的地址。所有套餐均可使用。'
 			]
+		},
+		cantgetin: {
+			title: '查明某人为什么进不去',
+			sentence:
+				'在 Users 中打开此人：Activity 标签页列出他的每次登录、每次失败的登录，以及代理后面的应用或 API 每次拒绝他的情况，附带原因和他看到的内容。',
+			protocol: 'Sign-in decisions · Forward auth decisions',
+			problemCaption: '有人进不去，却没人知道原因。',
+			fixCaption: '每次拒绝都会连同原因一起保留。',
+			lanes: {
+				person: '用户',
+				fox: 'FoxAuth',
+				admin: '管理员'
+			},
+			steps: [
+				{
+					label: '打开 Wiki',
+					text: 'Anna 打开 Wiki，这是你代理后面的一个应用，并完成登录。'
+				},
+				{
+					label: '被拒绝',
+					text: 'Wiki 的规则不允许她打开 /admin。她看到一个页面，说无法打开。'
+				},
+				{
+					label: '打开此人的 Activity',
+					text: 'Anna 联系支持人员。支持人员在 Users 中找到她，打开 Activity 标签页。'
+				},
+				{
+					label: '原因和看到的内容',
+					text: '标签页显示 10:14 的拒绝，共三次，“Not in the groups that may open /admin”，以及一个按今天的规则重新检查的链接。'
+				}
+			],
+			sees: ['和以前一样的拒绝页面：对此人来说什么都没变'],
+			goodToKnow: [
+				'每个项目都会保留：登录的应用、方式、网络地址，开启网络信息时还有 FoxTrust 提供的国家和网络类型，以及浏览器和系统。',
+				'只有在找到账户时才保留失败的登录：密码或验证码错误、账户被锁定或停用、缺少验证码，或地址未验证。',
+				'在你的代理处，只有代理用项目的代理密钥证明了地址，才会保留此人的地址。API 的记录从不带地址。',
+				'所有记录保留 90 天，锁定后仍然保留，并会随此人和项目一起删除。读取记录会写入审计日志。',
+				'记录最多晚一分钟。超级管理员可以在 Settings 中关闭记录。'
+			],
+			actionLabel: '打开 Users'
 		},
 		proxyfresh: {
 			title: '在管理页面前要求重新登录',
@@ -1278,6 +1318,7 @@ export default {
 			sees: ['此人从每个应用中退出登录，不会看到任何页面'],
 			goodToKnow: [
 				'你也可以手动操作：打开 Users，选择此人，点击 Deactivate。',
+				'停用之后，此人的活动记录还会保留 90 天，你仍然可以看到他用过什么。',
 				'只有在你添加了公司的身份提供商，并且超级管理员在服务器设置中开启它发送的信号之后，它才能替你完成这件事。'
 			],
 			actionLabel: '打开 Users'

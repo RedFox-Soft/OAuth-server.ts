@@ -1,29 +1,263 @@
-import { useCallback, useEffect, useState } from 'react';
-import { Flex, Table, Tag, Typography } from 'antd';
-import { Link } from '../../frame/router.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Alert, Button, Flex, Select, Tag, Tooltip, Typography } from 'antd';
+import { Link, useNavigate, useRoute } from '../../frame/router.js';
 import { request } from '../../frame/request.js';
 import { EmptyState, LoadFailed } from '../../frame/states.js';
+import { apiHref, behindProxyHref, userHref } from '../../frame/routes.js';
 
-interface AuditEntry {
-	_id: string;
-	actorEmail: string;
-	action: string;
-	attributes: string[];
-	viaSurface?: 'mcp' | 'scim' | 'upstream' | 'self-service' | null;
-	timestamp: string;
+type Kind = 'signIn' | 'app' | 'api';
+type Outcome = 'let_in' | 'sign_in_again' | 'refused';
+
+export interface ActivityRow {
+	id: string;
+	day: string;
+	kind: Kind;
+	outcome: Outcome;
+	reason: string;
+	words: {
+		outcome: string;
+		reason: string;
+		sawText: string | null;
+		method: string | null;
+		device: string | null;
+	};
+	place: {
+		clientId?: string;
+		appId?: string;
+		appOrigin?: string;
+		resource?: string;
+		rule?: string;
+		tool?: string;
+		providerId?: string;
+		name: string | null;
+	};
+	client: string | null;
+	address: string | null;
+	addressFrom: 'sign_in' | 'proxy' | null;
+	facts: { country: string | null; categories: string[] } | null;
+	newAddress: boolean;
+	count: number;
+	firstAt: string;
+	lastAt: string;
+	check: { app: string } | { api: string } | null;
 }
 
-interface AuditPage {
-	entries: AuditEntry[];
-	total: number;
+interface ActivityPage {
+	recording: boolean;
+	recordingBegan: string | null;
+	keptDays: number;
+	rows: ActivityRow[];
+	next: string | null;
+	busyDays: string[];
 }
 
-const SHOWN = 20;
+const KINDS: { value: Kind | 'all'; label: string }[] = [
+	{ value: 'all', label: 'All kinds' },
+	{ value: 'signIn', label: 'Sign-ins' },
+	{ value: 'app', label: 'Apps' },
+	{ value: 'api', label: 'APIs' }
+];
+
+const OUTCOMES: { value: Outcome | 'all'; label: string }[] = [
+	{ value: 'all', label: 'All outcomes' },
+	{ value: 'let_in', label: 'Let in' },
+	{ value: 'sign_in_again', label: 'Asked to sign in again' },
+	{ value: 'refused', label: 'Refused' }
+];
+
+const CATEGORY_WORDS: Record<string, string> = {
+	tor: 'Tor',
+	vpn: 'VPN',
+	hosting: 'hosting'
+};
+
+const PAGE = 50;
+
+export function dateWords(at: string): string {
+	return new Date(at).toLocaleDateString(undefined, {
+		day: 'numeric',
+		month: 'short',
+		year: 'numeric'
+	});
+}
+
+function timeWords(at: string): string {
+	return new Date(at).toLocaleTimeString(undefined, {
+		hour: '2-digit',
+		minute: '2-digit'
+	});
+}
+
+/* The browser's own date of the row's latest event: rows are grouped by the reader's day, not the server's. */
+function localDay(at: string): string {
+	const d = new Date(at);
+	return `${String(d.getFullYear())}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function countryName(code: string): string {
+	try {
+		return (
+			new Intl.DisplayNames(undefined, { type: 'region' }).of(code) ?? code
+		);
+	} catch {
+		return code;
+	}
+}
+
+function placeOf(row: ActivityRow): string {
+	if (row.place.name) return row.place.name;
+	if (row.kind === 'api') return row.place.resource ?? 'An API';
+	if (row.kind === 'app') return 'An app behind the proxy';
+	return row.place.appOrigin ?? row.place.clientId ?? 'An application';
+}
+
+function checkHref(
+	bucketId: string,
+	userId: string,
+	row: ActivityRow
+): string | null {
+	if (!row.check) return null;
+	const params = new URLSearchParams({ person: userId });
+	if ('app' in row.check) {
+		if (row.place.rule) params.set('path', row.place.rule);
+		return `${behindProxyHref(bucketId, row.check.app, 'access')}?${params.toString()}`;
+	}
+	if (row.place.tool && row.place.tool !== '*another') {
+		params.set('tool', row.place.tool);
+	}
+	return `${apiHref(bucketId, row.check.api, 'access')}?${params.toString()}`;
+}
+
+function Address({ row }: { row: ActivityRow }) {
+	if (row.kind === 'api') return null;
+	if (!row.address) {
+		if (row.kind !== 'app') return null;
+		return (
+			<Tooltip title="Your proxy didn't prove with this project's proxy key that it passes people's addresses.">
+				<Typography.Text type="secondary">no address</Typography.Text>
+			</Tooltip>
+		);
+	}
+	const facts = row.facts
+		? [
+				row.facts.country ? countryName(row.facts.country) : null,
+				...row.facts.categories.map((c) => CATEGORY_WORDS[c] ?? c)
+			].filter((part): part is string => part !== null)
+		: [];
+	return (
+		<>
+			<Typography.Text code>{row.address}</Typography.Text>
+			{row.addressFrom === 'proxy' && (
+				<Typography.Text type="secondary">
+					{' '}
+					as your proxy reported it
+				</Typography.Text>
+			)}
+			{facts.length > 0 && (
+				<Tooltip title="Known to FoxTrust when this was recorded. IP Geolocation by DB-IP.">
+					<Typography.Text type="secondary">
+						{' '}
+						· {facts.join(' · ')}
+					</Typography.Text>
+				</Tooltip>
+			)}
+		</>
+	);
+}
+
+function Row({
+	bucketId,
+	userId,
+	row
+}: {
+	bucketId: string;
+	userId: string;
+	row: ActivityRow;
+}) {
+	const check =
+		row.outcome === 'let_in' ? null : checkHref(bucketId, userId, row);
+	const when =
+		row.count > 1
+			? `${timeWords(row.firstAt)}–${timeWords(row.lastAt)}`
+			: timeWords(row.lastAt);
+	const outcome =
+		row.count > 1
+			? `${row.words.outcome} ${String(row.count)} times`
+			: row.words.outcome;
+	return (
+		<Flex
+			vertical
+			gap={2}
+			style={{
+				padding: '8px 0',
+				borderBottom: '1px solid rgba(5, 5, 5, 0.06)'
+			}}
+		>
+			<Flex
+				wrap
+				gap={8}
+				align="baseline"
+			>
+				<Typography.Text type="secondary">{when}</Typography.Text>
+				<Tag
+					color={
+						row.outcome === 'let_in'
+							? 'green'
+							: row.outcome === 'refused'
+								? 'red'
+								: 'gold'
+					}
+				>
+					{outcome}
+				</Tag>
+				<Typography.Text strong>{placeOf(row)}</Typography.Text>
+				{row.kind === 'api' && row.client && (
+					<Typography.Text type="secondary">
+						through {row.client}
+					</Typography.Text>
+				)}
+				{row.newAddress && <Tag>New address</Tag>}
+			</Flex>
+			<Flex
+				wrap
+				gap={8}
+				align="baseline"
+			>
+				{row.outcome === 'let_in' ? (
+					<>
+						{row.words.method && (
+							<Typography.Text>{row.words.method}</Typography.Text>
+						)}
+						<Address row={row} />
+						{row.words.device && (
+							<Tooltip title="As the browser reported it.">
+								<Typography.Text type="secondary">
+									{row.words.device}
+								</Typography.Text>
+							</Tooltip>
+						)}
+					</>
+				) : (
+					<>
+						<Typography.Text>{row.words.reason}</Typography.Text>
+						<Address row={row} />
+					</>
+				)}
+				{check && <Link href={check}>Check this now</Link>}
+			</Flex>
+			{row.words.sawText && (
+				<Typography.Text type="secondary">
+					They saw: “{row.words.sawText}”
+				</Typography.Text>
+			)}
+		</Flex>
+	);
+}
 
 /*
- * What administrators, agents and directories recently did to this person: the audit entries that name
- * them. Their own sign-ins are not recorded per person, so this is never a sign-in history, and it says so.
- * Changes to a group they are in are recorded against the group, and are found there.
+ * What this server decided about the person (specs/133 contracts/console.md): sign-ins, failed sign-ins and stops,
+ * and what apps behind the proxy and APIs checked at it asked or refused, newest first, grouped by the reader's day.
+ * The filters live in the address, like the Users list, so a link shows the same view.
  */
 export function UserActivityTab({
 	bucketId,
@@ -32,33 +266,88 @@ export function UserActivityTab({
 	bucketId: string;
 	userId: string;
 }) {
-	const [page, setPage] = useState<AuditPage | null>(null);
+	const { query } = useRoute();
+	const navigate = useNavigate();
+	const kind = (query.get('kind') ?? 'all') as Kind | 'all';
+	const outcome = (query.get('outcome') ?? 'all') as Outcome | 'all';
+	const [pages, setPages] = useState<ActivityPage[]>([]);
 	const [loadError, setLoadError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);
-	const filter = new URLSearchParams({
-		targetId: userId,
-		targetScope: bucketId
-	}).toString();
+	/* Whether recording began within the kept days, judged when a page arrives rather than on every render. */
+	const [recent, setRecent] = useState(false);
 
-	const fetchEntries = useCallback(async () => {
-		try {
-			const result = await request<AuditPage>(
-				'GET',
-				`/admin/api/audit?${filter}&pageSize=${String(SHOWN)}`
-			);
-			if (result.ok) {
-				setPage(result.data);
-				setLoadError(null);
-			} else {
-				setLoadError(result.error.message);
+	// Every state write follows an await, so the effect below calls this without setting `loading` first.
+	const load = useCallback(
+		async (before: string | null) => {
+			try {
+				const result = await request<ActivityPage>(
+					'POST',
+					`/admin/api/projects/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(userId)}/activity`,
+					{
+						...(kind === 'all' ? {} : { kind }),
+						...(outcome === 'all' ? {} : { outcome }),
+						...(before ? { before } : {}),
+						limit: PAGE
+					}
+				);
+				if (result.ok) {
+					setPages((earlier) =>
+						before ? [...earlier, result.data] : [result.data]
+					);
+					const began = result.data.recordingBegan;
+					setRecent(
+						began !== null &&
+							Date.now() - new Date(began).getTime() <
+								result.data.keptDays * 86_400_000
+					);
+					setLoadError(null);
+				} else {
+					setLoadError(result.error.message);
+				}
+			} finally {
+				setLoading(false);
 			}
-		} finally {
-			setLoading(false);
-		}
-	}, [filter]);
+		},
+		[bucketId, userId, kind, outcome]
+	);
 	useEffect(() => {
-		void fetchEntries();
-	}, [fetchEntries]);
+		void load(null);
+	}, [load]);
+
+	const go = (changes: Record<string, string>) => {
+		const params = new URLSearchParams(query);
+		for (const [key, value] of Object.entries(changes)) {
+			if (value === 'all') params.delete(key);
+			else params.set(key, value);
+		}
+		const qs = params.toString();
+		void navigate(
+			`${userHref(bucketId, userId, 'activity')}${qs ? `?${qs}` : ''}`,
+			{
+				replace: true,
+				scroll: false
+			}
+		);
+	};
+
+	const rows = useMemo(() => pages.flatMap((page) => page.rows), [pages]);
+	const busy = useMemo(
+		() => new Set(pages.flatMap((page) => page.busyDays)),
+		[pages]
+	);
+	const days = useMemo(() => {
+		const grouped = new Map<string, ActivityRow[]>();
+		for (const row of rows) {
+			const day = localDay(row.lastAt);
+			const list = grouped.get(day) ?? [];
+			list.push(row);
+			grouped.set(day, list);
+		}
+		return [...grouped.entries()];
+	}, [rows]);
+	const first = pages.at(0);
+	const last = pages.at(-1);
+	const began = first?.recordingBegan ?? null;
 
 	if (loadError !== null) {
 		return (
@@ -66,7 +355,7 @@ export function UserActivityTab({
 				reason={loadError}
 				onRetry={() => {
 					setLoading(true);
-					void fetchEntries();
+					void load(null);
 				}}
 			/>
 		);
@@ -77,62 +366,93 @@ export function UserActivityTab({
 			vertical
 			gap={12}
 		>
+			<Typography.Text type="secondary">
+				Sign-ins, and what apps behind your proxy and APIs checked at it
+				answered. Kept for {String(first?.keptDays ?? 90)} days. Recorded up to
+				a minute late.
+				{recent && began && (
+					<>
+						{' '}
+						Recording began on {dateWords(began)}. Nothing earlier was recorded.
+					</>
+				)}
+			</Typography.Text>
+			{first?.recording === false && (
+				<Alert
+					type="info"
+					showIcon
+					title="Recording is turned off for this server. What was recorded stays until it expires."
+				/>
+			)}
 			<Flex
-				justify="space-between"
 				wrap
-				gap={12}
+				gap={8}
 			>
-				<Typography.Text type="secondary">
-					Sign-ins aren&apos;t recorded per person; this lists the changes made
-					to them.
-				</Typography.Text>
-				<Link href={`/admin/audit?${filter}`}>Open in Audit</Link>
+				<Select
+					aria-label="Outcome"
+					value={outcome}
+					options={OUTCOMES}
+					style={{ minWidth: 200 }}
+					onChange={(value) => go({ outcome: value })}
+				/>
+				<Select
+					aria-label="Kind"
+					value={kind}
+					options={KINDS}
+					style={{ minWidth: 140 }}
+					onChange={(value) => go({ kind: value })}
+				/>
 			</Flex>
-			<Table<AuditEntry>
-				rowKey="_id"
-				size="small"
-				loading={loading}
-				dataSource={page?.entries ?? []}
-				pagination={false}
-				locale={{
-					emptyText: (
-						<EmptyState purpose="No administrative changes to this person yet." />
-					)
-				}}
-				columns={[
-					{
-						title: 'When',
-						dataIndex: 'timestamp',
-						render: (at: string) => new Date(at).toLocaleString()
-					},
-					{ title: 'Action', dataIndex: 'action' },
-					{
-						title: 'Changed',
-						dataIndex: 'attributes',
-						render: (attributes: string[]) =>
-							attributes.map((a) => <Tag key={a}>{a}</Tag>)
-					},
-					{
-						title: 'By',
-						key: 'by',
-						render: (_: unknown, row: AuditEntry) => (
-							<>
-								{/* The person on their connected-apps page: the sentinel is not an address (specs/095). */}
-								{row.viaSurface === 'self-service'
-									? 'The person themselves'
-									: row.actorEmail}
-								{row.viaSurface === 'mcp' && <Tag>agent</Tag>}
-								{row.viaSurface === 'scim' && <Tag>directory</Tag>}
-							</>
-						)
+			{!loading && rows.length === 0 && (
+				<EmptyState
+					purpose={
+						began
+							? `No sign-ins or refusals since recording began on ${dateWords(began)}.`
+							: 'No sign-ins or refusals recorded yet.'
 					}
-				]}
-			/>
-			{page && page.total > page.entries.length && (
-				<Typography.Text type="secondary">
-					The latest {String(page.entries.length)} of {String(page.total)} —
-					open in Audit for the rest.
-				</Typography.Text>
+				/>
+			)}
+			{days.map(([day, list]) => {
+				const serverDays = new Set(list.map((row) => row.day));
+				const missing = [...serverDays].some((d) => busy.has(d));
+				return (
+					<Flex
+						key={day}
+						vertical
+					>
+						<Typography.Title
+							level={5}
+							style={{ marginBottom: 0 }}
+						>
+							{dateWords(list[0].lastAt)}
+						</Typography.Title>
+						{missing && (
+							<Typography.Text type="warning">
+								On this day this server was too busy to record everything for
+								this project. This day may be missing entries.
+							</Typography.Text>
+						)}
+						{list.map((row) => (
+							<Row
+								key={row.id}
+								bucketId={bucketId}
+								userId={userId}
+								row={row}
+							/>
+						))}
+					</Flex>
+				);
+			})}
+			{last?.next && (
+				<Button
+					loading={loading}
+					onClick={() => {
+						setLoading(true);
+						void load(last.next);
+					}}
+				>
+					Show earlier days
+				</Button>
 			)}
 		</Flex>
 	);

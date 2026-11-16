@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Card, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd';
 import { request } from '../../frame/request.js';
+import { useRoute } from '../../frame/router.js';
 import { usersApi, type EndUser } from '../users/endUser.js';
 import { personOfView } from '../../../../behind_proxy/access_check.js';
 import {
@@ -128,8 +129,14 @@ export function ApiCheckAccess({
 	edited: ApiView | null;
 }) {
 	const tools = (edited ?? saved).tools?.rows.map((row) => row.name) ?? [];
+	/*
+	 * "Check this now" on a person's activity (specs/133 FR-023): the person and the tool row arrive in the address, and
+	 * the check answers at once against today's rules. Read when the panel opens.
+	 */
+	const { query } = useRoute();
+	const prefillPerson = query.get('person');
 	const [kind, setKind] = useState<Kind>('tool');
-	const [toolName, setToolName] = useState('');
+	const [toolName, setToolName] = useState(() => query.get('tool') ?? '');
 	const [otherName, setOtherName] = useState('');
 	const [held, setHeld] = useState<string[]>([...scopes]);
 	const [from, setFrom] = useState('');
@@ -170,6 +177,27 @@ export function ApiCheckAccess({
 	useEffect(() => {
 		search('');
 	}, [search]);
+
+	useEffect(() => {
+		if (!prefillPerson) return;
+		void request<EndUser>('GET', usersApi(bucketId, prefillPerson)).then(
+			(result) => {
+				if (!result.ok) return;
+				const option = {
+					id: result.data._id,
+					email: result.data.email,
+					view: result.data
+				};
+				setPeople((shown) =>
+					shown.some((p) => p.id === option.id) ? shown : [option, ...shown]
+				);
+				setPersonId(option.id);
+				setChosen(option);
+			}
+		);
+		// Once per opening: later edits are the administrator's own.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	/* Asked only when some condition relies on network facts: the decision runs here and cannot hold the snapshot. */
 	const wantsFacts = [saved, edited].some((view) =>

@@ -17,7 +17,7 @@ import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useConfirm } from '../../frame/confirm.js';
 import { ACTIONS } from '../../frame/actions.js';
-import { Link, useLeaveGuard } from '../../frame/router.js';
+import { Link, useLeaveGuard, useRoute } from '../../frame/router.js';
 import { behindProxyHref } from '../../frame/routes.js';
 import { ConfirmDestruction } from '../../ConfirmDestruction.js';
 import { SaveBar } from '../../settings/SaveBar.js';
@@ -185,7 +185,7 @@ const OUTCOMES: Record<Decision['outcome'], { color: string; label: string }> =
 	{
 		allow: { color: 'success', label: 'Allowed' },
 		sign_in: { color: 'processing', label: 'Signs in first' },
-		deny: { color: 'error', label: 'Denied' }
+		deny: { color: 'error', label: 'Refused' }
 	};
 
 /*
@@ -818,7 +818,13 @@ function AccessCheck({
 	zone: string | null;
 	nameOf: (id: string) => string | null;
 }) {
-	const [address, setAddress] = useState('');
+	/*
+	 * "Check this now" on a person's activity (specs/133 FR-023): the person and the rule's path arrive in the address,
+	 * and the check answers at once against today's rules. Read when the panel opens.
+	 */
+	const { query } = useRoute();
+	const prefillPerson = query.get('person');
+	const [address, setAddress] = useState(() => query.get('path') ?? '');
 	const [from, setFrom] = useState('');
 	/*
 	 * What the server's copy of FoxTrust's snapshot says about `from` (specs/129 FR-027), asked only when some rule has
@@ -887,6 +893,27 @@ function AccessCheck({
 	useEffect(() => {
 		search('');
 	}, [search]);
+
+	useEffect(() => {
+		if (!prefillPerson) return;
+		void request<EndUser>('GET', usersApi(bucketId, prefillPerson)).then(
+			(result) => {
+				if (!result.ok) return;
+				const option = {
+					id: result.data._id,
+					email: result.data.email,
+					view: result.data
+				};
+				setPeople((shown) =>
+					shown.some((p) => p.id === option.id) ? shown : [option, ...shown]
+				);
+				setPersonId(option.id);
+				setChosen(option);
+			}
+		);
+		// Once per opening: later edits are the administrator's own.
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, []);
 
 	const at = momentOf(moment);
 	const viewed = personOfView(

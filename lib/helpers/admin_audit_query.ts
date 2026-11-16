@@ -60,6 +60,9 @@ export function matchesAuditQuery(
 	if (query.action !== undefined && entry.action !== query.action) {
 		return false;
 	}
+	if (query.excludeActions?.includes(entry.action)) {
+		return false;
+	}
 	// A literal prefix, not a pattern: the stores escape it, so every backend reads `.` and `%` as text.
 	if (
 		query.actionPrefix !== undefined &&

@@ -29,7 +29,8 @@ import {
 	ResetPasswordBody,
 	LockEndUserBody,
 	UserListQuery,
-	AttributeMatchesQuery
+	AttributeMatchesQuery,
+	UserActivityBody
 } from '../admin/users-end/schema.js';
 import {
 	CreateProviderBody,
@@ -470,7 +471,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists. `totpEnrolledVia` says how their authenticator app was set up (`self` on their own page, `sign-in` when the project required one), and `totpProofRequired` that an administrator removed it, so the next one needs a link emailed to them."
+			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists. `totpEnrolledVia` says how their authenticator app was set up (`self` on their own page, `sign-in` when the project required one), and `totpProofRequired` that an administrator removed it, so the next one needs a link emailed to them. `activity` summarises their activity: `lastSignIn` (when, to which application, how), `notLetInSince` (only when a sign-in or a check turned them away after it: when, how many times, why), `lastActive` (the last day, or month, they signed in, renewed a token or were let in at the proxy) and `recordingBegan`; no address, country or device, which project_user_activity_list gives."
 	},
 	{
 		tool: 'project_user_session_list',
@@ -483,7 +484,20 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			'The applications an end-user is signed in to in this project, as `{ applications }`: per application its `clientId` and `clientName`, `signedInAt`, `lastTokenAt` (when this server last issued it a token for the person — not when the application used one) and `offline` (it holds offline access no live session carries). A row with `clientId: null` is a sign-in that has reached no application yet. No network address, browser or device is stored, so none is returned. Sign the person out of one application with project_user_application_sign_out.'
+			'The applications an end-user is signed in to in this project, as `{ applications }`: per application its `clientId` and `clientName`, `signedInAt`, `lastTokenAt` (when this server last issued it a token for the person — not when the application used one) and `offline` (it holds offline access no live session carries). A row with `clientId: null` is a sign-in that has reached no application yet. Sessions carry no network address or device. Where and how the person signed in: project_user_activity_list. Sign the person out of one application with project_user_application_sign_out.'
+	},
+	{
+		tool: 'project_user_activity_list',
+		method: 'POST',
+		path: '/admin/api/projects/:id/users/:uid/activity',
+		action: 'enduser.activity.read',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: UserActivityBody,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			"What this server decided about one person of the project, newest first, as `{ rows, next, busyDays, recordingBegan, keptDays }`: every sign-in (`kind: signIn`, `outcome: let_in`, with the application, the method, the network address as this server attributed the caller, FoxTrust's country and categories when network facts are on, and the browser and system family), every failed sign-in where the account was found (a wrong password or code, a locked or deactivated account, a missing code, an unverified address, a provider sign-in into a closed account), and every time an app behind the proxy (`kind: app`) or an API checked at the proxy (`kind: api`) asked them to sign in again or refused them. Anything but a sign-in is one row per day, place, outcome and reason, with `count`, `firstAt` and `lastAt`. `words` are this server's fixed wording of the outcome, the reason and what the person saw; `place.tool` is a row of the API's tools table or `another tool`. An app row carries the person's address only when the proxy proved it with the project's proxy key; an API row never does. Kept 90 days after the last write; recorded up to a minute late; `busyDays` are days the server was too busy to record everything for this project. Filter with `kind` and `outcome`; page with `before` set to the previous `next`. Reading it is recorded in the audit trail, once per reader, person and day."
 	},
 	{
 		tool: 'federation_provider_list',

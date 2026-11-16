@@ -408,6 +408,16 @@ const routes = [
 		path: '/admin/api/projects/:id/users/:uid/invitation',
 		targetType: 'EndUser'
 	},
+	/*
+	 * A read, audited (specs/133 FR-025): a person's activity holds their network addresses, so who read it is kept,
+	 * once per reader, person and day. Not a change, so the person's Changes tab leaves it out (`AUDITED_READS`).
+	 */
+	{
+		action: 'enduser.activity.read',
+		method: 'POST',
+		path: '/admin/api/projects/:id/users/:uid/activity',
+		targetType: 'EndUser'
+	},
 	/* An administrator's statement that the person controls their address. */
 	{
 		action: 'enduser.verified.mark',
@@ -913,6 +923,16 @@ export const nonRouteAuditActions: readonly {
 export type AuditAction =
 	| (typeof routes)[number]['action']
 	| (typeof nonRouteActions)[number]['action'];
+
+/*
+ * Audited actions that change nothing: reads whose reader is kept because what they read is sensitive (an address
+ * looked up, a person's activity). A list of what was changed — a person's Changes tab — leaves them out
+ * (`changesOnly` on the audit list); the audit page shows them with everything else.
+ */
+export const AUDITED_READS: readonly AuditAction[] = [
+	'networkfacts.lookup',
+	'enduser.activity.read'
+];
 export type AuditTargetType =
 	| (typeof routes)[number]['targetType']
 	| (typeof nonRouteActions)[number]['targetType'];

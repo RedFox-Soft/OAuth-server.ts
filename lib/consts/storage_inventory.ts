@@ -185,6 +185,12 @@ export const STORE_AREAS = {
 	 */
 	connectedAccounts: 'connectedAccounts',
 	/*
+	 * What this server decided about a person (specs/133): their sign-ins, failed sign-ins where the account was
+	 * known, and what apps behind the proxy and APIs checked at it asked or refused. One row per sign-in; anything
+	 * else is one row per person, day, place, outcome and reason, with a count.
+	 */
+	personActivity: 'personActivity',
+	/*
 	 * A bucket's groups of end users — what its roles became. Distinct from `groups`, which hold administrators
 	 * and own buckets; the two are never the same record.
 	 */
@@ -779,6 +785,27 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			/* The keep-alive pass's scan across projects (specs/118 R11). */
 			{ key: { refreshedAt: 1 } }
 		]
+	),
+	/*
+	 * Unowned on purpose, though every row names a person, for the reason connected accounts are: an account owner
+	 * here would mean "swept by every lock, deactivation and Sign out everywhere", and a person's activity is what an
+	 * administrator reads at exactly that moment. The person's deletion and the project's destruction remove it by
+	 * hand (lib/person_activity/forget.ts).
+	 *
+	 * Reaped on `expiresAt`, which every write moves to 90 days after the row's last event, so expiry is spread over
+	 * the day rather than falling due for a whole day at once.
+	 *
+	 * `{bucketId, accountId, lastAt, _id}` serves a person's timeline newest first, walked backwards, with `_id` making
+	 * the order total; its prefixes serve deletion by person and by project. A project-wide read of refusals has no
+	 * index yet because nothing reads one before specs 5B.
+	 */
+	storeArea(
+		STORE_AREAS.personActivity,
+		EXPIRES_AT,
+		unowned(
+			'a person keeps their activity through a lock (specs/133); deleted by the person and project deletion paths'
+		),
+		[{ key: { bucketId: 1, accountId: 1, lastAt: 1, _id: 1 } }]
 	),
 	storeArea(
 		STORE_AREAS.provisioningRefusals,

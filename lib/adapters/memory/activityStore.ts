@@ -54,6 +54,18 @@ export class ActivityStore implements ActivityStoreInstance {
 		}
 	}
 
+	async markedPeriods(
+		bucketId: string,
+		accountId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]> {
+		return periods.filter((period) => {
+			const mark = this.marks.get(markId(bucketId, period, accountId));
+			return mark !== undefined && mark.expiresAt.getTime() > at.getTime();
+		});
+	}
+
 	/* Expired marks are dropped on the way past, the lazy sweep the other bespoke memory stores do. */
 	private live(period: string, at: Date): ActivityMarkRecord[] {
 		const found: ActivityMarkRecord[] = [];

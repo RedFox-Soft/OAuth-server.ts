@@ -25,6 +25,8 @@ export const AuditQuery = t.Object({
 	project: t.Optional(t.String()),
 	connection: t.Optional(t.String()),
 	actionPrefix: t.Optional(t.String()),
+	/* `true` leaves out the audited reads (a person's activity read, an address looked up): only what was changed. */
+	changesOnly: t.Optional(t.String()),
 	from: t.Optional(t.String()),
 	to: t.Optional(t.String()),
 	page: t.Optional(t.String()),

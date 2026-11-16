@@ -36,6 +36,7 @@ import type { Language } from '../i18n/languages.js';
 import { languageOfRequest } from '../i18n/request.js';
 import { Interaction } from '../models/interaction.js';
 import { registrationClosedPage } from '../interactions/registrationPages.js';
+import { noteSignInRefused } from '../person_activity/record.js';
 
 /*
  * The return leg from an upstream provider.
@@ -341,6 +342,17 @@ async function completeReturn(params: ReturnParams, request: Request) {
 						? federationNoConsoleAccountPage()
 						: federationProvisioningClosedPage(language);
 				case 'inactive':
+					/* The account was found, and is locked or deactivated: that person's activity says so (specs/133). */
+					if (resolution.accountId !== undefined) {
+						noteSignInRefused({
+							bucketId: bucket._id,
+							accountId: resolution.accountId,
+							reason: 'provider_closed',
+							clientId: undefined,
+							providerId: provider.id,
+							request
+						});
+					}
 					return federationInactivePage(language);
 				/*
 				 * The page a paused self-registration answers, not the provisioning-closed one: that one tells the

@@ -253,7 +253,7 @@ export function BulkUsersBar({
 					title={`Delete ${people(n)}?`}
 					okText="Delete"
 					consequences={[
-						'Their accounts, sessions, tokens and links to identity providers are destroyed. This cannot be undone.',
+						'Their accounts, sessions, tokens, activity and links to identity providers are destroyed. This cannot be undone.',
 						...forecastSkips('delete', selected)
 					]}
 					busy={busy}

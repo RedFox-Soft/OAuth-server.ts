@@ -1562,7 +1562,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		},
 		goodToKnow: [
 			'A super administrator turns on “Network facts from FoxTrust” in Settings → Integrations. Each server then downloads a file of about 13 MB once a day and an update every hour.',
-			'People’s addresses are only compared inside your server. FoxTrust learns only that the file was downloaded.',
+			'People’s addresses are looked up only inside your server. FoxTrust learns only that the file was downloaded.',
 			'Commercial VPN covers only the VPN services FoxTrust lists, not a company VPN. Hosting or a cloud also covers content networks and some companies’ own exits. iCloud Private Relay is not kept out.',
 			'Countries come from DB-IP (IP Geolocation by DB-IP, CC BY 4.0). An address with no known country is refused by “Only from” and passes “Not from”.',
 			'A matching address is refused, or asked to sign in again within the minutes you choose, with a code from an authenticator app if you tick it. An API checked at the proxy can only refuse.',
@@ -1573,6 +1573,69 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Keep Tor, commercial VPNs and hosting away from /admin of my app behind the proxy, and let people open the whole app only from Germany and Austria.\nCheck that network facts are current for the app. Then add a network condition with a facts part to the rule for /admin (categories tor, vpn and hosting) and one to the rule for / (countries: only DE and AT), each refusing a matching address.',
 			'behind_proxy_app_get (addresses.networkFacts says whether they are current), then behind_proxy_app_update with a facts part on a network condition in rules[].conditions',
 			'Network facts are an instance setting for a super administrator: networkFacts.enabled. To explain a refusal, look the address up with network_facts_lookup.'
+		)
+	},
+	{
+		id: 'cantgetin',
+		tab: 'product',
+		title: 'Find out why someone can’t get in',
+		sentence:
+			'Open the person in Users: their Activity tab shows every sign-in, every failed one, and every time an app behind your proxy or an API refused them, with the reason and what they saw.',
+		protocol: 'Sign-in decisions · Forward auth decisions',
+		lanes: lanes('person', 'fox', 'admin'),
+		steps: [
+			step(
+				'person',
+				'fox',
+				'Tries to open the wiki',
+				'Anna opens the wiki, an app behind your proxy, and signs in.'
+			),
+			step(
+				'fox',
+				'person',
+				'Refused',
+				'The wiki’s rules do not let her open /admin. She sees a page saying she cannot open it.',
+				'refusal'
+			),
+			step(
+				'admin',
+				'fox',
+				'Opens the person’s Activity',
+				'Anna writes to support. Support opens her in Users and goes to her Activity tab.'
+			),
+			step(
+				'fox',
+				'admin',
+				'Reason and what they saw',
+				'The tab shows the refusal at 10:14, three times, “Not in the groups that may open /admin”, and a link to check it against today’s rules.'
+			)
+		],
+		problem: {
+			at: 'admin',
+			mark: 'missing',
+			caption: 'Someone can’t get in, and nobody can see why.'
+		},
+		fixCaption: 'Every refusal is kept, with its reason.',
+		sees: {
+			kind: 'none',
+			lines: ['The same refusal page as before: nothing changes for the person']
+		},
+		needs: { role: 'manageUsers' },
+		action: {
+			kind: 'open',
+			label: 'Open Users',
+			target: { area: 'users' }
+		},
+		goodToKnow: [
+			'Kept for every project: sign-ins with the application, the method, the network address, FoxTrust’s country and network kind when network facts are on, and the browser and system.',
+			'Failed sign-ins are kept only where the account was found: a wrong password or code, a locked or deactivated account, a missing code or an unverified address.',
+			'At your proxy the person’s address is kept only when your proxy proves it with the project’s proxy key. An API row never has one.',
+			'Everything is kept 90 days, survives a lock, and goes with the person and the project. Reading it is recorded in the audit trail.',
+			'It is recorded up to a minute late. A super administrator can turn recording off in Settings.'
+		],
+		prompt: prompt(
+			'Why was anna@acme.com refused by the Wiki app today?',
+			'project_user_list to find her, then project_user_activity_list with outcome refused'
 		)
 	},
 	{
@@ -2684,6 +2747,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		},
 		goodToKnow: [
 			'You can do it by hand: Users, the person, Deactivate.',
+			'Their activity stays for 90 days after you deactivate them, so you can still see what they used.',
 			'The company’s provider can do it for you only after you add it as a sign-in provider and a super administrator switches on the signals it sends, in the server’s settings.'
 		],
 		prompt: prompt(

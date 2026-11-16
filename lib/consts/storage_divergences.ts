@@ -131,5 +131,22 @@ export const STORAGE_DIVERGENCES: readonly StorageDivergence[] = [
 		observable:
 			'nothing. The in-memory store lower-cases on write as well — create, update and the test seed — ' +
 			'so the three stores hold the same address, and a prefix search on it agrees across them.'
+	},
+	{
+		id: 'person-activity-partial-chunk',
+		subject:
+			"how much of a person's activity a failed write leaves behind (specs/133)",
+		mongodb:
+			'an unordered bulk write: the operations that succeeded stay, the refused ones are counted as lost',
+		postgres: 'one transaction per chunk: all of it or none of it',
+		reason:
+			'Both keep the rule the spec cares about, that a failure may lose counts but never doubles one: neither ' +
+			'retries a failed chunk, because the write adds. Making MongoDB all-or-nothing would need a ' +
+			'multi-document transaction, which a standalone `mongod` (a supported topology) does not have; making ' +
+			'PostgreSQL partial would mean one statement per row outside a transaction, giving up the sorted lock ' +
+			'order that keeps two processes from deadlocking.',
+		observable:
+			"after a failed write, how many of that minute's rows were recorded: some on MongoDB, none of the " +
+			'chunk on PostgreSQL. Counts are never higher than what happened on either.'
 	}
 ];

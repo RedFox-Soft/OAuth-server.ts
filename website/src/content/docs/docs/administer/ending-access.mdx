@@ -87,8 +87,9 @@ the same action.
 - **One application.** A person's Sign-in methods tab lists the applications they are signed in to: when they
   signed in, and when each app last got a token. **Sign out of this app** ends that application's access only. Its
   tokens stop working, offline access included, and the person's other applications are untouched. The list shows
-  no network address or device, because the server keeps none. Agents use `project_user_session_list` and
-  `project_user_application_sign_out`.
+  no network address or device. Where and how the person signed in is on their Activity tab, kept for 90 days
+  ([what FoxAuth records about people](/people-records/)). Agents use `project_user_session_list`,
+  `project_user_activity_list` and `project_user_application_sign_out`.
 - **Many people.** Select up to 100 people in a project's Users list, then Deactivate, Activate, Sign out
   everywhere or Delete them. Each person is handled exactly as if acted on alone, with their own entry in the audit
   trail. People an act does not apply to are skipped and counted, not failed: a directory's people for

@@ -49,6 +49,9 @@ function toFilter(query: AdminAuditQuery): Filter<AdminAuditEntry> {
 			disjunctions.push([prefix]);
 		}
 	}
+	if (query.excludeActions !== undefined && query.excludeActions.length > 0) {
+		disjunctions.push([{ action: { $nin: [...query.excludeActions] } }]);
+	}
 	if (query.targetType !== undefined) {
 		filter.targetType = query.targetType;
 	}

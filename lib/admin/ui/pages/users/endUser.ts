@@ -34,7 +34,27 @@ export type EndUser = Omit<
 	};
 	/* Known for accounts written since specs/082; absent on older ones, which say nothing either way. */
 	passwordSet?: boolean;
+	/* The person's activity in brief (specs/133), on the single read only. No address, country or device. */
+	activity?: ActivitySummaryView;
 };
+
+export interface ActivitySummaryView {
+	recordingBegan: string | null;
+	keptDays: number;
+	lastSignIn: {
+		at: string;
+		clientId: string | null;
+		name: string | null;
+		method: string | null;
+	} | null;
+	notLetInSince: {
+		at: string;
+		count: number;
+		reason: string;
+		kind: 'signIn' | 'app' | 'api';
+	} | null;
+	lastActive: { day: string } | { month: string } | null;
+}
 
 /* One page of the users list (GET /admin/api/projects/:id/users). */
 export interface EndUserPage {

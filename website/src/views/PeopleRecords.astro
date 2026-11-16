@@ -1,0 +1,49 @@
+---
+import Site from '../layouts/Site.astro';
+import Section from '../components/ui/Section.astro';
+import Eyebrow from '../components/ui/Eyebrow.astro';
+import StaleTranslationNotice from '../components/StaleTranslationNotice.astro';
+import { isStale, messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/peopleRecords/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+
+/*
+ * What a FoxAuth server keeps about people (specs/133): one page an operator can point their own privacy notice at,
+ * in every published language. The facts come from the server's own rules; change them here when those change.
+ */
+interface Props {
+	locale: LocaleKey;
+}
+const { locale } = Astro.props;
+const t = messagesFor('peopleRecords', english, locale);
+---
+
+<Site title={`${t.title} | FoxAuth`} description={t.description} locale={locale}>
+	<Section narrow>
+		<Eyebrow>{t.eyebrow}</Eyebrow>
+		<h1 class="text-4xl font-[650] leading-[1.15] tracking-tight text-balance">
+			{t.heading}
+		</h1>
+		<p class="mt-5 text-lg text-gray-600 dark:text-gray-400">
+			{t.lead}
+		</p>
+		{isStale('peopleRecords', locale) && <StaleTranslationNotice locale={locale} english="/people-records/" class="mt-4" />}
+	</Section>
+
+	<Section narrow tone="muted">
+		<div class="flex flex-col gap-10">
+			{
+				t.sections.map((section) => (
+					<section>
+						<h2 class="text-xl font-[650] tracking-tight">{section.heading}</h2>
+						<ul class="mt-4 flex list-disc flex-col gap-3 pl-5 text-gray-700 dark:text-gray-300">
+							{section.items.map((item) => (
+								<li>{item}</li>
+							))}
+						</ul>
+					</section>
+				))
+			}
+		</div>
+	</Section>
+</Site>
