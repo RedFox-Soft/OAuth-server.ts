@@ -61,6 +61,7 @@ import { federationBackChannelLogout } from './upstream_signals/back_channel_log
 import { accountPageRoutes } from './account_page/routes.js';
 import { accountServicesRoutes } from './account_page/services_routes.js';
 import { accountSecurityRoutes } from './account_page/security_routes.js';
+import { accountSignInsRoutes } from './account_page/sign_ins_routes.js';
 import { accountLinkRoutes } from './account_page/link_routes.js';
 import { behindProxyRoutes } from './behind_proxy/routes.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
@@ -281,6 +282,11 @@ elysia.group('/:bucket', (bucketScoped) =>
 elysia.use(accountSecurityRoutes);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(accountSecurityRoutes)
+);
+// The person's own recent sign-ins and "Sign out everywhere" (specs/135), the same way.
+elysia.use(accountSignInsRoutes);
+elysia.group('/:bucket', (bucketScoped) =>
+	bucketScoped.use(accountSignInsRoutes)
 );
 // Where an agent's connect link leads (specs/119), the same way.
 elysia.use(accountLinkRoutes);

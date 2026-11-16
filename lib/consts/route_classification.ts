@@ -99,6 +99,7 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_security,
 	routeNames.account_security_link,
 	routeNames.account_security_disown,
+	routeNames.account_sign_ins,
 	BEHIND_PROXY_CHECK_BASE
 ];
 
@@ -335,6 +336,12 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: routeNames.account_security_disown },
 	{ method: 'POST', path: routeNames.account_security_disown },
 	/*
+	 * The person's own recent sign-ins (specs/135), unconditional too: a person who fears someone else is in their
+	 * account must always be able to look and to sign out everywhere.
+	 */
+	{ method: 'GET', path: routeNames.account_sign_ins },
+	{ method: 'POST', path: routeNames.account_sign_ins },
+	/*
 	 * The check a proxy makes for an app behind it (specs/122 R4). No instance switch: the endpoint does nothing
 	 * until a project declares an app, and a switch would only add a setting that protects nothing.
 	 */
@@ -563,6 +570,8 @@ const bareRateRoutes: readonly RateRoute[] = [
 	// The person's own page checks a code and sends mail (specs/126), and the disown link removes a factor.
 	{ method: 'POST', path: routeNames.account_security, rate: 'strict' },
 	{ method: 'POST', path: routeNames.account_security_disown, rate: 'strict' },
+	// Signing out everywhere sweeps every record of the account and may send a reset mail (specs/135).
+	{ method: 'POST', path: routeNames.account_sign_ins, rate: 'strict' },
 	{ method: 'POST', path: '/verify-email/code', rate: 'strict' },
 	{ method: 'POST', path: '/verify-email/resend', rate: 'strict' },
 	{ method: 'POST', path: '/reset-password', rate: 'strict' },

@@ -69,6 +69,16 @@ export function pageHolder(session: Session): string {
 }
 
 /*
+ * The person signed in in this browser, by any method, no more than fifteen minutes ago (specs/135 research R4). Looser
+ * than `freshPassword` on purpose: reading one's own sign-ins and signing out everywhere set nothing up a provider
+ * account could abuse, and a person who signs in only through a provider has no password to type.
+ */
+export function freshSignIn(session: Session): boolean {
+	const { loginTs } = session.payload;
+	return typeof loginTs === 'number' && epochTime() - loginTs <= FRESH_SECONDS;
+}
+
+/*
  * The person entered their password in this browser no more than fifteen minutes ago (research R3). A sign-in through
  * a provider is not one: whoever holds the provider account may hold the mailbox too.
  */

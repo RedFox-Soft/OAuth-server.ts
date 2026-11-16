@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'fbbbd972ca00';
+export const source = 'e2cdf357ab87';
 
 export default {
 	questions: {
@@ -1212,6 +1212,43 @@ export default {
 				'在你的应用的账户设置中放一个指向它的链接。'
 			],
 			actionLabel: '打开账户页面'
+		},
+		ownsignins: {
+			title: '用户查看自己的登录记录，并在所有地方退出登录',
+			sentence:
+				'账户页面列出用户最近十次登录，不显示地址。如果其中某次不是本人，用户可以一次退出所有应用，并收到设置新密码的链接。',
+			protocol: '面向最终用户的会话管理',
+			problemCaption: '怀疑别人在用自己账户的用户，没有地方可以查看。',
+			fixCaption: '用户查看自己的登录记录，并把不是本人的登录者挡在外面。',
+			lanes: { person: '用户', fox: 'FoxAuth' },
+			steps: [
+				{
+					label: '打开“最近登录”',
+					text: '用户在账户页面打开“最近登录”；如果登录已超过 15 分钟，需要重新登录。'
+				},
+				{
+					label: '最近十次登录',
+					text: 'FoxAuth 列出每次登录：应用、时间、方式、浏览器和国家。'
+				},
+				{
+					label: '在所有地方退出登录',
+					text: '其中一次不是本人，于是用户在所有地方退出登录。'
+				},
+				{
+					label: '所有进入方式都已结束',
+					text: 'FoxAuth 结束该账户的所有会话和令牌，并发送设置新密码的链接。'
+				}
+			],
+			sees: [
+				'最近十次登录：应用、时间、方式、浏览器和国家',
+				'一个在所有地方退出登录的按钮'
+			],
+			goodToKnow: [
+				'不需要开启任何东西。',
+				'该页面从不显示登录来自的地址。',
+				'在所有地方退出登录不会锁定账户，你可以在该用户的 Changes 中看到这次操作。'
+			],
+			actionLabel: '打开“最近登录”'
 		},
 		bound: {
 			title: '被盗的令牌毫无用处',

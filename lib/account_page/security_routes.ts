@@ -97,6 +97,7 @@ function navOf(person: PagePerson): AccountNav {
 				}
 			: {}),
 		security: pathOf(person.bucket),
+		signIns: new URL(`${base}${routeNames.account_sign_ins}`).pathname,
 		current: 'security'
 	};
 }

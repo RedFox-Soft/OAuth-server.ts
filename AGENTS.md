@@ -267,7 +267,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   is a tools-table row name or "another tool", a browser is a family. What a person used behind the proxy is one row a
   person, place and day, never with an address or a rule, its tools a list bounded at twenty, written by a buffer of
   its own every five minutes. A write adds and is never retried; a read of the timeline, or of who an app or an API
-  refused, is an audited POST. → `person-activity.md`
+  refused, is an audited POST. A person reads their own sign-ins on their account page only after a sign-in of any
+  method within fifteen minutes, never with an address or a network category, and signing out everywhere there never
+  locks the account. → `person-activity.md`, `connected-apps-page.md`
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment

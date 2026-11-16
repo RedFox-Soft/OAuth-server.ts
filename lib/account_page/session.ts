@@ -142,6 +142,8 @@ export interface PendingSignIn {
 	 * was for is said only so the page can tell the person what to do next.
 	 */
 	security?: SecurityStep;
+	/* The recent sign-ins page (specs/135) asked for this sign-in: return there, never to signing out everywhere. */
+	signIns?: true;
 }
 
 export type SecurityStep = 'view' | 'enrol' | 'replace' | 'off';
@@ -204,7 +206,8 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			connect,
 			disconnect,
 			link,
-			security
+			security,
+			signIns
 		} = parsed as PendingSignIn;
 		return {
 			state,
@@ -217,7 +220,8 @@ export function readPending(cookie: CookieJar): PendingSignIn | undefined {
 			...(typeof link === 'string' ? { link } : undefined),
 			...(SECURITY_STEPS.includes(security as SecurityStep)
 				? { security }
-				: undefined)
+				: undefined),
+			...(signIns === true ? { signIns } : undefined)
 		};
 	} catch {
 		return undefined;
@@ -254,6 +258,8 @@ export function signInRedirect(
 		link?: string;
 		/* Return to the two-step verification page (specs/126). */
 		security?: SecurityStep;
+		/* Return to the recent sign-ins page (specs/135). */
+		signIns?: boolean;
 	} = {}
 ): string {
 	const state = crypto.randomBytes(32).toString('base64url');
@@ -264,6 +270,7 @@ export function signInRedirect(
 		...(options.services ? { services: true as const } : undefined),
 		...(options.link ? { link: options.link } : undefined),
 		...(options.security ? { security: options.security } : undefined),
+		...(options.signIns ? { signIns: true as const } : undefined),
 		...(back?.connect ? { connect: back.connect } : undefined),
 		...(back?.disconnect ? { disconnect: back.disconnect } : undefined),
 		...(options.reauthenticate

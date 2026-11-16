@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-11-10
+updated: 2026-11-16
 graph:
   node_type: concept
   relationships:
@@ -30,7 +30,9 @@ told. An administrator responding to a compromised account had no way to end acc
 Now deactivation, the local lock and deletion all run `revokeAccountAccess`
 (`lib/end_users/revoke_access.ts:51`) — and, since spec 072, so does **"sign out everywhere"**
 (`revokeEndUserAccess`, `lib/end_users/service.ts:318`), which ends access without writing any flag, for an
-administrator and for a project's upstream provider through [[global-token-revocation]] — in this order:
+administrator and for a project's upstream provider through [[global-token-revocation]], and since spec 135 for the
+person themselves from Recent sign-ins (`signOutOwnAccount`, recorded as `enduser.signout` with
+`viaSurface: 'self-service'`, [[connected-apps-page]]) — in this order:
 
 1. The caller has already written the flag, so account resolution refuses the user from that moment.
 2. **Back-channel logout for every session** (`notifyRelyingParties`, `revoke_access.ts:17`). Sessions are

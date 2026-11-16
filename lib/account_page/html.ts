@@ -1,7 +1,12 @@
 import { esc } from '../html/escape.js';
 import { page } from '../interactions/plainPage.js';
-import { formatDateTime } from '../i18n/format.js';
-import type { Language } from '../i18n/languages.js';
+import {
+	formatAgo,
+	formatDate,
+	formatDateTime,
+	formatList
+} from '../i18n/format.js';
+import { FORMAT_LOCALE, type Language } from '../i18n/languages.js';
 import { html, htmlWith, plural, text } from '../i18n/message.js';
 import {
 	ACCOUNT_TEXTS,
@@ -14,6 +19,8 @@ import type {
 	RarBlock
 } from '../interactions/consentView.js';
 import type { ApplicationRow } from './view.js';
+import type { ActivityBrowser, ActivitySystem } from '../adapters/types.js';
+import type { OwnSignIn, OwnSignInsView } from '../person_activity/own.js';
 import { foxVar } from '../html/theme/palette.js';
 
 /*
@@ -178,7 +185,9 @@ export function listPage(
 	/* The connected-services page (specs/117), linked only where the project offers a service to connect. */
 	servicesHref?: string,
 	/* The two-step verification page (specs/126), on every project. */
-	securityHref?: string
+	securityHref?: string,
+	/* The person's recent sign-ins (specs/135), on every project. */
+	signInsHref?: string
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
 	const services = `${
@@ -188,6 +197,10 @@ export function listPage(
 	}${
 		securityHref
 			? ` · <a href="${esc(securityHref)}" style="${LINK}">${esc(T.securityLink)}</a>`
+			: ''
+	}${
+		signInsHref
+			? ` · <a href="${esc(signInsHref)}" style="${LINK}">${esc(T.signInsLink)}</a>`
 			: ''
 	}`;
 	const body = `${header(frame)}<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.title)}</h1>
@@ -354,12 +367,20 @@ export function servicesPage(
 	xsrf: string,
 	notice?: ServicesNotice,
 	/* The two-step verification page (specs/126). */
-	securityHref?: string
+	securityHref?: string,
+	/* The person's recent sign-ins (specs/135). */
+	signInsHref?: string
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
-	const security = securityHref
-		? ` · <a href="${esc(securityHref)}" style="${LINK}">${esc(T.securityLink)}</a>`
-		: '';
+	const security = `${
+		securityHref
+			? ` · <a href="${esc(securityHref)}" style="${LINK}">${esc(T.securityLink)}</a>`
+			: ''
+	}${
+		signInsHref
+			? ` · <a href="${esc(signInsHref)}" style="${LINK}">${esc(T.signInsLink)}</a>`
+			: ''
+	}`;
 	const connect = offered.length
 		? `<h2 style="font-size:16px; margin:24px 0 8px;">${esc(T.servicesAvailable)}</h2><ul style="list-style:none; padding:0; margin:0;">${offered
 				.map(
@@ -602,7 +623,8 @@ export interface AccountNav {
 	apps: string;
 	services?: string;
 	security: string;
-	current: 'apps' | 'services' | 'security';
+	signIns: string;
+	current: 'apps' | 'services' | 'security' | 'signIns';
 }
 
 export function navLine(frame: PageFrame, nav: AccountNav): string {
@@ -610,7 +632,8 @@ export function navLine(frame: PageFrame, nav: AccountNav): string {
 	const entries: [AccountNav['current'], string, string | undefined][] = [
 		['apps', T.appsLink, nav.apps],
 		['services', T.servicesLink, nav.services],
-		['security', T.securityLink, nav.security]
+		['security', T.securityLink, nav.security],
+		['signIns', T.signInsLink, nav.signIns]
 	];
 	return entries
 		.filter(([, , href]) => href !== undefined)
@@ -796,4 +819,208 @@ export function disownOutcomePage(
 		removed ? 200 : 400,
 		{ language }
 	);
+}
+
+// ---------------------------------------------------------------- recent sign-ins (specs/135)
+
+const BROWSER_NAMES: Record<ActivityBrowser, string | null> = {
+	chrome: 'Chrome',
+	edge: 'Edge',
+	firefox: 'Firefox',
+	safari: 'Safari',
+	opera: 'Opera',
+	samsung: 'Samsung Internet',
+	other: null
+};
+
+const SYSTEM_NAMES: Record<ActivitySystem, string | null> = {
+	windows: 'Windows',
+	macos: 'macOS',
+	ios: 'iOS',
+	android: 'Android',
+	linux: 'Linux',
+	chromeos: 'ChromeOS',
+	other: null
+};
+
+function placeWords(row: OwnSignIn, T: AccountTexts): string {
+	switch (row.place.kind) {
+		case 'app':
+			return row.place.name;
+		case 'accountPage':
+			return T.accountPageName;
+		case 'gone':
+			return T.deletedApp;
+	}
+}
+
+function methodWords(row: OwnSignIn, T: AccountTexts): string {
+	switch (row.method) {
+		case 'password':
+			return T.methodPassword;
+		case 'password_code':
+			return T.methodPasswordCode;
+		case 'provider':
+			return row.provider
+				? text(T.methodProvider, { provider: row.provider })
+				: T.methodProviderGone;
+	}
+}
+
+/* Brand names stay as they are in every language; only "other" and the joining words are the catalog's. */
+function deviceWords(row: OwnSignIn, T: AccountTexts): string | null {
+	if (!row.device) return null;
+	const browser = BROWSER_NAMES[row.device.browser] ?? T.otherBrowser;
+	const system = SYSTEM_NAMES[row.device.system];
+	return system === null ? browser : text(T.browserOn, { browser, system });
+}
+
+const countryNames = new Map<Language, Intl.DisplayNames>();
+
+function countryWords(code: string, language: Language): string | null {
+	let names = countryNames.get(language);
+	if (!names) {
+		names = new Intl.DisplayNames([FORMAT_LOCALE[language]], {
+			type: 'region'
+		});
+		countryNames.set(language, names);
+	}
+	const name = names.of(code);
+	return name && name !== code ? name : null;
+}
+
+function signInItem(row: OwnSignIn, language: Language, now: Date): string {
+	const T = ACCOUNT_TEXTS[language];
+	const ago = formatAgo(language, row.at.getTime(), now.getTime()) ?? T.justNow;
+	const country = row.country ? countryWords(row.country, language) : null;
+	const parts = [
+		`${stamp(row.at, language)} (${esc(ago)})`,
+		...[methodWords(row, T), deviceWords(row, T), country]
+			.filter((part): part is string => part !== null)
+			.map((part) => esc(part))
+	];
+	const mark = row.thisBrowser
+		? ` · <strong>${esc(T.thisBrowser)}</strong>`
+		: '';
+	return `<li data-sign-in style="margin:0 0 12px; padding:0 0 12px; border-bottom:1px solid ${foxVar('box-border')};"><strong style="overflow-wrap:anywhere;">${esc(placeWords(row, T))}</strong>${mark}<br/><span style="${MUTED}">${parts.join(' · ')}</span></li>`;
+}
+
+export function signInsPage(
+	frame: PageFrame,
+	nav: AccountNav,
+	view: OwnSignInsView,
+	now: Date
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	let list: string;
+	switch (view.state) {
+		case 'off':
+			list = `<p style="margin:8px 0;">${esc(T.signInsOff)}</p>`;
+			break;
+		case 'empty':
+			list = `<p style="margin:8px 0;">${html(T.signInsEmpty, {
+				date: formatDate(frame.language, view.since.getTime(), now.getTime())
+			})}</p>`;
+			break;
+		case 'list':
+			list = [
+				`<p style="margin:8px 0;">${html(T.signInsIntro, { service: frame.service })}</p>`,
+				`<ul style="list-style:none; padding:0; margin:16px 0;">${view.rows.map((row) => signInItem(row, frame.language, now)).join('')}</ul>`,
+				`<p style="margin:8px 0; ${MUTED}">${esc(T.signInsLate)}</p>`
+			].join('');
+			break;
+	}
+	const body = [
+		header(frame),
+		`<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.signInsTitle)}</h1>`,
+		`<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>`,
+		`<nav style="margin:0 0 8px;">${navLine(frame, nav)}</nav>`,
+		list,
+		`<h2 style="font-size:16px; margin:24px 0 8px;">${esc(T.notMe)}</h2>`,
+		`<p><a href="${esc(`${frame.path}?confirm=1`)}" style="${DANGER_LINK}">${esc(T.signOutEverywhere)}</a></p>`
+	].join('');
+	const response = page(T.signInsTitle, body, 200, {
+		wide: true,
+		language: frame.language
+	});
+	// What a person's sign-ins were is theirs alone; no cache between them and the server keeps it.
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+/* What the confirmation says about a password, decided by the route from the person and the project. */
+export type SignOutMail = 'reset' | { providers: string[] } | 'none';
+
+export function signOutConfirmPage(
+	frame: PageFrame,
+	xsrf: string,
+	mail: SignOutMail
+): Response {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const password =
+		mail === 'reset'
+			? `<p>${esc(T.signOutMail)}</p>`
+			: mail === 'none'
+				? ''
+				: `<p>${html(T.signOutProvider, {
+						providers: formatList(frame.language, mail.providers)
+					})}</p>`;
+	const body = [
+		header(frame),
+		`<h1 style="font-size:24px; margin:0 0 8px;">${esc(T.signOutTitle)}</h1>`,
+		`<p style="margin:8px 0;">${esc(T.signOutEffect)}</p>`,
+		password,
+		`<form method="post" action="${esc(frame.path)}" style="display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin-top:16px;">`,
+		`<input type="hidden" name="xsrf" value="${esc(xsrf)}"/>`,
+		`<button type="submit" style="${BUTTON}">${esc(T.signOutEverywhere)}</button>`,
+		`<a href="${esc(frame.path)}" style="${LINK}">${esc(T.cancel)}</a>`,
+		`</form>`
+	].join('');
+	const response = page(T.signOutTitle, body, 200, {
+		wide: true,
+		language: frame.language
+	});
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export type SignOutOutcome =
+	| {
+			done: true;
+			mail: 'sent' | 'refused' | 'none';
+			email: string;
+			forgot: string;
+	  }
+	| { done: false };
+
+/* Shown as the answer to the act itself: the session it ended is not needed, and nothing in an address chooses it. */
+export function signOutOutcomePage(
+	language: Language,
+	service: string,
+	accountHref: string,
+	outcome: SignOutOutcome
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const title = outcome.done ? T.signOutDoneTitle : T.signOutFailedTitle;
+	let lines: string[] = [];
+	if (!outcome.done) lines = [`<p>${esc(T.signOutFailed)}</p>`];
+	else if (outcome.mail === 'sent') {
+		lines = [`<p>${html(T.signOutDoneMail, { email: outcome.email })}</p>`];
+	} else if (outcome.mail === 'refused') {
+		lines = [
+			`<p>${html(T.signOutDoneNoMail, { service, forgot: outcome.forgot })}</p>`
+		];
+	}
+	const response = page(
+		title,
+		[
+			`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1>`,
+			...lines,
+			`<p><a href="${esc(accountHref)}" style="${LINK}">${esc(T.backToAccount)}</a></p>`
+		].join(''),
+		outcome.done ? 200 : 500,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
 }

@@ -125,8 +125,8 @@ function decodeCursor(
 	return undefined;
 }
 
-/* Today's names for what the rows name, read once per page. */
-class Names {
+/* Today's names for what the rows name, read once per page; the person's own page reads them too (own.ts). */
+export class Names {
 	private apps = new Map<string, Promise<BehindProxyApp | null>>();
 	private appsByOrigin: Promise<BehindProxyApp[]> | null = null;
 	private apis = new Map<string, Promise<ProtectedResource | null>>();

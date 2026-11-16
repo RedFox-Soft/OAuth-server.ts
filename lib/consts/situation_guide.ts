@@ -106,7 +106,7 @@ export type GuideTarget =
 	/* A console section of the whole instance that every administrator may open. */
 	| { section: 'teams' | 'audit' }
 	/* A page the project itself serves to its people, at its own issuer; it opens in a new tab. */
-	| { projectPage: 'account/apps' }
+	| { projectPage: 'account/apps' | 'account/sign-ins' }
 	/* A foxauth.dev path. */
 	| { docs: string };
 
@@ -2496,6 +2496,70 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		],
 		prompt: prompt(
 			'Add a “Connected apps” link to my app’s account settings that opens {issuer}/account/apps.'
+		)
+	},
+	{
+		id: 'ownsignins',
+		tab: 'product',
+		title: 'People see their own sign-ins and sign out everywhere',
+		sentence:
+			'The account page lists a person’s last ten sign-ins, without the address. If one wasn’t them, they sign out of every app at once and get a link to set a new password.',
+		protocol: 'Session management for end users',
+		lanes: lanes('person', 'fox'),
+		steps: [
+			step(
+				'person',
+				'fox',
+				'Opens Recent sign-ins',
+				'The person opens Recent sign-ins on the account page and signs in again if their sign-in is older than 15 minutes.'
+			),
+			step(
+				'fox',
+				'person',
+				'Their last ten sign-ins',
+				'FoxAuth lists each sign-in: the app, when, how, the browser and the country.'
+			),
+			step(
+				'person',
+				'fox',
+				'Signs out everywhere',
+				'One of them wasn’t them, so they sign out everywhere.'
+			),
+			step(
+				'fox',
+				'fox',
+				'Every way in ended',
+				'FoxAuth ends every session and token of the account and mails a link to set a new password.',
+				'refusal'
+			)
+		],
+		problem: {
+			at: 'person',
+			mark: 'missing',
+			caption:
+				'A person who thinks someone else uses their account has nowhere to look.'
+		},
+		fixCaption: 'People check their sign-ins and shut out whoever wasn’t them.',
+		sees: {
+			kind: 'none',
+			lines: [
+				'Their last ten sign-ins, with app, time, method, browser and country',
+				'A button to sign out everywhere'
+			]
+		},
+		needs: {},
+		action: {
+			kind: 'open',
+			label: 'Open Recent sign-ins',
+			target: { projectPage: 'account/sign-ins' }
+		},
+		goodToKnow: [
+			'There is nothing to switch on.',
+			'The page never shows the address a sign-in came from.',
+			'Signing out everywhere doesn’t lock the account, and you see it under the person’s Changes.'
+		],
+		prompt: prompt(
+			'Add a “Recent sign-ins” link to my app’s account settings that opens {issuer}/account/sign-ins.'
 		)
 	},
 	{

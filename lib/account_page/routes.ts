@@ -256,7 +256,17 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 			const securityHref = new URL(
 				`${accountPageBase(person.bucket)}${routeNames.account_security}`
 			).pathname;
-			return listPage(frame, rows, notice, servicesHref, securityHref);
+			const signInsHref = new URL(
+				`${accountPageBase(person.bucket)}${routeNames.account_sign_ins}`
+			).pathname;
+			return listPage(
+				frame,
+				rows,
+				notice,
+				servicesHref,
+				securityHref,
+				signInsHref
+			);
 		},
 		{ query: ListQuery }
 	)
@@ -418,6 +428,14 @@ export const accountPageRoutes = new Elysia({ name: 'account-page' })
 						`${pagePath}?revoke=${encodeURIComponent(pending.revoke)}`
 					);
 				}
+			}
+			/* Asked for by the recent sign-ins page (specs/135): back there, and to no act. */
+			if (pending.signIns) {
+				return seeOther(
+					new URL(
+						`${accountPageBase(person.bucket)}${routeNames.account_sign_ins}`
+					).pathname
+				);
 			}
 			/* Asked for by the two-step verification page (specs/126): back there, and to no act. */
 			if (pending.security !== undefined) {

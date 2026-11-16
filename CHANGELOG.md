@@ -11,6 +11,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **People see their own recent sign-ins** (spec 135). Every project's account page has a fourth page, Recent sign-ins
+  (`/account/sign-ins`), in English, Russian and Chinese: the person's last ten sign-ins with the app, the time, how
+  they signed in, the browser and the country, never the address. It opens only after a sign-in within 15 minutes.
+  "Sign out everywhere" there ends every session, grant, token and app session behind the proxy, mails a person with a
+  password the usual link to set a new one, never locks the account, and shows in the person's Changes as their own
+  `enduser.signout`. Nothing to set up or migrate.
 - **What a person uses, and who was refused recently** (spec 134). A person's Activity tab now also shows which apps
   behind your proxy and which APIs checked at it they used each day ("Used Wiki, 10:02–11:10"; an API with the tools
   of its table they called), never with an address, and Profile lists the apps used in the last 90 days. The list of

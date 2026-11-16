@@ -449,6 +449,9 @@ export const accountServicesRoutes = new Elysia({ name: 'account-services' })
 				await noticeOf(person, language, query),
 				new URL(
 					`${accountPageBase(person.bucket)}${routeNames.account_security}`
+				).pathname,
+				new URL(
+					`${accountPageBase(person.bucket)}${routeNames.account_sign_ins}`
 				).pathname
 			);
 		},

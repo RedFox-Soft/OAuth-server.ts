@@ -47,6 +47,7 @@ export default {
 			items: [
 				'The administrators of the project, on the person’s Activity tab, and the agents acting for them. Every read is written to the audit trail, once per reader, person and day.',
 				'The same administrators, on an app’s or an API’s Access tab, see who it refused or asked to sign in again in the last 24 hours. That read is written to the audit trail too, once per reader, app or API, and day.',
+				'The person themselves, on Recent sign-ins on their account page: their last ten sign-ins, with the app, the time, how they signed in, the browser and the country, but never the address. The page opens only after they sign in again within 15 minutes. From there they can sign out of every app at once, and a person with a password gets a link to set a new one.',
 				'A super administrator can turn recording off for the whole server in Settings.'
 			]
 		},

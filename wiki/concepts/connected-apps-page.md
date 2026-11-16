@@ -4,7 +4,7 @@ title: 'The connected-applications page: an end user sees and removes the access
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-11-10
+updated: 2026-11-16
 graph:
   node_type: concept
   relationships:
@@ -150,6 +150,29 @@ way, from the project's own session, and checks every POST the same way (`fromTh
 anti-forgery value). Its re-authentication returns through this page's callback with a `security` pending flag, back
 to the page and never to the act. Unlike the removal here, its freshness reads *how* the person signed in, not only
 when: see [[totp-second-factor]].
+
+## Four account pages (spec 135)
+
+Since 2026-11-16 there is a fourth, **Recent sign-ins**, at `/account/sign-ins`
+(`lib/account_page/sign_ins_routes.ts:104`), linked from the same line on every page. It lists the person's ten newest
+successful sign-ins from their activity ([[person-activity]]), and offers one act, **Sign out everywhere**:
+
+- **Fresh by any method.** Both the list and the act need a sign-in in this browser within 15 minutes
+  (`freshSignIn`, `lib/totp/self_service.ts:76`), unlike Two-step verification, which needs a password: a person
+  who signs in only through a provider has no password to type, and nothing here sets up a factor. Its
+  re-authentication returns through this page's callback with a `signIns` pending flag, back to the page, never to
+  the act.
+- **The act** checks a POST the same way (origin, person, anti-forgery value, freshness), then
+  `signOutOwnAccount` (`lib/end_users/service.ts:388`) records `enduser.signout` as the person
+  (`viaSurface: 'self-service'`, the administrator's action for the same effect, as removal here records
+  `enduser.application.signout`) and runs `revokeAccountAccess`. It never locks or deactivates the account or
+  touches the authenticator: whoever holds a stolen session must not be able to lock the owner out with it.
+- **The password.** A person with a password in a project that signs people in with passwords is then mailed the
+  reset link exactly as "Forgot password" would (`request`, `lib/password_reset/challenge.ts`), with its throttle; a
+  refused request says so and the sign-out stands. A password reset alone would have left a thief's refresh tokens
+  working, which is why the act is the sweep first. The outcome is the POST's own answer, so no query parameter
+  chooses its words, and it needs no session: the sweep ended it.
+- The wording avoids "This wasn't me", which spec 126's mailed link already uses for removing an authenticator.
 
 ## Related
 

@@ -219,5 +219,37 @@ export const en = {
 		'Your account is signed out everywhere. Change your password now: on the {service} sign-in page, choose "{forgot}".',
 	disownNothingTitle: 'Nothing was changed',
 	disownNothing:
-		'This link no longer works. If someone else set up two-step verification on your account, ask the people who run {service}.'
+		'This link no longer works. If someone else set up two-step verification on your account, ask the people who run {service}.',
+	/*
+	 * The person's own recent sign-ins (specs/135). The address a sign-in came from is never shown here; the method,
+	 * the browser and the country are words from tables, never what a browser sent.
+	 */
+	signInsLink: 'Recent sign-ins',
+	signInsTitle: 'Recent sign-ins',
+	signInsIntro: 'Your last ten sign-ins to {service} in the last 90 days.',
+	signInsLate: 'A sign-in may take up to a minute to appear.',
+	signInsOff: 'Sign-ins aren’t recorded here.',
+	signInsEmpty: 'No sign-ins since recording began on {date}.',
+	justNow: 'just now',
+	thisBrowser: 'This browser',
+	accountPageName: 'Your account page',
+	methodPassword: 'Password',
+	methodPasswordCode: 'Password and a code from an authenticator app',
+	methodProvider: 'Through {provider}',
+	methodProviderGone: 'Through a provider that no longer exists',
+	otherBrowser: 'Other browser',
+	browserOn: '{browser} on {system}',
+	notMe: 'Don’t recognize one of these?',
+	signOutEverywhere: 'Sign out everywhere',
+	signOutTitle: 'Sign out everywhere and secure your account?',
+	signOutEffect: 'Every app signs you out now, this page included.',
+	signOutMail: 'We’ll then email you a link to set a new password.',
+	signOutProvider: 'You sign in with {providers}. Change your password there.',
+	signOutDoneTitle: 'You’re signed out everywhere',
+	signOutDoneMail: 'We sent a link to set a new password to {email}.',
+	signOutDoneNoMail:
+		'We couldn’t send the email now. On the {service} sign-in page, choose "{forgot}" later.',
+	signOutFailedTitle: 'Not every app could be signed out',
+	signOutFailed: 'Try again from your account page.',
+	backToAccount: 'Back to your account page'
 } as const;

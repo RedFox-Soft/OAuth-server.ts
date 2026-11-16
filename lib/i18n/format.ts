@@ -85,6 +85,23 @@ export function formatMinutesAgo(language: Language, minutes: number): string {
 	return relativeFormat(language).format(-minutes, 'minute');
 }
 
+/*
+ * How long ago, in the largest whole unit under a day's, or days (specs/135 research R3); `null` under a minute, where
+ * the caller says "just now" from its own catalog rather than "0 minutes ago".
+ */
+export function formatAgo(
+	language: Language,
+	ms: number,
+	now = Date.now()
+): string | null {
+	const minutes = Math.floor((now - ms) / 60_000);
+	if (minutes < 1) return null;
+	if (minutes < 60) return relativeFormat(language).format(-minutes, 'minute');
+	const hours = Math.floor(minutes / 60);
+	if (hours < 24) return relativeFormat(language).format(-hours, 'hour');
+	return relativeFormat(language).format(-Math.floor(hours / 24), 'day');
+}
+
 export function formatList(
 	language: Language,
 	items: readonly string[]

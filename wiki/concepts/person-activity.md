@@ -91,6 +91,13 @@ or API and application, that let them through (see "What a person used" below). 
   counts. No address, country or device, so it is not audited.
 - MCP: `project_user_activity_list`, `consequence: 'ordinary'`.
 
+- **The person themselves** (spec 135): Recent sign-ins on their account page reads their ten newest `signIn`
+  `let_in` rows (`ownSignIns`, `lib/person_activity/own.ts:81`) through `listForPerson`, no new index. The view is
+  built field by field, so the address, `addressFrom`, the network categories and any rule or tool never reach it;
+  the country is shown only when it is one of `COUNTRY_CODES`. "This browser" is the row within 5 s of the session's
+  `loginTs`; an unflushed sign-in has no row yet, and the page says sign-ins appear up to a minute late. Not audited:
+  it is the person's own data, behind a sign-in no older than 15 minutes ([[connected-apps-page]]).
+
 ## What a person used (spec 134)
 
 - **One row per person, place and UTC day**, `outcome: let_in`, `reason: used`: `noteAppUse` at the allowed branch of

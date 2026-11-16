@@ -381,6 +381,21 @@ export async function revokeEndUserAccess(
 }
 
 /*
+ * The person's own "Sign out everywhere" from their account page (specs/135 research R6): the same sweep an
+ * administrator's sign-out makes, recorded first as the person's own act. It never locks, deactivates or touches the
+ * authenticator: someone holding a session must not be able to lock the owner out with it.
+ */
+export async function signOutOwnAccount(
+	bucket: UserBucket,
+	id: string,
+	record: RecordChange
+): Promise<CascadeResult> {
+	await existing(bucket._id, id);
+	await record();
+	return revokeAccountAccess(id);
+}
+
+/*
  * Hands a local user to a provisioning connection: the administrator's answer when the directory a bucket
  * now provisions from already has people in it (specs/070 FR-007a). Explicit and audited, never automatic —
  * a connection taking over an existing account by matching its email is the takeover the series refuses.
