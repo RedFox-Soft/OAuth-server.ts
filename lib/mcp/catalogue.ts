@@ -12,6 +12,7 @@ import {
 } from '../admin/connected-services/schema.js';
 import {
 	CreateResourceBody,
+	RefusalsBody as ResourceRefusalsBody,
 	UpdateResourceBody
 } from '../admin/resources/schema.js';
 import { CreateAdminBody, UpdateAdminBody } from '../admin/users/schema.js';
@@ -85,6 +86,7 @@ import {
 } from '../admin/outside-servers/schema.js';
 import {
 	CreateBehindProxyAppBody,
+	RefusalsBody as AppRefusalsBody,
 	UpdateBehindProxyAppBody
 } from '../admin/behind-proxy/schema.js';
 
@@ -251,6 +253,19 @@ const catalogue = [
 		pathParams: ['id', 'resourceId'],
 		summary:
 			'One declared protected resource. The resourceId is the canonical resource identifier itself, percent-encoded into the path, and names the declaration in this project: another tenant may declare the same identifier in its own.'
+	},
+	{
+		tool: 'resource_refusal_list',
+		method: 'POST',
+		path: '/admin/api/projects/:id/resources/:resourceId/refusals',
+		action: 'resource.refusals.read',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: ResourceRefusalsBody,
+		querySchema: null,
+		pathParams: ['id', 'resourceId'],
+		summary:
+			"Who this API checked at your proxy refused, or asked to sign in again, in the last 24 hours; the resourceId is the canonical identifier, percent-encoded. `tool` is a row of the API's tools table or `another tool`. Answers `{ asOf, accessSavedAt, cut, rows }`: each row a person (`accountId`, `email`), `outcome` (`refused` or `sign_in_again`) with `outcomeWords`, the `reason` in this server's fixed words, the `rule` or `tool` as recorded, `count` and `lastAt`, newest first, a person's rows of the two UTC days folded into one line per reason. `accessSavedAt` is when an administrator last changed who may get in, to tell who was refused before from after; `cut` says the list is the newest part. Never an address. Recorded up to a minute late. Reading it is recorded in the audit trail, once per reader and day."
 	},
 	{
 		tool: 'resource_vouching_check',
@@ -445,7 +460,7 @@ const catalogue = [
 		querySchema: UserListQuery,
 		pathParams: ['id'],
 		summary:
-			"A page of the end-user accounts held in one project, ordered by email, as `{ users, totalResults }`. `q` finds people whose email or username starts with it, in any letter case, or whose id is exactly it. Narrow with `status` (active, deactivated, locked), `managedBy` (`console` for people administrators manage, or a provisioning connection's id), `verified` and `authenticator` (yes or no). Page with `startIndex` (1-based) and `count` (1–200, default 50). Each user carries their groups; `passwordSet` says whether a password anyone chose opens the account, when known. Read one person in full with project_user_get."
+			'A page of the end-user accounts held in one project, ordered by email, as `{ users, totalResults }`. `q` finds people whose email or username starts with it, in any letter case, or whose id is exactly it. Narrow with `status` (active, deactivated, locked), `managedBy` (`console` for people administrators manage, or a provisioning connection\'s id), `verified` and `authenticator` (yes or no), and `lastActive` (`in7`, `in30`, `not30`, `not90`: marked active in the last 7 or 30 days, or not in the last 30 or 90, where a sign-in, a token renewal and a request your proxy let through count, and a month that overlaps the 90 days counts as active). Page with `startIndex` (1-based) and `count` (1–200, default 50). Each user carries their groups and `lastActive` (`{ day }`, `{ month }` when only the month is still known, or null); `activeSince` is when counting began, so null means nothing since then, never "never". `passwordSet` says whether a password anyone chose opens the account, when known. Read one person in full with project_user_get.'
 	},
 	{
 		tool: 'project_user_attribute_count',
@@ -497,7 +512,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"What this server decided about one person of the project, newest first, as `{ rows, next, busyDays, recordingBegan, keptDays }`: every sign-in (`kind: signIn`, `outcome: let_in`, with the application, the method, the network address as this server attributed the caller, FoxTrust's country and categories when network facts are on, and the browser and system family), every failed sign-in where the account was found (a wrong password or code, a locked or deactivated account, a missing code, an unverified address, a provider sign-in into a closed account), and every time an app behind the proxy (`kind: app`) or an API checked at the proxy (`kind: api`) asked them to sign in again or refused them. Anything but a sign-in is one row per day, place, outcome and reason, with `count`, `firstAt` and `lastAt`. `words` are this server's fixed wording of the outcome, the reason and what the person saw; `place.tool` is a row of the API's tools table or `another tool`. An app row carries the person's address only when the proxy proved it with the project's proxy key; an API row never does. Kept 90 days after the last write; recorded up to a minute late; `busyDays` are days the server was too busy to record everything for this project. Filter with `kind` and `outcome`; page with `before` set to the previous `next`. Reading it is recorded in the audit trail, once per reader, person and day."
+			"What this server decided about one person of the project, newest first, as `{ rows, next, busyDays, recordingBegan, keptDays }`: every sign-in (`kind: signIn`, `outcome: let_in`, with the application, the method, the network address as this server attributed the caller, FoxTrust's country and categories when network facts are on, and the browser and system family), every failed sign-in where the account was found (a wrong password or code, a locked or deactivated account, a missing code, an unverified address, a provider sign-in into a closed account), every time an app behind the proxy (`kind: app`) or an API checked at the proxy (`kind: api`) asked them to sign in again or refused them, and what they used there (`outcome: let_in`, `reason: used`): one row per app, or per API and application, and day, with `checks` (the proxy's checks, each image and script of a page one, not visits) and for an API the `tools` used that day, at most 20, each a row of its tools table or `another tool`, never an address. Anything but a sign-in is one row per day, place, outcome and reason, with `count`, `firstAt` and `lastAt`. `words` are this server's fixed wording of the outcome, the reason and what the person saw; `place.tool` is a row of the API's tools table or `another tool`. An app row carries the person's address only when the proxy proved it with the project's proxy key; an API row never does. Kept 90 days after the last write; recorded up to a minute late, use up to five minutes; `busyDays` are days the server was too busy to record everything for this project. Filter with `kind` and `outcome`; page with `before` set to the previous `next`. Reading it is recorded in the audit trail, once per reader, person and day."
 	},
 	{
 		tool: 'federation_provider_list',
@@ -668,6 +683,19 @@ const catalogue = [
 		pathParams: ['id', 'appId'],
 		summary:
 			'One app behind a proxy, as behind_proxy_app_list describes it. A group a rule names that has since been deleted is shown with a null name and admits nobody.'
+	},
+	{
+		tool: 'behind_proxy_app_refusal_list',
+		method: 'POST',
+		path: '/admin/api/projects/:id/behind-proxy/:appId/refusals',
+		action: 'behindproxy.refusals.read',
+		consequence: 'ordinary',
+		superAdminOnly: false,
+		bodySchema: AppRefusalsBody,
+		querySchema: null,
+		pathParams: ['id', 'appId'],
+		summary:
+			"Who this app behind the proxy refused, or asked to sign in again, in the last 24 hours: the list to read after narrowing its rules. Answers `{ asOf, accessSavedAt, cut, rows }`: each row a person (`accountId`, `email`), `outcome` (`refused` or `sign_in_again`) with `outcomeWords`, the `reason` in this server's fixed words, the `rule` or `tool` as recorded, `count` and `lastAt`, newest first, a person's rows of the two UTC days folded into one line per reason. `accessSavedAt` is when an administrator last changed who may get in, to tell who was refused before from after; `cut` says the list is the newest part. Never an address. Recorded up to a minute late. Reading it is recorded in the audit trail, once per reader and day."
 	},
 	{
 		tool: 'provisioning_hold_get',

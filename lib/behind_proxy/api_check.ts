@@ -1,5 +1,6 @@
 import { captureFault } from '../error_store/capture.js';
-import { noteApiCheck } from '../person_activity/record.js';
+import { noteApiCheck, noteApiUse } from '../person_activity/record.js';
+import { markActivityOf } from '../activity/note.js';
 import { eventBus } from '../event_bus.js';
 import { sameHost } from './address.js';
 import { apiMetadataUrlOf } from './api_address.js';
@@ -146,7 +147,8 @@ const TOKEN_CHALLENGE: Record<BearerRefusal, Record<string, string>> = {
 
 async function evaluate({
 	params,
-	request
+	request,
+	route
 }: ApiCheckRequest): Promise<Response> {
 	const addressed = await addressedApi(params, request);
 	if (!addressed) {
@@ -271,6 +273,20 @@ async function evaluate({
 				clientId: presented.clientId,
 				accountId: presented.accountId
 			});
+			/* What the person used, and that they were active (specs/134): no read, no wait, never an address. */
+			if (presented.accountId !== null) {
+				noteApiUse({
+					api,
+					accountId: presented.accountId,
+					clientId: presented.clientId,
+					tool: decided.tool
+				});
+				markActivityOf(api.bucketId, presented.accountId, {
+					route,
+					method: request.method,
+					clientId: presented.clientId
+				});
+			}
 			return answer(200, 'allowed', identity);
 		}
 		case 'refuse': {

@@ -37,6 +37,14 @@ export interface ActivityRow {
 	facts: { country: string | null; categories: string[] } | null;
 	newAddress: boolean;
 	count: number;
+	/* A use row (specs/134): the proxy's checks behind it, said only in a tooltip, never as a count of visits. */
+	checks: string | null;
+	tools: {
+		names: string[];
+		more: number;
+		atBound: boolean;
+		words: string;
+	} | null;
 	firstAt: string;
 	lastAt: string;
 	check: { app: string } | { api: string } | null;
@@ -165,6 +173,68 @@ function Address({ row }: { row: ActivityRow }) {
 	);
 }
 
+/*
+ * What the person used that day at an app or an API (specs/134 contracts/console.md, У6): a span of time and no count,
+ * because one page is many checks; the checks are in the tooltip, the tools beside an API's row.
+ */
+function UseRow({ row }: { row: ActivityRow }) {
+	const [open, setOpen] = useState(false);
+	const first = timeWords(row.firstAt);
+	const last = timeWords(row.lastAt);
+	const span = first === last ? last : `${first}–${last}`;
+	return (
+		<Flex
+			wrap
+			gap={8}
+			align="baseline"
+			style={{
+				padding: '8px 0',
+				borderBottom: '1px solid rgba(5, 5, 5, 0.06)'
+			}}
+		>
+			<Tooltip title={row.checks}>
+				<Typography.Text type="secondary">{span}</Typography.Text>
+			</Tooltip>
+			<Typography.Text>
+				{row.kind === 'api' ? (
+					<>
+						<Typography.Text strong>{placeOf(row)}</Typography.Text>
+						{row.client ? ` through ${row.client}` : ''}
+					</>
+				) : (
+					<>
+						Used <Typography.Text strong>{placeOf(row)}</Typography.Text>
+					</>
+				)}
+			</Typography.Text>
+			{row.tools &&
+				(open ? (
+					<Typography.Text type="secondary">
+						{row.tools.names.join(', ')}
+						{row.tools.atBound ? ' and perhaps more' : ''}
+					</Typography.Text>
+				) : (
+					<>
+						<Typography.Text type="secondary">
+							{row.tools.words}
+						</Typography.Text>
+						{row.tools.more > 0 && (
+							<Button
+								type="link"
+								size="small"
+								onClick={() => {
+									setOpen(true);
+								}}
+							>
+								Show all
+							</Button>
+						)}
+					</>
+				))}
+		</Flex>
+	);
+}
+
 function Row({
 	bucketId,
 	userId,
@@ -174,6 +244,7 @@ function Row({
 	userId: string;
 	row: ActivityRow;
 }) {
+	if (row.reason === 'used') return <UseRow row={row} />;
 	const check =
 		row.outcome === 'let_in' ? null : checkHref(bucketId, userId, row);
 	const when =
@@ -368,8 +439,9 @@ export function UserActivityTab({
 		>
 			<Typography.Text type="secondary">
 				Sign-ins, and what apps behind your proxy and APIs checked at it
-				answered. Kept for {String(first?.keptDays ?? 90)} days. Recorded up to
-				a minute late.
+				answered. Kept for {String(first?.keptDays ?? 90)} days. Sign-ins and
+				refusals are recorded up to a minute late, use of apps up to five
+				minutes.
 				{recent && began && (
 					<>
 						{' '}
@@ -407,8 +479,8 @@ export function UserActivityTab({
 				<EmptyState
 					purpose={
 						began
-							? `No sign-ins or refusals since recording began on ${dateWords(began)}.`
-							: 'No sign-ins or refusals recorded yet.'
+							? `No sign-ins, refusals or use of apps since recording began on ${dateWords(began)}.`
+							: 'No sign-ins, refusals or use of apps recorded yet.'
 					}
 				/>
 			)}

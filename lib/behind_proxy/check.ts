@@ -4,7 +4,8 @@ import { requestBucketFor } from '../admin/auth/bucketAddress.js';
 import type { RequestBucket } from '../configs/issuer.js';
 import { hostOfRequest } from '../consts/request_host.js';
 import { captureFault } from '../error_store/capture.js';
-import { noteAppCheck } from '../person_activity/record.js';
+import { noteAppCheck, noteAppUse } from '../person_activity/record.js';
+import { markActivityOf } from '../activity/note.js';
 import { eventBus } from '../event_bus.js';
 import { UnknownBucket } from '../helpers/errors.js';
 import { languageOfRequest } from '../i18n/request.js';
@@ -380,7 +381,11 @@ function refused(
 	);
 }
 
-async function evaluate({ params, request }: CheckRequest): Promise<Response> {
+async function evaluate({
+	params,
+	request,
+	route
+}: CheckRequest): Promise<Response> {
 	const bucket = await addressedBucket(params, request);
 	const app = await appOf(bucket, params);
 	if (!bucket || !app) {
@@ -489,7 +494,16 @@ async function evaluate({ params, request }: CheckRequest): Promise<Response> {
 			return denied('unsafe_value');
 		}
 		emitDecision(app, decision, accountId);
-		if (person && decision.reason !== 'public') noteAllowed(app);
+		if (person && decision.reason !== 'public') {
+			noteAllowed(app);
+			/* What the person used, and that they were active (specs/134): no read, no wait. */
+			noteAppUse({ app, accountId: person.standing.accountId });
+			markActivityOf(app.bucketId, person.standing.accountId, {
+				route,
+				method: request.method,
+				clientId: null
+			});
+		}
 		return allowed(ctx, decision, person);
 	}
 

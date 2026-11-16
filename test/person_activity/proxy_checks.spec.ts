@@ -65,13 +65,16 @@ async function appRows(accountId: string) {
 	const page = await activityOf(w.cookie, w.acme.id, accountId, {
 		kind: 'app'
 	});
-	return page.rows.filter((row) => row.place.appId === app.id);
+	/* What the person used is spec 134's (use.spec.ts); these cases are about refusals and asks. */
+	return page.rows.filter(
+		(row) => row.place.appId === app.id && row.outcome !== 'let_in'
+	);
 }
 
 /**
  * @proves What an app behind the proxy asked of a person or refused them is kept on their activity, with the rule's
- * path as configured, the reason in words and the app to check against today's rules; a check with no person, and a
- * request let in, keep nothing.
+ * path as configured, the reason in words and the app to check against today's rules; a check with no person keeps
+ * nothing.
  */
 describe('a person at an app behind the proxy', () => {
 	beforeAll(async () => {
@@ -154,18 +157,6 @@ describe('a person at an app behind the proxy', () => {
 		]) {
 			expect(await appRows(member.accountId)).toEqual([]);
 		}
-	});
-
-	it('records nothing for a request let in', async () => {
-		app = await wiki();
-		const signed = await signInThrough(target(), w.acme.staffMember);
-		const allowed = await checkApp(target(), {
-			uri: '/pages/home',
-			cookie: signed.cookie
-		});
-		expect(allowed.status).toBe(200);
-
-		expect(await appRows(w.acme.staffMember.accountId)).toEqual([]);
 	});
 });
 

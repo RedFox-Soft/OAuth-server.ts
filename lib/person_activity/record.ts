@@ -77,6 +77,7 @@ interface Noted {
 	method?: PersonActivityRow['method'];
 	freshness?: PersonActivityRow['freshness'];
 	device?: PersonActivityRow['device'];
+	tools?: string[];
 }
 
 function rowOf(noted: Noted): PersonActivityRow {
@@ -116,6 +117,7 @@ function rowOf(noted: Noted): PersonActivityRow {
 			: {}),
 		...(facts === undefined ? {} : { facts }),
 		...(noted.device === undefined ? {} : { device: noted.device }),
+		...(noted.tools === undefined ? {} : { tools: noted.tools }),
 		count: 1,
 		firstAt: noted.at,
 		lastAt: noted.at,
@@ -367,6 +369,64 @@ export function noteApiCheck(input: {
 					...(tool === undefined ? {} : { tool })
 				},
 				at: new Date()
+			})
+		);
+	});
+}
+
+/*
+ * What a person used (specs/134 research R1): an app behind the proxy or an API checked at it let them through. One
+ * row a person, place and UTC day, with the checks counted; never an address, network facts, a device or the rule,
+ * because a day of where and how someone works is more than an administrator needs to see what they use (S11).
+ */
+export function noteAppUse(input: {
+	app: { _id: string; bucketId: string };
+	accountId: string;
+}): void {
+	const { app, accountId } = input;
+	if (!recording(app.bucketId)) return;
+	safely(() => {
+		note(
+			rowOf({
+				bucketId: app.bucketId,
+				accountId,
+				kind: 'app',
+				outcome: 'let_in',
+				reason: 'used',
+				place: { appId: app._id },
+				at: new Date()
+			})
+		);
+	});
+}
+
+/*
+ * An API's use (specs/134 research R1, R3): one row a person, API, application and day; the tool is not in the row's
+ * identity but in its bounded list, a row of the API's table or "another tool", never the caller's text.
+ */
+export function noteApiUse(input: {
+	api: { bucketId: string; identifier: string; tools?: ToolsTable };
+	accountId: string;
+	clientId: string | null;
+	tool: string | null;
+}): void {
+	const { api, accountId } = input;
+	if (!recording(api.bucketId)) return;
+	safely(() => {
+		const tool = recordedTool(api.tools, input.tool);
+		note(
+			rowOf({
+				bucketId: api.bucketId,
+				accountId,
+				kind: 'api',
+				outcome: 'let_in',
+				reason: 'used',
+				place: {
+					resource: api.identifier,
+					...(input.clientId === null ? {} : { clientId: input.clientId })
+				},
+				at: new Date(),
+				...(tool === undefined ? {} : { tools: [tool] })
 			})
 		);
 	});

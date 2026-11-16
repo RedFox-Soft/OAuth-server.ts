@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { entriesOf } from '../../helpers/_/object.js';
 import { db } from './db.js';
+import { lastActivePeriods } from '../activity_records.js';
 import { ABSENT_UNDEFINED } from './write_options.js';
 import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
@@ -304,6 +305,20 @@ export class UserStore implements UserStoreInstance {
 				.find({ groupId: filter.memberOf }, { projection: { userId: 1 } })
 				.toArray();
 			clauses.push({ _id: { $in: memberships.map((m) => m.userId) } });
+		}
+		/*
+		 * Marked active, or not, in the periods a "Last active" filter names (specs/134 research R5): the accounts from
+		 * the marks' `{bucketId, period}` index, then those users or the rest, as `memberOf` does.
+		 */
+		if (filter.lastActive !== undefined) {
+			const now = new Date();
+			const { periods, has } = lastActivePeriods(filter.lastActive, now);
+			const marked = await (
+				await import('../index.js')
+			)
+				.getActivityStore()
+				.accountsMarkedIn(this.name, periods, now);
+			clauses.push({ _id: has ? { $in: marked } : { $nin: marked } });
 		}
 		const stored =
 			clauses.length === 0

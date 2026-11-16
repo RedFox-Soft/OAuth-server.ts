@@ -16,6 +16,23 @@ export const PERSON_ACTIVITY_DAYS = 90;
 export const PERSON_ACTIVITY_FLUSH_MS = 60_000;
 
 /*
+ * How often each process writes what people used (specs/134 research R2). Use is almost all the volume, and the write
+ * rate, and on PostgreSQL the dead row versions, scale with this interval rather than with the roll-up (Н4).
+ */
+export const PERSON_ACTIVITY_USE_FLUSH_MS = 300_000;
+
+/* Tool names an API use row keeps (research R3): the tools table has no row cap, so the bound is ours. */
+export const MAX_TOOLS_PER_ROW = 20;
+
+/* "Refused recently" (research R6): the window, how many rows one read may walk, and how many people it shows. */
+export const REFUSALS_WINDOW_MS = 86_400_000;
+export const REFUSALS_SCAN = 5_000;
+export const REFUSALS_SHOWN = 100;
+
+/* Rows of a person's use one Profile read may walk for "Apps used in the last 90 days" (research R8). */
+export const APPS_USED_SCAN = 1_000;
+
+/*
  * Rows per write. Bounded so one PostgreSQL transaction stays short and one MongoDB batch small; a failed chunk loses
  * only itself (specs/133 research R11).
  */
@@ -31,7 +48,13 @@ export const PERSON_ACTIVITY_BUDGETS = {
 	signInRefusals: 20_000,
 	app: 20_000,
 	api: 20_000,
-	perProject: 2_000
+	perProject: 2_000,
+	/*
+	 * What people used has budgets of its own (specs/134 FR-009), so a busy project's use never pushes out a sign-in or
+	 * a refusal of any project.
+	 */
+	use: 40_000,
+	perProjectUse: 4_000
 } as const;
 
 export type PersonActivityBudgets = {

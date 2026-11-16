@@ -25,8 +25,11 @@ import {
 } from './service.js';
 import {
 	CreateBehindProxyAppBody,
+	RefusalsBody,
 	UpdateBehindProxyAppBody
 } from './schema.js';
+import { recordReadOnce } from '../../person_activity/audit.js';
+import { refusedRecently } from '../../person_activity/refusals.js';
 
 /*
  * A project's apps behind a proxy (specs/122): web apps the operator's own proxy asks this server about before
@@ -93,6 +96,22 @@ export const behindProxyRoutes = new Elysia({ name: 'admin-behind-proxy' })
 			const bucket = await loadBucketForUsers(ctx, params.id);
 			return viewApp(bucket, await loadApp(bucket, params.appId));
 		}
+	)
+	/*
+	 * Who this app refused or asked to sign in again in the last day (specs/134 FR-019), for the Access tab. Read by
+	 * whoever may read the project's people's activity, audited once per reader, app and day; a project scheduled for
+	 * deletion is read like any other.
+	 */
+	.post(
+		'/admin/api/projects/:id/behind-proxy/:appId/refusals',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const app = await loadApp(bucket, params.appId);
+			await recordReadOnce(ctx, bucket, 'behindproxy.refusals.read', app._id);
+			return refusedRecently(bucket, { kind: 'app', app });
+		},
+		{ body: RefusalsBody }
 	)
 	.post(
 		'/admin/api/projects/:id/behind-proxy',

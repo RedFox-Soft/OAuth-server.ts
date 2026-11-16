@@ -190,7 +190,7 @@ export default {
 				},
 				usage: {
 					title: 'Monthly active users per project',
-					body: 'Each project counts the people it issued tokens to, once per UTC month and day, split into local sign-in, upstream sign-in, renewal and directory provisioning. A closed month never changes, and the history outlives the people and the project. The Usage page shows every project beside the team that owns it, so whoever runs an instance for other teams or customers can see who used how much.'
+					body: 'Each project counts the people it issued tokens to or its proxy let in, once per UTC month and day, split into local sign-in, upstream sign-in, renewal or use behind the proxy, and directory provisioning. A closed month never changes, and the history outlives the people and the project. The Usage page shows every project beside the team that owns it, so whoever runs an instance for other teams or customers can see who used how much.'
 				},
 				plans: {
 					title: 'Plans for a shared instance',
@@ -269,7 +269,7 @@ export default {
 				},
 				personActivity: {
 					title: 'A person’s activity',
-					body: 'Each person’s page shows their sign-ins (application, method, address, browser and system), their failed sign-ins, and every time an app behind your proxy or an API refused them or asked them to sign in again, with the reason and what they saw. Kept 90 days, it survives a lock and goes with the person; reading it is audited.'
+					body: 'Each person’s page shows their sign-ins (application, method, address, browser and system), their failed sign-ins, and every time an app behind your proxy or an API refused them or asked them to sign in again, with the reason and what they saw, and which apps and APIs behind your proxy they used each day, without an address. The list of people filters on when each was last active, and an app’s or an API’s Access tab lists who it refused in the last day. Kept 90 days, it survives a lock and goes with the person; reading it is audited.'
 				},
 				federation: {
 					title: 'Sign in with Google, Microsoft, Apple or GitHub',

@@ -205,3 +205,9 @@ export const UpdateBehindProxyAppBody = t.Object(
 	},
 	{ additionalProperties: false }
 );
+
+/*
+ * "Refused recently" (specs/134): nothing to send. A POST because reading who was refused names people and is audited
+ * once per reader, target and day; closed, so an agent cannot pass anything along.
+ */
+export const RefusalsBody = t.Object({}, { additionalProperties: false });

@@ -10,7 +10,7 @@ updated: 2026-11-05
 # Monthly active users per project
 
 Every project counts, per UTC month and per UTC day, the distinct end users it **issued tokens to**
-(spec 076). The Default and administrators' projects are counted like any other. Each figure is broken down
+(spec 076), or, since spec 134, that its proxy **let through** to an app or an API. The Default and administrators' projects are counted like any other. Each figure is broken down
 by how the person was active — `local` (a sign-in at this server), `federated` (through an upstream
 provider), `renewal` (tokens without a fresh sign-in) — and by whether a directory provisioned them. Since
 spec 102 a project's plan reads the current month's figure for its soft cap: at the cap, new self-service
@@ -28,7 +28,11 @@ Activity is a token issued on the person's behalf, recorded at one place: `noteA
 `executeGrant` (`lib/actions/grants/index.ts:102`). The one exception is a sign-in that issues no token at all:
 an app behind a proxy (spec 122) redeems its code in-process and calls the same writer, `markActivity`
 (`lib/activity/note.ts`), from `lib/behind_proxy/sign_in.ts`, with the account `findAccount` resolved and the
-code's sign-in kind, so a person who only ever uses such an app still counts. Auth0, Entra External ID, Supabase, FusionAuth and
+code's sign-in kind, so a person who only ever uses such an app still counts. Since spec 134 (owner, 2026-11-16)
+every request the proxy lets a person through marks them too, as `renewal`, through `markActivityOf`
+(`lib/activity/note.ts:126`): an app session lasts up to 14 days, and without it someone working daily on one would
+read as inactive. The check never waits for it: the user is read for `provisioned` after the answer, once per person,
+day and process. The figure therefore rose for projects behind a proxy, and a plan's monthly-active cap counts them. Auth0, Entra External ID, Supabase, FusionAuth and
 ZITADEL all count token issuance, refresh and silent authentication included; counting interactive sign-ins
 only would make an application living on long refresh tokens look unused. Every edge case then falls out
 with no rule of its own: a failed, throttled or abandoned sign-in issued nothing; a sign-in whose code is

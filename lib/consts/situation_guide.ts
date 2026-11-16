@@ -1631,11 +1631,69 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Failed sign-ins are kept only where the account was found: a wrong password or code, a locked or deactivated account, a missing code or an unverified address.',
 			'At your proxy the person’s address is kept only when your proxy proves it with the project’s proxy key. An API row never has one.',
 			'Everything is kept 90 days, survives a lock, and goes with the person and the project. Reading it is recorded in the audit trail.',
-			'It is recorded up to a minute late. A super administrator can turn recording off in Settings.'
+			'It is recorded up to a minute late. A super administrator can turn recording off in Settings.',
+			'After you narrow an app’s or an API’s rules, its Access tab lists who it refused in the last 24 hours, with the time you saved between those refused before and after.'
 		],
 		prompt: prompt(
 			'Why was anna@acme.com refused by the Wiki app today?',
-			'project_user_list to find her, then project_user_activity_list with outcome refused'
+			'project_user_list to find her, then project_user_activity_list with outcome refused; after a rule change, behind_proxy_app_refusal_list or resource_refusal_list'
+		)
+	},
+	{
+		id: 'stillused',
+		tab: 'product',
+		title: 'Find people who no longer use an app',
+		sentence:
+			'Filter Users by Last active: it counts a sign-in, a token renewal and every request your proxy lets through, so someone working on an open session is never called inactive.',
+		protocol: 'Activity marks · Forward auth decisions',
+		lanes: lanes('admin', 'fox'),
+		steps: [
+			step(
+				'admin',
+				'fox',
+				'Filters Users',
+				'Before a quarterly clean-up, Kai filters Users by “Last active: Not in the last 90 days”.'
+			),
+			step(
+				'fox',
+				'admin',
+				'People not active',
+				'The list shows who has not signed in, renewed tokens or been let in by your proxy in 90 days. Someone who opens the wiki every day on an old session is not on it.'
+			),
+			step(
+				'admin',
+				'fox',
+				'Opens a person',
+				'Kai opens one of them. Profile lists the apps and APIs they used in the last 90 days, and their Activity tab shows each day.'
+			)
+		],
+		problem: {
+			at: 'admin',
+			mark: 'missing',
+			caption:
+				'Nobody can tell who still uses an app before taking access away.'
+		},
+		fixCaption: 'Every day of use is kept, without an address.',
+		sees: {
+			kind: 'none',
+			lines: ['Nothing: people never see this']
+		},
+		needs: { role: 'manageUsers' },
+		action: {
+			kind: 'open',
+			label: 'Open Users',
+			target: { area: 'users' }
+		},
+		goodToKnow: [
+			'Last active counts a sign-in, a token renewal and a request your proxy let through, once a day.',
+			'What a person used is kept one entry per app, or per API and application, and day, with the first and last time. An API’s entry names the tools of its table they called. Never an address.',
+			'“Not in the last 90 days” is read from monthly marks: a month that overlaps the 90 days counts as active, so nobody is called inactive by rounding.',
+			'Use is recorded up to five minutes late, kept 90 days, and goes with the person and the project.',
+			'Monthly active people count people your proxy let in, so a plan’s limit on them counts them too.'
+		],
+		prompt: prompt(
+			'Who in the Acme project has not been active in the last 90 days, and what did they last use?',
+			'project_user_list with lastActive not90, then project_user_activity_list for one of them'
 		)
 	},
 	{

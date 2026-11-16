@@ -3,6 +3,7 @@ import {
 	SENTINEL_ID,
 	figureId,
 	freezeOpenPeriods,
+	latestMarked,
 	markId,
 	periodsOf,
 	tallyOf,
@@ -17,7 +18,8 @@ import type {
 	ActivityMarkRecord,
 	ActivityStoreInstance,
 	ActivityTally,
-	ActivityTombstone
+	ActivityTombstone,
+	LastMarked
 } from '../types.js';
 
 /*
@@ -64,6 +66,53 @@ export class ActivityStore implements ActivityStoreInstance {
 			const mark = this.marks.get(markId(bucketId, period, accountId));
 			return mark !== undefined && mark.expiresAt.getTime() > at.getTime();
 		});
+	}
+
+	async lastMarkedMany(
+		bucketId: string,
+		accountIds: readonly string[],
+		at: Date
+	): Promise<Map<string, LastMarked>> {
+		const wanted = new Set(accountIds);
+		const periods = new Map<string, string[]>();
+		for (const mark of this.marks.values()) {
+			if (
+				mark.bucketId !== bucketId ||
+				!wanted.has(mark.accountId) ||
+				mark.expiresAt.getTime() <= at.getTime()
+			) {
+				continue;
+			}
+			const list = periods.get(mark.accountId) ?? [];
+			list.push(mark.period);
+			periods.set(mark.accountId, list);
+		}
+		const found = new Map<string, LastMarked>();
+		for (const [accountId, list] of periods) {
+			const latest = latestMarked(list);
+			if (latest) found.set(accountId, latest);
+		}
+		return found;
+	}
+
+	/* The accounts with a live mark in any of `periods`: what the users store's "Last active" filter reads. */
+	async accountsMarkedIn(
+		bucketId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]> {
+		const wanted = new Set(periods);
+		const found = new Set<string>();
+		for (const mark of this.marks.values()) {
+			if (
+				mark.bucketId === bucketId &&
+				wanted.has(mark.period) &&
+				mark.expiresAt.getTime() > at.getTime()
+			) {
+				found.add(mark.accountId);
+			}
+		}
+		return [...found];
 	}
 
 	/* Expired marks are dropped on the way past, the lazy sweep the other bespoke memory stores do. */

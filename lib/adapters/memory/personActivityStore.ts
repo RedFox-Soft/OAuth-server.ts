@@ -74,6 +74,24 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 		return [...found];
 	}
 
+	async listRefusals(
+		bucketId: string,
+		query: { since: Date; now: Date; limit: number }
+	): Promise<PersonActivityRow[]> {
+		return [...this.rows.values()]
+			.filter(
+				(row) =>
+					row.bucketId === bucketId &&
+					row.accountId !== OVERFLOW_ACCOUNT &&
+					row.outcome !== 'let_in' &&
+					row.lastAt.getTime() >= query.since.getTime() &&
+					row.expiresAt.getTime() > query.now.getTime()
+			)
+			.sort(newestFirst)
+			.slice(0, Math.max(query.limit, 1))
+			.map((row) => structuredClone(row));
+	}
+
 	async destroyPerson(bucketId: string, accountId: string): Promise<number> {
 		return this.destroyWhere(
 			(row) => row.bucketId === bucketId && row.accountId === accountId

@@ -796,8 +796,9 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * the day rather than falling due for a whole day at once.
 	 *
 	 * `{bucketId, accountId, lastAt, _id}` serves a person's timeline newest first, walked backwards, with `_id` making
-	 * the order total; its prefixes serve deletion by person and by project. A project-wide read of refusals has no
-	 * index yet because nothing reads one before specs 5B.
+	 * the order total; its prefixes serve deletion by person and by project. `{bucketId, outcome, lastAt}` serves
+	 * "Refused recently" (specs/134): without the outcome a busy project's read would walk every row of what its people
+	 * used that day to find a handful of refusals (Н5).
 	 */
 	storeArea(
 		STORE_AREAS.personActivity,
@@ -805,7 +806,10 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned(
 			'a person keeps their activity through a lock (specs/133); deleted by the person and project deletion paths'
 		),
-		[{ key: { bucketId: 1, accountId: 1, lastAt: 1, _id: 1 } }]
+		[
+			{ key: { bucketId: 1, accountId: 1, lastAt: 1, _id: 1 } },
+			{ key: { bucketId: 1, outcome: 1, lastAt: 1 } }
+		]
 	),
 	storeArea(
 		STORE_AREAS.provisioningRefusals,
@@ -1060,7 +1064,12 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		unowned(
 			'evidence of how many people used a bucket; deleting a person must not change a month they counted in'
 		),
-		[{ key: { bucketId: 1, period: 1 } }, { key: { period: 1, bucketId: 1 } }]
+		[
+			{ key: { bucketId: 1, period: 1 } },
+			{ key: { period: 1, bucketId: 1 } },
+			/* The list of people's "Last active", read by the accounts of one page (specs/134 research R5). */
+			{ key: { bucketId: 1, accountId: 1, period: 1 } }
+		]
 	),
 	/*
 	 * Permanent: a frozen figure is what a future invoice is computed from, and it outlives both the marks

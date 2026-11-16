@@ -225,7 +225,14 @@ export interface EndUserFilter {
 	 * may name, or `claim:<key>`. Only a stored string matches.
 	 */
 	attribute?: { name: string; values: readonly string[] };
+	/*
+	 * Marked active (specs/134 research R5): a day mark within the last 7 or 30 days, or none in the last 30, or no
+	 * month mark for any month overlapping the last 90 days.
+	 */
+	lastActive?: LastActiveFilter;
 }
+
+export type LastActiveFilter = { within: 7 | 30 } | { notWithin: 30 | 90 };
 
 /*
  * The order a page is read in. `id` is the stable default SCIM pages by; `email` is what a person scanning
@@ -1702,6 +1709,11 @@ export const ProtectedResource = t.Object({
 	/* As an app's `addressProvenAt` and `addressForgedAt` (specs/124 research R6). */
 	proxyAddressProvenAt: t.Optional(t.Date()),
 	proxyAddressForgedAt: t.Optional(t.Date()),
+	/*
+	 * When an administrator last changed who may get in (specs/134 research R6): set only by the paths that change it,
+	 * never by a rename, so "Refused recently" can divide before from after.
+	 */
+	accessSavedAt: t.Optional(t.Date()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -1717,6 +1729,7 @@ export type ProtectedResourcePatch = Partial<
 		| 'accessTokenTTL'
 		| 'checkedBy'
 		| 'tools'
+		| 'accessSavedAt'
 	>
 > & {
 	/* `null` removes the API's exchanging application (specs/118 R3). */
@@ -2159,6 +2172,11 @@ export const BehindProxyApp = t.Object({
 	 */
 	addressProvenAt: t.Optional(t.Date()),
 	addressForgedAt: t.Optional(t.Date()),
+	/*
+	 * When an administrator last changed who may get in (specs/134 research R6): set only by the paths that change it,
+	 * never by a rename, so "Refused recently" can divide before from after.
+	 */
+	accessSavedAt: t.Optional(t.Date()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -2166,7 +2184,10 @@ export type BehindProxyApp = Static<typeof BehindProxyApp>;
 
 /* What an administrator changes. `rules` is replaced as a whole; `updatedAt` is the store's to set. */
 export type BehindProxyAppPatch = Partial<
-	Pick<BehindProxyApp, 'name' | 'address' | 'proxyKind' | 'rules'>
+	Pick<
+		BehindProxyApp,
+		'name' | 'address' | 'proxyKind' | 'rules' | 'accessSavedAt'
+	>
 > & {
 	/* Null removes it. */
 	timeZone?: string | null;
@@ -2413,6 +2434,8 @@ export const ACTIVITY_REASONS = [
 	'old_client',
 	'bad_mcp_header',
 	'insufficient_scope',
+	/* An app behind the proxy or an API checked at it let the person through (specs/134). */
+	'used',
 	'other'
 ] as const;
 export type ActivityReason = (typeof ACTIVITY_REASONS)[number];
@@ -2499,6 +2522,11 @@ export const PersonActivityRow = t.Object({
 	device: t.Optional(
 		t.Object({ browser: ActivityBrowser, system: ActivitySystem })
 	),
+	/*
+	 * An API use row's tools (specs/134 research R3): distinct, the names kept first, at most 20; each a tools-table
+	 * row name or `*another`, never the caller's text.
+	 */
+	tools: t.Optional(t.Array(t.String(), { maxItems: 20 })),
 	count: t.Integer({ minimum: 1 }),
 	firstAt: t.Date(),
 	lastAt: t.Date(),
@@ -2550,6 +2578,14 @@ export interface PersonActivityStoreInstance {
 		days: readonly string[],
 		now: Date
 	): Promise<string[]>;
+	/*
+	 * A project's refusals and "sign in again" rows of people (never its overflow rows) last written at or after
+	 * `since`, newest first by `(lastAt, _id)`, at most `limit`: what "Refused recently" reads (specs/134 research R6).
+	 */
+	listRefusals(
+		bucketId: string,
+		query: { since: Date; now: Date; limit: number }
+	): Promise<PersonActivityRow[]>;
 	destroyPerson(bucketId: string, accountId: string): Promise<number>;
 	destroyBucket(bucketId: string): Promise<number>;
 }
@@ -3288,6 +3324,8 @@ export interface ActivityBucketSnapshot {
 	createdAt: Date;
 }
 
+export type LastMarked = { day: string } | { month: string };
+
 export interface ActivityStoreInstance {
 	/*
 	 * The month's mark and the day's mark for one activity: two single-record upserts that set every field on
@@ -3301,6 +3339,25 @@ export interface ActivityStoreInstance {
 	markedPeriods(
 		bucketId: string,
 		accountId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]>;
+	/*
+	 * For each of `accountIds`, the latest unexpired day mark, else the latest unexpired month mark: the list of
+	 * people's "Last active" column, one query a page (specs/134 research R5). A day mark implies its month's, so the
+	 * latest day is never older than the latest month.
+	 */
+	lastMarkedMany(
+		bucketId: string,
+		accountIds: readonly string[],
+		at: Date
+	): Promise<Map<string, LastMarked>>;
+	/*
+	 * The accounts of a bucket with a live mark in any of `periods`: what the list of people's "Last active" filter
+	 * reads on the backends that cannot join to the marks in one statement (specs/134 research R5).
+	 */
+	accountsMarkedIn(
+		bucketId: string,
 		periods: readonly string[],
 		at: Date
 	): Promise<string[]>;

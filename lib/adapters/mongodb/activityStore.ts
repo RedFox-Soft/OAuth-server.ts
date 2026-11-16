@@ -8,6 +8,7 @@ import {
 	emptyTally,
 	figureId,
 	freezeOpenPeriods,
+	latestMarked,
 	markId,
 	periodsOf,
 	tombstoneId,
@@ -22,7 +23,8 @@ import {
 	type ActivityMarkInput,
 	type ActivityMarkRecord,
 	type ActivityStoreInstance,
-	type ActivityTally
+	type ActivityTally,
+	type LastMarked
 } from '../types.js';
 
 function isDuplicateKey(error: unknown): boolean {
@@ -128,6 +130,61 @@ export class ActivityStore implements ActivityStoreInstance {
 			.toArray();
 		const marked = new Set(found.map((mark) => mark.period));
 		return periods.filter((period) => marked.has(period));
+	}
+
+	/* One page of people's marks, on `{bucketId, accountId, period}` (specs/134 research R5). */
+	async lastMarkedMany(
+		bucketId: string,
+		accountIds: readonly string[],
+		at: Date
+	): Promise<Map<string, LastMarked>> {
+		const found = new Map<string, LastMarked>();
+		if (accountIds.length === 0) return found;
+		const marks = await this.marks
+			.find(
+				{
+					bucketId,
+					accountId: { $in: [...accountIds] },
+					expiresAt: { $gt: at }
+				},
+				{ projection: { accountId: 1, period: 1 } }
+			)
+			.toArray();
+		const periods = new Map<string, string[]>();
+		for (const mark of marks) {
+			const list = periods.get(mark.accountId) ?? [];
+			list.push(mark.period);
+			periods.set(mark.accountId, list);
+		}
+		for (const [accountId, list] of periods) {
+			const latest = latestMarked(list);
+			if (latest) found.set(accountId, latest);
+		}
+		return found;
+	}
+
+	/*
+	 * The accounts with a live mark in any of `periods`, on `{bucketId, period}`: the users store's filter reads it. A
+	 * `$group`, not `distinct`, which the strict Stable API v1 this server connects with does not offer.
+	 */
+	async accountsMarkedIn(
+		bucketId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]> {
+		const found = await this.marks
+			.aggregate<{ _id: string }>([
+				{
+					$match: {
+						bucketId,
+						period: { $in: [...periods] },
+						expiresAt: { $gt: at }
+					}
+				},
+				{ $group: { _id: '$accountId' } }
+			])
+			.toArray();
+		return found.map((entry) => entry._id);
 	}
 
 	private async tallies(match: Record<string, unknown>): Promise<TallyRow[]> {

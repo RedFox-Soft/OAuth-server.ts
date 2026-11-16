@@ -22,12 +22,7 @@ import type { BucketCan } from '../../frame/can.js';
 import { ClaimsDrawer } from '../../accounts/ClaimsDrawer.js';
 import type { BucketView } from '../bucketView.js';
 import type { ConnectionView } from '../ProvisioningPanel.js';
-import {
-	nameOf,
-	usersApi,
-	type ActivitySummaryView,
-	type EndUser
-} from './endUser.js';
+import { lastActiveWords, nameOf, usersApi, type EndUser } from './endUser.js';
 import { useUserActions } from './useUserActions.js';
 import { ProfileCard, profileSetClaims } from './ProfileCard.js';
 
@@ -52,27 +47,10 @@ function whenWords(at: string): string {
 	return `${date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })} (${ago})`;
 }
 
-function lastActiveWords(active: ActivitySummaryView['lastActive']): string {
-	if (!active) return '—';
-	if ('day' in active) {
-		const today = new Date().toISOString().slice(0, 10);
-		if (active.day === today) return 'Today';
-		return new Date(`${active.day}T12:00:00Z`).toLocaleDateString(undefined, {
-			dateStyle: 'medium'
-		});
-	}
-	return new Date(`${active.month}-15T12:00:00Z`).toLocaleDateString(
-		undefined,
-		{
-			month: 'long',
-			year: 'numeric'
-		}
-	);
-}
-
 /*
  * The person's activity in brief, where support starts (specs/133 FR-021): when they last signed in and how, whether
- * anything turned them away since, and the last day they were active, token renewals counting. Never "Never":
+ * anything turned them away since, the last day they were active, token renewals and use behind the proxy counting,
+ * and what they used there (specs/134). Never "Never":
  * nothing recorded only means nothing since recording began.
  */
 function activityItems(
@@ -123,6 +101,29 @@ function activityItems(
 		key: 'lastActive',
 		label: 'Last active',
 		children: lastActiveWords(activity.lastActive)
+	});
+	const used = activity.appsUsed ?? [];
+	items.push({
+		key: 'appsUsed',
+		label: 'Apps used in the last 90 days',
+		children:
+			used.length === 0 ? (
+				<Typography.Text type="secondary">— {since}</Typography.Text>
+			) : (
+				<Space
+					wrap
+					size={8}
+				>
+					{used.map((entry, index) => (
+						<span key={`${entry.kind}-${entry.id}`}>
+							{index > 0 ? '· ' : ''}
+							{entry.name ?? entry.id}
+							{entry.kind === 'api' ? ', API' : ''} (
+							{lastActiveWords({ day: entry.lastDay })})
+						</span>
+					))}
+				</Space>
+			)
 	});
 	return items;
 }

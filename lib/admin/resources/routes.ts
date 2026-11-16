@@ -33,7 +33,13 @@ import {
 } from '../../resources/scopes.js';
 import { isMcpResource } from '../../mcp/resource_server.js';
 import { SCIM_BASE_PATH } from '../../consts/scim.js';
-import { CreateResourceBody, UpdateResourceBody } from './schema.js';
+import {
+	CreateResourceBody,
+	RefusalsBody,
+	UpdateResourceBody
+} from './schema.js';
+import { recordReadOnce } from '../../person_activity/audit.js';
+import { refusedRecently } from '../../person_activity/refusals.js';
 import { whyCannotExchange } from '../../connected_services/eligibility.js';
 import { namespaceOf, ROOT_NAMESPACE } from '../../resources/namespace.js';
 import { findDeclaredResource } from '../../resources/registry.js';
@@ -629,6 +635,26 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 		}
 	)
 	/*
+	 * Who this API refused or asked to sign in again in the last day (specs/134 FR-019), for the Access tab; audited
+	 * once per reader, API and day.
+	 */
+	.post(
+		'/admin/api/projects/:id/resources/:resourceId/refusals',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const api = await loadResource(bucket, params.resourceId);
+			await recordReadOnce(
+				ctx,
+				bucket,
+				'resource.refusals.read',
+				api.identifier
+			);
+			return refusedRecently(bucket, { kind: 'api', api });
+		},
+		{ body: RefusalsBody }
+	)
+	/*
 	 * Whether the resource's published metadata currently vouches for this declaration — a diagnostic
 	 * the console fetches per row after the list has rendered, so a slow or unreachable resource never
 	 * holds the list up. Read-only, so not audited, and blocking nothing in any namespace.
@@ -735,6 +761,19 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				expect: _expect,
 				...unchanged
 			} = body;
+			/*
+			 * When who may get in last changed (specs/134 research R6): the tools table (with who may call the API at all),
+			 * the sign-in requirement, or who checks the API. A rename or new scopes leave it.
+			 */
+			const accessChanged =
+				(tools !== undefined &&
+					JSON.stringify(tools) !== JSON.stringify(existing.tools)) ||
+				(body.requireCode !== undefined &&
+					body.requireCode !== (existing.requireCode === true)) ||
+				(body.signInEveryMinutes !== undefined &&
+					(body.signInEveryMinutes ?? undefined) !==
+						existing.signInEveryMinutes) ||
+				(body.checkedBy !== undefined && body.checkedBy !== existing.checkedBy);
 			const updated = await getProtectedResourceStore().update(
 				namespace,
 				identifier,
@@ -742,7 +781,8 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					...unchanged,
 					...(scopes === undefined ? {} : { scopes }),
 					...(scopeDescriptions === undefined ? {} : { scopeDescriptions }),
-					...(tools === undefined ? {} : { tools })
+					...(tools === undefined ? {} : { tools }),
+					...(accessChanged ? { accessSavedAt: new Date() } : {})
 				}
 			);
 			const view =

@@ -13,6 +13,7 @@ import {
 	Statistic,
 	Table,
 	Tag,
+	Tooltip,
 	Typography
 } from 'antd';
 import { request } from '../frame/request.js';
@@ -72,7 +73,15 @@ const COLUMNS = [
 	{ title: 'Active users', dataIndex: 'total', key: 'total' },
 	{ title: 'Local sign-in', dataIndex: 'local', key: 'local' },
 	{ title: 'Upstream sign-in', dataIndex: 'upstream', key: 'upstream' },
-	{ title: 'Renewal', dataIndex: 'renewal', key: 'renewal' },
+	{
+		title: (
+			<Tooltip title="Renewed tokens, or let through by your proxy without signing in again.">
+				Renewal or use
+			</Tooltip>
+		),
+		dataIndex: 'renewal',
+		key: 'renewal'
+	},
 	{ title: 'Provisioned', dataIndex: 'provisioned', key: 'provisioned' }
 ];
 
@@ -283,7 +292,7 @@ export function BucketActivityPanel({
 					/>
 				)}
 			{neverActive && !loading ? (
-				<Empty description="Nobody has received a token from this project yet. People are counted when an app signs them in or renews their tokens." />
+				<Empty description="Nobody has been active in this project yet. People are counted when an app signs them in or renews their tokens, or your proxy lets them in." />
 			) : (
 				<>
 					<Row gutter={[16, 16]}>
@@ -439,9 +448,9 @@ export function BucketActivityPanel({
 				</>
 			)}
 			<Typography.Text type="secondary">
-				People this project issued tokens to, counted once per month and once
-				per day, in UTC. One person can appear under more than one kind, so the
-				kinds add up to more than the total.
+				People this project issued tokens to or your proxy let in, counted once
+				per month and once per day, in UTC. One person can appear under more
+				than one kind, so the kinds add up to more than the total.
 			</Typography.Text>
 		</Flex>
 	);

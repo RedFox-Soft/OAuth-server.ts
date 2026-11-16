@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '5f5da1d90805';
+export const source = 'fbbbd972ca00';
 
 export default {
 	questions: {
@@ -717,7 +717,43 @@ export default {
 				'只有在找到账户时才保留失败的登录：密码或验证码错误、账户被锁定或停用、缺少验证码，或地址未验证。',
 				'在你的代理处，只有代理用项目的代理密钥证明了地址，才会保留此人的地址。API 的记录从不带地址。',
 				'所有记录保留 90 天，锁定后仍然保留，并会随此人和项目一起删除。读取记录会写入审计日志。',
-				'记录最多晚一分钟。超级管理员可以在 Settings 中关闭记录。'
+				'记录最多晚一分钟。超级管理员可以在 Settings 中关闭记录。',
+				'收紧某个应用或 API 的规则后，它的 Access 标签页会列出过去 24 小时内被它拒绝的人，并用保存时间分开保存前后被拒绝的人。'
+			],
+			actionLabel: '打开 Users'
+		},
+		stillused: {
+			title: '找出不再使用某个应用的人',
+			sentence:
+				'按 Last active 筛选 Users。它把登录、令牌续期以及你的代理放行的每个请求都算在内，所以在已打开的会话中工作的人不会被当作不活跃。',
+			protocol: 'Activity marks · Forward auth decisions',
+			problemCaption: '在收回访问权限之前，没人知道谁还在使用某个应用。',
+			fixCaption: '每天的使用都会保留，不带地址。',
+			lanes: {
+				admin: '管理员',
+				fox: 'FoxAuth'
+			},
+			steps: [
+				{
+					label: '筛选 Users',
+					text: '在季度清理之前，Kai 按“Last active: Not in the last 90 days”筛选 Users。'
+				},
+				{
+					label: '不活跃的人',
+					text: '列表显示 90 天内没有登录、没有续期令牌、也没有被你的代理放行过的人。每天在旧会话中打开 Wiki 的人不在列表中。'
+				},
+				{
+					label: '打开某人',
+					text: 'Kai 打开其中一人。Profile 列出此人在过去 90 天里使用过的应用和 API，Activity 标签页显示每一天。'
+				}
+			],
+			sees: ['没有：用户看不到这些'],
+			goodToKnow: [
+				'Last active 把登录、令牌续期以及你的代理放行的请求都算在内，每天一次。',
+				'一个人的使用情况按每个应用，或每个 API 和应用，每天保留一条记录，包括第一次和最后一次的时间。API 的记录会写出此人调用过的、表中列出的工具。从不带地址。',
+				'“Not in the last 90 days”根据每月标记判断：与这 90 天有重叠的月份都算活跃，所以不会因为取整而把人当作不活跃。',
+				'使用情况最多晚五分钟记录，保留 90 天，并会随此人和项目一起删除。',
+				'每月活跃人数现在包括被你的代理放行的人，所以套餐对每月活跃人数的限制也会算上他们。'
 			],
 			actionLabel: '打开 Users'
 		},

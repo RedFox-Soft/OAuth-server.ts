@@ -37,6 +37,8 @@ export interface ResourceView {
 	/* How the person behind a token must have signed in (specs/130). */
 	requireCode: boolean;
 	signInEveryMinutes: number | null;
+	/* When who may get in last changed (specs/134); absent until the first such save. */
+	accessSavedAt?: string;
 	/* What the proxy's checks showed about the addresses it passes (specs/124); only when the proxy checks. */
 	addresses?: AddressesView;
 	/* What the API itself must serve and check, as the server states it (spec 107). */

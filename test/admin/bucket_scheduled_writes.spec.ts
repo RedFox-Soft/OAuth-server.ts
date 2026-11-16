@@ -56,8 +56,10 @@ const guarded = elysia.routes
 			(route.path === BUCKET || route.path.startsWith(`${BUCKET}/`)) &&
 			route.path !== `${BUCKET}/restore` &&
 			route.path !== `${BUCKET}/purge` &&
-			/* A read made a POST so it can be audited (specs/133), proved readable in test/person_activity/. */
+			/* Reads made POSTs so they can be audited (specs/133, 134), proved readable in test/person_activity/. */
 			route.path !== `${BUCKET}/users/:uid/activity` &&
+			route.path !== `${BUCKET}/behind-proxy/:appId/refusals` &&
+			route.path !== `${BUCKET}/resources/:resourceId/refusals` &&
 			!(route.method === 'DELETE' && route.path === BUCKET)
 	);
 

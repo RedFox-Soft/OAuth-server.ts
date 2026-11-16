@@ -137,6 +137,18 @@ export const UserListQuery = t.Object(
 		managedBy: t.Optional(t.String({ minLength: 1, maxLength: 128 })),
 		verified: t.Optional(t.Union([t.Literal('yes'), t.Literal('no')])),
 		authenticator: t.Optional(t.Union([t.Literal('yes'), t.Literal('no')])),
+		/*
+		 * Marked active in the last 7 or 30 days, or not in the last 30 or 90 (specs/134): a sign-in, a token renewal or
+		 * a request your proxy let through counts. A filter, never a sort.
+		 */
+		lastActive: t.Optional(
+			t.Union([
+				t.Literal('in7'),
+				t.Literal('in30'),
+				t.Literal('not30'),
+				t.Literal('not90')
+			])
+		),
 		/* 1-based, as SCIM's is. Default 1. */
 		startIndex: t.Optional(t.String({ pattern: '^[1-9][0-9]{0,8}$' })),
 		/* 1–200. Default 50. */

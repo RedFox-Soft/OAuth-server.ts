@@ -4,14 +4,15 @@ export default {
 		'What a FoxAuth server keeps about the people who sign in to it, for how long, why, who reads it, and when it is deleted.',
 	eyebrow: 'Privacy',
 	heading: 'What FoxAuth records about people',
-	lead: 'A FoxAuth server keeps a short record of what it decided about each person who signs in: when they signed in, when they were turned away, and why. This page lists all of it, so the operator of a project can point their own privacy notice here.',
+	lead: 'A FoxAuth server keeps a short record of what it decided about each person who signs in: when they signed in, when they were turned away and why, and which apps behind the operator’s proxy they used. This page lists all of it, so the operator of a project can point their own privacy notice here.',
 	sections: [
 		{
 			heading: 'What is kept',
 			items: [
 				'Every sign-in: when, to which application, and how (a password, a password and a code, or a provider). The network address this server attributed the request to, the same one its rate limits use. The browser and system family, for example "Chrome on Windows". When network facts are turned on, the country and network kind (Tor, VPN, hosting) from FoxTrust’s snapshot, looked up on the server itself.',
 				'Every failed sign-in where the account was found: a wrong password or code, a locked or deactivated account, a missing code, or an unverified address. An attempt on an address no account holds keeps nothing.',
-				'Every time an app behind the operator’s proxy, or an API checked at it, asked the person to sign in again or refused them, with the reason. At an app, the person’s address is kept only when the proxy proves with the project’s proxy key that it passes the address. At an API, no address is kept: the caller there is the agent’s machine, not the person.'
+				'Every time an app behind the operator’s proxy, or an API checked at it, asked the person to sign in again or refused them, with the reason. At an app, the person’s address is kept only when the proxy proves with the project’s proxy key that it passes the address. At an API, no address is kept: the caller there is the agent’s machine, not the person.',
+				'What the person used there: one entry per app behind the proxy, or per API and application, and day, with the first and last time and how many checks the proxy made. For an API, the tools of its table the person called. Never an address, a country or a path.'
 			]
 		},
 		{
@@ -21,7 +22,7 @@ export default {
 				'The raw browser string.',
 				'Tokens, passwords, codes or session identifiers.',
 				'A tool name an MCP client sent that is not in the API’s table of tools.',
-				'Requests the proxy let through.',
+				'The address, country or path of a request the proxy let through.',
 				'The network owner, the region or the city of an address.'
 			]
 		},
@@ -30,7 +31,7 @@ export default {
 			items: [
 				'Each record is kept 90 days after it was last updated, then deleted. The 90 days are the same on every plan.',
 				'A record survives a lock, a deactivation and "Sign out everywhere", because that is when an administrator needs it. It is deleted at once with the person, and with the project.',
-				'Records are written once a minute. If a server process crashes, up to the last minute can be lost.',
+				'Sign-ins and refusals are written once a minute, and what people used every five minutes. If a server process crashes, up to the last minute, or five for use, can be lost.',
 				'Behind a proxy the server does not trust, every sign-in carries the proxy’s address. The operator fixes this with the "Caller address" settings.'
 			]
 		},
@@ -45,13 +46,14 @@ export default {
 			heading: 'Who reads it',
 			items: [
 				'The administrators of the project, on the person’s Activity tab, and the agents acting for them. Every read is written to the audit trail, once per reader, person and day.',
+				'The same administrators, on an app’s or an API’s Access tab, see who it refused or asked to sign in again in the last 24 hours. That read is written to the audit trail too, once per reader, app or API, and day.',
 				'A super administrator can turn recording off for the whole server in Settings.'
 			]
 		},
 		{
 			heading: 'Other records about people',
 			items: [
-				'To count monthly active users, a server marks each person once a day and once a month, without an address. These marks outlive a deletion: a day’s mark for up to 40 days, a month’s mark for up to 13 months.',
+				'To count monthly active users, a server marks each person once a day and once a month, without an address, when they sign in, when an app renews their tokens, and when the proxy lets them through. These marks outlive a deletion: a day’s mark for up to 40 days, a month’s mark for up to 13 months.',
 				'Sessions and tokens carry no address and no device.'
 			]
 		}

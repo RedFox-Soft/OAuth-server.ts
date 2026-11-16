@@ -1,9 +1,14 @@
 import { Elysia } from 'elysia';
 import { uriPathParams } from 'lib/plugins/uri_path_params.js';
-import { getBucketGroupStore, getUserStore } from '../../adapters/index.js';
+import {
+	getActivityStore,
+	getBucketGroupStore,
+	getUserStore
+} from '../../adapters/index.js';
 import {
 	MAX_END_USER_PAGE,
 	type EndUserFilter,
+	type LastActiveFilter,
 	type User,
 	type UserBucket
 } from '../../adapters/types.js';
@@ -212,8 +217,21 @@ function listFilterOf(query: typeof UserListQuery.static): EndUserFilter {
 	if (query.verified !== undefined) filter.verified = query.verified === 'yes';
 	if (query.authenticator !== undefined)
 		filter.totpEnrolled = query.authenticator === 'yes';
+	if (query.lastActive !== undefined) {
+		filter.lastActive = LAST_ACTIVE_FILTERS[query.lastActive];
+	}
 	return filter;
 }
+
+const LAST_ACTIVE_FILTERS: Record<
+	NonNullable<typeof UserListQuery.static.lastActive>,
+	LastActiveFilter
+> = {
+	in7: { within: 7 },
+	in30: { within: 30 },
+	not30: { notWithin: 30 },
+	not90: { notWithin: 90 }
+};
 
 /*
  * Where an entry about one of a bucket's people belongs: within the bucket, and to the group that owns it. The
@@ -288,14 +306,15 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 	})
 	/*
 	 * A page of the bucket's people, ordered by email, with how many match. Searched by the start of an email or
-	 * a username in any letter case, or by an exact id, and narrowed by status, who manages them, verification
-	 * and authenticator — every filter answered by the datastore, so a bucket of any size reads in one page.
+	 * a username in any letter case, or by an exact id, and narrowed by status, who manages them, verification,
+	 * authenticator and when they were last active — every filter answered by the datastore, so a bucket of any size
+	 * reads in one page.
 	 */
 	.get(
 		'/admin/api/projects/:id/users',
 		async ({ admin, params, query, request }) => {
 			const ctx = assertAuth(admin);
-			await loadBucketForUsers(ctx, params.id);
+			const bucket = await loadBucketForUsers(ctx, params.id);
 			assertNoUnknownParams(request.url);
 			const { users, totalResults } = await getUserStore(params.id).query(
 				listFilterOf(query),
@@ -305,7 +324,31 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 				},
 				'email'
 			);
-			return { users: await withGroups(params.id, users), totalResults };
+			/*
+			 * "Last active" for the page (specs/134 research R5): one read of the page's marks, and the day counting began,
+			 * so an empty cell says since when rather than "never".
+			 */
+			const now = new Date();
+			const activity = getActivityStore();
+			const [rows, marked, countingSince] = await Promise.all([
+				withGroups(params.id, users),
+				activity.lastMarkedMany(
+					params.id,
+					users.map((user) => user._id),
+					now
+				),
+				activity.countingSince(now)
+			]);
+			return {
+				users: rows.map((row) => ({
+					...row,
+					lastActive: marked.get(row._id) ?? null
+				})),
+				totalResults,
+				activeSince: new Date(
+					Math.max(bucket.createdAt.getTime(), countingSince.getTime())
+				).toISOString()
+			};
 		},
 		{ query: UserListQuery }
 	)

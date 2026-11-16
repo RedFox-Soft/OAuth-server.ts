@@ -1,4 +1,6 @@
 import { entriesOf } from '../../helpers/_/object.js';
+import { lastActivePeriods } from '../activity_records.js';
+import type { LastActiveFilter } from '../types.js';
 import {
 	clampPage,
 	derivedKeysOf,
@@ -24,6 +26,21 @@ import {
 	type User,
 	type UserStoreInstance
 } from '../types.js';
+
+/* The accounts a "Last active" filter is about, and whether it wants them or the rest. */
+async function markedFor(
+	bucketId: string,
+	filter: LastActiveFilter
+): Promise<{ marked: Set<string>; has: boolean }> {
+	const now = new Date();
+	const { periods, has } = lastActivePeriods(filter, now);
+	const marked = await (
+		await import('../index.js')
+	)
+		.getActivityStore()
+		.accountsMarkedIn(bucketId, periods, now);
+	return { marked: new Set(marked), has };
+}
 
 export class UserStore implements UserStoreInstance {
 	private users = new Map<string, User>();
@@ -119,6 +136,14 @@ export class UserStore implements UserStoreInstance {
 							.getBucketGroupStore()
 							.memberIds(filter.memberOf)
 					);
+		/*
+		 * Marked active, or not, in the periods a "Last active" filter names (specs/134 research R5), read from the
+		 * marks the same way.
+		 */
+		const lastActive =
+			filter.lastActive === undefined
+				? null
+				: await markedFor(this.name, filter.lastActive);
 		/* Code-unit order, which is the byte order the other two stores sort in for these ASCII-heavy keys. */
 		const key = (user: User) => (order === 'email' ? user.email : user._id);
 		const matches = [...this.users.values()]
@@ -126,7 +151,9 @@ export class UserStore implements UserStoreInstance {
 				(user) =>
 					matchesStored(user, stored) &&
 					matchesConsoleFilter(user, filter) &&
-					(members === null || members.has(user._id))
+					(members === null || members.has(user._id)) &&
+					(lastActive === null ||
+						lastActive.marked.has(user._id) === lastActive.has)
 			)
 			.sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0));
 		return {

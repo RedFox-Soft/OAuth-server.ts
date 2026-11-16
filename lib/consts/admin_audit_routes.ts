@@ -59,6 +59,13 @@ const routes = [
 		path: '/admin/api/projects/:id/resources/:resourceId',
 		targetType: 'ProtectedResource'
 	},
+	/* A read, audited, as an app's refusals above (specs/134 FR-022). */
+	{
+		action: 'resource.refusals.read',
+		method: 'POST',
+		path: '/admin/api/projects/:id/resources/:resourceId/refusals',
+		targetType: 'ProtectedResource'
+	},
 
 	/*
 	 * Which client identities may administer this instance. `targetId` is the permitted identifier URL
@@ -622,6 +629,16 @@ const routes = [
 		path: '/admin/api/projects/:id/behind-proxy/:appId',
 		targetType: 'BehindProxyApp'
 	},
+	/*
+	 * A read, audited (specs/134 FR-022): who an app refused names people, so who read it is kept, once per reader, app
+	 * and day. Not a change (`AUDITED_READS`).
+	 */
+	{
+		action: 'behindproxy.refusals.read',
+		method: 'POST',
+		path: '/admin/api/projects/:id/behind-proxy/:appId/refusals',
+		targetType: 'BehindProxyApp'
+	},
 
 	/*
 	 * Upstream federation providers. `targetType` is the bucket, because a provider has no identity outside
@@ -931,7 +948,9 @@ export type AuditAction =
  */
 export const AUDITED_READS: readonly AuditAction[] = [
 	'networkfacts.lookup',
-	'enduser.activity.read'
+	'enduser.activity.read',
+	'behindproxy.refusals.read',
+	'resource.refusals.read'
 ];
 export type AuditTargetType =
 	| (typeof routes)[number]['targetType']

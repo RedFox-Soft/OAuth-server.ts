@@ -1911,6 +1911,26 @@ const personActivityFence: Migration = {
 	postgres: { noop: true, reason: PERSON_ACTIVITY_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/134 research R9). People's activity now holds what they used: rows with a reason
+ * (`used`) and a field (`tools`) an older release's schema does not know, and two new indexes. An older release would
+ * fail to read a person's timeline and would not keep the tools bound; recording this migration makes its startup gate
+ * refuse the database instead.
+ */
+const PERSON_APP_USAGE_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than recording what people use refuses to start against a database that may hold it.';
+
+const personAppUsageFence: Migration = {
+	id: '2026-11-17-person-app-usage-fence',
+	description:
+		"Mark the database as holding what people used at apps and APIs behind the proxy, so that an older release refuses to start against it rather than failing to read people's activity",
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: PERSON_APP_USAGE_FENCE_REASON },
+	postgres: { noop: true, reason: PERSON_APP_USAGE_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1930,5 +1950,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	proxyNetworkFactsFence,
 	apiSignInRequirementFence,
 	apiToolConditionsFence,
-	personActivityFence
+	personActivityFence,
+	personAppUsageFence
 ];

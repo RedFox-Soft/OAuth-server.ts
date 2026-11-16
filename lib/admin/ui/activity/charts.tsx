@@ -14,7 +14,8 @@ const KIND_KEYS = ['local', 'federated', 'renewal'] as const;
 const KIND_NAMES = {
 	local: 'local',
 	federated: 'upstream',
-	renewal: 'renewal'
+	/* Renewed tokens, or let through by the proxy without signing in again (specs/134). */
+	renewal: 'renewal or use'
 };
 
 function niceMax(values: readonly number[]): number {

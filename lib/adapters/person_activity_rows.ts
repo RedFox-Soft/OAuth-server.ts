@@ -1,3 +1,4 @@
+import { MAX_TOOLS_PER_ROW } from '../consts/person_activity.js';
 import type { PersonActivityCursor, PersonActivityRow } from './types.js';
 
 /*
@@ -16,11 +17,30 @@ export function addTo(
 			: { address: next.address, addressFrom: next.addressFrom }),
 		...(next.facts === undefined ? {} : { facts: next.facts }),
 		...(next.device === undefined ? {} : { device: next.device }),
+		...(existing.tools === undefined && next.tools === undefined
+			? {}
+			: { tools: unionOfTools(existing.tools, next.tools) }),
 		count: existing.count + next.count,
 		firstAt: earlier(existing.firstAt, next.firstAt),
 		lastAt: later(existing.lastAt, next.lastAt),
 		expiresAt: later(existing.expiresAt, next.expiresAt)
 	};
+}
+
+/*
+ * An API use row's tools (specs/134 research R3): the names kept, then the new ones not kept, in their order, cut at
+ * twenty. MongoDB's pipeline and PostgreSQL's statement compute the same list.
+ */
+export function unionOfTools(
+	kept: readonly string[] | undefined,
+	added: readonly string[] | undefined
+): string[] {
+	const tools = [...(kept ?? [])];
+	for (const tool of added ?? []) {
+		if (tools.length >= MAX_TOOLS_PER_ROW) break;
+		if (!tools.includes(tool)) tools.push(tool);
+	}
+	return tools.slice(0, MAX_TOOLS_PER_ROW);
 }
 
 function earlier(a: Date, b: Date): Date {

@@ -3,9 +3,10 @@ import { getPersonActivityStore, getUserStore } from '../adapters/index.js';
 import type { PersonActivityRow } from '../adapters/types.js';
 import {
 	OVERFLOW_ACCOUNT,
-	PERSON_ACTIVITY_FLUSH_MS
+	PERSON_ACTIVITY_FLUSH_MS,
+	PERSON_ACTIVITY_USE_FLUSH_MS
 } from '../consts/person_activity.js';
-import { takeAll } from './buffer.js';
+import { takeAll, takeUse } from './buffer.js';
 
 /*
  * Writing what this process noted (specs/133 research R11, R12). Once a minute, everything held goes to the store in
@@ -55,8 +56,8 @@ async function withoutTheDeleted(
 	);
 }
 
-async function flushOnce(): Promise<void> {
-	const taken = takeAll();
+async function flushOnce(take: () => PersonActivityRow[]): Promise<void> {
+	const taken = take();
 	if (taken.length === 0) return;
 	const rows = await withoutTheDeleted(taken);
 	if (rows.length === 0) return;
@@ -78,12 +79,20 @@ async function flushOnce(): Promise<void> {
 }
 
 /* One write at a time: a flush that runs long is followed, never overlapped, by the next. */
-export function flushPersonActivityNow(): Promise<void> {
-	flushing = flushing.then(flushOnce, flushOnce);
+function flushQueued(take: () => PersonActivityRow[]): Promise<void> {
+	const run = () => flushOnce(take);
+	flushing = flushing.then(run, run);
 	return flushing;
 }
 
+/* Both buffers, now: what tests ask for and what a stop drains. */
+export function flushPersonActivityNow(): Promise<void> {
+	void flushQueued(takeAll);
+	return flushQueued(takeUse);
+}
+
 let timer: ReturnType<typeof setInterval> | null = null;
+let useTimer: ReturnType<typeof setInterval> | null = null;
 let drainInstalled = false;
 
 /*
@@ -113,8 +122,13 @@ function installShutdownDrain(): void {
 export function startPersonActivity(): void {
 	if (timer) return;
 	timer = setInterval(() => {
-		void flushPersonActivityNow();
+		void flushQueued(takeAll);
 	}, PERSON_ACTIVITY_FLUSH_MS);
 	timer.unref();
+	/* What people used, every five minutes (specs/134 research R2). */
+	useTimer = setInterval(() => {
+		void flushQueued(takeUse);
+	}, PERSON_ACTIVITY_USE_FLUSH_MS);
+	useTimer.unref();
 	installShutdownDrain();
 }

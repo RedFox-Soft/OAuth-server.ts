@@ -8,6 +8,7 @@ import {
 	emptyTally,
 	figureId,
 	freezeOpenPeriods,
+	latestMarked,
 	markId,
 	periodsOf,
 	tombstoneId,
@@ -22,7 +23,8 @@ import {
 	type ActivityMarkInput,
 	type ActivityMarkRecord,
 	type ActivityStoreInstance,
-	type ActivityTally
+	type ActivityTally,
+	type LastMarked
 } from '../types.js';
 
 interface TallyRow {
@@ -176,6 +178,52 @@ export class ActivityStore implements ActivityStoreInstance {
 		`;
 		const found = new Set(rows.map((row) => row.period));
 		return periods.filter((period) => found.has(period));
+	}
+
+	/* One page of people's marks, on `{bucketId, accountId, period}` (specs/134 research R5). */
+	async lastMarkedMany(
+		bucketId: string,
+		accountIds: readonly string[],
+		at: Date
+	): Promise<Map<string, LastMarked>> {
+		const found = new Map<string, LastMarked>();
+		if (accountIds.length === 0) return found;
+		const handle = sql();
+		const rows = await handle<{ accountId: string; period: string }[]>`
+			SELECT doc->>'accountId' AS "accountId", doc->>'period' AS period
+			FROM ${handle(this.marksArea)}
+			WHERE doc->>'bucketId' = ${bucketId}
+				AND doc->>'accountId' = ANY(${handle.array([...accountIds], 'text')})
+				AND expires_at > ${at}
+		`;
+		const periods = new Map<string, string[]>();
+		for (const row of rows) {
+			const list = periods.get(row.accountId) ?? [];
+			list.push(row.period);
+			periods.set(row.accountId, list);
+		}
+		for (const [accountId, list] of periods) {
+			const latest = latestMarked(list);
+			if (latest) found.set(accountId, latest);
+		}
+		return found;
+	}
+
+	async accountsMarkedIn(
+		bucketId: string,
+		periods: readonly string[],
+		at: Date
+	): Promise<string[]> {
+		if (periods.length === 0) return [];
+		const handle = sql();
+		const rows = await handle<{ accountId: string }[]>`
+			SELECT DISTINCT doc->>'accountId' AS "accountId"
+			FROM ${handle(this.marksArea)}
+			WHERE doc->>'bucketId' = ${bucketId}
+				AND doc->>'period' = ANY(${handle.array([...periods], 'text')})
+				AND expires_at > ${at}
+		`;
+		return rows.map((row) => row.accountId);
 	}
 
 	private async insertIfAbsent(id: string, doc: object): Promise<void> {

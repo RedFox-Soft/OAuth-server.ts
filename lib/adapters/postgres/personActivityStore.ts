@@ -1,6 +1,7 @@
 import { sql, type Tx } from './db.js';
 import { docOf } from './json.js';
 import {
+	MAX_TOOLS_PER_ROW,
 	OVERFLOW_ACCOUNT,
 	PERSON_ACTIVITY_CHUNK
 } from '../../consts/person_activity.js';
@@ -61,6 +62,27 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 			...(row.facts === undefined ? {} : { facts: row.facts }),
 			...(row.device === undefined ? {} : { device: row.device })
 		};
+		/*
+		 * An API use row's tools (specs/134 research R3): the names kept, then the new ones not kept, in their order, cut
+		 * at twenty — the same list the buffer and MongoDB keep. A new name's position is offset past any kept one.
+		 */
+		const tools =
+			row.tools !== undefined && row.tools.length > 0
+				? tx`|| jsonb_build_object('tools', (
+					SELECT COALESCE(jsonb_agg(kept.tool ORDER BY kept.position), '[]'::jsonb)
+					FROM (
+						SELECT tool, min(position) AS position FROM (
+							SELECT tool, position FROM jsonb_array_elements_text(
+								COALESCE(activity.doc->'tools', '[]'::jsonb)
+							) WITH ORDINALITY AS old(tool, position)
+							UNION ALL
+							SELECT tool, position + 1000 FROM jsonb_array_elements_text(
+								EXCLUDED.doc->'tools'
+							) WITH ORDINALITY AS new(tool, position)
+						) AS every GROUP BY tool ORDER BY position LIMIT ${MAX_TOOLS_PER_ROW}
+					) AS kept
+				))`
+				: tx``;
 		await tx`
 			INSERT INTO ${tx(this.area)} AS activity (id, doc, expires_at)
 			VALUES (${row._id}, ${row}, ${row.expiresAt})
@@ -71,7 +93,8 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 					'firstAt', LEAST(activity.doc->>'firstAt', EXCLUDED.doc->>'firstAt'),
 					'lastAt', GREATEST(activity.doc->>'lastAt', EXCLUDED.doc->>'lastAt'),
 					'expiresAt', GREATEST(activity.doc->>'expiresAt', EXCLUDED.doc->>'expiresAt')
-				),
+				)
+				${tools},
 				expires_at = GREATEST(activity.expires_at, EXCLUDED.expires_at)
 		`;
 	}
@@ -129,6 +152,27 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 				AND expires_at > ${now}
 		`;
 		return found.map((row) => row.day);
+	}
+
+	/* On `{bucketId, outcome, lastAt}`: never the project's use rows (specs/134 research R6). */
+	async listRefusals(
+		bucketId: string,
+		query: { since: Date; now: Date; limit: number }
+	): Promise<PersonActivityRow[]> {
+		const handle = sql();
+		const found = await handle`
+			SELECT doc FROM ${handle(this.area)}
+			WHERE doc->>'bucketId' = ${bucketId}
+				AND doc->>'outcome' IN ('refused', 'sign_in_again')
+				AND doc->>'lastAt' >= ${query.since.toISOString()}
+				AND expires_at > ${query.now}
+				AND doc->>'accountId' <> ${OVERFLOW_ACCOUNT}
+			ORDER BY doc->>'lastAt' DESC, id DESC
+			LIMIT ${Math.max(query.limit, 1)}
+		`;
+		return found.map((row: unknown) =>
+			documentOf(this.area, PersonActivityRow, docOf(row))
+		);
 	}
 
 	async destroyPerson(bucketId: string, accountId: string): Promise<number> {

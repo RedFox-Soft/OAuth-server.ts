@@ -402,6 +402,13 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 	},
 	{
 		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/behind-proxy/:appId/refusals`,
+		body: {}
+	},
+	{
+		on: 'bucket',
 		flag: 'edit',
 		method: 'POST',
 		path: `${BUCKET}/behind-proxy`,
@@ -728,6 +735,13 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		flag: 'manageUsers',
 		method: 'GET',
 		path: `${BUCKET}/resources/:resourceId/vouching`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/resources/:resourceId/refusals`,
+		body: {}
 	},
 	{
 		on: 'bucket',

@@ -83,12 +83,13 @@ const WHAT_COUNTS = (
 	<div style={{ maxWidth: 360 }}>
 		<p>
 			A monthly active user is a person a project issued tokens to — a sign-in,
-			a refresh, a silent re-authentication — counted once per calendar month in
-			UTC.
+			a refresh, a silent re-authentication — or whom your proxy let into an app
+			or an API, counted once per calendar month in UTC.
 		</p>
 		<p>
-			Local, upstream and renewal say how they were active. One person can be
-			active in more than one way, so the three add up to more than the total.
+			Local, upstream and renewal (or use behind your proxy) say how they were
+			active. One person can be active in more than one way, so the three add up
+			to more than the total.
 		</p>
 		<p>
 			A customer is the team that owns a project. Its figure is the sum of its
@@ -335,7 +336,7 @@ export function Usage({ superAdmin }: { superAdmin: boolean }) {
 		},
 		{
 			title: (
-				<Tooltip title="Local sign-in · upstream sign-in · renewal · provisioned by a directory. One person can be in more than one.">
+				<Tooltip title="Local sign-in · upstream sign-in · renewal or use behind your proxy · provisioned by a directory. One person can be in more than one.">
 					Composition
 				</Tooltip>
 			),

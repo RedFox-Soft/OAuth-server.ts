@@ -3,6 +3,7 @@ import crypto from 'crypto';
 
 import { sql, type Sql } from './db.js';
 import { docOf } from './json.js';
+import { lastActivePeriods } from '../activity_records.js';
 import { isUniqueViolation } from './sqlState.js';
 import { STORE_AREAS, userAreaFor } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
@@ -92,9 +93,26 @@ function consoleConditionsFor(
 	handle: Sql,
 	where: ReturnType<typeof conditionsFor>,
 	filter: EndUserFilter,
-	area: string
+	area: string,
+	bucketId: string
 ) {
 	let all = where;
+	/*
+	 * Marked active, or not, in the periods a "Last active" filter names (specs/134 research R5): a mark of this
+	 * account in this bucket, served by the marks' `(bucketId, accountId, period)` index.
+	 */
+	if (filter.lastActive !== undefined) {
+		const now = new Date();
+		const { periods, has } = lastActivePeriods(filter.lastActive, now);
+		const marked = handle`EXISTS (
+			SELECT 1 FROM ${handle(STORE_AREAS.activityMarks)} AS mark
+			WHERE mark.doc->>'bucketId' = ${bucketId}
+			AND mark.doc->>'accountId' = ${handle(area)}.id
+			AND mark.doc->>'period' = ANY(${handle.array([...periods], 'text')})
+			AND mark.expires_at > ${now}
+		)`;
+		all = has ? handle`${all} AND ${marked}` : handle`${all} AND NOT ${marked}`;
+	}
 	/*
 	 * A member of one bucket group (specs/089): a membership record naming this user, served by the membership
 	 * area's `(groupId, userId)` index. The user's own `id` is qualified by its table, because the membership
@@ -360,7 +378,8 @@ export class UserStore implements UserStoreInstance {
 			handle,
 			conditionsFor(handle, stored),
 			filter,
-			this.area
+			this.area,
+			this.name
 		);
 		/* Byte order, as MongoDB's default comparison sorts, so a page is the same page on either backend. */
 		const orderBy =

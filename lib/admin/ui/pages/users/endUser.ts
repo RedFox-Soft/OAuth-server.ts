@@ -36,6 +36,8 @@ export type EndUser = Omit<
 	passwordSet?: boolean;
 	/* The person's activity in brief (specs/133), on the single read only. No address, country or device. */
 	activity?: ActivitySummaryView;
+	/* On the list only (specs/134): the latest day, or month, the person was marked active. */
+	lastActive?: ActivitySummaryView['lastActive'];
 };
 
 export interface ActivitySummaryView {
@@ -54,12 +56,42 @@ export interface ActivitySummaryView {
 		kind: 'signIn' | 'app' | 'api';
 	} | null;
 	lastActive: { day: string } | { month: string } | null;
+	/* Apps behind the proxy and APIs the person was let through in the last 90 days, newest first (specs/134). */
+	appsUsed?: {
+		kind: 'app' | 'api';
+		id: string;
+		name: string | null;
+		lastDay: string;
+	}[];
 }
 
 /* One page of the users list (GET /admin/api/projects/:id/users). */
 export interface EndUserPage {
 	users: EndUser[];
 	totalResults: number;
+	/* When counting activity began (specs/134): an empty "Last active" means nothing since then. */
+	activeSince?: string | null;
+}
+
+/* "Today", a date, or a month when only the month is still known (specs/133 R17, specs/134); "—" for nothing. */
+export function lastActiveWords(
+	active: ActivitySummaryView['lastActive']
+): string {
+	if (!active) return '—';
+	if ('day' in active) {
+		const today = new Date().toISOString().slice(0, 10);
+		if (active.day === today) return 'Today';
+		return new Date(`${active.day}T12:00:00Z`).toLocaleDateString(undefined, {
+			dateStyle: 'medium'
+		});
+	}
+	return new Date(`${active.month}-15T12:00:00Z`).toLocaleDateString(
+		undefined,
+		{
+			month: 'long',
+			year: 'numeric'
+		}
+	);
 }
 
 export function usersApi(bucketId: string, userId?: string): string {

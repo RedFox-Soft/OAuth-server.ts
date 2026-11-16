@@ -12,8 +12,8 @@ import type {
 	ProtectedResource,
 	UserBucket
 } from '../adapters/types.js';
-import { dayOf, monthOf } from '../activity/periods.js';
 import {
+	APPS_USED_SCAN,
 	NEW_ADDRESS_AFTER,
 	PERSON_ACTIVITY_DAYS
 } from '../consts/person_activity.js';
@@ -22,7 +22,13 @@ import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { Client } from '../models/client.js';
 import { namespaceOf } from '../resources/namespace.js';
-import { wordsOf, type RowWords } from './words.js';
+import {
+	checksWords,
+	toolsView,
+	wordsOf,
+	type RowWords,
+	type ToolsView
+} from './words.js';
 
 /*
  * Reading a person's activity (specs/133 contracts/admin-api.md). Names are looked up as they are today, for the
@@ -64,6 +70,9 @@ export interface ActivityRowView {
 	facts: { country: string | null; categories: string[] } | null;
 	newAddress: boolean;
 	count: number;
+	/* A use row (specs/134): the proxy checks behind it, said only in a tooltip, never as a count of visits. */
+	checks: string | null;
+	tools: ToolsView | null;
 	firstAt: string;
 	lastAt: string;
 	check: { app: string } | { api: string } | null;
@@ -226,6 +235,8 @@ async function viewOf(
 			: null,
 		newAddress,
 		count: row.count,
+		checks: row.reason === 'used' ? checksWords(row.count) : null,
+		tools: toolsView(row.tools),
 		firstAt: row.firstAt.toISOString(),
 		lastAt: row.lastAt.toISOString(),
 		check
@@ -318,36 +329,80 @@ export interface ActivitySummary {
 		kind: PersonActivityRow['kind'];
 	} | null;
 	lastActive: { day: string } | { month: string } | null;
+	/* Apps behind the proxy and APIs the person was let through in the last 90 days, newest first (specs/134). */
+	appsUsed: AppUsed[];
+}
+
+export interface AppUsed {
+	kind: 'app' | 'api';
+	/* The app's id, or the API's identifier. */
+	id: string;
+	name: string | null;
+	/* The UTC day last used. */
+	lastDay: string;
+}
+
+/*
+ * What a person used (specs/134 research R8), from their use rows: one line per app or API, its latest day. An API
+ * reached through two applications is one line. Names as they are today.
+ */
+async function appsUsedBy(
+	bucket: UserBucket,
+	accountId: string,
+	now: Date,
+	names: Names
+): Promise<AppUsed[]> {
+	const store = getPersonActivityStore();
+	const [apps, apis] = await Promise.all(
+		(['app', 'api'] as const).map((kind) =>
+			store.listForPerson(bucket._id, accountId, {
+				kind,
+				outcome: 'let_in',
+				limit: APPS_USED_SCAN,
+				now
+			})
+		)
+	);
+	const latest = new Map<string, AppUsed>();
+	for (const row of [...apps.rows, ...apis.rows]) {
+		const id = row.kind === 'app' ? row.place.appId : row.place.resource;
+		if (id === undefined || (row.kind !== 'app' && row.kind !== 'api'))
+			continue;
+		const key = `${row.kind}\u0000${id}`;
+		const seen = latest.get(key);
+		if (!seen || row.day > seen.lastDay) {
+			latest.set(key, { kind: row.kind, id, name: null, lastDay: row.day });
+		}
+	}
+	const used = [...latest.values()].sort((a, b) =>
+		a.lastDay < b.lastDay ? 1 : a.lastDay > b.lastDay ? -1 : 0
+	);
+	for (const entry of used) {
+		entry.name =
+			entry.kind === 'app'
+				? ((await names.app(entry.id))?.name ?? null)
+				: ((await names.api(entry.id))?.name ?? null);
+	}
+	return used;
 }
 
 const RECENT_ROWS = 200;
-const DAY_MS = 24 * 60 * 60 * 1000;
 
-/* The latest day the person was marked active in the last 40 days, else the latest month in the last 13 (R17). */
+/*
+ * The latest day the person was marked active, else the latest month (R17), in one read of their marks (specs/134
+ * research R5).
+ */
 async function lastActive(
 	bucketId: string,
 	accountId: string,
 	now: Date
 ): Promise<ActivitySummary['lastActive']> {
-	const days = Array.from({ length: 41 }, (_, i) =>
-		dayOf(new Date(now.getTime() - i * DAY_MS))
-	);
-	const store = getActivityStore();
-	const markedDays = await store.markedPeriods(bucketId, accountId, days, now);
-	if (markedDays.length > 0)
-		return { day: [...markedDays].sort().at(-1) ?? '' };
-	const months = Array.from({ length: 14 }, (_, i) =>
-		monthOf(new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1)))
-	);
-	const markedMonths = await store.markedPeriods(
+	const marked = await getActivityStore().lastMarkedMany(
 		bucketId,
-		accountId,
-		months,
+		[accountId],
 		now
 	);
-	return markedMonths.length > 0
-		? { month: [...markedMonths].sort().at(-1) ?? '' }
-		: null;
+	return marked.get(accountId) ?? null;
 }
 
 /*
@@ -360,7 +415,8 @@ export async function activitySummary(
 ): Promise<ActivitySummary> {
 	const now = new Date();
 	const store = getPersonActivityStore();
-	const [recent, signedIn, startedAt, active] = await Promise.all([
+	const names = new Names(bucket);
+	const [recent, signedIn, startedAt, active, appsUsed] = await Promise.all([
 		store.listForPerson(bucket._id, accountId, { limit: RECENT_ROWS, now }),
 		store.listForPerson(bucket._id, accountId, {
 			kind: 'signIn',
@@ -369,10 +425,10 @@ export async function activitySummary(
 			now
 		}),
 		recordingBegan(),
-		lastActive(bucket._id, accountId, now)
+		lastActive(bucket._id, accountId, now),
+		appsUsedBy(bucket, accountId, now, names)
 	]);
 	const last = signedIn.rows.at(0);
-	const names = new Names(bucket);
 	let lastSignIn: ActivitySummary['lastSignIn'] = null;
 	if (last) {
 		const view = await viewOf(last, names, false);
@@ -404,6 +460,7 @@ export async function activitySummary(
 		keptDays: PERSON_ACTIVITY_DAYS,
 		lastSignIn,
 		notLetInSince,
-		lastActive: active
+		lastActive: active,
+		appsUsed
 	};
 }

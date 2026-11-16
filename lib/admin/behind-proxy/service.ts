@@ -346,6 +346,19 @@ export async function updateApp(
 		}
 	}
 
+	/*
+	 * When who may get in last changed (specs/134 research R6): the rules, or the time zone their hours are read in.
+	 * A rename or a new address leaves it, so "Refused recently" divides before from after the change that matters.
+	 */
+	if (
+		(patch.rules !== undefined &&
+			JSON.stringify(patch.rules) !== JSON.stringify(current.rules)) ||
+		(patch.timeZone !== undefined &&
+			(patch.timeZone ?? null) !== (current.timeZone ?? null))
+	) {
+		patch.accessSavedAt = new Date();
+	}
+
 	await record();
 	let updated: BehindProxyApp | null;
 	try {
@@ -455,6 +468,8 @@ export async function viewApps(
 			firstAllowedAt: iso(app.firstAllowedAt)
 		},
 		lastAskedAt: iso(app.lastAskedAt),
+		/* When who may get in last changed (specs/134): "Refused recently" divides before from after. */
+		accessSavedAt: iso(app.accessSavedAt),
 		/* The hosts the proxy recently reported for the app that were not its address, kept in memory only. */
 		mismatchedHosts: mismatchedHostsOf(app._id),
 		/* What the proxy's checks showed about the addresses it passes (specs/124 research R6), for Connect's step 5. */

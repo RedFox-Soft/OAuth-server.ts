@@ -222,11 +222,12 @@ available and has no instance switch, because the endpoint does nothing until a 
 
 ## What is not recorded
 
-**Requests let in are not logged.** Each decision is emitted as `behind_proxy.decision` on the [[event-bus]], with
+**No request is logged as such.** Each decision is emitted as `behind_proxy.decision` on the [[event-bus]], with
 identifiers only (no host, path or cookie). Since spec 133 (2026-11-16) every "Asked to sign in again" and "Refused"
 of an identified person is kept on that person's activity, with the rule's configured path and, when the proxy proves
-it, the address ([[person-activity]]). Requests let in stay unrecorded: every page asset is one check, so that log is
-a different storage and privacy decision (spec 5B).
+it, the address ([[person-activity]]). Since spec 134 a request let in is kept only as the person's use of the app
+that day, one row with the first and last time and the number of checks, never the path, the rule or an address,
+and it marks the person active ([[monthly-active-users]]).
 
 **Usage writes are throttled** (`usage.ts:9-18`). The Connect page's checklist reads "first asked", "last asked",
 "first sign-in" and "first let through". "Last asked" is written at most once a minute per app per server. Each

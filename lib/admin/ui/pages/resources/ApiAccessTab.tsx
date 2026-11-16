@@ -47,6 +47,7 @@ import {
 } from './ResourceSignInFields.js';
 import { ToolRowConditions } from './ToolRowConditions.js';
 import { ApiCheckAccess } from './ApiCheckAccess.js';
+import { RefusedRecentlyCard } from '../RefusedRecentlyCard.js';
 import { resourcesApi, type ResourceView } from './resourceView.js';
 
 interface ToolsForm {
@@ -698,6 +699,12 @@ export function ApiAccessTab({
 					scopes={api.scopes}
 					saved={savedView}
 					edited={editedView}
+				/>
+			)}
+			{byProxy && (
+				<RefusedRecentlyCard
+					bucketId={bucketId}
+					path={`${resourcesApi(bucketId, api.identifier)}/refusals`}
 				/>
 			)}
 

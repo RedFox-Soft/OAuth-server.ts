@@ -20,6 +20,8 @@ export interface AppView {
 		firstAllowedAt: string | null;
 	};
 	lastAskedAt: string | null;
+	/* When who may get in last changed (specs/134): "Refused recently" divides before from after. */
+	accessSavedAt: string | null;
 	mismatchedHosts: string[];
 	signUpsOpen: boolean;
 	/* The zone the app's time conditions read the clock in (specs/124). */

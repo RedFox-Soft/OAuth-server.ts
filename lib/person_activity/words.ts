@@ -1,4 +1,4 @@
-import { ANOTHER_TOOL } from '../consts/person_activity.js';
+import { ANOTHER_TOOL, MAX_TOOLS_PER_ROW } from '../consts/person_activity.js';
 import { PLAIN_TEXTS } from '../i18n/texts/plain/index.js';
 import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 import type {
@@ -28,6 +28,8 @@ interface Values {
 	kind: PersonActivityRow['kind'];
 	app: string;
 	api: string;
+	/* The application an API was called through, by name. */
+	client: string;
 	rule: string;
 	tool: string | null;
 	provider: string;
@@ -82,6 +84,8 @@ const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	old_client: () => 'App too old to name its tool',
 	bad_mcp_header: () => 'The app sent a malformed MCP header',
 	insufficient_scope: (v) => `Without the permission ${toolOr(v, v.api)} needs`,
+	used: (v) =>
+		v.kind === 'api' ? `${v.api} through ${v.client}` : `Used ${v.app}`,
 	other: (v) => `Not recorded one by one: ${String(v.count)} more`
 };
 
@@ -170,6 +174,7 @@ export function wordsOf(row: PersonActivityRow, names: PlaceNames): RowWords {
 		kind: row.kind,
 		app: names.place ?? 'The app',
 		api: names.place ?? 'The API',
+		client: names.client ?? 'an application',
 		rule: row.place.rule ?? 'this path',
 		tool: toolWords(row.place.tool),
 		provider: names.provider ?? 'a provider',
@@ -200,10 +205,47 @@ export function reasonWords(
 		kind,
 		app: 'The app',
 		api: 'The API',
+		client: 'an application',
 		rule: 'this path',
 		tool: null,
 		provider: 'a provider',
 		count: 0,
 		requireCode: false
 	});
+}
+
+/*
+ * The proxy checks behind one use row (specs/134 У6): a page is many checks, so the number is said only here, never
+ * as a count of visits.
+ */
+export function checksWords(count: number): string {
+	return `${String(count)} ${count === 1 ? 'check' : 'checks'} by the proxy; every image and script of a page is one`;
+}
+
+export interface ToolsView {
+	/* Sorted for reading; the store keeps them in the order first seen. */
+	names: string[];
+	/* How many beyond the two the row shows. */
+	more: number;
+	/* The row reached its bound: more tools may have been used than are kept. */
+	atBound: boolean;
+	/* "search_files, read_file and 2 more", or "… and 18 or more" at the bound. */
+	words: string;
+}
+
+export function toolsView(
+	tools: readonly string[] | undefined
+): ToolsView | null {
+	if (!tools || tools.length === 0) return null;
+	const names = tools
+		.map((tool) => toolWords(tool) ?? tool)
+		.sort((a, b) => a.localeCompare(b));
+	const shown = names.slice(0, 2).join(', ');
+	const more = Math.max(0, names.length - 2);
+	const atBound = tools.length >= MAX_TOOLS_PER_ROW;
+	const words =
+		more === 0
+			? shown
+			: `${shown} and ${String(more)}${atBound ? ' or' : ''} more`;
+	return { names, more, atBound, words };
 }

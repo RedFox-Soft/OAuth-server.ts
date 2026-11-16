@@ -2,6 +2,7 @@ import type { AnyBulkWriteOperation, Filter } from 'mongodb';
 
 import { db } from './db.js';
 import {
+	MAX_TOOLS_PER_ROW,
 	OVERFLOW_ACCOUNT,
 	PERSON_ACTIVITY_CHUNK
 } from '../../consts/person_activity.js';
@@ -50,9 +51,72 @@ function refusedIndexes(error: unknown): {
 	return { duplicate, other };
 }
 
+/*
+ * A row that carries tools (specs/134 research R3) is written by an update pipeline, because the bounded union —
+ * the names kept, then the new ones not kept, cut at twenty — is an expression, not an operator. Only `$concatArrays`,
+ * `$filter`, `$in`, `$slice` and `$ifNull`, which the strict Stable API v1 this server connects with accepts. Every
+ * value of the row is wrapped in `$literal`: a tool row name an administrator set may begin with `$`, which a pipeline
+ * would otherwise read as a field path.
+ */
+function toolsUpsertOf(
+	row: PersonActivityRow,
+	tools: readonly string[]
+): AnyBulkWriteOperation<PersonActivityRow> {
+	const kept = { $ifNull: ['$tools', []] };
+	return {
+		updateOne: {
+			filter: { _id: row._id },
+			update: [
+				{
+					$set: {
+						bucketId: { $literal: row.bucketId },
+						accountId: { $literal: row.accountId },
+						day: { $literal: row.day },
+						kind: { $literal: row.kind },
+						outcome: { $literal: row.outcome },
+						reason: { $literal: row.reason },
+						place: { $literal: row.place },
+						count: { $add: [{ $ifNull: ['$count', 0] }, row.count] },
+						firstAt: {
+							$min: [{ $ifNull: ['$firstAt', row.firstAt] }, row.firstAt]
+						},
+						lastAt: {
+							$max: [{ $ifNull: ['$lastAt', row.lastAt] }, row.lastAt]
+						},
+						expiresAt: {
+							$max: [{ $ifNull: ['$expiresAt', row.expiresAt] }, row.expiresAt]
+						},
+						tools: {
+							$slice: [
+								{
+									$concatArrays: [
+										kept,
+										{
+											$filter: {
+												input: { $literal: [...tools] },
+												as: 'tool',
+												cond: { $not: [{ $in: ['$$tool', kept] }] }
+											}
+										}
+									]
+								},
+								MAX_TOOLS_PER_ROW
+							]
+						}
+					}
+				}
+			],
+			upsert: true
+		}
+	};
+}
+
 function upsertOf(
 	row: PersonActivityRow
 ): AnyBulkWriteOperation<PersonActivityRow> {
+	if (row.tools !== undefined && row.tools.length > 0) {
+		return toolsUpsertOf(row, row.tools);
+	}
 	const replaced = {
 		...(row.address === undefined
 			? {}
@@ -194,6 +258,27 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 			)
 			.toArray();
 		return [...new Set(found.map((row) => row.day))];
+	}
+
+	/* On `{bucketId, outcome, lastAt}`: never the project's use rows (specs/134 research R6). */
+	async listRefusals(
+		bucketId: string,
+		query: { since: Date; now: Date; limit: number }
+	): Promise<PersonActivityRow[]> {
+		const found = await this.collection
+			.find({
+				bucketId,
+				outcome: { $in: ['refused', 'sign_in_again'] },
+				lastAt: { $gte: query.since },
+				expiresAt: { $gt: query.now },
+				accountId: { $ne: OVERFLOW_ACCOUNT }
+			})
+			.sort({ lastAt: -1, _id: -1 })
+			.limit(Math.max(query.limit, 1))
+			.toArray();
+		return found.map((document) =>
+			documentOf(STORE_AREAS.personActivity, PersonActivityRow, document)
+		);
 	}
 
 	async destroyPerson(bucketId: string, accountId: string): Promise<number> {

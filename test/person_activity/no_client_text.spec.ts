@@ -2,9 +2,11 @@ import { beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 import fc from 'fast-check';
 
 import bootstrap from '../test_helper.ts';
-import { takeAll } from 'lib/person_activity/buffer.ts';
+import { takeAll, takeUse } from 'lib/person_activity/buffer.ts';
 import {
 	noteApiCheck,
+	noteApiUse,
+	noteAppUse,
 	noteSignedIn,
 	noteSignInRefused
 } from 'lib/person_activity/record.ts';
@@ -25,13 +27,13 @@ const TABLE = {
 };
 
 function stored(): string {
-	return JSON.stringify(takeAll());
+	return JSON.stringify([...takeAll(), ...takeUse()]);
 }
 
 /**
  * @proves For every text a caller can write into a request, nothing the server keeps about a person contains it:
  * the browser is kept only as one of a few families, and a tool only as the name of a row an administrator set, or
- * as "another tool".
+ * as "another tool"; what a person used at the proxy carries no address, no network facts and no device at all.
  */
 describe("a person's activity and the caller's own text", () => {
 	beforeAll(async () => {
@@ -40,6 +42,7 @@ describe("a person's activity and the caller's own text", () => {
 
 	beforeEach(() => {
 		takeAll();
+		takeUse();
 	});
 
 	it('never keeps the browser string a sign-in sent', () => {
@@ -86,6 +89,45 @@ describe("a person's activity and the caller's own text", () => {
 						tool
 					});
 					expect(stored()).not.toContain(JSON.stringify(tool).slice(1, -1));
+				}
+			)
+		);
+	});
+
+	it('never keeps a tool name the caller wrote on what a person used, nor anything but the table and the place', () => {
+		fc.assert(
+			fc.property(
+				callerText.filter((name) => name !== 'search_files'),
+				(tool) => {
+					noteApiUse({
+						api: {
+							bucketId: 'acme',
+							identifier: 'https://files.acme.test/mcp',
+							tools: TABLE
+						},
+						accountId: 'anna',
+						clientId: 'agent-1',
+						tool
+					});
+					noteAppUse({
+						app: { _id: 'wiki', bucketId: 'acme' },
+						accountId: 'anna'
+					});
+					const rows = [...takeAll(), ...takeUse()];
+					const text = JSON.stringify(rows);
+					expect(text).not.toContain(JSON.stringify(tool).slice(1, -1));
+					for (const row of rows) {
+						expect([
+							row.address,
+							row.facts,
+							row.device,
+							row.place.rule,
+							row.place.tool
+						]).toEqual([undefined, undefined, undefined, undefined, undefined]);
+						for (const name of row.tools ?? []) {
+							expect(['search_files', '*another']).toContain(name);
+						}
+					}
 				}
 			)
 		);

@@ -1,6 +1,6 @@
 ---
 type: concept
-title: "A person's activity: sign-ins and what the proxy refused"
+title: "A person's activity: sign-ins, what the proxy refused and what people used"
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-16
@@ -12,8 +12,9 @@ updated: 2026-11-16
 Spec 133 ("5A" of the visit log). What this server **decided** about a person, kept per person for 90 days and shown on
 the person's Activity tab: every sign-in, every failed sign-in where the account was already found, every stop on the
 sign-in path, and every "Asked to sign in again" and "Refused" of an app behind the proxy or an API checked at it.
-Requests let in at the proxy are not recorded (that is 5B). The module is `lib/person_activity/`; the area is
-`personActivity`.
+Since spec 134 ("5B", 2026-11-16) what a person **used** behind the proxy is kept too: one row a day for each app,
+or API and application, that let them through (see "What a person used" below). The module is
+`lib/person_activity/`; the area is `personActivity`.
 
 ## What is recorded, and from where
 
@@ -89,3 +90,47 @@ Requests let in at the proxy are not recorded (that is 5B). The module is `lib/p
   "Last active" from the existing day and month marks read by id ([[monthly-active-users]]), so a token renewal
   counts. No address, country or device, so it is not audited.
 - MCP: `project_user_activity_list`, `consequence: 'ordinary'`.
+
+## What a person used (spec 134)
+
+- **One row per person, place and UTC day**, `outcome: let_in`, `reason: used`: `noteAppUse` at the allowed branch of
+  `lib/behind_proxy/check.ts:500` (a person and not a public path) and `noteApiUse` at `api_check.ts:278` (a token
+  naming a person). Place is `{ appId }`, or `{ resource, clientId }` for an API (`record.ts:382`, `:407`). Never an
+  address, network facts, a device or the rule: a day of where and how someone works is more than an administrator
+  needs to see what they use (S11). `count` is the proxy's checks, which the console shows only in a tooltip: every
+  image and script of a page is one (У6).
+- **An API row's `tools`** is a bounded list, not part of the row's id: the names kept, then the new ones not kept, cut
+  at 20 (`unionOfTools`, `lib/adapters/person_activity_rows.ts:34`). MongoDB writes such a row with an update pipeline
+  (`toolsUpsertOf`, `lib/adapters/mongodb/personActivityStore.ts:61`) using only `$concatArrays`, `$filter`, `$in`,
+  `$slice` and `$ifNull`, because the server connects with Stable API v1 in strict mode; every value is `$literal`,
+  since a tool row name may begin with `$`. PostgreSQL computes the same list by ordinality. Names are table rows or
+  `*another`, as for refusals.
+- **A buffer of its own**, written every five minutes (`pendingUse`, `buffer.ts:31`; the second timer in
+  `flush.ts:129`): use is almost all the volume, and the write rate, with PostgreSQL's dead row versions, scales with
+  the interval (Н4). It has its own budget and per-project quota (`use`, `perProjectUse`), so a busy project's use
+  never pushes out a sign-in or a refusal; over a bound it folds into the same overflow row as the other buffer.
+  Deletion, the setting and the drain clear or write both.
+- **An allowed check marks the person active.** `markActivityOf` (`lib/activity/note.ts:126`) shares
+  `markActivity`'s per-process memo with kind `renewal`; on a miss it reads the user after the answer, unawaited, for
+  `provisioned`, and skips a person no longer there. So "Last active" and monthly active people count someone working
+  on an app session opened two weeks ago (owner, 2026-11-16; [[monthly-active-users]]). Not governed by
+  `personActivity.enabled`, as marks never were.
+
+## Refused recently, and Last active on the list
+
+- **"Refused recently"** on an app's and an API's Access tab: `refusedRecently` (`lib/person_activity/refusals.ts:53`)
+  reads `listRefusals` on the new `{bucketId, outcome, lastAt}` index, never the project's use rows (Н5), keeps the
+  place, folds a person's rows of the two UTC days the 24 hours span, and names people by one `findMany`. Its divider
+  is `accessSavedAt` on the app and the API, written only when who may get in changes (rules or time zone,
+  `lib/admin/behind-proxy/service.ts:359`; tools table, sign-in requirement or checker,
+  `lib/admin/resources/routes.ts:768`), because `updatedAt` moves on a rename.
+- **The read is audited** like the timeline: `POST …/behind-proxy/:appId/refusals` and `…/resources/:resourceId/refusals`
+  record `behindproxy.refusals.read` / `resource.refusals.read` once per reader, target and UTC day
+  (`recordReadOnce`, `audit.ts:56`), both in `AUDITED_READS`; agents use `behind_proxy_app_refusal_list` and
+  `resource_refusal_list`. A project scheduled for deletion is read like any other.
+- **"Last active" on the list of people** is a column and a filter, never a sort (У1). The column reads the page's
+  marks in one query (`lastMarkedMany`, on the new `activityMarks` index `{bucketId, accountId, period}`); the filter
+  is `EndUserFilter.lastActive`, applied as `EXISTS`/`NOT EXISTS` on PostgreSQL and as an id set from
+  `accountsMarkedIn` on MongoDB and memory, like `memberOf`. "Not in the last 90 days" is read from month marks, and a
+  month overlapping the window counts as active (`lastActivePeriods`, `lib/adapters/activity_records.ts:139`).
+- **Profile's "Apps used in the last 90 days"** folds the person's use rows by place (`appsUsedBy`, `read.ts:349`).

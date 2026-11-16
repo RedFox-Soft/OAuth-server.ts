@@ -24,6 +24,7 @@ import {
 import { whenUsageRecorded } from 'lib/behind_proxy/usage.ts';
 import nanoid from 'lib/helpers/nanoid.ts';
 import { activityOf, from, only } from './helpers.ts';
+import { flushPersonActivityNow } from 'lib/person_activity/flush.ts';
 
 let w: World;
 let ops: string;
@@ -101,13 +102,16 @@ async function apiRows(api: ApiView, who: Member) {
 	const page = await activityOf(w.cookie, w.acme.id, who.accountId, {
 		kind: 'api'
 	});
-	return page.rows.filter((row) => row.place.resource === api.identifier);
+	/* What the person used is spec 134's (use.spec.ts); these cases are about refusals and asks. */
+	return page.rows.filter(
+		(row) => row.place.resource === api.identifier && row.outcome !== 'let_in'
+	);
 }
 
 /**
  * @proves What an API checked at the proxy refused a person, or asked them to sign in again for, is kept on their
  * activity: by the tools-table row an administrator named, or as "another tool", through the agent's client, never
- * with an address; a token naming no person, and a call let in, keep nothing.
+ * with an address; a token naming no person keeps nothing.
  */
 describe('a person at an API checked at the proxy', () => {
 	beforeAll(async () => {
@@ -204,6 +208,40 @@ describe('a person at an API checked at the proxy', () => {
 		]);
 	});
 
+	it('lists who the API refused recently on its Access tab, with the tool', async () => {
+		const api = await filesMcp();
+		const refused = await callTool(
+			api,
+			await personToken(api, w.acme.outsider),
+			'delete_files'
+		);
+		expect(refused.status).toBe(403);
+		await flushPersonActivityNow();
+
+		const reply = await admin(
+			'POST',
+			`${resourcesPath(w.acme.id, api.identifier)}/refusals`,
+			w.cookie,
+			{}
+		);
+		expect(reply.status).toBe(200);
+		const view = reply.body as {
+			accessSavedAt: string | null;
+			rows: { email: string; reason: string; tool: string; count: number }[];
+		};
+		expect(view.accessSavedAt).not.toBeNull();
+		expect(
+			view.rows.map((row) => [row.email, row.reason, row.tool, row.count])
+		).toEqual([
+			[
+				w.acme.outsider.email,
+				'Not in the groups that may call delete_files',
+				'delete_files',
+				1
+			]
+		]);
+	});
+
 	it('records nothing for a token naming no person', async () => {
 		const api = await filesMcp();
 		const machine = await jwtFor(api, {
@@ -214,17 +252,5 @@ describe('a person at an API checked at the proxy', () => {
 
 		expect(await apiRows(api, opsMember)).toEqual([]);
 		expect(await apiRows(api, w.acme.outsider)).toEqual([]);
-	});
-
-	it('records nothing for a call let in', async () => {
-		const api = await filesMcp();
-		const allowed = await callTool(
-			api,
-			await personToken(api, opsMember),
-			'search_files'
-		);
-		expect(allowed.status).toBe(200);
-
-		expect(await apiRows(api, opsMember)).toEqual([]);
 	});
 });

@@ -3,6 +3,8 @@ import type {
 	ActivityBucketSnapshot,
 	ActivityKind,
 	ActivityMarkRecord,
+	LastActiveFilter,
+	LastMarked,
 	ActivityOwner,
 	ActivityStoreInstance,
 	ActivityTally,
@@ -105,4 +107,52 @@ export async function freezeOpenPeriods(
 			});
 		}
 	}
+}
+
+/*
+ * The latest of one person's live marks (specs/134 research R5): the latest day if any, else the latest month. A day
+ * mark implies its month's, so the latest day is never older than the latest month.
+ */
+export function latestMarked(periods: Iterable<string>): LastMarked | null {
+	let day: string | null = null;
+	let month: string | null = null;
+	for (const period of periods) {
+		if (period.length === 7) {
+			if (month === null || period > month) month = period;
+		} else if (day === null || period > day) {
+			day = period;
+		}
+	}
+	if (day !== null) return { day };
+	return month === null ? null : { month };
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/*
+ * The periods a "Last active" filter asks about, and whether a person must have a mark in one of them (`has`) or in
+ * none (research R5). "Within N days" and "not within 30" are day marks, which live 40 days; "not within 90" can only
+ * be told from month marks, and every month overlapping the window counts, so rounding never calls anyone inactive.
+ */
+export function lastActivePeriods(
+	filter: LastActiveFilter,
+	now: Date
+): { periods: string[]; has: boolean } {
+	if ('within' in filter) {
+		return { periods: daysBack(filter.within, now), has: true };
+	}
+	if (filter.notWithin === 30) {
+		return { periods: daysBack(30, now), has: false };
+	}
+	const months = new Set<string>();
+	for (let i = 0; i < 90; i += 1) {
+		months.add(monthOf(new Date(now.getTime() - i * DAY_MS)));
+	}
+	return { periods: [...months], has: false };
+}
+
+function daysBack(count: number, now: Date): string[] {
+	return Array.from({ length: count }, (_, i) =>
+		dayOf(new Date(now.getTime() - i * DAY_MS))
+	);
 }

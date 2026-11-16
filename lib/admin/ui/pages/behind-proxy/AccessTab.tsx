@@ -20,6 +20,7 @@ import { ACTIONS } from '../../frame/actions.js';
 import { Link, useLeaveGuard, useRoute } from '../../frame/router.js';
 import { behindProxyHref } from '../../frame/routes.js';
 import { ConfirmDestruction } from '../../ConfirmDestruction.js';
+import { RefusedRecentlyCard } from '../RefusedRecentlyCard.js';
 import { SaveBar } from '../../settings/SaveBar.js';
 import type { Change } from '../../settings/model.js';
 import type { GroupView } from '../groups/groupShared.js';
@@ -642,6 +643,10 @@ export function AccessTab({
 				draft={dirty ? rulesOf(draft) : null}
 				zone={zone}
 				nameOf={nameOf}
+			/>
+			<RefusedRecentlyCard
+				bucketId={bucketId}
+				path={`${behindProxyApi(bucketId, app.id)}/refusals`}
 			/>
 			<Drawer
 				open={editingRule !== null}

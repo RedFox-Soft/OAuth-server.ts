@@ -234,8 +234,9 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **Error store** — only defects (5xx) are recorded, from eight capture sites; recording never blocks a
   request; the read surface is not flag-gated. → `error-store-capture-sites.md`,
   `error-store-is-not-flag-gated.md`
-- **Monthly active users** — recorded only in `executeGrant`, by `noteActivity`, and at an app behind a proxy, whose
-  sign-in issues no token, by `markActivity`; never awaited; the bucket
+- **Monthly active users** — recorded only in `executeGrant`, by `noteActivity`, at an app behind a proxy, whose
+  sign-in issues no token, by `markActivity`, and at every request the proxy lets a person through, by
+  `markActivityOf`, which reads the person only after the answer; never awaited; the bucket
   is the one `findAccount` resolved, never the token's `bucketId`; marks and figures are unowned and never
   swept, and a frozen figure is never rewritten. → `monthly-active-users.md`
 - **Plans** — a project's plan is recorded on it (`planId`), never implied from the default; a limit is checked in
@@ -263,8 +264,10 @@ Each rule is the part that is easy to break. Read the named page before changing
 - **A person's activity** — noted only by a synchronous, never-throwing call beside the decision, never through the
   event bus or a datastore read on the request path, and never for the administrators' project; a failed sign-in is
   noted only where the account was already read. Nothing a request carries is stored: reasons are a closed set, a tool
-  is a tools-table row name or "another tool", a browser is a family. A write adds and is never retried; a read of the
-  timeline is an audited POST. → `person-activity.md`
+  is a tools-table row name or "another tool", a browser is a family. What a person used behind the proxy is one row a
+  person, place and day, never with an address or a rule, its tools a list bounded at twenty, written by a buffer of
+  its own every five minutes. A write adds and is never retried; a read of the timeline, or of who an app or an API
+  refused, is an audited POST. → `person-activity.md`
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment

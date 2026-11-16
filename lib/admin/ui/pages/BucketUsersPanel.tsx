@@ -29,6 +29,7 @@ import { LockModal } from '../accounts/LockModal.js';
 import { ClaimsField, parseClaims } from '../accounts/ClaimsDrawer.js';
 import type { ConnectionView } from './ProvisioningPanel.js';
 import {
+	lastActiveWords,
 	nameOf,
 	usersApi,
 	type EndUser,
@@ -44,7 +45,8 @@ const FILTER_KEYS = [
 	'status',
 	'managedBy',
 	'verified',
-	'authenticator'
+	'authenticator',
+	'lastActive'
 ] as const;
 type FilterKey = (typeof FILTER_KEYS)[number];
 
@@ -371,6 +373,12 @@ export function BucketUsersPanel({
 							{ label: 'Set up', value: 'yes' },
 							{ label: 'Not set up', value: 'no' }
 						])}
+						{filterSelect('lastActive', 'Last active', [
+							{ label: 'In the last 7 days', value: 'in7' },
+							{ label: 'In the last 30 days', value: 'in30' },
+							{ label: 'Not in the last 30 days', value: 'not30' },
+							{ label: 'Not in the last 90 days', value: 'not90' }
+						])}
 						{filtered && (
 							<Button
 								type="link"
@@ -499,6 +507,29 @@ export function BucketUsersPanel({
 								<AccountStatusTags account={row} />
 							</Space>
 						)
+					},
+					{
+						/* A filter above, never a sort (specs/134, У1): "—" has no place in an order. */
+						title: (
+							<Tooltip title="The last time this person signed in, an app renewed their tokens, or a proxy let them in.">
+								Last active
+							</Tooltip>
+						),
+						key: 'lastActive',
+						render: (_: unknown, row: EndUser) =>
+							row.lastActive ? (
+								lastActiveWords(row.lastActive)
+							) : (
+								<Tooltip
+									title={
+										data?.activeSince
+											? `Nothing since recording began on ${new Date(data.activeSince).toLocaleDateString(undefined, { dateStyle: 'medium' })}.`
+											: 'Nothing recorded yet.'
+									}
+								>
+									<Typography.Text type="secondary">—</Typography.Text>
+								</Tooltip>
+							)
 					},
 					{
 						title: 'Groups',

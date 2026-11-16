@@ -2,7 +2,8 @@ import QuickLRU from 'quick-lru';
 
 import type { OIDCContext } from '../helpers/oidc_context.js';
 import type { TokenParams } from '../actions/token.js';
-import { getActivityStore } from '../adapters/index.js';
+import { getActivityStore, getUserStore } from '../adapters/index.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { captureFault } from '../error_store/capture.js';
 import { now } from './clock.js';
 import { dayOf } from './periods.js';
@@ -17,7 +18,9 @@ import {
  * Records that a successful grant was activity of an end user in their bucket (specs/076). Called once, by
  * `executeGrant`, after the handler resolved — the one place every token issued on a person's behalf
  * passes — and never awaited there: counting must never slow a token request or fail one (FR-008). The one
- * sign-in that issues no token, at an app behind a proxy, calls `markActivity` below instead (specs/122).
+ * sign-in that issues no token, at an app behind a proxy, calls `markActivity` below instead (specs/122); and every
+ * request the proxy lets a person through, at an app or an API, calls `markActivityOf` (specs/134, owner 2026-11-16:
+ * working on an open app session is activity, so "Last active" and monthly active people count it).
  *
  * A direct call rather than an `eventBus` listener: the bus is a synchronous emitter, so a listener that
  * threw would fail a request whose tokens were already saved, and nothing would see an async listener's
@@ -112,6 +115,44 @@ export function markActivity(
 				});
 			})
 	);
+}
+
+/*
+ * A request the proxy let a person through (specs/134 research R4). The check knows the person's id but not whether a
+ * directory provisioned them, and must not read the datastore before it answers: on the first miss of the day the
+ * person is read after the answer, unawaited, and marked as continued use (`renewal`). The per-instance memo makes the
+ * check's own cost one lookup in memory. A person no longer there is not marked.
+ */
+export function markActivityOf(
+	bucketId: string,
+	accountId: string,
+	source: ActivitySource
+): void {
+	if (bucketId === ADMIN_BUCKET_ID) return;
+	const key = `${bucketId}|${dayOf(now())}|${accountId}|renewal`;
+	if (recorded.has(key)) return;
+	queueMicrotask(() => {
+		track(
+			getUserStore(bucketId)
+				.findMany([accountId])
+				.then((found) => {
+					const user = found.at(0);
+					if (!user) return;
+					markActivity(
+						{
+							bucketId,
+							accountId,
+							provisioned: user.provisionedBy !== undefined
+						},
+						'renewal',
+						source
+					);
+				})
+				.catch((error: unknown) => {
+					console.error('activity not recorded', { bucketId, error });
+				})
+		);
+	});
 }
 
 /* The sign-in the artifact behind this grant recorded, if it recorded one. */

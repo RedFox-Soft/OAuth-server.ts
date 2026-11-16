@@ -11,6 +11,16 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **What a person uses, and who was refused recently** (spec 134). A person's Activity tab now also shows which apps
+  behind your proxy and which APIs checked at it they used each day ("Used Wiki, 10:02–11:10"; an API with the tools
+  of its table they called), never with an address, and Profile lists the apps used in the last 90 days. The list of
+  people gains a "Last active" column and filter. An app's or an API's Access tab lists who it refused or asked to
+  sign in again in the last 24 hours, divided at the moment its rules were last saved; agents read it with
+  `behind_proxy_app_refusal_list` and `resource_refusal_list`, audited once a day. **Upgrade note:** a request your
+  proxy lets a person through now counts as activity, so monthly active people rise for projects behind a proxy and
+  a plan's monthly-active cap may be reached sooner. Use is recorded per person and day for 90 days, written every
+  five minutes; `personActivity.enabled` turns it off. Re-run `db:setup` or `db:setup:pg` (two new indexes), then
+  `db:migrate` (a fence).
 - **A person's activity** (spec 133). Each person's page has an Activity tab: every sign-in (application, method,
   full network address, browser and system, FoxTrust's country and network kind when network facts are on), every
   failed sign-in where the account was found, and every time an app behind the proxy or an API checked at it asked
