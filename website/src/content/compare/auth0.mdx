@@ -26,6 +26,9 @@ sources:
   - https://auth0.com/docs/secure/tenant-access-control-list/use-curated-blocklists
   - https://auth0.com/docs/secure/multi-factor-authentication/step-up-authentication/configure-step-up-authentication-for-apis
   - https://auth0.com/ai/docs/mcp/get-started/secure-mcp-server-with-auth0-fga
+  - https://auth0.com/docs/manage-users/user-accounts/view-user-details
+  - https://auth0.com/docs/deploy-monitor/logs/log-data-retention
+  - https://auth0.com/docs/customize/log-streams
 bottomLine: 'Auth0 is the better pick when you want identity as a service with an SLA this week, with social connections and a FAPI certification you can hand to a reviewer. FoxAuth is the better pick when the data has to live in your own database, when the per-user bill is the problem, or when you need the banking-grade profiles without an Enterprise add-on.'
 chooseThem:
   - 'You do not want to run anything, and you need an SLA today.'
@@ -355,6 +358,20 @@ groups:
         verdict: different
         why: 'Auth0 FGA can hold richer rules for each tool, but your MCP server asks it in its own code. Here the rule sits on the tool in the console, your proxy has it checked, and it can name a network or hours.'
         note: 'The FGA quickstart says "Users inherit permissions through group membership," "Access is automatically revoked when the time expires," and "The server queries FGA on each connection to determine available tools."'
+      - dimension: "A person's sign-ins and refusals, on their page"
+        us:
+          {
+            status: yes,
+            text: "On each person's Activity tab: every sign-in with the application, the method, the full address, the browser and system and, with FoxTrust's network facts on, the country and kind of network; every failed sign-in of an account that exists, with what the person saw; and every time an app behind your proxy or an API checked at it refused them or asked them to sign in again, with the reason. Kept 90 days, on by default and on every plan. Reading it is itself recorded in the audit trail."
+          }
+        them:
+          {
+            status: yes,
+            text: "Successful and failed logins are in the tenant logs with the IP address, the application, the connection, the user agent and the city and country of the address. A user's History tab shows the past 2 days, and a Locations tab shows a map. Logs are kept 1 day on Free, 5 on Essentials, 10 on Professional and 30 on Enterprise, and can be streamed to a SIEM from Essentials."
+          }
+        verdict: different
+        why: "Auth0 records more about each sign-in, the city included, and streams its logs to your SIEM, but keeps them 1 to 30 days by plan and shows 2 days on the user's page. Here they are kept 90 days on every plan, with what your proxy refused, and there is no export yet."
+        note: 'The user details page says "The History tab displays a log of the user''s account activity for the past 2 days."'
       - dimension: Refusing password sign-ins from known password-guessing addresses
         us:
           {

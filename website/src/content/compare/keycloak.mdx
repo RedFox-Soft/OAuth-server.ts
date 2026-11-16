@@ -351,6 +351,20 @@ groups:
         verdict: us
         why: 'With Keycloak a rule for one tool is a resource you model and a policy enforcer you run in the MCP server. Here it is a field on the tool in the console, and your proxy has it checked.'
         note: 'The Authorization Services guide says a group-based policy defines that "a set of one or more groups (and their hierarchies) is permitted to access an object," and that policy enforcers "enforce authorization decisions at the resource server side."'
+      - dimension: "A person's sign-ins and refusals, on their page"
+        us:
+          {
+            status: yes,
+            text: "On each person's Activity tab: every sign-in with the application, the method, the full address, the browser and system and, with FoxTrust's network facts on, the country and kind of network; every failed sign-in of an account that exists, with what the person saw; and every time an app behind your proxy or an API checked at it refused them or asked them to sign in again, with the reason. Kept 90 days, on by default and on every plan. Reading it is itself recorded in the audit trail."
+          }
+        them:
+          {
+            status: flag,
+            text: 'Successful and failed sign-ins are saved as user events only after Save events is turned on for the realm, with the client, the IP address and the error, for as long as the Expiration field says. They are read in one Events list for the whole realm, filtered by user. No browser and no country are documented, and with no check endpoint for a proxy there are no proxy refusals to record.'
+          }
+        verdict: us
+        why: "Keycloak has the sign-in events, but off by default and in one list for the whole realm. Here they are on the person's page from the start, with the browser, the country and what your proxy refused."
+        note: 'The administration guide says "By default, Keycloak does not store or display events in the Admin Console." and "Specify the length of time to store events in the Expiration field."'
   - label: Licence and cost
     rows:
       - dimension: Licence

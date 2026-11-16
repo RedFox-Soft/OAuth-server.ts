@@ -12,6 +12,8 @@ sources:
   - https://zitadel.com/docs/examples/identity-proxy/oauth2-proxy
   - https://zitadel.com/docs/examples/secure-api/go
   - https://zitadel.com/docs/guides/manage/console/default-settings
+  - https://zitadel.com/docs/concepts/features/audit-trail
+  - https://zitadel.com/pricing/detail
 bottomLine: 'Pick Zitadel if you need SAML or a managed cloud with an enterprise contract behind it. Pick FoxAuth for OAuth 2.1 behaviour by default, the banking-grade profiles that Zitadel does not document, and a licence other than AGPL.'
 chooseThem:
   - 'You need SAML 2.0 as well as OpenID Connect.'
@@ -254,6 +256,20 @@ groups:
           }
         verdict: us
         why: 'With ZITADEL a rule for one tool is code in your MCP server. Here it is a field on the tool in the console, and your proxy has it checked.'
+      - dimension: "A person's sign-ins and refusals, on their page"
+        us:
+          {
+            status: yes,
+            text: "On each person's Activity tab: every sign-in with the application, the method, the full address, the browser and system and, with FoxTrust's network facts on, the country and kind of network; every failed sign-in of an account that exists, with what the person saw; and every time an app behind your proxy or an API checked at it refused them or asked them to sign in again, with the reason. Kept 90 days, on by default and on every plan. Reading it is itself recorded in the audit trail."
+          }
+        them:
+          {
+            status: flag,
+            text: "Every event is kept in the event store. The Console shows the last changes of a user and an event viewer for the whole instance. A list of one person's sign-ins and failed sign-ins with their addresses is not documented, and neither is a country. On ZITADEL Cloud the audit trail goes back 1 day on Free and 2 weeks on Pro."
+          }
+        verdict: us
+        why: "ZITADEL keeps everything, but shows a user's changes, not their sign-ins with addresses. Here those are the person's Activity tab, with what your proxy refused."
+        note: 'The audit trail page says "You can check the last changes of most objects in the Console." The Cloud pricing table lists Audit Trail History as 1 day on Free and 2 weeks on Pro.'
       - dimension: Managed hosting
         us:
           {
