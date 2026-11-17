@@ -23,8 +23,9 @@ export const CLOUD_SIGN_UP_REL = 'nofollow';
  * deviceFlow, clientIdMetadataDocument, dpop and par were switched on. Re-checked on 2026-11-04 against what
  * production's discovery document and /mcp metadata show (registration, CIBA, the JWT bearer grant, RAR and ID-JAG
  * off); the switches discovery does not reveal (federation, SCIM, plans) were not re-read. On 2026-11-10 FoxTrust's
- * attacker list was switched on beside attack reporting, read back from production's settings. Change this when
- * production changes.
+ * attacker list was switched on beside attack reporting, read back from production's settings. On 2026-11-17 the
+ * whole settings list was read back from production: network facts were switched on that day, and
+ * clientAuth.issuerOnlyAudience is on by its 2.0.0 default. Change this when production changes.
  * Operator-only switches (the error store, Sentry) are left out: a tenant never sees them.
  */
 export const CLOUD_FLAGS_ON: ReadonlySet<string> = new Set([
@@ -44,7 +45,9 @@ export const CLOUD_FLAGS_ON: ReadonlySet<string> = new Set([
 	'cors.enabled',
 	'rateLimit.enabled',
 	'attackReports.enabled',
-	'attackerList.enabled'
+	'attackerList.enabled',
+	'networkFacts.enabled',
+	'clientAuth.issuerOnlyAudience'
 ]);
 
 /*
