@@ -54,7 +54,7 @@ const enterprise = [
 	...situations.filter((s) => s.tab === 'enterprise' && !s.first)
 ];
 
-const pricingHref = `${await localizedHref('/pricing/', locale)}#cloud`;
+const pricingHref = `${await localizedHref('/pricing/', locale)}#free`;
 const ownServerHref = await localizedHref(
 	'/docs/get-started/docker-compose/',
 	locale

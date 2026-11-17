@@ -46,7 +46,7 @@ faq:
   - question: 'Does FoxAuth support social logins like Google and GitHub?'
     answer: 'Google, Microsoft, Apple and GitHub are recognised by name: FoxAuth tells you what to do at the provider, shows you the exact callback address to register, and asks only for the values that provider issues: two for Google and GitHub, three for Microsoft, four for Apple. Any other provider speaking OpenID Connect can be configured by hand, per project. Two caveats before you compare. You still register the application at the provider yourself, because none of them lets a third party do it for you. And four recognised providers is not the connection catalogue Auth0 ships, which runs to dozens and includes SAML and AD/LDAP enterprise connections FoxAuth does not speak. Microsoft Entra ID and Okta can instead provision users and groups into FoxAuth over SCIM.'
   - question: 'Is FoxAuth cheaper than Auth0?'
-    answer: "FoxAuth's bill has a different shape from Auth0's, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud also has a free plan, capped at 1,000,000 monthly active users per project, with no SLA yet. Auth0 bills per monthly active user. At small scale Auth0 is usually the cheaper option. At large scale Auth0's bill keeps growing with every user, while FoxAuth's does not."
+    answer: "FoxAuth's bill has a different shape from Auth0's, and it is not uniformly smaller. FoxAuth is free to self-host under FSL-1.1-ALv2; what it costs you is a database, a container and the engineering time to keep them healthy, so the cost grows with infrastructure and is indifferent to monthly active users. FoxAuth Cloud is also free during the beta, with no limit on monthly active users and no SLA yet. Auth0 bills per monthly active user. At small scale Auth0 is usually the cheaper option. At large scale Auth0's bill keeps growing with every user, while FoxAuth's does not."
   - question: 'Do I get FAPI, DPoP and PAR without an enterprise plan?'
     answer: 'FoxAuth implements DPoP (RFC 9449), PAR (RFC 9126), mTLS (RFC 8705), CIBA, RAR (RFC 9396) and JARM, and each one is a feature flag on the instance you run. There is no plan tier and no add-on. All of them ship switched off and are turned on per deployment. FAPI profile behaviours sit behind fapi.enabled the same way, without a conformance certification.'
 groups:
@@ -56,7 +56,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Self-hosted container, imported as a library, or a free plan on FoxAuth Cloud with limits and no SLA yet.'
+            text: 'Self-hosted container, imported as a library, or FoxAuth Cloud, free during the beta with no SLA yet.'
           }
         them:
           {
@@ -92,7 +92,7 @@ groups:
         us:
           {
             status: flag,
-            text: 'Google, Microsoft, Apple and GitHub by name; any other OIDC provider by hand. Per project, behind federation.enabled. Entra ID, Okta or any SCIM 2.0 directory provisions users and groups (scim.enabled); no SAML or AD/LDAP connections. On the FoxAuth Cloud free plan, the four named providers only.'
+            text: 'Google, Microsoft, Apple and GitHub by name; any other OIDC provider by hand. Per project, behind federation.enabled. Entra ID, Okta or any SCIM 2.0 directory provisions users and groups (scim.enabled); no SAML or AD/LDAP connections.'
           }
         them:
           {
@@ -264,7 +264,7 @@ groups:
         us:
           {
             status: yes,
-            text: "A person's token at Google, GitHub, Slack, Microsoft or any OIDC or OAuth 2.0 provider, through a standard RFC 8693 token exchange. An administrator lists the applications allowed per service, and the person allows each agent per account and can withdraw it. One refresh at a time, idle accounts kept alive, and a mail to the person when an account breaks. When the person must connect, allow or reconnect an account, the refusal carries a link the agent hands them, ready for an MCP URL elicitation, and the link works only for that person after their own sign-in. Free to self-host; 10 connected services per project on the FoxAuth Cloud Free plan."
+            text: "A person's token at Google, GitHub, Slack, Microsoft or any OIDC or OAuth 2.0 provider, through a standard RFC 8693 token exchange. An administrator lists the applications allowed per service, and the person allows each agent per account and can withdraw it. One refresh at a time, idle accounts kept alive, and a mail to the person when an account breaks. When the person must connect, allow or reconnect an account, the refusal carries a link the agent hands them, ready for an MCP URL elicitation, and the link works only for that person after their own sign-in. Free to self-host, and with no limit on FoxAuth Cloud during the beta."
           }
         them:
           {
@@ -272,7 +272,7 @@ groups:
             text: 'Token Vault: connected accounts, and an exchange on an Auth0 grant type that names the provider with a connection parameter. The subject is the application’s refresh token, or an access token exchanged by a Custom API Client linked to the API. Consent is given per connection, at the provider; the person does not allow each agent. To connect an account, the application calls the My Account API and sends the person to a connect address that lasts five minutes. The pricing page lists Token Vault at 2 on Free, 3 on Essentials and Professional, 4 on Enterprise, and unlimited with the AI Agents add-on, which adds 50% to the base price.'
           }
         verdict: us
-        why: 'FoxAuth takes the standard RFC 8693 request, asks the person about each agent, and limits connected services only on the Free cloud plan. Auth0 counts Token Vault per plan, but runs it for you, as a managed service with an SLA.'
+        why: 'FoxAuth takes the standard RFC 8693 request, asks the person about each agent, and does not limit connected services, on your servers or on FoxAuth Cloud during the beta. Auth0 counts Token Vault per plan, but runs it for you, as a managed service with an SLA.'
         note: 'The grant type is "urn:auth0:params:oauth:grant-type:token-exchange:federated-connection-access-token"; the AI Agents add-on unlocks "Unlimited Token Vault".'
       - dimension: Sign-in in front of a web app through your proxy
         us:
@@ -405,7 +405,7 @@ groups:
         us:
           {
             status: yes,
-            text: 'Free to self-host, every feature included, with no charge per user. Monthly active users are counted per project and per owning team, so an instance run for others can report them. The free plan on FoxAuth Cloud allows 1,000,000 monthly active users per project and two projects; paid cloud plans are in development. Support by agreement.'
+            text: 'Free to self-host, every feature included, with no charge per user. Monthly active users are counted per project and per owning team, so an instance run for others can report them. FoxAuth Cloud is free during the beta, with no limit on monthly active users and up to ten projects; paid cloud plans are in development. Support by agreement.'
           }
         them:
           {

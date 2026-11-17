@@ -1,61 +1,40 @@
 import type english from './en.ts';
 
-export const source = '74b8b3894f81';
+export const source = '650a9082b6d3';
 
 export default {
 	title: '定价',
 	description:
-		'FoxAuth 定价：在 FoxAuth Cloud 上免费开始，或免费自托管完整服务器。付费云方案正在开发中，另提供企业支持。',
+		'FoxAuth Cloud 在测试期间免费，包含全部功能且不限用户数。Enterprise 是你自己的独立实例，仅限受邀。',
 	eyebrow: '定价',
-	heading: '免费开始：在我们的云上，或在你自己的服务器上。',
-	lead: '在 FoxAuth Cloud 创建免费账户，几分钟内就能拥有一个可用的授权服务器。也可以自己运行同一个服务器，功能完整、没有限制。付费云方案正在开发中，将提供更高的限额和保障。',
+	heading: '在我们的云上免费。独立实例仅限受邀。',
+	lead: 'FoxAuth Cloud 在测试期间免费，包含全部功能且不限用户数：创建账户，几分钟内就能拥有一个可用的授权服务器。在测试期间加入的团队，在付费方案推出后还可以再免费使用一年。需要独立实例的公司，可以申请邀请。',
 	cloudFree: {
-		badge: '现已可用',
-		name: 'Cloud Free',
+		badge: '测试期间免费',
+		name: 'Cloud',
 		price: '免费',
-		tagline: '我们在 auth.foxauth.dev 上运行的实例。无需信用卡，无需电话。',
+		tagline:
+			'我们在 auth.foxauth.dev 上运行的实例。无需信用卡，无需电话，不限用户数。',
 		items: [
-			'每位管理员 2 个项目，每个项目都是独立的 OpenID Connect 签发者',
-			'每个项目每月 1,000,000 名活跃用户',
-			'每个项目 10 个应用和 10 个 API',
-			'通过 Google、Apple、GitHub 和任意组织的 Microsoft 账户登录',
+			'全部功能，每月活跃用户、应用和 API 数量不限',
+			'每位管理员最多 10 个项目，每个项目都是独立的 OpenID Connect 签发者，地址由你选择',
+			'通过 Google、Apple、GitHub 和 Microsoft 登录，也可以通过任意 OpenID 提供方登录，包括 Okta 或单个组织的 Entra ID',
 			'服务间令牌、设备登录、发送方约束令牌（DPoP）、推送授权请求（PAR），以及 AI 智能体通过 MCP 进行管理',
+			'可应要求使用你自己的域名',
+			'在测试期间加入的团队，付费方案推出后还可免费使用一年',
 			'通过 GitHub issues 获得社区支持；暂无 SLA'
 		],
 		cta: '创建免费账户'
 	},
-	selfHosted: {
-		badge: '现已可用',
-		name: '自托管',
-		price: '免费',
-		tagline: '你的基础设施，你的数据库，无需在我们这里开账户。',
-		items: [
-			'全部功能，无需在不同版本之间挑选',
-			'用户、项目、应用和令牌数量不限',
-			'以 FSL-1.1-ALv2 许可源码可用',
-			'通过 GitHub issues 获得社区支持'
-		],
-		cta: '快速开始'
-	},
-	cloud: {
-		badge: '开发中',
-		name: '付费云方案',
-		price: '尚未定价',
-		tagline: '同一个实例，更多空间，并有人对它负责。',
-		items: [
-			'更多项目、应用和用户',
-			'通过任意 OpenID 提供方登录，包括单个组织的 Microsoft 目录',
-			'自定义项目地址和自己的域名',
-			'SLA 和支持邮箱'
-		]
-	},
 	enterprise: {
-		badge: '按协议',
-		name: '企业支持',
+		badge: '仅限受邀',
+		name: 'Enterprise',
 		price: '面议',
-		tagline: '自托管，背后有支持合同兜底。',
+		tagline:
+			'与免费云分开的 Enterprise Cloud、你自己的独立实例，或你自己的基础设施。仅限受邀。',
 		items: [
-			'你自行托管，我们为你提供支持',
+			'Enterprise Cloud：仅供企业客户共享，与免费云分开，提供 SLA',
+			'独立实例，由我们运行或部署在你的基础设施上，其数据库和密钥与其他所有人分开',
 			'针对缺陷的响应时间 SLA',
 			'在公开披露之前收到安全公告',
 			'架构评审和优先修复'
@@ -76,9 +55,9 @@ export default {
 				'FoxAuth 现在就可以自托管用于生产环境。免费云方案暂时没有 SLA，适合用来起步，还不适合依赖。当前版本是 2.0.0。从首个稳定版本 1.0.0 起，HTTP 接口和管理 API 只会在主版本中做不兼容的变更。升级前请阅读更新日志；如果其中提到无法撤销的迁移，请先做备份，升级后再运行 setup 和 migrate 步骤。协议端点遵循规范，因此为 FoxAuth 编写的客户端实际上是按 RFC 编写的，换到其他服务器时应该只需很少的改动。'
 		},
 		{
-			question: '免费云方案真的免费吗？',
+			question: 'FoxAuth Cloud 真的免费吗？',
 			answer:
-				'FoxAuth Cloud 的免费方案不收取任何费用，也不需要信用卡。它提供每位管理员 2 个项目、每个项目每月 1,000,000 名活跃用户、每个项目 10 个应用和 10 个 API，以及通过 Google、Microsoft、Apple 和 GitHub 登录。达到用户上限时，只会暂停新用户注册，已有账户的人不会被拒绝登录。免费方案暂时没有 SLA。提供更高限额和保障的付费方案正在开发中；加入候补名单不需要承担任何义务，方案开放时我们只会给你发一封邮件。'
+				'FoxAuth Cloud 在测试期间免费，也不需要信用卡。包含全部功能：每月活跃用户、应用和 API 数量不限，每位管理员最多十个项目，每个项目的地址由你选择，并可通过任意 OpenID 提供方登录。自己的域名可应要求设置。在测试期间加入的团队，在付费方案推出后还可以再免费使用一年。目前暂无 SLA。提供 SLA 的付费方案正在开发中。'
 		},
 		{
 			question: '你们提供咨询服务吗？',

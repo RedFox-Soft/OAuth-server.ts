@@ -1,0 +1,87 @@
+---
+import Button from './ui/Button.astro';
+import { messagesFor } from '../i18n/messages.ts';
+import english from '../i18n/messages/forms/en.ts';
+import type { LocaleKey } from '../data/seo.ts';
+import { ENTERPRISE_FORM_KEY, ENTERPRISE_SUBJECT } from '../data/cloud.ts';
+
+interface Props {
+	locale?: LocaleKey;
+	/* The page the form sends the reader back to, with `#enterprise-sent` so the thanks shows without a script. */
+	back: string;
+}
+const { locale = 'en', back } = Astro.props;
+const t = messagesFor('forms', english, locale);
+/* The subject stays English because the owner's inbox reads it; the tag says which language the page was in. */
+const subject = locale === 'en' ? ENTERPRISE_SUBJECT : `${ENTERPRISE_SUBJECT} [${locale}]`;
+const fieldClass =
+	'w-full rounded-control border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-500 dark:border-gray-700 dark:bg-gray-950 dark:text-gray-100';
+const labelClass = 'flex flex-col gap-1 text-sm font-medium';
+---
+
+<p
+	id="enterprise-sent"
+	class="enterprise-sent mb-3 hidden rounded-control border border-accent-200 bg-accent-50 p-3 text-sm text-gray-900 dark:border-accent-900 dark:bg-gray-900 dark:text-gray-100"
+	role="status"
+>
+	{t.enterprise.sent}
+</p>
+<form method="POST" action="https://api.web3forms.com/submit" class="flex flex-col gap-3">
+	<input type="hidden" name="access_key" value={ENTERPRISE_FORM_KEY} />
+	<input type="hidden" name="subject" value={subject} />
+	<input type="hidden" name="from_name" value="foxauth.dev" />
+	<input type="hidden" name="redirect" value={`${back}#enterprise-sent`} />
+	<input type="checkbox" name="botcheck" tabindex="-1" autocomplete="off" class="hidden" />
+	<label class={labelClass}>
+		{t.enterprise.name}
+		<input type="text" name="name" required autocomplete="name" class={fieldClass} />
+	</label>
+	<label class={labelClass}>
+		{t.workEmail}
+		<input
+			type="email"
+			name="email"
+			required
+			autocomplete="email"
+			placeholder={t.emailPlaceholder}
+			class={fieldClass}
+		/>
+	</label>
+	<label class={labelClass}>
+		{t.enterprise.company}
+		<input type="text" name="company" required autocomplete="organization" class={fieldClass} />
+	</label>
+	<label class={labelClass}>
+		{t.enterprise.users}
+		<input type="text" name="users" placeholder={t.enterprise.usersPlaceholder} class={fieldClass} />
+	</label>
+	<label class={labelClass}>
+		{t.enterprise.hosting}
+		<select name="hosting" required class={fieldClass}>
+			{
+				(['shared', 'ours', 'yours', 'unsure'] as const).map((option) => (
+					<option value={english.enterprise.hostingOptions[option]}>
+						{t.enterprise.hostingOptions[option]}
+					</option>
+				))
+			}
+		</select>
+	</label>
+	<label class={labelClass}>
+		{t.enterprise.message}
+		<textarea
+			name="message"
+			required
+			rows="4"
+			placeholder={t.enterprise.messagePlaceholder}
+			class={fieldClass}></textarea>
+	</label>
+	<Button type="submit">{t.enterprise.send}</Button>
+	<p class="text-xs text-gray-600 dark:text-gray-400">{t.enterprise.reassurance}</p>
+</form>
+
+<style>
+	.enterprise-sent:target {
+		display: block;
+	}
+</style>

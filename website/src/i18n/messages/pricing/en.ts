@@ -11,57 +11,36 @@
 export default {
 	title: 'Pricing',
 	description:
-		'FoxAuth pricing: start free on FoxAuth Cloud, or self-host the whole server for free. Paid cloud plans are in development, and enterprise support is available.',
+		'FoxAuth Cloud is free during the beta, with every feature and no user limit. Enterprise, an instance of your own, is by invitation.',
 	eyebrow: 'Pricing',
-	heading: 'Free to start, in our cloud or on your own servers.',
-	lead: 'Create a free account on FoxAuth Cloud and have a working authorization server in minutes. Or run the same server yourself, with every feature and no limits. Paid cloud plans, with higher limits and guarantees, are in development.',
+	heading: 'Free in our cloud. An instance of your own by invitation.',
+	lead: 'FoxAuth Cloud is free during the beta, with every feature and no limit on users: create an account and have a working authorization server in minutes. Teams that join during the beta keep it free for a year after paid plans launch. A company that needs an instance of its own asks for an invitation.',
 	cloudFree: {
-		badge: 'Available now',
-		name: 'Cloud Free',
+		badge: 'Free during the beta',
+		name: 'Cloud',
 		price: 'Free',
-		tagline: 'Our instance at auth.foxauth.dev. No card, no call.',
+		tagline:
+			'Our instance at auth.foxauth.dev. No card, no call, no user limit.',
 		items: [
-			'2 projects per administrator, each its own OpenID Connect issuer',
-			'1,000,000 monthly active users per project',
-			'10 applications and 10 APIs per project',
-			'Sign-in with Google, Apple, GitHub and Microsoft accounts of any organisation',
+			'Every feature, with no limit on monthly active users, applications or APIs',
+			'Up to 10 projects per administrator, each its own OpenID Connect issuer at an address you choose',
+			'Sign-in with Google, Apple, GitHub and Microsoft, and through any OpenID provider, including Okta or one organisation’s Entra ID',
 			'Machine-to-machine tokens, device sign-in, sender-constrained tokens (DPoP), pushed authorization requests (PAR), and administration by an AI agent over MCP',
+			'Your own domain on request',
+			'Free for a year after paid plans launch, for teams that join during the beta',
 			'Community support on GitHub issues; no SLA yet'
 		],
 		cta: 'Create a free account'
 	},
-	selfHosted: {
-		badge: 'Available now',
-		name: 'Self-hosted',
-		price: 'Free',
-		tagline: 'Your infrastructure, your database, no account with us.',
-		items: [
-			'Every feature, with no editions to choose between',
-			'Unlimited users, projects, applications and tokens',
-			'Source-available under FSL-1.1-ALv2',
-			'Community support on GitHub issues'
-		],
-		cta: 'Get started'
-	},
-	cloud: {
-		badge: 'In development',
-		name: 'Cloud paid plans',
-		price: 'Not priced yet',
-		tagline: 'The same instance, with more room and someone on the hook.',
-		items: [
-			'Higher limits on projects, applications and users',
-			'Sign-in through any OpenID provider, including one organisation’s Microsoft directory',
-			'Your own project address and your own domain',
-			'An SLA and a support address'
-		]
-	},
 	enterprise: {
-		badge: 'By agreement',
+		badge: 'By invitation',
 		name: 'Enterprise',
 		price: 'Let’s talk',
-		tagline: 'Self-hosted, with a support contract behind it.',
+		tagline:
+			'An Enterprise Cloud apart from the free one, an instance of your own, or your infrastructure. By invitation only.',
 		items: [
-			'You self-host; we support you',
+			'Enterprise Cloud: shared only by enterprise customers, apart from the free cloud, with an SLA',
+			'A dedicated instance, run by us or on your infrastructure, its database and keys apart from everyone else’s',
 			'Response-time SLA on defects',
 			'Security advisories ahead of public disclosure',
 			'Architecture review and priority fixes'
@@ -82,9 +61,9 @@ export default {
 				'FoxAuth can run in production today, self-hosted. The free cloud plan has no SLA yet, so it is a place to start rather than one to depend on. The current release is 2.0.0. Since 1.0.0, the first stable release, the HTTP surface and the admin API change incompatibly only in a major release. Read the changelog before upgrading, take a backup when it names a migration that cannot be undone, and run the setup and migrate steps afterwards. The protocol endpoints follow the specs, so a client written for FoxAuth is in practice written against the RFC and should move to another server with little change.'
 		},
 		{
-			question: 'Is the free cloud plan really free?',
+			question: 'Is FoxAuth Cloud really free?',
 			answer:
-				'The free plan on FoxAuth Cloud costs nothing and asks for no card. It allows two projects per administrator, 1,000,000 monthly active users per project, ten applications and ten APIs per project, and sign-in through Google, Microsoft, Apple and GitHub. At the user cap only new sign-ups pause; nobody who already has an account is refused. The free plan has no SLA yet. Paid plans with higher limits and guarantees are in development; their waitlist commits you to nothing, and we email you once when they open.'
+				'FoxAuth Cloud is free during the beta and asks for no card. Every feature is included: no limit on monthly active users, applications or APIs, up to ten projects per administrator, an address you choose for each, and sign-in through any OpenID provider. Your own domain is set up on request. Teams that join during the beta keep it free for a year after paid plans launch. There is no SLA yet. Paid plans with an SLA are in development.'
 		},
 		{
 			question: 'Do you offer consulting?',

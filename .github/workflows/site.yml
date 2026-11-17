@@ -86,7 +86,6 @@ jobs:
         working-directory: website
         run: bun run build
         env:
-          PUBLIC_FORMSPREE_WAITLIST: ${{ vars.PUBLIC_FORMSPREE_WAITLIST }}
           PUBLIC_FORMSPREE_CONTACT: ${{ vars.PUBLIC_FORMSPREE_CONTACT }}
           PUBLIC_PLAUSIBLE_DOMAIN: ${{ vars.PUBLIC_PLAUSIBLE_DOMAIN }}
 

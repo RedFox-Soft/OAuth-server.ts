@@ -2,8 +2,7 @@
 import Site from '../layouts/Site.astro';
 import FaqSection from '../components/FaqSection.astro';
 import { faqPage } from '../data/structured.ts';
-import WaitlistForm from '../components/WaitlistForm.astro';
-import ContactForm from '../components/ContactForm.astro';
+import EnterpriseForm from '../components/EnterpriseForm.astro';
 import Button from '../components/ui/Button.astro';
 import Card from '../components/ui/Card.astro';
 import Badge from '../components/ui/Badge.astro';
@@ -22,9 +21,9 @@ interface Props {
 const { locale } = Astro.props;
 const t = messagesFor('pricing', english, locale);
 
-const getStarted = await localizedHref('/docs/get-started/docker-compose/', locale);
 const license = await localizedHref('/license/', locale);
 const contact = await localizedHref('/contact/', locale);
+const pricing = await localizedHref('/pricing/', locale);
 ---
 
 <Site
@@ -45,7 +44,7 @@ const contact = await localizedHref('/contact/', locale);
 	</Section>
 
 	<Section tone="muted">
-		<div class="grid grid-cols-1 items-start gap-6 md:grid-cols-2 xl:grid-cols-4">
+		<div class="mx-auto grid max-w-4xl grid-cols-1 items-start gap-6 md:grid-cols-2">
 			<Card
 				id="free"
 				tone="accent"
@@ -75,56 +74,7 @@ const contact = await localizedHref('/contact/', locale);
 				</p>
 			</Card>
 
-			<Card>
-				<Badge tone="accent">{t.selfHosted.badge}</Badge>
-				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.selfHosted.name}</h2>
-				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.selfHosted.price}</p>
-				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-					{t.selfHosted.tagline}
-				</p>
-				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-					{
-						t.selfHosted.items.map((item) => (
-							<li class="flex gap-2">
-								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
-									→
-								</span>
-								<span>{item}</span>
-							</li>
-						))
-					}
-				</ul>
-				<p class="mt-6">
-					<Button
-						href={getStarted}
-						variant="secondary">{t.selfHosted.cta}</Button
-					>
-				</p>
-			</Card>
-
-			<Card id="cloud">
-				<Badge tone="neutral">{t.cloud.badge}</Badge>
-				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.cloud.name}</h2>
-				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.cloud.price}</p>
-				<p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
-					{t.cloud.tagline}
-				</p>
-				<ul class="mt-5 flex flex-col gap-2 text-sm text-gray-700 dark:text-gray-300">
-					{
-						t.cloud.items.map((item) => (
-							<li class="flex gap-2">
-								<span aria-hidden="true" class="text-accent-700 dark:text-accent-200">
-									→
-								</span>
-								<span>{item}</span>
-							</li>
-						))
-					}
-				</ul>
-				<div class="mt-6"><WaitlistForm locale={locale} /></div>
-			</Card>
-
-			<Card>
+			<Card id="enterprise">
 				<Badge tone="neutral">{t.enterprise.badge}</Badge>
 				<h2 class="mt-4 text-xl font-[650] tracking-tight">{t.enterprise.name}</h2>
 				<p class="mt-2 text-3xl font-[650] tracking-tight">{t.enterprise.price}</p>
@@ -143,7 +93,7 @@ const contact = await localizedHref('/contact/', locale);
 						))
 					}
 				</ul>
-				<div class="mt-6"><ContactForm subject="Enterprise" locale={locale} /></div>
+				<div class="mt-6"><EnterpriseForm locale={locale} back={new URL(pricing, Astro.site).href} /></div>
 			</Card>
 		</div>
 	</Section>

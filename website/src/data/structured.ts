@@ -61,7 +61,7 @@ export function softwareApplication({
 			price: '0',
 			priceCurrency: 'USD',
 			description:
-				'Free on FoxAuth Cloud for up to 1,000,000 monthly active users per project, or free to run on your own servers'
+				'Free on FoxAuth Cloud during the beta, with no limit on monthly active users, or free to run on your own servers'
 		}
 	};
 }

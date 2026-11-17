@@ -3,9 +3,10 @@
  * sign-in page there offers "Register now!", and a new administrator gets a personal team and Free projects.
  *
  * The Free plan's limits are written in the pricing messages rather than computed, because they are the
- * production instance's plan catalogue, not this repository's defaults. Checked against production on
- * 2026-10-18 (plan `free`: 1,000,000 monthly active users, raised from 100,000 that day; 2 projects per
- * administrator, 10 applications and 10 APIs per project, no enterprise sign-in, custom slug or custom domain).
+ * production instance's plan catalogue, not this repository's defaults. Since 2026-11-17 the cloud is free during
+ * the beta, read back from production that day (plan `free`: no limit on monthly active users, applications, APIs
+ * or connected services; 10 projects per administrator; enterprise sign-in and custom slug on, custom domain off,
+ * set up on request).
  */
 export const CLOUD_SIGN_UP = 'https://auth.foxauth.dev/admin/signup';
 
@@ -47,18 +48,29 @@ export const CLOUD_FLAGS_ON: ReadonlySet<string> = new Set([
 ]);
 
 /*
- * The plan features the Free plan includes, so the guide can mark an answer "Not on the Free plan". Free has none of
- * them: no enterprise sign-in, custom slug or custom domain (checked against production on 2026-10-18, as above).
+ * The plan features the Free plan includes, so the guide can mark an answer "Not on the Free plan". Free has
+ * enterprise sign-in and a custom slug, not a custom domain (read back from production on 2026-11-17, as above).
  * Change this when the Free plan changes.
  */
-export const CLOUD_FREE_FEATURES: ReadonlySet<string> = new Set<string>([]);
+export const CLOUD_FREE_FEATURES: ReadonlySet<string> = new Set<string>([
+	'enterpriseSignIn',
+	'customSlug'
+]);
 
 /*
- * Where a request for a paid plan goes, and the subject the team's inbox sorts it by: the waitlist form's fallback
- * and the guide's "Ask for a paid plan" both write this mail. The subject stays English in every language.
+ * Where a request for a paid plan goes, and the subject the team's inbox sorts it by: the guide's "Ask for a paid
+ * plan" writes this mail. The subject stays English in every language.
  */
 export const WAITLIST_ADDRESS = 'hello@foxauth.dev';
 export const WAITLIST_SUBJECT = 'FoxAuth Cloud paid plans waitlist';
+
+/*
+ * The pricing page's Enterprise request goes through Web3Forms, which mails it to the owner's inbox: the site is
+ * static and sends no mail itself. The access key is public by design (it only lets a form post to the inbox it was
+ * issued for), so it lives here rather than in a build variable. The subject stays English in every language.
+ */
+export const ENTERPRISE_FORM_KEY = '754f57f5-de46-4422-a0cb-7664bf782aed';
+export const ENTERPRISE_SUBJECT = 'FoxAuth Enterprise request';
 
 /* The console of FoxAuth Cloud: what a prompt names, and where the guide's buttons lead. */
 export const CLOUD_CONSOLE = 'https://auth.foxauth.dev/admin';
