@@ -9,6 +9,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **Claude Code signs in to an MCP server through its client metadata document.** Its document lists
+  `http://localhost/callback` without a port and names no application type, and the default, web, kept the port
+  exact, so the ephemeral port it binds at sign-in was refused as a redirect_uri mismatch. A document that names no
+  type and offers only plain-http loopback targets is now read as a native client, whose loopback port may vary
+  (RFC 8252 §7.3). Nothing to set up or migrate.
+
 ## [2.0.0] - 2026-11-17
 
 The major number moves for one change: a client assertion whose `aud` is anything but the issuer is now refused, as

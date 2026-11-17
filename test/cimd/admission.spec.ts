@@ -105,6 +105,41 @@ describe('a document presented at the authorization endpoint', () => {
 		expect(response.headers.get('location')).toStartWith('/ui/');
 	});
 
+	/* Claude Code's published document names no application type and lists loopback targets without a port. */
+	it('lets a document offering only loopback targets, and naming no type, come back on any port', async () => {
+		const { identifier } = serveDocument({
+			overrides: {
+				redirect_uris: [
+					'http://localhost/callback',
+					'http://127.0.0.1/callback'
+				]
+			}
+		});
+
+		const { response } = await authorize(
+			identifier,
+			'http://localhost:3118/callback'
+		);
+
+		expect(response.status).toBe(303);
+		expect(response.headers.get('location')).toStartWith('/ui/');
+	});
+
+	it('keeps the port exact for a document that also offers a real host', async () => {
+		const { identifier } = serveDocument({
+			overrides: {
+				redirect_uris: [REDIRECT, 'http://localhost:3000/callback']
+			}
+		});
+
+		const { response } = await authorize(
+			identifier,
+			'http://localhost:3118/callback'
+		);
+
+		expect(response.status).toBe(400);
+	});
+
 	it('refuses as an unknown client a document whose redirect is plain http on a host that is not loopback', async () => {
 		const { identifier } = serveDocument({
 			overrides: { redirect_uris: ['http://intranet.example/callback'] }

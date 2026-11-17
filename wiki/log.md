@@ -428,3 +428,5 @@ Operations:
 ## [2026-11-17] update | [[client-assertion-audience]] — draft-ietf-oauth-rfc7523bis published as RFC 10070 (audience rules unchanged from -11), so `clientAuth.issuerOnlyAudience` now defaults to `true`; off is the compatibility setting and departs from RFC 10070, on still departs from CIBA §7.1 (no CIBA errata). Request Object tightening still waits for OIDC Core errata 3 (issue #80). Draft citations replaced with RFC 10070 in [[enterprise-managed-authorization]]; line citations moved in [[ipsie-sl1-profile]], [[override-seams-vs-dead-code]].
 
 ## [2026-11-17] update | [[situation-guide]] — `behindproxy` and `mcpproxy` moved from the chips to answers of question 2 (a person, an AI agent); line citations moved.
+
+## [2026-11-17] update | [[loopback-redirect-port-matching]] — a metadata document that names no `application_type` and offers only plain-http loopback targets is read as native, so Claude Code's CIMD document can come back on its ephemeral port (found by the spec 130 live run; 2.0.1).

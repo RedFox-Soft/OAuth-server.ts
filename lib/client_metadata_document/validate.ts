@@ -1,4 +1,5 @@
 import { snakeToCanonical } from '../models/client/wire.js';
+import { isLoopbackRedirect } from './identifier.js';
 
 /*
  * Turning a retrieved document into client metadata, or refusing it.
@@ -134,6 +135,24 @@ export function validateClientDocument(
 	 */
 	if (document.token_endpoint_auth_method === undefined) {
 		document.token_endpoint_auth_method = 'none';
+	}
+
+	/*
+	 * A document that names no application type and offers only plain-http loopback redirect targets describes a
+	 * native client: nothing but a program on the person's own machine can receive a code there. The registration
+	 * default, web, kept the port exact, so a client that binds an ephemeral port when the sign-in starts, as RFC 8252
+	 * §7.3 expects and Claude Code's published document does (`http://localhost/callback`, then port 3118 at sign-in),
+	 * was refused with a redirect_uri mismatch. A document that names its type keeps it, and one with any other
+	 * redirect target stays web, so no real host gains a port it did not register.
+	 */
+	if (
+		document.application_type === undefined &&
+		redirectUris.every(
+			(uri: string) =>
+				URL.parse(uri)?.protocol === 'http:' && isLoopbackRedirect(uri)
+		)
+	) {
+		document.application_type = 'native';
 	}
 
 	return { ok: true, metadata: snakeToCanonical(document) };

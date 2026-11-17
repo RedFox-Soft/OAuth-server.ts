@@ -4,7 +4,7 @@ title: "Loopback redirect port matching"
 tags: [oauth, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-25
-updated: 2026-10-22
+updated: 2026-11-17
 graph:
   node_type: concept
   relationships:
@@ -55,6 +55,17 @@ its next sign-in. A stored client keeps its addresses and can still be renamed; 
 naming it. A metadata document has no record, so every address of it counts as added, and so does an address a
 pushed request presents unregistered (`validateRedirectUri`'s `newUri`). It is the same shape as the https rule for
 `jwks_uri` and `backchannel_logout_uri` (specs/103).
+
+## A metadata document that names no type
+
+A client identified by a metadata document (CIMD) has no registration form to choose `native` in, and Claude Code's
+published document (`https://claude.ai/oauth/claude-code-client-metadata`) names no `application_type`: it lists
+`http://localhost/callback` and `http://127.0.0.1/callback` and binds an ephemeral port at sign-in (3118 on
+2026-11-17). The registration default, `web`, kept that port exact, so Claude Code could not sign in to any MCP server
+behind FoxAuth through its document; the live run of spec 130 found it. Since 2.0.1 a document that names no type and
+offers only plain-http loopback targets is read as `native` (`validateClientDocument`,
+`lib/client_metadata_document/validate.ts`). One that names its type keeps it, and one with any other target stays
+`web`, so no real host gains a port it did not register.
 
 ## The failure it fixes
 
