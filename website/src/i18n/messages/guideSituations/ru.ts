@@ -4,7 +4,7 @@ import type { GuideTexts } from '../../guide-texts.ts';
  * \u00AD is a soft hyphen. A lane is about 52 px wide on a phone, and not every browser hyphenates Russian, so a
  * long word in a lane or a step label gets its break point by hand.
  */
-export const source = '814215c0b4e1';
+export const source = 'eca193b6df0e';
 
 export default {
 	questions: {
@@ -22,6 +22,10 @@ export default {
 				device: {
 					title: 'На устройстве без клавиатуры',
 					sub: 'телевизор, приставка, киоск'
+				},
+				behindproxy: {
+					title: 'За обратным прокси',
+					sub: 'в самом приложении нет входа'
 				}
 			}
 		},
@@ -60,6 +64,10 @@ export default {
 				adminmcp: {
 					title: 'Управлять самим FoxAuth',
 					sub: 'через административный MCP'
+				},
+				mcpproxy: {
+					title: 'Подключиться к моему MCP-серверу через мой прокси',
+					sub: 'токены проверяет прокси, сервер остаётся как есть'
 				}
 			}
 		}

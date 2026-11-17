@@ -274,6 +274,11 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
 				answer: 'device',
 				title: 'A device with no keyboard',
 				sub: 'a TV, a set-top box, a kiosk'
+			},
+			{
+				answer: 'behindproxy',
+				title: 'Behind a reverse proxy',
+				sub: 'the app has no sign-in of its own'
 			}
 		]
 	},
@@ -320,6 +325,11 @@ export const GUIDE_QUESTIONS: readonly GuideQuestion[] = [
 				answer: 'adminmcp',
 				title: 'To manage FoxAuth itself',
 				sub: 'through the administrative MCP'
+			},
+			{
+				answer: 'mcpproxy',
+				title: 'To reach my MCP server through my proxy',
+				sub: 'the proxy checks tokens, the server stays as it is'
 			}
 		]
 	}
@@ -1221,6 +1231,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 	{
 		id: 'behindproxy',
 		tab: 'product',
+		ask: { actor: 'person', answer: 'behindproxy' },
 		title: 'A web app with no sign-in of its own',
 		sentence:
 			'Put the app behind your proxy. The proxy asks FoxAuth about each request before it reaches the app, so people sign in to your project and the app does not change.',
@@ -1308,6 +1319,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 	{
 		id: 'mcpproxy',
 		tab: 'product',
+		ask: { actor: 'agent', answer: 'mcpproxy' },
 		title: 'Protect an MCP server without auth code',
 		sentence:
 			'Put your MCP server behind your proxy. The proxy asks FoxAuth to check the token on each request, and the scopes the tool needs, so the server itself needs no auth code.',

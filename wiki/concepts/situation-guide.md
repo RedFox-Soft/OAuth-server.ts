@@ -30,7 +30,7 @@ are built from the same data.
 ## One declaration
 
 Every question, situation, step, diagram lane, prompt and target is plain, import-free data in
-`lib/consts/situation_guide.ts` (`GUIDE_QUESTIONS` :242, `GUIDE_SITUATIONS` :394). The console renders it, the
+`lib/consts/situation_guide.ts` (`GUIDE_QUESTIONS` :251, `GUIDE_SITUATIONS` :415). The console renders it, the
 availability function reads it, and the docs export hands the same list to the site (`situationGuide`,
 `lib/docs_export/build.ts:370`), so the console and the site cannot drift. The chooser for a new application takes its preset titles and descriptions from the same entries
 (`[[application-page]]`).
@@ -182,6 +182,11 @@ CSS `:has()` pick the visible one, so the page works with scripts off; one small
 in the address, copies the agent prompt, steps and replays the diagram, and below 1024 px scrolls to the answer after
 a choice in question 2 (not question 1, whose next step is question 2 just under it). The chips under the questions are links to
 `#answer-<id>`, not radios: in one radio group with the second question, Tab reached only one of the two.
+
+An app behind your proxy (`behindproxy`) and an MCP server behind your proxy (`mcpproxy`) are answers to question 2,
+under "A person" and "An AI agent", not chips (2026-11-17): they are how a person or an agent signs in, and as two of
+twenty-one chips under "Not a sign-in flow" readers did not find them. The conditions at the proxy stay chips, as the
+next step after either.
 
 Since 2026-11-04 the page is split from 1024 px, the questions left and the answer right and sticky, and every
 answer opens with a strip of three frames: "Your problem", "With FoxAuth" and "What you get", with the one button in

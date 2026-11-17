@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '814215c0b4e1';
+export const source = 'eca193b6df0e';
 
 export default {
 	questions: {
@@ -15,7 +15,8 @@ export default {
 					title: '手机、桌面或终端',
 					sub: 'iOS、Android、Electron、CLI'
 				},
-				device: { title: '没有键盘的设备', sub: '电视、机顶盒、自助终端' }
+				device: { title: '没有键盘的设备', sub: '电视、机顶盒、自助终端' },
+				behindproxy: { title: '在反向代理后面', sub: '应用本身没有登录功能' }
 			}
 		},
 		program: {
@@ -41,7 +42,11 @@ export default {
 					title: '使用用户的 Google、GitHub 等账户',
 					sub: '代表用户，并经用户同意'
 				},
-				adminmcp: { title: '管理 FoxAuth 本身', sub: '通过管理 MCP' }
+				adminmcp: { title: '管理 FoxAuth 本身', sub: '通过管理 MCP' },
+				mcpproxy: {
+					title: '通过我的代理连接我的 MCP 服务器',
+					sub: '由代理检查令牌，服务器保持原样'
+				}
 			}
 		}
 	},
