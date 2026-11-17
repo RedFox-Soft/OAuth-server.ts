@@ -9,88 +9,62 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-11-17
+
+The major number moves for one change: a client assertion whose `aud` is anything but the issuer is now refused, as
+RFC 10070 requires (see Changed). Everything else adds to what was there. Each person has an Activity tab with their
+sign-ins, refusals and what they used behind your proxy, and the network owner and place of each address; people see
+their own recent sign-ins; an API can require a code or a recent sign-in, has a page of its own, and one MCP tool can
+have conditions of its own; a path behind your proxy can keep out Tor, VPNs, hosting or countries with FoxTrust's
+network facts. Sign-in addresses are now kept for 90 days, and sent to FoxTrust's API for their owner and place, by
+default: read the upgrade notes. Six migrations, which cannot be undone, and new indexes: take a backup, then run the
+usual setup and migrate steps.
+
 ### Added
 
-- **Network owner and location beside a person's addresses** (spec 136). A person's Activity tab shows, beside each
-  recorded address, its network owner and place ("AS64500 Example Net · Bavaria, Munich"), and agents read the same
-  through `project_user_activity_list`. A server gets the FoxTrust key it needs by itself, with no account: its daily
-  usage report now carries a public instance key, and about a week later the server registers at FoxTrust. The
-  status is under Settings → Integrations and `address_lookup_status_get`. **Upgrade note:** the addresses people's
-  activity records are now sent to FoxTrust's API by default, in batches, about a minute after each sign-in or
-  refusal, with nothing else about the person. FoxTrust keeps none of them and acts as your processor (RedFox
-  Software, terms at https://foxtrust.dev/terms). Only the AS number and name, region and city are kept. Turn it off
-  with **Look up network owner and location at FoxTrust**. The first key needs usage reporting on and arrives about a
-  week after upgrading. Keep your keyring: the instance key is sealed with it, and a lost one cannot be replaced
-  without FoxTrust support. Run `db:migrate` (a fence).
-- **People see their own recent sign-ins** (spec 135). Every project's account page has a fourth page, Recent sign-ins
-  (`/account/sign-ins`), in English, Russian and Chinese: the person's last ten sign-ins with the app, the time, how
-  they signed in, the browser and the country, never the address. It opens only after a sign-in within 15 minutes.
-  "Sign out everywhere" there ends every session, grant, token and app session behind the proxy, mails a person with a
-  password the usual link to set a new one, never locks the account, and shows in the person's Changes as their own
-  `enduser.signout`. Nothing to set up or migrate.
-- **What a person uses, and who was refused recently** (spec 134). A person's Activity tab now also shows which apps
-  behind your proxy and which APIs checked at it they used each day ("Used Wiki, 10:02–11:10"; an API with the tools
-  of its table they called), never with an address, and Profile lists the apps used in the last 90 days. The list of
-  people gains a "Last active" column and filter. An app's or an API's Access tab lists who it refused or asked to
-  sign in again in the last 24 hours, divided at the moment its rules were last saved; agents read it with
-  `behind_proxy_app_refusal_list` and `resource_refusal_list`, audited once a day. **Upgrade note:** a request your
-  proxy lets a person through now counts as activity, so monthly active people rise for projects behind a proxy and
-  a plan's monthly-active cap may be reached sooner. Use is recorded per person and day for 90 days, written every
-  five minutes; `personActivity.enabled` turns it off. Re-run `db:setup` or `db:setup:pg` (two new indexes), then
-  `db:migrate` (a fence).
-- **A person's activity** (spec 133). Each person's page has an Activity tab: every sign-in (application, method,
-  full network address, browser and system, FoxTrust's country and network kind when network facts are on), every
-  failed sign-in where the account was found, and every time an app behind the proxy or an API checked at it asked
-  them to sign in again or refused them, with the reason, what they saw and a link to check it now. Profile shows the
-  last sign-in, "Not let in since" and "Last active"; the old Activity list of changes is now Changes. Agents read it
-  with `project_user_activity_list`; every read is audited once per reader, person and day. **Upgrade note:** from
-  this release every project keeps full sign-in addresses for 90 days per person (kept through a lock, deleted with
-  the person and the project); tell your users, or turn it off with `personActivity.enabled`. Re-run `db:setup` or
-  `db:setup:pg`, then `db:migrate` (a fence: an older release refuses this database afterwards).
-- **An API's own console page** (spec 132). Each API in a project opens at an address of its own with three tabs, as
-  an app behind the proxy does: Connect (the proxy's configuration, or what the API must check and serve, with its
-  metadata status), Access (the sign-in requirement, the API's conditions, the tools table with each tool's
-  conditions, and Check access under them, saved in one go) and Settings (name, scopes, tokens, who checks them, and
-  removal). The Edit… and Connect dialogs and the Access… drawer are gone; declaring an API opens its page.
-- **Conditions on one MCP tool** (spec 131). On an API checked at the proxy, one tool can be limited to some groups,
-  some networks (address ranges or FoxTrust's network facts) and some hours, on top of the API's own conditions and
-  after the tool's scopes; every other tool stays as it was. A refused call is a plain 403. A tool may need a
-  condition and no scope. Apps too old to say which tool they call are refused once a tool has conditions. The
-  Access drawer gains "Check access", which answers with the decision the proxy check runs. A tool condition stops
-  an app that names its tool honestly; the console says what it does not stop. Free on every plan. Run `db:migrate`.
-- **An API that requires a code or a recent sign-in** (spec 130). Any API or MCP server of a project can require a
-  sign-in with a code from an authenticator app, and a new sign-in every day, 7 or 14 days, or a custom interval.
-  No MCP client understands the standard step-up challenge yet, so FoxAuth enforces it itself: the sign-in for a
-  token asks for the code or a new sign-in whatever the client asked, every grant refuses a token whose sign-in
-  falls short, a renewal is refused without spending it, and the proxy answers RFC 9470's
-  `insufficient_user_authentication`. Apps that act for no one and sign-ins by assertion cannot connect. Turning it on
-  shows first whom it affects. Introspection now reports `acr` and `auth_time`, and a code typed twice says it was
-  just used. Free on every plan. Run `db:migrate`; an older release then refuses to start against the database.
-
-- **Where a connection comes from, at your proxy** (spec 129). A super administrator can turn on "Network facts from
-  FoxTrust" in Settings → Integrations. Each server process then downloads FoxTrust's signed snapshot (about 13 MB a
-  day plus hourly updates) and checks its signature; people's addresses are only compared here and never sent. "From
-  where" on a path of an app behind your proxy, or on an API checked there, can then keep out Tor, commercial VPNs, or
-  hosting and clouds, and allow or keep out countries, either refusing a matching address or, on an app, asking it to
-  sign in again (optionally with a code). With the download off or more than 26 hours old, such a path is closed and
-  the console says why. Check access looks an address up in the server's own copy. Free on every plan. Run
-  `db:migrate`; an older release then refuses to start against the database.
+- **Network owner and location of a person's addresses** (spec 136). Beside each address on a person's Activity tab
+  and in `project_user_activity_list`: the AS number and name, region and city, looked up at FoxTrust's API with a
+  key the server registers for itself about a week after its usage reports start carrying its instance key. Status
+  under Settings → Integrations and `address_lookup_status_get`. **Upgrade note:** recorded addresses now go to
+  FoxTrust's API by default, in batches, with nothing else about the person; FoxTrust keeps none and acts as your
+  processor (https://foxtrust.dev/terms). Turn it off with **Look up network owner and location at FoxTrust**. Keep
+  your keyring: it seals the instance key. Run `db:migrate`.
+- **People see their own recent sign-ins** (spec 135) at `/account/sign-ins`: the last ten, with the app, time,
+  method, browser and country, never the address, after a sign-in within 15 minutes. "Sign out everywhere" there ends
+  every session, grant, token and app session behind the proxy without locking the account.
+- **What a person uses, and who was refused recently** (spec 134). The Activity tab shows the apps and APIs behind
+  your proxy a person used each day, the list of people gains "Last active", and an app's or an API's Access tab lists
+  whom it refused in the last 24 hours (`behind_proxy_app_refusal_list`, `resource_refusal_list`). **Upgrade note:** a
+  request your proxy lets through now counts as activity, so monthly active people rise. Re-run `db:setup` or
+  `db:setup:pg`, then `db:migrate`.
+- **A person's activity** (spec 133). Each person's page has an Activity tab: sign-ins with the full address, browser
+  and FoxTrust's country and network kind, failed sign-ins where the account was found, and refusals behind your
+  proxy. Agents read it with `project_user_activity_list`, audited once a day per reader and person. **Upgrade
+  note:** every project now keeps full sign-in addresses for 90 days; tell your users, or turn it off with
+  `personActivity.enabled`. Re-run `db:setup` or `db:setup:pg`, then `db:migrate`.
+- **An API's own console page** (spec 132) with Connect, Access and Settings tabs, in place of the Edit… and Connect
+  dialogs and the Access… drawer.
+- **Conditions on one MCP tool** (spec 131): groups, networks and hours on top of the API's own conditions. A refused
+  call is a plain 403, and apps too old to name their tool are refused once a tool has conditions. "Check access"
+  answers with the proxy's own decision. Run `db:migrate`.
+- **An API that requires a code or a recent sign-in** (spec 130). FoxAuth enforces it itself, since no MCP client
+  handles step-up yet: at the sign-in, at every grant, at a refresh and at the proxy (RFC 9470
+  `insufficient_user_authentication`). Introspection now reports `acr` and `auth_time`. Run `db:migrate`.
+- **Network facts at your proxy** (spec 129). With "Network facts from FoxTrust" on, each process downloads FoxTrust's
+  signed snapshot (about 13 MB a day), and "From where" can keep out Tor, commercial VPNs, hosting or countries,
+  comparing the address in the server's own copy. Off, or more than 26 hours old, closes such a path. Run
+  `db:migrate`.
 
 ### Changed
 
-- **A client assertion's audience must be the issuer alone, by default** (RFC 10070). draft-ietf-oauth-rfc7523bis is
-  now RFC 10070, so `clientAuth.issuerOnlyAudience` is on by default: a `private_key_jwt` or `client_secret_jwt`
-  assertion whose `aud` is the token endpoint URL, another endpoint's URL or several values is refused with
-  `invalid_client` at every endpoint, CIBA's included. **Upgrade note:** a client that puts anything but the issuer
-  in `aud` stops authenticating; turn the setting off only until it is fixed, since that reopens the
-  audience-injection attack (CVE-2025-27370/27371). An instance that stored `false` keeps it.
+- **A client assertion's audience must be the issuer alone** (RFC 10070). `clientAuth.issuerOnlyAudience` is now on
+  by default: an assertion whose `aud` is an endpoint's URL or several values gets `invalid_client` at every endpoint.
+  **Upgrade note:** fix such clients; turning the setting off reopens CVE-2025-27370/27371. A stored `false` is kept.
 
 ### Fixed
 
-- **An MCP header sent twice no longer slips past an API's tools table.** A request that sent `Mcp-Method`,
-  `Mcp-Name` or `MCP-Protocol-Version` twice reached the check as one joined value, so `tools/call` twice read as a
-  method the table does not cover and was let through without the tool's scopes, while a server behind the proxy that
-  takes the first value ran the tool. Such a request is now refused as `bad_mcp_header`.
+- **An MCP header sent twice is refused** as `bad_mcp_header` at an API's tools table. It used to read as one joined
+  value and let the call through without the tool's scopes.
 
 ## [1.7.0] - 2026-11-11
 
@@ -2461,7 +2435,8 @@ found`. The refusal text existed and never ran: the call that delivered it sat i
 - The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
   state unrepresentable (spec 014)
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...v2.0.0
 [1.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.4.0...v1.5.0

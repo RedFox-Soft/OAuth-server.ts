@@ -776,6 +776,47 @@ What an operator sees afterwards:
   [Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/#with-code).
 - **An expired sign-in shows a plain page** in the person's language instead of `interaction session not found`.
 
+### Then 2.0.0
+
+2.0.0 carries six schema migrations, which the usual `db:migrate` step applies, and `db:setup` (or `db:setup:pg`)
+provisions the new storage area for people's activity and two new indexes. The migrations change no data, but they
+cannot be undone: once they are recorded, an older release refuses to start against the database, so take a backup
+first. Check these before upgrading:
+
+- **A client assertion must name the issuer alone in `aud`.** This change is why the release is a major one. A client
+  that authenticates with `private_key_jwt` or `client_secret_jwt` and puts the token endpoint's URL, another
+  endpoint's URL or several values in `aud` is now refused with `invalid_client`, as RFC 10070 requires. Fix the
+  client. Until then a super administrator can turn off `clientAuth.issuerOnlyAudience`, which reopens the
+  audience-injection attack the RFC closes. An instance that already stored `false` keeps it.
+- **Every project keeps people's full sign-in addresses for 90 days.** Each sign-in, each failed sign-in where the
+  account was found and each refusal behind your proxy is recorded for the person. It is kept through a lock and
+  deleted with the person and with the project. Tell your users, or turn it off with `personActivity.enabled`.
+- **Those addresses go to FoxTrust's API by default**, to look up the network owner and place. They are sent in
+  batches, about a minute after each event, with nothing else about the person. FoxTrust keeps none of them and acts
+  as your processor (RedFox Software, terms at https://foxtrust.dev/terms). Turn it off under
+  **Settings → Integrations** with **Look up network owner and location at FoxTrust**. The first key needs usage
+  reporting on and arrives about a week after the upgrade.
+- **Keep your keyring.** The instance key FoxTrust knows this server by is sealed with it, and a lost one cannot be
+  replaced without FoxTrust's support.
+- **Monthly active people rise in projects behind a proxy.** A request your proxy lets a person through now counts
+  as activity, so a plan's monthly-active cap may be reached sooner.
+- **Rolling back below 2.0.0 is not possible** without restoring that backup. During a rolling deploy, an older
+  process answers an error for an app or an API with the new conditions until it is replaced, so add them once every
+  process runs 2.0.0.
+
+What an operator sees afterwards:
+
+- **An Activity tab for each person**: sign-ins, failed sign-ins, refusals and requests to sign in again behind your
+  proxy, the apps and APIs they used each day, and the network owner and place of each address. The list of people
+  gains "Last active", and an app's or an API's Access tab lists whom it refused in the last 24 hours.
+- **Recent sign-ins on a person's own account page**, `/account/sign-ins`, with "Sign out everywhere".
+- **An API's own page** with Connect, Access and Settings tabs. An API can require a code or a recent sign-in, and one
+  MCP tool can have conditions of its own. See
+  [Protect an MCP server at your proxy](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
+- **Network facts from FoxTrust**, off until a super administrator turns them on under **Settings → Integrations**.
+  "From where" can then keep Tor, commercial VPNs, hosting or some countries out of a path or an API. See
+  [Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/#network-facts).
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
