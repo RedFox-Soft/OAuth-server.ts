@@ -1,0 +1,268 @@
+---
+title: 'Which OAuth flow does your app need?'
+description: 'A web server, a SPA, a phone app, a TV, a cron job or an AI agent: which OAuth flow each one needs, and how FoxAuth''s guide sets it up for you.'
+publishedAt: '2026-11-17'
+draft: false
+tags: [oauth, openid-connect, pkce, mcp, guide]
+---
+
+"I just need a login for my React app." The answers to that request usually arrive as a list of
+specifications: [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749) for OAuth itself,
+[RFC 7636](https://www.rfc-editor.org/rfc/rfc7636) for PKCE, OpenID Connect on top,
+[RFC 8252](https://www.rfc-editor.org/rfc/rfc8252) if it is a mobile app,
+[RFC 8628](https://www.rfc-editor.org/rfc/rfc8628) if it is a TV,
+[RFC 8707](https://www.rfc-editor.org/rfc/rfc8707) if you have an API. Every item on the list is
+correct, but none of them says which flow your app needs.
+
+I build FoxAuth, an OAuth 2.1 and OpenID Connect server, and that request is the one I hear first
+from new users. The list is the wrong place to start: the OAuth flow you need comes from two facts
+about your situation, and once you know them you need one line of that list, not all of it. Below
+are the two questions, the answer each combination gets, and
+[the page we built on the FoxAuth site](/guide/) that asks them for you.
+
+## The OAuth flow follows from who acts and, for a person, where the code runs {#two-questions}
+
+The first question is who is acting: a person signing in, a program with no person behind it, or an
+AI agent. The second depends on the first. For a person it is where your code runs, because that
+decides two things every flow is built around: whether there is a place to keep a secret, and
+whether a browser can be opened. For a program it is what you are building. For an agent it is what
+the agent needs to reach.
+
+In the tree, the boxes under the two numbered questions are the common answers and the flow each one
+gets.
+
+<svg viewBox="0 0 800 560" width="100%" role="img" font-family="system-ui, sans-serif" xmlns="http://www.w3.org/2000/svg">
+  <title>Choosing an OAuth flow by two questions. Who is acting: a person, a program or an AI agent. For a person, where the code runs: a server gets Authorization Code with PKCE and a secret; a browser app gets Authorization Code with PKCE and no secret; a phone, desktop or terminal app gets PKCE through the system browser; a device with no keyboard gets the device code flow; an app behind a reverse proxy gets forward auth at the proxy. For a program, what you are building: a program that calls an API gets Client Credentials; an API to protect gets audience-bound tokens; a platform for other developers gets dynamic client registration. For an agent, what it needs: connecting to your MCP server, directly or through your proxy, uses a client ID metadata document and a token only for your server; acting in the person's Google uses token exchange; managing FoxAuth uses the administrative MCP.</title>
+  <rect x="300" y="16" width="200" height="40" rx="8" fill="none" stroke="var(--diagram-accent, #d9480f)" stroke-width="2"/>
+  <text x="400" y="42" text-anchor="middle" font-size="15" font-weight="600" fill="var(--diagram-accent, #d9480f)">1  Who is acting?</text>
+  <line x1="400" y1="56" x2="155" y2="96" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <line x1="400" y1="56" x2="420" y2="96" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <line x1="400" y1="56" x2="665" y2="96" stroke="var(--diagram-line, #555)" stroke-width="1.5"/>
+  <rect x="20" y="96" width="270" height="36" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="155" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">A person</text>
+  <rect x="305" y="96" width="230" height="36" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="420" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">A program, no person</text>
+  <rect x="550" y="96" width="230" height="36" rx="8" fill="none" stroke="var(--diagram-fg, #1a1a1a)" stroke-width="1.5"/>
+  <text x="665" y="119" text-anchor="middle" font-size="14" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">An AI agent</text>
+  <text x="155" y="160" text-anchor="middle" font-size="13" font-weight="600" fill="var(--diagram-accent, #d9480f)">2  Where does your code run?</text>
+  <text x="420" y="160" text-anchor="middle" font-size="13" font-weight="600" fill="var(--diagram-accent, #d9480f)">2  What are you building?</text>
+  <text x="665" y="160" text-anchor="middle" font-size="13" font-weight="600" fill="var(--diagram-accent, #d9480f)">2  What does it need?</text>
+  <rect x="20" y="176" width="270" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="32" y="198" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">On a server</text>
+  <text x="32" y="220" font-size="12" fill="var(--diagram-line, #555)">Code + PKCE, with a secret</text>
+  <rect x="20" y="244" width="270" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="32" y="266" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">In the browser</text>
+  <text x="32" y="288" font-size="12" fill="var(--diagram-line, #555)">Code + PKCE, no secret</text>
+  <rect x="20" y="312" width="270" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="32" y="334" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Phone, desktop or terminal</text>
+  <text x="32" y="356" font-size="12" fill="var(--diagram-line, #555)">Code + PKCE in the system browser</text>
+  <rect x="20" y="380" width="270" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="32" y="402" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">A device with no keyboard</text>
+  <text x="32" y="424" font-size="12" fill="var(--diagram-line, #555)">Device code (RFC 8628)</text>
+  <rect x="20" y="448" width="270" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="32" y="470" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">Behind a reverse proxy</text>
+  <text x="32" y="492" font-size="12" fill="var(--diagram-line, #555)">Forward auth at the proxy</text>
+  <rect x="305" y="176" width="230" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="317" y="198" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">A program that calls an API</text>
+  <text x="317" y="220" font-size="12" fill="var(--diagram-line, #555)">Client Credentials</text>
+  <rect x="305" y="244" width="230" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="317" y="266" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">An API to protect</text>
+  <text x="317" y="288" font-size="12" fill="var(--diagram-line, #555)">Audience-bound tokens (RFC 8707)</text>
+  <rect x="305" y="312" width="230" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="317" y="334" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">A platform for developers</text>
+  <text x="317" y="356" font-size="12" fill="var(--diagram-line, #555)">Dynamic registration (RFC 7591)</text>
+  <rect x="550" y="176" width="230" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="562" y="198" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">To reach your MCP server</text>
+  <text x="562" y="220" font-size="12" fill="var(--diagram-line, #555)">Metadata URL, token for your server</text>
+  <rect x="550" y="244" width="230" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="562" y="266" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">To act in the person's Google</text>
+  <text x="562" y="288" font-size="12" fill="var(--diagram-line, #555)">Token exchange (RFC 8693)</text>
+  <rect x="550" y="312" width="230" height="56" rx="6" fill="none" stroke="var(--diagram-line, #555)" stroke-width="1"/>
+  <text x="562" y="334" font-size="13" font-weight="600" fill="var(--diagram-fg, #1a1a1a)">To manage FoxAuth itself</text>
+  <text x="562" y="356" font-size="12" fill="var(--diagram-line, #555)">The administrative MCP</text>
+  <text x="665" y="402" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">An agent on the person's own</text>
+  <text x="665" y="420" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">computer, signing in as them,</text>
+  <text x="665" y="438" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">is a desktop or terminal app</text>
+  <text x="400" y="540" text-anchor="middle" font-size="12" fill="var(--diagram-line, #555)">Every person flow is OpenID Connect over Authorization Code + PKCE, except the device code flow.</text>
+</svg>
+
+The same decision as a table, with the specification each answer rests on:
+
+| Who acts | Answer | Flow | Specification |
+| --- | --- | --- | --- |
+| A person | On a server | Authorization Code + PKCE, with a secret | OpenID Connect, RFC 7636 |
+| A person | In the browser | Authorization Code + PKCE, public app | OpenID Connect, RFC 7636 |
+| A person | Phone, desktop or terminal | Authorization Code + PKCE in the system browser | RFC 8252 |
+| A person | No keyboard | Device code | RFC 8628 |
+| A person | Behind a reverse proxy | Forward auth, OpenID Connect at the proxy | OpenID Connect |
+| A program | Calls an API | Client Credentials | OAuth 2.1 |
+| A program | An API to protect | Audience-bound tokens | RFC 8707 |
+| A program | A platform for developers | Dynamic client registration | RFC 7591, RFC 7592 |
+| An AI agent | To reach your MCP server | Client ID metadata document, token for your server | MCP authorization, RFC 9728 |
+| An AI agent | To act in the person's Google | Token exchange | RFC 8693 |
+| An AI agent | To manage FoxAuth | The administrative MCP | MCP authorization |
+
+Most of the person branch is one flow, Authorization Code with PKCE; what changes from row to row is
+where the secret lives, or that there is none. In the agent branch, "an agent needs OAuth" means
+three different things depending on what it is reaching for.
+
+## On a server, your code keeps a secret {#on-a-server}
+
+A website with its own server, say Next.js, Django, Rails or Laravel, is the simplest and the safest
+case, because the server can hold a secret the browser never sees. The person clicks "Sign in", your
+server sends the browser to the sign-in page, the person signs in there, and the browser comes back
+to your callback address with a one-time code. Your server then trades that code for tokens directly
+with the authorization server, out of the browser's sight, and proves who it is with its secret. It
+sends a PKCE check as well, described in the next section; FoxAuth requires it by default, and the
+secret adds proof of which app is asking.
+
+Your server never stores anyone's password; only the authorization server sees it. Keep the
+secret in an environment variable on the server, never in the code. Plain `http` is acceptable only
+for `localhost`.
+
+## In a browser or on a phone, there is no secret and PKCE protects the code {#no-secret}
+
+A single-page app in React, Vue or Angular has nowhere to keep a secret: anything in browser code is
+public. PKCE protects the code instead. The app makes up a random string (the `code_verifier`), sends
+a hash of it (the `code_challenge`) with the sign-in request, and sends the string itself when it
+trades the code for tokens. A code stolen on the way back is useless without the string, which only
+that browser tab knows. The application is registered as a public one, with no secret. Anyone can
+use a public app's ID, so the callback addresses you register are what tie the sign-in to your app.
+If your library can hold the tokens in memory, do not put them in `localStorage`.
+
+An app on a phone, on a desktop or in a terminal uses the same flow with one difference:
+sign-in opens in the system browser, not in a WebView inside your app. The person types the password
+in a browser they trust, and your app never sees it. On a desktop or in a terminal, the code comes
+back to `http://127.0.0.1` on whatever port your app listens on at that moment
+([RFC 8252, section 7.3](https://www.rfc-editor.org/rfc/rfc8252#section-7.3)), so one registered
+callback address covers every port. A phone app usually gets it back through an HTTPS link it has
+claimed or a URL scheme of its own, such as `com.example.app:/callback` (sections 7.1 and 7.2).
+
+An AI agent that runs on the person's own computer and signs in as them belongs here too. To OAuth
+it is a desktop or terminal app, and it is set up the same way.
+
+## With no keyboard, the person signs in on their phone {#no-keyboard}
+
+A TV, a set-top box or a kiosk cannot reasonably ask for a password. The device code flow (RFC 8628)
+moves the sign-in to a second screen. The device asks the authorization server for a short code and
+shows it with an address. The person opens the address on their phone, types the code, and signs in
+as usual. Meanwhile the device asks every few seconds whether the code was confirmed, and gets its
+tokens once it was. The short code expires quickly; what the device keeps is the tokens it gets at
+the end. Poll no faster than the interval the response gives, and add five seconds each time the
+server answers `slow_down`.
+
+## An app with no sign-in of its own goes behind your proxy {#behind-a-proxy}
+
+A Prometheus or Jaeger UI, an internal dashboard, a tool somebody wrote for the team: plenty of apps
+have no sign-in, and adding one is not your job. Put the app behind Caddy, Traefik or nginx instead.
+On each request the proxy asks the authorization server whether this request may go through. A
+person who has not signed in is sent to the sign-in page and back, and once they are signed in the
+proxy passes the request on with who they are in `X-Auth-*` headers. The app does not change.
+
+This is safe only if the app can be reached through the proxy alone, because a request that reaches
+it another way skips the check. The walkthrough is
+[Put sign-in in front of a web app](/docs/get-started/put-sign-in-in-front-of-a-web-app/).
+
+## With no person, the program signs in as itself {#no-person}
+
+A background job, a cron task or another service calling your API has no person to sign in. Client
+Credentials is the flow for it: the program shows its own ID and secret and gets an access token in
+its own name. Cache the token until it expires instead of asking for a new one on every call, and if
+the secret leaks, issue a new one.
+
+A platform for outside developers is rarer: they register their own apps with one request, through
+dynamic client registration ([RFC 7591](https://www.rfc-editor.org/rfc/rfc7591)), and change or delete
+them with the token they got back. It is a setting for the whole server, so on FoxAuth it needs your
+own server rather than a Cloud project.
+
+## Your API refuses a token meant for another API {#api-audience}
+
+The other half of the program case is the API being called. A token with a valid signature is not
+necessarily a token meant for you. If your API accepts any token the authorization server signed, a
+token issued for some other API opens yours as well. Resource indicators (RFC 8707) fix it: the
+client names the API when it asks for a token, the server writes that API into the token's `aud`
+claim, and your API refuses a token whose `aud` is anyone else, even when its signature is fine.
+
+## "An AI agent needs OAuth" means one of three things {#agents}
+
+When an agent connects to your MCP server, your server is an ordinary OAuth resource server, and the
+check that matters is the same audience check as for any API. I wrote about skipping it at length in
+[Your MCP server must check who a token is for](/blog/your-mcp-server-is-an-oauth-resource-server/).
+What is new is how the agent introduces itself. An agent host that supports client ID metadata
+documents, as the current
+[MCP authorization specification](https://modelcontextprotocol.io/specification/2026-07-28/basic/authorization)
+prefers, does not register beforehand. It gives the address of a document that describes it, the
+person signs in and sees which agent is asking, and the agent gets a token that works only at your
+server. A host that cannot publish such a document needs an application registered for it in the
+console, or dynamic registration, which on your own server a super administrator switches on. The steps are in
+[Protect your MCP server](/docs/get-started/protect-your-mcp-server/).
+
+If you would rather not write any of this in the MCP server, put it behind your proxy: the proxy asks
+the authorization server to check the token on each request, together with the scopes the tool being
+called needs, and the MCP server itself needs no code for it. The guide lists this as an answer of
+its own, and the docs have
+[Protect an MCP server at your proxy](/docs/get-started/protect-an-mcp-server-at-your-proxy/).
+
+When the agent has to act in the person's Google, GitHub or Slack, the problem is different: the
+agent should not hold the person's keys. The person connects their account once and agrees; the
+authorization server keeps the provider's token encrypted; and when the agent needs that token, it
+exchanges its own token ([RFC 8693](https://www.rfc-editor.org/rfc/rfc8693)) for the person's
+Google token, which it should use for one request and not keep. The person can see their connected
+accounts and disconnect any of them, and the agent loses access at once.
+
+The third case is the agent managing the authorization server itself: "create an application for my
+new app" typed into your coding agent. In FoxAuth that is the administrative MCP. The agent connects
+after you sign in, acts with exactly your rights, goes through the same checks and plan limits as the
+console, and every change it makes is written to the audit trail with both your name and the agent's.
+The most dangerous acts, such as deleting a project, stay in the console. The agent connects through
+FoxAuth's own MCP client or as an application a super administrator has permitted; an app that
+registered itself never can. FoxAuth Cloud has the administrative MCP switched on, and
+[the MCP tools reference](/docs/reference/mcp-tools/) lists what it can do.
+
+## The guide page asks the two questions for you {#the-guide}
+
+Explaining this tree one support thread at a time does not scale, so we put it on a page:
+[What do you need?](/guide/) on the FoxAuth site. It asks the same two questions. For each answer it
+shows the problem the flow removes and what changes with it, the flow itself step by step, what the
+person will see (a sign-in page, a consent page naming the agent, a short code on a TV), and
+a short "Good to know" list with the mistakes worth avoiding, such as the WebView and the
+`localStorage` above.
+
+Most answers end with two ways to set it up. One is a button that opens your FoxAuth Cloud project with
+that situation already chosen, so what you create starts with the right settings. The other is a
+prompt to paste into Claude, Cursor or another coding agent. It names the flow and the checks your
+code must make, gives the callback addresses where there are any, and, where an administrative MCP
+tool exists for the step, tells the agent which one to call, so the agent can do the console part
+too.
+
+The page also says where each answer can run. "Ready on Cloud" means a free Cloud project sets it up
+now. "Own server" means it needs a setting or an action only a super administrator can do, and a
+Cloud tenant never is one; developer self-registration is one of those. Below the two questions there is a
+list of the tasks that come next, such as adding "Sign in with Google", asking for a second factor,
+or finding out why someone cannot get in, and a separate tab for when your customer is a company and
+its IT department starts asking for company sign-in and SCIM.
+
+## Start on the free Cloud plan, run production on your own server {#when-it-fits}
+
+FoxAuth's current release is 2.0.0. It has every flow in the tree above, and all but dynamic
+registration run on the free Cloud plan. It fits if you want standard flows you can move to another
+server later, if you are putting an MCP server or an internal app behind sign-in, or if you would
+rather your coding agent did the setup. You can run it two ways.
+
+[FoxAuth Cloud](/pricing/) is free during the beta and asks for no card. The Free plan has no limit
+on monthly active users, applications or APIs, and includes up to ten projects per administrator,
+each at an address you choose, sign-in with Google, Apple, GitHub, Microsoft or any OpenID provider,
+machine-to-machine tokens, device sign-in, DPoP and PAR, and the administrative MCP. Your own domain
+is set up on request. Teams that join during the beta keep it free for a year after paid plans
+launch. It has no SLA yet, so it is a place to start, not one to depend on in production.
+
+Or you run the same server yourself. The source is available under FSL-1.1-ALv2, which is not an
+open-source license: you may read, change, self-host and redistribute it, and build a business on
+it, but not offer it to others in a commercial product or service that competes with FoxAuth, and
+each version becomes Apache 2.0 two years after it ships.
+
+Until Cloud has an SLA, production runs on your own server. A company that needs an instance of its own, run by us or on its own
+infrastructure, with a response-time SLA on defects, can ask for an Enterprise invitation on the
+same pricing page.
+
+To get your flow and a setup to test, answer the two questions on [the guide](/guide/).
