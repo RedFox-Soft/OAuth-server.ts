@@ -68,2082 +68,451 @@ usual setup and migrate steps.
 
 ## [1.7.0] - 2026-11-11
 
-People can turn on two-step verification for their own account, and an administrator can ask for a code from an
-authenticator app only where it matters: in one application, or on one path of an app behind your proxy. A person
-without a code is offered to set one up inside the same sign-in instead of meeting an error. Two migrations, which
-cannot be undone, and new storage areas: take a backup, then run the usual setup and migrate steps.
+Two-step verification people turn on themselves, and authenticator codes required per application or proxy path.
+Two irreversible migrations: back up, then run `db:setup` (or `db:setup:pg`) and `db:migrate`.
 
 ### Added
 
-- **A code at your proxy** (spec 128). The "Ask to sign in again" condition on a path of an app behind your proxy can
-  ask for a code from an authenticator app: only a recent sign-in with a code then opens the path. A person without
-  one gets the refusal page and can set one up inside the same sign-in; going back ends on a page that says what the
-  path needs instead of "Sign in again". Turning it on shows first how many people it turns away. Run `db:migrate`;
-  an older release then refuses to start against the database.
-- **Two-step verification people turn on themselves** (spec 126). A project's people can add a code from an
-  authenticator app to their own account on a new account page, `/account/security`, after a sign-in with their
-  password and a link mailed to them that works only in that browser; moving it to another phone or turning it off
-  needs a code. Every change is mailed, with a 72-hour "This was not me" link. A person who holds a factor is now asked
-  for it at every password sign-in, in any project, so an app requiring a multi-factor sign-in gets one for them; people
-  who set one up while their project required it are asked again after this upgrade. Codes are capped at 30 wrong a
-  day per account, with a mail when someone with the password runs out of guesses. An administrator's removal mails the
-  person, is `high` for agents, and makes the next factor need a mailed link. Projects can turn self-service off
-  (`totpSelfService`). Re-run `db:setup` or `db:setup:pg`. Rolling back stops asking self-enrolled people for their code.
-- **An application can require a code from an authenticator app** (spec 127). One switch on the application page
-  (`requireCode` in the API and MCP): nobody gets into it, or keeps getting tokens for it, without a sign-in in which
-  they typed a code. Turning it on first shows how many people it turns away or sends to set one up, and is `high` for
-  agents. A person without a code sees a page inside the sign-in instead of an error: they can set one up there and
-  continue, sign in with a password instead of a provider, or go back to the app, which then gets
-  `unmet_authentication_requirements`. Refresh tokens from sign-ins without a code stop working while it is on, and
-  assertion grants are refused. Run `db:migrate`: it records a migration after which an older release refuses to start.
+- **Self-service two-step verification** (spec 126) at `/account/security`; `totpSelfService` turns it off.
+- **An authenticator code can be required** by an application (`requireCode`, spec 127) or a proxy path (spec 128).
 
 ### Changed
 
-- **An expired sign-in shows a plain page in the person's language** ("This sign-in has expired") instead of the
-  generic `interaction session not found` error.
+- **An expired sign-in shows a plain page in the person's language** instead of `interaction session not found`.
 
 ### Fixed
 
-- **Switching accounts during a sign-in works on a project addressed by a path.** When another account signed in, the
-  "Do you want to sign out?" confirmation posted to the server's root and failed with "could not find logout details";
-  it now posts under the project's own path.
-- **A code from an authenticator app signs in once, even when sent twice at the same moment.** Two requests with
-  the same code could both pass, a slower one could make an older code usable again, and a check running while an
-  administrator reset the authenticator could put the old one back. Each accepted code is now recorded once in a new
-  storage area: re-run `db:setup` or `db:setup:pg`.
-- **A password reset removes an authenticator set up before the address was proven.** In a project that requires an
-  authenticator but not a proven address, someone who registered another person's address first could set up their
-  own; the owner, resetting the password, still met that code. A factor set up after the address was proven stays.
+- **Switching accounts during a sign-in works on a project addressed by a path.**
+- **Authenticator codes are accepted once**, and a password reset removes one set up before the address was proven.
 
 ## [1.6.0] - 2026-11-10
 
-Your own proxy (Caddy, Traefik or nginx) can now put a project's sign-in in front of a web app, check tokens for an
-API or MCP server tool by tool, and add conditions on network, hours, attributes and a fresh sign-in. A project can
-also count or refuse password sign-ins from addresses FoxTrust lists as password-guessing. One migration, which
-cannot be undone, and new storage areas: take a backup, then run the usual setup and migrate steps.
+Your own proxy can put sign-in in front of a web app, check API tokens tool by tool and add conditions. A migration
+makes rolling back impossible: back up, then run `db:setup` (or `db:setup:pg`) and `db:migrate`.
 
 ### Added
 
-- **Sign-in in front of a web app, through your proxy** (spec 122, issue #57 part 1). A project can hold apps behind
-  your proxy: an address plus path rules naming which groups may open which part. Caddy, Traefik or nginx asks the
-  project's `/verify/<appId>` before each request; people sign in with the project's own sign-in and the app receives
-  `X-Auth-*` headers and a signed statement. The console shows them in Applications with ready-made proxy snippets
-  and an access check. Re-run `db:setup` or `db:setup:pg` to provision the new storage areas.
-- **Token checks for an API at your proxy, tool by tool** (spec 123, issue #57 part 2). An API can answer "Who checks
-  tokens?" with your proxy: Caddy, Traefik or nginx then asks the project's `/verify/api/<checkId>` before each
-  request, the project checks the bearer token as the API would and serves the API's metadata, and the API receives
-  `X-Auth-Subject`, `X-Auth-Client` and `X-Auth-Scope`. For an MCP server, a Tools table names the scopes each tool
-  needs; a missing one is refused with `insufficient_scope`. Tokens bound to a key are refused at the proxy.
-- **Conditions at your proxy: network, hours, attribute, fresh sign-in** (spec 124, issue #57 part 3). A path of an
-  app behind your proxy, or an API checked there, can add "and only if" conditions: only from or not from address
-  ranges, opening hours in a time zone, an administrator- or SCIM-set attribute, groups for an API, and for an app a
-  sign-in no older than N minutes. Conditions accumulate down the paths and are decided before sign-in where they can
-  be. The person's address is believed only from a proxy that shows a project proxy key (new console-only route; at
-  most two keys) and passes one `X-Forwarded-For` address, and is only compared. Access tokens now carry `auth_time`,
-  `acr` and `amr`; an API condition about the person refuses machine tokens, pairwise clients' tokens and JWTs issued
-  before this release. **Rolling back below this release is not possible**: a fence migration makes an older release
-  refuse to start, and during a rolling deploy older processes answer errors for apps and APIs with conditions until
-  replaced. Free on every plan.
-
-- **Refusing password sign-ins from known password-guessing addresses** (spec 125). A super administrator can turn
-  on FoxTrust's signed list of addresses seen guessing passwords (Settings → Integrations, with attack reporting on).
-  Each server process downloads it hourly, checks the signature against a built-in key and refuses an older or
-  expired list; a missing or stale list refuses nobody. Each project chooses, on its Sign-in tab, nothing, count only
-  (the default, with 7-day numbers) or refuse: a listed address is refused once it has failed 3 passwords here within
-  an hour, or at once when FoxTrust corroborates it, and stays refused while it keeps trying. The refused person sees
-  why, what to do, and a line with their own address to send to the operator, who can exempt networks; the address is
-  never logged. Only password sign-in is affected, never on the administrators' project. Re-run `db:setup` or `db:setup:pg` to provision
-  the new `PasswordGuessingTally` area. Rolling back to an older release stops the refusals.
+- **Sign-in in front of a web app, through your proxy** (spec 122), asked at `/verify/<appId>`.
+- **Token checks for an API at your proxy, tool by tool** (spec 123), asked at `/verify/api/<checkId>`.
+- **Conditions at your proxy** (spec 124); access tokens now carry `auth_time`, `acr` and `amr`.
+- **Refusing password sign-ins from known password-guessing addresses** (spec 125), per project, from FoxTrust's list.
 
 ### Fixed
 
-- **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof` (spec 121). It was read as no proof at
-  all, so the token and PAR endpoints issued an unbound token to a client that meant to bind one, and the IPSIE SL1
-  profile refused it as missing.
-- **Sign-in timing no longer tells which accounts exist.** A password sent for an address with no account was refused
-  before any password hashing, so it answered measurably sooner than a wrong password. It is now checked against a
-  hash no one can type first, and both refusals cost the same.
+- **A DPoP proof without a usable `htu` is refused** with `invalid_dpop_proof` (spec 121).
+- **Sign-in timing no longer tells which accounts exist.**
 
 ### Security
 
-- **Elysia 1.4.31 and `@elysiajs/static` 1.4.12**, which close upstream advisories on encoded path routing,
-  authorization and signed-cookie handling, and on serving `.env` and `.git` files. An API or a client whose
-  identifier is a URL is still addressed by it, exactly, in the console, over MCP and at `/reg`.
+- **Elysia 1.4.31 and `@elysiajs/static` 1.4.12**, closing upstream routing, cookie and file-serving advisories.
 
 ## [1.5.0] - 2026-11-05
 
-Signing in through a project's provider can also connect the person's account at a service linked to it, and a
-"What do you need?" guide leads from two plain questions to the setup a person needs. Applications that skip
-consent, the console included, sign in again two weeks after the first time. No migration.
+Connected accounts from sign-in, and a "What do you need?" setup guide. No migration.
 
 ### Added
 
-- **Connected accounts from sign-in** (spec 120) — an administrator can link a project's sign-in provider to one of
-  its connected services (same provider and client id; not Slack), so signing in through that provider also connects
-  the person's account there, with the service's scopes asked at sign-in and the consent screen never forced. Agents
-  still need the person's permission; a refused or paused sign-in connects nothing, a fault never blocks a sign-in, a
-  provider refusing the extra scopes gets one retry without them, and a person's own disconnect holds against later
-  sign-ins. The account page and console say how each account was connected.
-
-- **"What do you need?" guide** — two plain questions lead to the setup a person needs, drawn step by step, with one
-  button that opens the right form already filled in. It is in every project's console and on foxauth.dev in English,
-  Russian and Chinese, from one declaration; an answer the project cannot use yet says why (a setting off, the plan,
-  a missing right) instead of disappearing. The home page and the docs link to it.
+- **Connected accounts from sign-in** (spec 120): a provider linked to a connected service connects there too.
+- **"What do you need?" guide** in every project's console and on foxauth.dev.
 
 ### Fixed
 
-- **Signing in to an application that skips consent works again two weeks after the first sign-in**, the console
-  included. The sign-in outlived the grant it remembered, and the server refused with `access_denied` instead of
-  granting afresh. The console also shows a refused sign-in by its own code instead of
-  `422 Property 'code' is missing`. No migration.
+- **Applications that skip consent sign in again after two weeks** instead of failing with `access_denied`.
 
 ## [1.4.0] - 2026-11-03
 
-A token vault for agents: people connect their accounts at the services a project declares, and an agent obtains a
-person's token there by token exchange, with a link to hand the person when something is missing. Stored secrets are
-encrypted at rest once a keyring is in use. Before upgrading, check how the server learns a caller's address, and
-note that two reports to FoxTrust are on by default. Two migrations, the first irreversible: take a backup.
+A token vault for agents and secrets encrypted at rest. Two migrations, the first irreversible: back up, check how the
+server learns a caller's address, and note two FoxTrust reports on by default.
 
 ### Added
 
-- **Connected services** (spec 117) — a project declares the services its people may connect their accounts at
-  (Google, GitHub, Slack, Microsoft, any OpenID Connect or OAuth 2.0 provider) with its own registration there, and a
-  person connects and disconnects accounts from their account page at `/account/services`; the provider's tokens are
-  stored encrypted (never without a keyring), revoked at the provider on disconnect, and deleted with the person,
-  service or project, while a lock keeps them. Console tab, admin API, MCP tools and a plan limit (Free: 10 per
-  project).
-- **Agents obtain connected accounts' tokens** (spec 118) — an application holding a person's access token exchanges
-  it at `/token` (RFC 8693, `audience` = the connected service, optional `login_hint` = the account) for that person's
-  token at the service, only when an administrator listed the application on the service and the person allowed it,
-  per account, on the consent screen or their account page; an MCP server exchanges the tokens it receives once linked
-  to its API. Expired tokens are refreshed once however many requests arrive, accounts in use are kept alive, and the
-  person is mailed when an account breaks or an administrator removes it. Refusals carry a `reason`. The token exchange
-  grant is now always advertised; `tokenExchange.enabled` gates only ID-JAGs, which it now refuses with
-  `invalid_request` while off.
-- **Connect links for agents** (spec 119) — when an agent's exchange is refused because the person must connect the
-  service, allow the agent or reconnect an account, the refusal carries `connect_uri`, `connect_id`,
-  `connect_expires_in` and `connect_message`, ready to relay as an MCP URL elicitation; the link leads to that one act
-  on the person's account page and works only for that person after their own recent sign-in, for thirty minutes.
-  `account_selection_required` now lists the labels the agent may choose from, and a scope the service does not
-  declare is refused as `invalid_scope`.
-- **Encryption at rest for stored secrets** (security) — application secrets, sign-in provider credentials, the SMTP
-  password, private signing keys and authenticator secrets are now stored encrypted (AES-256-GCM, each value bound to
-  its record) with an operator-held keyring, supplied as `KEYRING` or a keyring file and never stored in the database;
-  first-run setup generates one when none is supplied, and `bun run keyring` rotates it. Upgrading changes nothing
-  until a keyring is in use, then existing secrets are encrypted automatically. **Operators:** generate the keyring
-  from Keys → Encryption at rest (or supply `KEYRING`) and back it up apart from the database; Compose users pull the
-  new compose file, which adds the keyring volume. Constitution 3.3.0 allows client secrets to be encrypted where they
-  cannot be hashed.
-- **Hourly attack reports** (`attackReports.enabled`, **on by default**) — once an hour the server sends FoxTrust the
-  public addresses that crossed a threshold of failed sign-ins, wrong client or SCIM/MCP credentials, rate-limit
-  refusals, mail requests or scanner paths, with the counts and nothing else; IPv6 only as its /64. A switch of its own
-  in Settings → Integrations; the console shows the exact last report, and every field is listed at
-  /docs/reference/attack-reports/.
-- **Per-caller mail limit** (`mail.requestsPerCallerPerHour`, 10) — one address may make at most this many password
-  reset requests, sign-ups and verification resends an hour, across every project; past it no email is sent and the
-  visitor is asked to try later (429). Every request counts whatever its outcome, so the refusal reveals nothing about
-  which addresses have accounts.
-- **Daily anonymous usage report** (`telemetry.enabled`, **on by default**) — once a day the server sends FoxTrust
-  its version, runtime, storage backend, which feature settings are on, coarse ranges of its size and the previous
-  day's token and defect counts, under a random instance identifier. No name, email, hostname, issuer, address or
-  setting value is ever sent. Turn it off in Settings → Integrations. The console shows the exact last report; every field is listed at /docs/reference/telemetry/.
-  A report that cannot be delivered is silently skipped.
-- **Spec alignment: rfc7523bis client-assertion audience and IPSIE SL1 `session_expiry`** — the opt-in
-  `clientAuth.issuerOnlyAudience` (off; FAPI implies it) accepts a client assertion only when the issuer is its sole
-  audience, closing CVE-2025-27370/27371, and becomes the default once rfc7523bis is an RFC. Under the default rule,
-  device authorization and CIBA now accept their own endpoint URLs (CIBA §7.1) and no longer accept
-  `<issuer>anonymous` or `<issuer>backchannel_authentication`. Any client assertion typed as another kind of JWT is
-  refused. Every ID token carries `session_expiry`: `iat` plus `idToken.relyingPartySessionLifetime` (24 h), never
-  past the browser session and never under five minutes. A federated session ends when the provider's own
-  `session_expiry` says, and a malformed or past value refuses the sign-in.
-- **IPSIE SL1 profile switch** (`ipsieSl1.enabled`, off) — while on: no `http` redirect URIs, clients only by
-  administrator or token-gated registration (no metadata-document fetch), `response_type=code` only, a DPoP proof at
-  every grant, PS256/ES256/EdDSA only with PS256 written for clients that registered none, binding `acr_values`, and
-  an issuer-string client-assertion audience. Turning it on is refused until DPoP, PKCE, encryption, registration's
-  initial access token and a PS256 signer at every issuer are in place; a readiness answer (console card and
-  `settings_ipsie_profile_readiness_get`) lists what stands in the way and every application it would refuse. The
-  console can now create an application under a Client Identifier URL. Constitution 3.2.0 amends Principle VI.
-- **Kept out of search engines** — every response carries `X-Robots-Tag: noindex, nofollow`, so sign-in pages, the
-  console and project hostnames no longer reach search results. There is deliberately no `robots.txt`: a `Disallow`
-  would hide the header from crawlers and still let a linked URL be indexed.
+- **Connected services, and their tokens for agents** (spec 117, 118, 119), by token exchange (RFC 8693).
+- **Encryption at rest for stored secrets** with a keyring (`KEYRING` or a file), backed up apart from the database.
+- **Hourly attack reports and a daily usage report to FoxTrust**, on by default; off in Settings → Integrations.
+- **Per-caller mail limit** (`mail.requestsPerCallerPerHour`), and `X-Robots-Tag: noindex, nofollow` everywhere.
+- **IPSIE SL1 profile** (`ipsieSl1.enabled`); opt-in `clientAuth.issuerOnlyAudience` closes CVE-2025-27370/27371.
 
 ### Changed
 
-- **RSA keys shorter than 2048 bits are refused** (RFC 7518 §3.3) in a client's key set, on registration, edit and
-  `jwks_uri` fetch, and among the server's own keys. jose already refused to verify with them.
-
-- **`auth_time` and `acr` in every ID token** (IPSIE SL1 §3.2.1) — no longer only when the request asked
-  (`max_age`, `prompt=login`, `require_auth_time`, `acr_values`, a claims request). Both are advertised whatever the
-  stored claims setting holds. A backchannel authentication whose integration reported neither still yields neither.
+- **RSA keys under 2048 bits are refused**, and every ID token carries `auth_time` and `acr`.
 
 ### Security
 
-- **A caller can no longer choose its own address.** With `rateLimit.trustedProxy` on (the default) the server took
-  the caller's address from `Fly-Client-IP`, then the first `X-Forwarded-For` entry, then `X-Real-IP`, all writable
-  by the caller, so on every deployment except Fly.io the per-address limits could be escaped by sending a new
-  header each time. The boolean is replaced by `clientAddress.source` (automatic, direct, fly, cloudflare, listed):
-  a proxy header is believed only from a proxy the choice trusts, and `X-Forwarded-For` is read from the right.
-  Upgrading needs no step on Fly.io: the migration selects "fly" for an instance in use, "direct" where the old
-  setting was off. **Not on Fly.io?** Open Settings → Sign-in & abuse after upgrading; the card there shows the address
-  the server sees for you and warns when the choice does not fit.
-- **nodemailer 10.2.1 and zod 4.6.7.** nodemailer's address parser could read a crafted recipient as a different
-  address than its header named (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w). zod, pulled in by the
-  MCP SDK, could exhaust memory validating an oversized array (CVE-2023-54404, GHSA-mrhx-c7xc-m3w5).
+- **A caller can no longer choose its own address** (`clientAddress.source`); off Fly.io, check it after upgrading.
+- **nodemailer 10.2.1 and zod 4.6.7** (GHSA-85x2-q946-cp5h, GHSA-8c8m-p3m8-cjg8, GHSA-m943-m63m-w62w,
+  CVE-2023-54404, GHSA-mrhx-c7xc-m3w5).
 
 ## [1.3.0] - 2026-10-22
 
-Agents in the enterprise: a project can accept identity assertions (ID-JAG) for its APIs and issue them for outside
-authorization servers, and internal tools can sign in the instance's own administrators. Alignment with MCP
-2026-07-28 binds a client's credentials to its issuer — check that every client calls its own project's token
-endpoint before upgrading. No migration; `db:setup` provisions two new storage areas.
+ID-JAG in both roles, and applications for the instance's administrators. No migration; run `db:setup`.
 
 ### Added
 
-- **MCP enterprise-managed authorization (ID-JAG), in both roles** — the JWT bearer grant (`jwtBearer.enabled`,
-  RFC 7523 with 7523bis, plus `jwt-dpop`) lets a project honour identity assertions from a sign-in provider it
-  marks `acceptsIdentityAssertions` (or plain assertions under `plainAssertions`), giving an agent a token for one of
-  its APIs with no browser, consent or refresh token; token exchange (`tokenExchange.enabled`, RFC 8693, ID-JAG
-  profile only) lets it issue ID-JAGs for outside authorization servers it connects, with group-based rules. Both
-  off by default and tracked from IETF draft -04. One new storage area each for connections and last use, no
-  migration — re-run `db:setup`.
-- **Applications in the Administrators project** — a super administrator registers sign-in-only applications there
-  (console only; agents can read them, not change them) so internal tools admit the instance's administrators,
-  deciding by team: for an administrator `groups` names their teams. Such an application is refused every resource.
-  Also: `groups` now reaches the ID token whenever the scope is granted, even where other scope claims go to userinfo
-  only; RP-initiated sign-out from such an application ends the administrators' sign-in; deactivating an administrator
-  revokes their tokens. No migration, no setting.
+- **MCP enterprise-managed authorization (ID-JAG), in both roles** (`jwtBearer.enabled`, `tokenExchange.enabled`).
+- **Applications in the Administrators project**, sign-in only, with `groups` naming the administrator's teams.
 
 ### Changed
 
-- **Aligned with MCP 2026-07-28** — client ID metadata documents now follow draft -02: one request answered 200 (no
-  redirect followed), a document that publishes a secret is refused, one that names no authentication method is a
-  public client, every refusal is `invalid_client`, and addresses inside a document must be https. The settings now
-  call metadata documents MCP's recommended path and dynamic registration deprecated (behaviour unchanged, both still
-  off by default). A client of a project with an address is now unknown at every other issuer's token, introspection,
-  revocation and pushed-request endpoints, and a code, refresh token, device code or backchannel request redeems only
-  at the issuer that issued it; client credentials at a project's address serve only that project's clients. A client
-  configured with another project's or the root's token endpoint stops working until pointed at its own. New
-  registrations and edits may add a plain-http redirect only on `localhost`, `127.0.0.1` or `[::1]`; stored ones keep
-  working. An agent-access entry that matched only through URL normalisation must be re-added exactly as the client
-  presents it. No migration, no setting.
+- **Aligned with MCP 2026-07-28**: a client works only at its own project's token endpoint; check yours first.
 
 ### Fixed
 
-- **Introspection at the root reports the root's own tokens active again** for applications of a project with no
-  address of its own. A token obtained through the sign-in screens recorded that project, and introspection compared
-  it with the default project the root is addressed as, answering `active: false`. No migration.
-- **Signing out of the console no longer disconnects an MCP agent** connected in the same browser. `/mcp` now tells
-  clients to ask for `openid offline_access` (while the instance offers `offline_access`), so the agent's grant
-  outlives the browser session and comes with a refresh token; agents already connected keep the old behaviour until
-  they authorize again.
+- **Root introspection reports root tokens active again; console sign-out no longer disconnects an MCP agent.**
 
 ## [1.2.0] - 2026-10-21
 
-A newcomer's path from sign-up to a first working sign-in: applications are created from a situation and get a page
-that says how to connect them, sign-in pages name the project and the application, and `prompt=create` opens on
-registration. One security fix ends machine tokens for clients without credentials — check for any before upgrading.
-No migration; `db:setup` provisions one new storage area.
+A newcomer's path from sign-up to a first sign-in. No migration; `db:setup` provisions `ClientUsage`.
 
 ### Added
 
-- **An application's primary colour** (`primaryColor` on the client routes and the MCP client tools; `null` removes
-  it). The sign-in, registration, two-step and consent pages paint it for the organization's own people, in both
-  colour schemes, shifted to the nearest shade that keeps WCAG AA; the response's `paintedPrimaryColor` shows what
-  they will see. A registration or metadata document cannot set it. The consent logo now follows the same rule per
-  sign-in, which also keeps it off a device's consent page that asks for administrator rights. No migration and no
-  new storage area.
-- **Sign-in pages say where they lead.** The sign-in, registration and two-step pages open with the project's name
-  (its display name, else its host) and, for an application its project stands behind, the application's name and
-  logo — "Sign in to Timesheets". An app that registered itself, another tenant's, a device's sign-in or one that
-  answers to a program on the person's computer is never named; the page names the account instead. The project
-  detail gains `shownName`.
-- **`prompt=create`** (OpenID Connect Initiating User Registration 1.0): an application can open its user's sign-in
-  on account creation; where the project takes no sign-ups the user gets its sign-in page instead. Discovery now
-  publishes `prompt_values_supported`. `GET /admin/signup` opens the console's registration the same way, and the
-  site's sign-up links point at it.
-- **An application page, and creating an application from a situation.** New application asks what the app is (web
-  app with a server, single-page app, mobile/desktop/CLI, device, service, or an MCP server/API, which goes to the
-  APIs tab) and where it runs while you develop, then opens the application's own page. Its Connect tab holds the
-  client ID, the one-time secret inside a configuration block, the project's issuer and endpoints, the callback and
-  sign-out addresses, who can sign in (invite yourself or open sign-ups), the sign-in page, a copy for an AI agent,
-  and "last sign-in"; Settings replaces the edit window. The admin API returns the same `connection` values, so
-  agents get them too, plus `hasSecret`; a project states how agent hosts get in, and each declared API what it must
-  serve and check. Upgrade: `db:setup` provisions the new `ClientUsage` area (it runs on deploy).
+- **An application page, created from a situation**, and sign-in pages naming the project and the application.
+- **Primary colour and `prompt=create`**: `primaryColor` paints an app's pages; `prompt=create` opens registration.
 
 ### Security
 
-- **A public client could get machine tokens with its client_id alone.** A client registered with token endpoint
-  auth `none` and the `client_credentials` grant received access tokens for every API and MCP server its project
-  declared, and a client_id is public. The token endpoint now answers `unauthorized_client` to such a client
-  (including ones already stored), CIBA's backchannel endpoint does the same for its grant, and the admin API and
-  console refuse the combination. An agent's `client_update` that sets redirect URIs, grant types or the auth
-  method now needs the two-call confirmation. Check for clients with auth `none` and `client_credentials`: their
-  machine tokens stop; give them a secret or a key.
+- **A public client with auth `none` gets no machine tokens** (`unauthorized_client`): give it a secret or a key.
 
 ### Fixed
 
-- **Application secrets in the console.** An edit that gave an application a secret now shows it once (it was minted
-  and never returned); "Rotate secret" is offered only to an application that has a secret; the sign-out return URIs
-  the API always accepted can now be set in the console.
-- **Emails and authenticator apps named a project by its console-only name.** Verification, reset and invitation
-  emails and the TOTP label now use the name shown to users, or the issuer's host when there is none — a console
-  sign-up was asked to verify its address "for Administrators". The confirmation page offers a way into the console
-  for an administrator's address and tells everyone else to go back to the sign-in page. Sign-in pages are titled
-  "Sign in" and "Create account", ask for an email rather than a username, and carry `autocomplete` so password
-  managers fill and generate passwords; the console's application form reads "New application".
+- **Application secrets in the console, and project names in emails and authenticator apps.**
 
 ## [1.1.0] - 2026-10-16
 
-Provider buttons on the sign-in page fit any number of providers, the console says when one is missing from it and
-why, and a super administrator can send a test message from the mail settings. No migration and no new storage area.
+Provider buttons fit any number of providers, and mail settings send a test. No migration.
 
 ### Added
 
-- **Send test email** on the mail settings (`POST /admin/api/settings/smtp/test`, MCP `smtp_settings_test`). A super
-  administrator sends a test message through the saved settings to their own address, never anyone else's; a refusal
-  answers with the mail server's own reply, such as `535 Authentication failed`. Audited as `smtp.settings.test`.
-- **Warnings for confusing provider buttons.** The providers list gives each provider `signInWarnings` and a
-  provider's detail `warnings`: `duplicate_brand` for a second enabled Google, Apple or GitHub connection, and
-  `named_like_brand` for an unrecognised provider named like a recognised one. Shown in the console and to agents.
+- **Send test email** (`smtp_settings_test`) and provider warnings (`duplicate_brand`, `named_like_brand`).
 
 ### Changed
 
-- **Provider buttons on the sign-in page fit any number of providers.** Every provider is one full-width button
-  of the same size with a mark (a neutral one for an unrecognised provider). Past six, five are shown and the rest
-  fold under **More sign-in options**, which works without JavaScript and opens after a cancelled provider sign-in;
-  Google, Microsoft, Apple and GitHub are never folded. Two connections to one brand show their names as a second
-  line. The sign-in card fits a 320 px phone, and the console's Sign-in preview draws the buttons with their frame.
+- **Provider buttons fit any number of providers**, folding past six under More sign-in options.
 
 ### Fixed
 
-- **The console says why a connected provider is missing from the sign-in page.** While sign-in through
-  providers is switched off on the instance (`federation.enabled`, off by default), no provider button appears,
-  and nothing said so. The providers list now gives each provider `onSignInPage`, a provider's detail warns
-  `federation_off`, and the console shows a notice on the providers list, the provider's page and the sign-in
-  preview, with a link to the setting for a super administrator.
-- **A message the mail server refuses is now logged with the server's reply.** Before, a refused verification,
-  password-reset or invitation message left nothing in the log. Sends also time out (15 seconds to connect, 30 of
-  silence) instead of holding a request for minutes. The console's hint to set up mail names the right place,
-  **Settings → Integrations → Email (SMTP)**.
+- **The console says why a provider is missing from the sign-in page; refused mail is logged with its reply.**
 
 ## [1.0.1] - 2026-10-16
 
-A new instance tells applications the person's email address. No migration and no new storage area; an
-instance that saved its claims setting adds the `email` scope there.
+A new instance tells applications the person's email address. No migration.
 
 ### Fixed
 
-- **A new instance releases `email` and `email_verified` under the `email` scope.** The shipped claims map had no
-  `email` scope, so on a default instance no application learned whom it signed in or whether the address was
-  proven. An instance that saved its claims setting keeps what it saved: add `"email": ["email", "email_verified"]`
-  under Settings → Claims there.
-- **`db:setup` no longer tells an operator to readdress the instance's own projects.** On every fresh database it
-  reported the administrators' and default projects as using reserved addresses; their `admin` and `default` names
-  only name a cookie and never become a path.
+- **A new instance releases `email` and `email_verified` under the `email` scope**; a saved claims setting needs
+  `"email": ["email", "email_verified"]` added under Settings → Claims.
+- **`db:setup` no longer reports the instance's own projects as using reserved addresses.**
 
 ## [1.0.0] - 2026-10-16
 
-The first stable release, and the one that makes FoxAuth fit to be offered to strangers. A project, formerly a
-bucket, is the one container: it is its own issuer and holds its applications, APIs and people for life. A team,
-formerly an administrator group, owns projects. A project can live on a subdomain of the instance. Plans put
-limits on what a team can create. The gaps one team could use against another are closed, and `email_verified` is
-true only for an address that was proven. From this release on the version numbers mean what Semantic Versioning
-says: an incompatible change to the protocol endpoints, the admin API, the MCP tools or the settings comes only in
-a major release.
-
-The upgrade asks a backup, `db:setup` (or `db:setup:pg`) for the new `TeamInvitationThrottle` area and the unique
-index on project slugs, and `db:migrate` for five migrations (`2026-10-15` to `2026-10-19`), some of which cannot
-be undone. What an integration meets, with no aliases kept: admin API paths, fields and MCP tool names say project
-and team; the old `/admin/api/projects` routes are gone; `can.createHost` is `can.addressForms`; a team owner
-invites rather than adds; team invitations, signing keys, names and request bodies are bounded; and new end users
-arrive with `email_verified: false` until they prove their address. The
-[upgrade guide](https://foxauth.dev/docs/deploy/upgrade/) walks through it.
+First stable release, with Semantic Versioning from here on. Back up, then run `db:setup` (or `db:setup:pg`) and
+`db:migrate` (five migrations, `2026-10-15` to `2026-10-19`, some irreversible).
 
 ### Added
 
-- **Plans and Free-tier limits** (spec 102), off by default (`plans.enabled`). A project is on a plan from a catalogue
-  super administrators edit (Settings → Plans & limits, `/admin/api/plans`, the `plan_*` and `project_plan_set`
-  tools); the built-in Free plan allows 100,000 monthly active users per project, 2 projects per administrator,
-  10 applications and 10 APIs per project, and social sign-in only, and generates the project's address name.
-  `plans.regularTeamsPerAdministrator` (1) caps regular teams. Limits gate only new creations and never a super
-  administrator or a System project; at the active-user cap only new self-service sign-ups pause, never a sign-in.
-  A refusal is a 409 whose body carries `code: 'plan_limit'` and the `limit`; `can` on `GET /admin/api/me` states
-  what is still allowed. The migration `2026-10-18-projects-record-plan` records Free on every existing project
-  (run `db:migrate`).
-
-- **A project can live on a subdomain of the instance** (spec 101): `https://acme.auth.example.com`, derived from
-  its slug, beside a path and a hostname of its own. A new setting, `projects.addressForms` (`path` by default,
-  `subdomain` or `both`), decides which of the two a team may choose; super administrators may give any form, and
-  changing the setting moves no project. The operator points one wildcard DNS record and certificate at the
-  instance. Subdomains the deployment keeps for itself (`www`, `api`, `mcp`, …), reserved hostnames and `xn--`-style
-  labels are refused.
+- **Plans and Free-tier limits** (spec 102), off by default; a refusal is a 409 `plan_limit`.
+- **A project can live on a subdomain of the instance** (spec 101), per `projects.addressForms`.
 
 ### Changed
 
-- **`email_verified` is true only for an address that was proven** (spec 104). A person who signs up, or whom an
-  administrator creates, now starts unverified in every project; before, a project that did not require verification
-  recorded them verified and told every application `email_verified: true` for an address nobody had proven. Sign-in
-  is unchanged. Applications may notice new unproven people arriving with `email_verified: false`. Existing accounts
-  keep their recorded value (nothing records why one is verified); turning verification on asks whoever is not.
-
-- **`can.createHost` is now `can.addressForms`** on `GET /admin/api/me` (spec 101): the list of forms the caller
-  may give a project, the first one preselected. Project slugs are now unique by an index that `db:setup` creates;
-  it reports and skips the index if two projects already share a slug. Address-change audit entries record the
-  old and new issuer rather than the bare name.
-
-- **Buckets are called projects, administrator groups are called teams** (spec 100). Everywhere an administrator or
-  an agent reads or types a name, a bucket is a project, an administrator group a team (a personal group a personal
-  team), and a bucket group a group of the project's end users; storage, the protocol and issued tokens are
-  unchanged. **Breaking, with no aliases:** `/admin/api/buckets…` is `/admin/api/projects…` and
-  `/admin/api/groups…` is `/admin/api/teams…`; the MCP tools are `project_*`, `project_user_*`, `project_group_*`,
-  `project_key_*` and `team_*`; fields are `ownerTeamId`, `projectId`, `teamId` and `activeTeamId`, and the audit
-  filter is `project`. The audit trail shows its history in the new names, entries about the projects removed by
-  spec 099 as `retiredproject.*`. The setting `buckets.reservedHostnames` is `projects.reservedHostnames`, moved by
-  the migration `2026-10-17-projects-reserved-hostnames` (run `db:migrate`). Old console addresses redirect.
-- **The bucket is the only container; projects are removed** (spec 099). An application (OAuth client) and an
-  API (declared protected resource) belong to one bucket for life, recorded on the client as a server-only
-  `bucketId` that no registration can set; a client's allowed browser origins are its own `corsOrigins`; machine
-  tokens for an API go to the administrator-created applications of its bucket. **Breaking:** every
-  `/admin/api/projects` route and the `project_*` and `bucket_resource_list` MCP tools are removed —
-  applications and APIs live under `/admin/api/buckets/:id/clients` and `/admin/api/buckets/:id/resources`, and
-  the console shows them as a bucket's Applications and APIs tabs. The migration `2026-10-16-remove-projects`
-  moves each project's bucket and origins to its clients and declarations (run `db:migrate`); sign-ins are
-  unchanged, and it refuses before writing if a client is listed by projects on different buckets. It also clears
-  "skip consent" on applications of a tenant's project on the Default bucket, where it has not been honoured since
-  0.7.0, so their consent screen stays as it is.
-- **Every project names its bucket** (spec 098). `POST /admin/api/projects` and `project_create` now require
-  `bucketId`, and only a super administrator may name the Default bucket, for a project in any group — on a public
-  instance a project left without one put its people into a pool shared by every tenant and managed by none of
-  them. **Breaking:** `DELETE /admin/api/projects/:id/bucket` and `project_bucket_clear` are removed. The migration
-  `2026-10-15-projects-require-bucket` writes the Default bucket into every project that named none (run
-  `db:migrate`); sign-ins are unchanged. The console's new-project form can create the bucket in the same step.
+- **`email_verified` is true only for an address that was proven** (spec 104).
+- **Breaking renames, with no aliases** (spec 100, 101): buckets are projects and administrator groups teams in admin
+  API paths, MCP tools and fields; `can.createHost` is `can.addressForms`.
+- **The bucket is the only container** (specs 098, 099): an application or API belongs to one bucket for life; the
+  old projects, their `/admin/api/projects` routes and `project_*` MCP tools are removed (`db:migrate`).
 
 ### Fixed
 
-- **A project's own SCIM endpoint is refused as a declared API at every address the project is served on**, not
-  only at the instance's own origin. At a subdomain or a hostname of its own it was accepted as a declaration that
-  could never take effect, because the built-in SCIM endpoint answers first.
-
-- **A team now reads its project's identity provider changes in the audit trail.** Creating, changing, reordering,
-  trying and deleting a project's identity provider, and removing a person's linked identity, were recorded without
-  the project's team, so only a super administrator could read them while the team read every other change to the
-  same project. Entries written before this fix stay super-administrator-only, because the trail is never
-  rewritten.
+- **SCIM endpoint refused as a declared API at every address; teams read their provider changes in the audit trail.**
 
 ### Security
 
-- **Tenant hardening before open administrator sign-up** (spec 103). Accepting a team invitation no longer joins an
-  account someone else registered under the invitee's address: administrators' sign-up may be open only with email
-  verification on (a 409 otherwise, where it used to be an advisory), and while verification is required, accepting
-  an invitation for an account whose address was never confirmed asks for a password, replaces the account's, and
-  removes its authenticator, linked providers, sessions and tokens. Only a super administrator adds someone to a team
-  directly; owners invite. Team invitations are bounded (one per address and team every 10 minutes and 5 a day, 100 a
-  day per inviter, 50 open per team), an owner invitation is judged against the plan only when accepted, keys are
-  bounded at 12 held and 20 made a day per project, request bodies at 1 MiB, and project, application and provider
-  names and lists have maximum lengths. New project paths may not use the reserved subdomain words or `account`,
-  `health`, `ready`; `jwks_uri` and `backchannel_logout_uri` must be https when set; the console's own clients are
-  accepted only at the instance root. **Upgrade:** run `db:setup` (new area `TeamInvitationThrottle`) and `db:migrate`;
-  `2026-10-19-admin-signup-requires-verification` closes administrators' sign-up where it was open without
-  verification — reopen it with verification on.
+- **Tenant hardening before open administrator sign-up** (spec 103). Invitations no longer join another's account,
+  and `db:migrate` closes administrators' sign-up where it was open without email verification.
 
 ## [0.12.0] - 2026-10-14
 
-The pages people see are rebuilt for the people who see them. The consent page says who is asking, which account
-is agreeing and what the application will be able to do, in plain sentences; people can leave out what they do not
-want to give and change their mind later; the organization's own applications show their logo and policy links;
-and every bucket has a page where people see and remove the access they gave. Every end-user page follows the
-device's light or dark scheme, and every end-user page and email is shown in English, Russian or Simplified
-Chinese, chosen from the person, the application's `ui_locales` and the browser.
-
-The upgrade asks a backup and `db:setup` (or `db:setup:pg`) for the new `ClientLogo` area. There is no schema
-migration. What an integration meets: the consent form now carries the account it was shown for and is refused
-for any other, so a script that posts the consent form must send `accountId`; the consent page's wording and
-markup changed; end-user pages declare their language and answer with `Content-Language` and
-`Vary: Accept-Language, Cookie`; and both discovery documents publish `ui_locales_supported`.
+End-user pages are rebuilt. Run `db:setup` (or `db:setup:pg`) for `ClientLogo`; consent form posts need `accountId`.
 
 ### Added
 
-- **End-user pages and emails in English, Russian and Simplified Chinese** (spec 097). The language comes from
-  the person's own choice, the application's `ui_locales` (query, request object or PAR), the account's stored
-  locale, then the browser, and is decided once per sign-in; Traditional Chinese falls back to English rather
-  than to the wrong script, and no value of any signal causes an error. A no-script switch under the card
-  offers English and back to a visitor whose own language is not English; the choice is kept in a `_lang`
-  cookie and saved to the account at sign-in (not for directory-provisioned accounts). Emails follow the
-  account's language, else the page that asked for them, and their links open pages in the email's language.
-  Both discovery documents publish `ui_locales_supported`. Protocol answers (`error`, `error_description`, JSON)
-  are unchanged. The Chinese translation has not been reviewed by a native speaker. Also: the error page now has
-  a heading of its own, and the connected-apps page writes dates in the reader's language.
-
-- **Every end-user page follows the device's light or dark scheme** (spec 096). Sign-in, registration,
-  two-step verification, consent, sign-out, device code, error, password reset, email verification and the
-  connected-apps page all turn dark when the device prefers it, with no script, cookie or setting; the admin
-  console is unchanged. Application logos and the TOTP QR code stay on a light plate, and Apple's and GitHub's
-  marks turn white. Colours now meet WCAG 2.2 AA in both schemes, so the light pages change too: a darker blue,
-  red and secondary grey, and field borders that stand out from the field.
-  - Fixed along the way: the hydrated sign-in pages painted without antd's colours until their script ran
-    (and for good with scripts off); the sign-out and device pages scrolled sideways at 320 px.
-
-- **People see and remove the access they gave applications** (spec 095). Every end-user bucket has
-  `/account/apps` at its own address. It lists each application holding access: what it can do, in the consent
-  page's words; when access was given; when it last got a token; and whether it keeps access after sign-out.
-  One confirmed removal ends that application's grants, tokens and sign-in, the same as the administrator's
-  "sign out of this app", and is audited as `self-service`. The page reads the bucket's own sign-in and signs a
-  signed-out person in through a built-in client that can get no code or token. Removal needs a sign-in no older
-  than 15 minutes and a same-origin form. The consent page now links to this page.
-  - Fixed along the way: grants now record their bucket; the console's per-application dates are no longer
-    decades ahead; plain pages no longer scroll sideways at 320 px.
-
-- **The organization's own applications show their logo and policy links on the consent page** (spec 094).
-  An administrator uploads a client's logo (`logo`: a PNG, JPEG or WebP `data:` URL of at most 64 KiB, checked
-  by its bytes; console, admin API and MCP) and sets `policyUri`/`tosUri` (https only). The page shows them only
-  for this organization's own app (never a self-registered one or another group's) — the logo never on a device or
-  loopback page, the links only on one of the app's redirect hosts. A client's own `logo_uri` is never fetched
-  or shown. Logos live in a new `ClientLogo` area: re-run `db:setup` / `db:setup:pg`.
-- **People can choose what an application gets** (spec 093). For a client an administrator marks with
-  `partialConsent` (console, admin API and MCP; never settable by dynamic registration or a metadata document),
-  the consent page gives every permission beyond signing in its own unticked checkbox, and the application's
-  tokens, ID token and userinfo carry only what was ticked. A refused permission is offered again when the
-  application sends `prompt=consent`; before, a refusal recorded on a grant could never be granted again.
+- **End-user pages and emails in English, Russian and Simplified Chinese, in light or dark** (specs 096, 097).
+- **`/account/apps`** (spec 095). People see and remove the access they gave applications.
+- **Consent shows own apps' `logo`, `policyUri` and `tosUri`** (spec 094) **and can be partial** (`partialConsent`).
 
 ### Changed
 
-- **The consent page says who is asking, which account is agreeing and what the app will do** (spec 092). It is
-  headed by the bucket's new `displayName` (or its address), names the account by email instead of its internal
-  id, and words requested data and declared-resource scopes in plain sentences grouped as "see", "act for you"
-  and "not described". Apps that registered themselves are never headed as the organization's own, every app's
-  redirect host is shown (the MCP requirement), at most one warning appears, a request for the administrative
-  MCP shows an administrator-rights block, long-lived access states its end date, and "Switch account" is
-  offered. Operators describe scopes with `scopeDescriptions` on a declared resource and the new
-  `consent.scopeDescriptions` setting. The consent form now carries the account it was shown for and is refused
-  for any other.
+- **Plain-language consent page** (spec 092, `scopeDescriptions`); it accepts only the account it was shown for.
 
 ## [0.11.0] - 2026-10-12
 
-The admin console is rebuilt around addresses, pages and previews. Every screen has a link; buckets, identity
-providers, provisioning connections, groups and people each have a page; and a change that can lock people out or
-break applications says whom it affects, counted, before it applies. Deleting a bucket can be undone for 30 days,
-a signing key rotates in one step and can be revoked at once, administrators can sign in through their
-organisation's identity provider, and end users can be invited, signed out of one application or changed a hundred
-at a time. Usage is open to every administrator, over their own groups' buckets. Security fixes close a leak of
-administrators' authenticator secrets, a verification bypass through an email change, and the repointing of an
-identity provider under the accounts linked to it.
-
-**Upgrading asks four things of an operator.** Take a backup. Run `db:setup` (or `db:setup:pg`) for the new
-`provisioningRefusals` area and the new indexes. Then run `db:migrate`: migration
-`2026-10-12-static-token-expiry` gives every SCIM static token that has no expiry one, a year from its issue and
-never sooner than 90 days from the upgrade, and cannot be undone. Administrators who enrolled an authenticator
-before this release should enrol again. An integration meets these changes: the users list answers
-`{ users, totalResults }` a page at a time; setting or clearing a project's bucket, tightening a bucket's sign-in
-and handing a group to a directory answer 409 with a preview and apply only when repeated with `confirm: true` and
-the same `expect`; deleting a bucket schedules its destruction instead of destroying it; new buckets are closed to
-sign-up unless asked otherwise; and a user's profile now wins over a stored claim of the same name.
-
-### Fixed
-
-- **A group's administrators can read what was done to their bucket's people.** The audit entries for end-user
-  changes made in the console or through MCP carried no owning group, so only a super administrator could read
-  them, on the Audit page or on a person's Activity tab. New entries carry the bucket's group. Entries already
-  written stay as they are.
+The admin console is rebuilt around addresses, pages and previews. Upgrade: back up, run `db:setup` (or
+`db:setup:pg`), then `db:migrate`; administrators who enrolled an authenticator before this release re-enrol.
 
 ### Security
 
-- **A host-addressed bucket's sign-out confirmation and device-code pages can no longer be framed.** Their forms
-  posted to an absolute address the page policy took for another site, so the pages lost `frame-ancestors`. The
-  forms now post to an origin-relative path.
-
-- **A password-reset link no longer survives an email change** (spec 089). Before, a link sent to a person's old
-  address still worked after an administrator or a directory changed it. Opened from the old mailbox, it set the
-  password and marked the _new_ address verified. The link now dies with the address it was sent to.
-
-- **The federation callback refuses a response from another issuer** (spec 088). An upstream's RFC 9207 `iss`
-  parameter is now compared with the issuer the sign-in started with, and required when the provider's metadata
-  says it sends one — the mix-up defence RFC 9700 §2.1 asks of a client that talks to several providers.
-- **Static SCIM tokens expire** (spec 088, RFC 7644 §7.4). A token is issued for 90 days or a year (`lifetimeDays`);
-  the upgrade's migration `2026-10-12-static-token-expiry` gives existing tokens a year from issue but never less
-  than 90 days from the upgrade, so none stops working that day. Run `bun run db:migrate` before starting.
-- **Administrators' authenticator secrets no longer leave the server.** The administrator list and the
-  answers to creating and updating an administrator carried each enrolled administrator's TOTP secret, so any
-  super administrator, or an agent acting for one (`admin_list`, `admin_update`), could generate another
-  administrator's second-factor codes. They now go through the same presenter as end users. Administrators
-  who enrolled an authenticator before this fix should re-enrol. Updating an administrator with
-  `active: false` now refuses deactivating yourself, as the deactivation route does, and `admin_update` is a
-  high-consequence agent tool, so it no longer bypasses the confirmation `admin_deactivate` requires.
-- **An identity provider can no longer be repointed under the accounts linked to it.** A link records the
-  provider and the upstream subject, not the issuer, so changing a provider's issuer (or a Microsoft
-  provider's tenant), or deleting a provider and creating another with the same id, let the new upstream's
-  users with a matching subject sign in to existing accounts. Changing the issuer or tenant is now refused
-  while anyone is linked — add a new provider instead — and deleting a provider removes its links.
-- **Linking an upstream identity to an administrator always asks for their password.** In the console's own
-  bucket a provider trusted for an address could otherwise sign its holder in as that administrator, a super
-  administrator included, once password sign-in was off or the account already held another identity. A locally
-  locked administrator is now also refused at the console's own callback.
-- **A rejected admin request is no longer echoed back.** The admin plane's validation answer (422) carried the
-  whole submitted body, a typed password included; it now names the first problem and the field, nothing more.
+- **Administrators' TOTP secrets no longer leave the server**; `admin_update` is now high-consequence.
+- **A password-reset link dies on an email change** (spec 089); **the federation callback checks RFC 9207 `iss`**.
+- **Static SCIM tokens expire** (spec 088), old ones via irreversible migration `2026-10-12-static-token-expiry`.
+- **A provider cannot be repointed under linked accounts**; linking an administrator asks for their password.
+- **A 422 no longer echoes the request body**; host-addressed sign-out and device-code pages cannot be framed.
 
 ### Added
 
-- **The Sign-in tab shows the sign-in page people will see** (spec 091). A card beside the switches draws the
-  bucket's real sign-in page and changes as the switches change, before saving: the password form, the
-  "Forgot password" and "Register now!" links and the provider buttons in their order. It is decided by the same
-  rule the server renders the page with, so the two cannot disagree.
-- **Supporting end users without inventing their passwords** (spec 089).
-  - An administrator can invite a person by email: a single-use link, valid 7 days, sets their own password and
-    confirms their address.
-  - An administrator can mark an address verified by hand.
-  - A person's page lists the applications they are signed in to, and one of them can be signed out without the
-    others.
-  - Local users get the directory's profile fields (name, locale, time zone, phone), delivered as standard claims.
-  - Up to 100 selected users can be deactivated, activated, signed out or deleted at once, each with their own
-    audit entry.
-  - A group's members can be searched.
-
-- **Administrators can sign in through your organisation's identity provider** (spec 080). Super administrators
-  connect providers to the Administrators bucket; a first sign-in links an existing administrator after a password
-  proof, or creates one — with a personal group, never the super administrator privilege — only while the console
-  takes sign-ups. Password sign-in can be turned off only from a session that came in through a linked provider,
-  and nothing can then leave every super administrator without a way in; `bun run admin:password-sign-in` turns it
-  back on from the server. Agents may change the console's providers only by confirming each change.
+- **Sign-in preview** (spec 091) and **administrators' sign-in through an identity provider** (spec 080).
+- **End-user support** (spec 089): invitations, manual verification, per-app sign-out, bulk actions on 100 users.
 
 ### Changed
 
-- **Usage is open to every administrator** (spec 091). It lists the buckets owned by the groups they belong to,
-  with those groups as the customers and every total computed over those buckets alone; the reserved buckets stay
-  a super administrator's. A deleted bucket's row and history stay readable by the group that owned it last, since
-  its active users counted in that group's months; everyone else is refused as for an id that never existed. The
-  `activity_overview` MCP tool follows.
-- **A user's profile now wins over a stored claim of the same name** (spec 089). Before, a `given_name` in the
-  claims document beat the profile's. Now the profile supplies the claims it sets, and stored claims supply the
-  rest, so for a directory's people the directory's value is what applications receive.
-
-- **Deleting a bucket can be undone for 30 days** (spec 090). Delete now switches the bucket off at once and
-  destroys it 30 days later. In between, nothing in it answers, and nothing in it is destroyed. Restore brings it
-  back with every session and refresh token still valid. Delete now (`POST /admin/api/buckets/:id/purge`) destroys a
-  scheduled bucket at once. An hourly pass destroys the rest, recorded in the audit trail as the server. Agents may
-  restore (`bucket_restore`) but neither schedule nor destroy.
-
-- **Replacing a SCIM secret or static token is no longer an outage; a provider can be tried before anyone relies on
-  it** (spec 088). The previous value keeps working until the directory has used the new one and stopped using the
-  old one for an hour, at most 24 hours; `overlap: false` stops it at once, and retiring it early
-  (`provisioning_credential_retire`) ends the tokens it obtained and only those. Keys and a change of kind still
-  replace at once. **Try sign-in** on a provider's page signs in at the provider through the bucket's real callback
-  and shows what it answered and what a real sign-in would do — link, create, refuse and why — writing nothing; it
-  works on a disabled provider and is console-only. Held provisioning connections show as a badge on Buckets
-  (`provisioning_hold_list`); the provisioning wizard speaks Entra's and Okta's own field names from a server-side
-  guide (`provisioning_directory_list`); sign-in buttons can be moved up and down (`federation_provider_move`).
-- **A key rotates in one step, a compromised key is revoked at once, and new things are created in the group you
-  choose** (spec 087). Rotate (`bucket_key_rotate`, `jwks_rotate`) makes the algorithm's oldest ready key sign and
-  publishes the next one, or only publishes the next one when none may sign yet. Revoke (`bucket_key_revoke`,
-  `jwks_revoke`, high-consequence) hides a key immediately — a new `revoked` state, never published again — so
-  nothing it signed verifies; revoking the signer puts a ready key, or a new key without the publication window, in
-  its place in the same act. Audit entries name every key an act touched (`keys`). Creating a project or bucket takes
-  an optional `groupId`, and a project an optional `bucketId` of that group; the console's creation dialogs choose
-  both.
-- **Signing keys read by algorithm; Activity reads like Usage; a deleted bucket's history has a page** (spec
-  086). A bucket's and the instance's keys show one card per algorithm, each key's state in words (can sign at,
-  signed until, verifies until) with Promote inline and Retire behind the typed word; the key read adds
-  `signedUntil` and the list `retiredKeyLifetimeSeconds`. A bucket served at the root explains that it signs with
-  the instance keys and lists their published ids, and the instance Keys page names every bucket depending on
-  them. The bucket Activity tab uses Usage's charts, month chooser and CSV; Usage links into buckets instead of a
-  drawer; `bucket_activity_get` adds `name`, `deletedAt` and `lastOwner`, and a super administrator gets a
-  deleted bucket's history at `/admin/usage/buckets/:id`.
-- **Changing a project's bucket shows who breaks first; groups have a page; audit answers "what happened
-  here"** (spec 085). Setting or clearing a project's bucket now answers 409 with a preview — its applications by
-  name, the issuer before and after, that people signed in through them sign in again, and every declared resource
-  that moves or collides — and applies only with `confirm: true` and the same `expect`; API clients that did it in
-  one request must now confirm, and `project_bucket_assign`/`project_bucket_clear` are high-consequence. Token
-  behaviour is unchanged. A project has a Settings tab, project rows carry their bucket and application count, and
-  a bucket's declared resources are read with `bucket_resource_list`. An administrator group has a page where any
-  owner invites colleagues and every removal states what the member loses; group reads give members their
-  colleagues' emails and what the group owns, and a refused group deletion names projects and buckets as such.
-  The audit trail filters by `bucket`, `connection` and `actionPrefix`, records the key id of key operations and
-  the created connection as its target, and the address before and after an address change (passed but
-  never stored until now), and names directories; the bucket Overview and connection page show
-  recent changes.
-- **Identity providers, provisioning connections and user groups each have a page** (spec 084). Connecting a
-  provider or a directory is a side-panel wizard that cannot finish without choosing who a first sign-in may
-  create, or what happens when the directory removes many people at once; a provider page asks before a save that
-  lets more people in, and secrets are shown once, in place, with an acknowledgement. While a connection is held,
-  each removal it refuses is recorded per person, read with `provisioning_hold_get` and cleared by the release
-  (whose audit entry keeps the count); the hold email links to the connection's page. New: one provider's read
-  (`federation_provider_get`: callback, logout signals, bound connection, linked people), and the connection read
-  adds `managedGroups` and `availableCredentialKinds`. Handing a group to a directory now answers 409 with a
-  preview naming the members it does not manage and applies only with `confirm: true` and the same counts.
-- **Tightening a bucket's sign-in is previewed with counts before it applies** (spec 083). Turning passwords
-  off, requiring verification or an authenticator, or opening sign-up on the default or administrators' bucket
-  now answers 409 with what it does to whom (`consequences`, `expect`) and applies only when repeated with
-  `confirm: true` and the same counts; agents get the preview through `bucket_update`. The bucket summary adds
-  `withoutEnabledLink`, `passwordWithoutAuthenticator` and, on the default bucket, `projects`. Requiring
-  verification is refused on every bucket until mail delivery is configured, and new buckets are created closed
-  to sign-up unless asked otherwise. A super administrator can sign a colleague out everywhere and reset their
-  authenticator (`admin_sign_out`, `admin_totp_clear`, both high-consequence). In the console, sign-in is a bucket
-  tab with one save bar, refusals shown beforehand and the server's counts in the question; the administrators'
-  bucket became the Administrators page (Accounts, Sign-in, Identity providers, Activity, Settings).
-- **A bucket's users are searched and paged by the server** (spec 082). **Breaking:** the users list
-  (`GET /admin/api/buckets/:id/users`, `bucket_user_list`) now answers `{ users, totalResults }` in email order, a
-  page at a time, with `q` (the start of an email or username in any case, or an exact id) and status,
-  managed-by, verified and authenticator filters. New: reading one person (`bucket_user_get`, with who locked
-  them), changing their address (`bucket_user_email_change`, high-consequence) and mailing them a fresh
-  verification message (`bucket_user_verification_send`); setting a password can sign the person out everywhere,
-  a person can be created without one, and an administrator's create now follows the bucket's verification
-  policy. In the console each person has a page (Profile, Sign-in methods, Groups, Activity), and no save spans
-  more than one request. Fixed on the way: a verification link or code sent to an old address no longer verifies
-  the new one.
-- **A bucket opens on an Overview and keeps its settings in one place** (spec 081). The Overview lists what needs
-  attention (a held deprovisioning, an unreached host, verification without mail…), the issuer and discovery
-  addresses to copy, sign-in at a glance and the counts; Settings holds the name, the address with its DNS record,
-  the owning group, and a Danger zone. Changing an address previews every application, connection, provider and
-  resource it affects and is refused if that set changed before confirming. A group owner may change an unused
-  bucket's path; only an owner (or a super administrator) may delete a bucket that still holds accounts.
-- **Every console screen has an address** (spec 079). Links, Back, reload and switching group keep your place,
-  and signing in returns to the page you asked for. Bucket and project responses state what the caller may do
-  (`can`), so the console hides what the server would refuse and disables, with the reason, what the current
-  state blocks — the console now offers group members the bucket creation the server always allowed them. Confirmations follow one scale, from none to a typed word or the
-  server's preview; outcomes, refusals and faults are reported the same way everywhere; each row has one way in
-  and its actions in one menu.
+- **Breaking: risky changes answer 409 with a preview** (specs 083, 084, 085); repeat with `confirm: true`, `expect`.
+- **Breaking: the users list is paged** (spec 082), answering `{ users, totalResults }`.
+- **Breaking: deleting a bucket schedules it** (spec 090); it can be restored for 30 days.
+- **Keys rotate in one step and can be revoked at once** (specs 086, 087); SCIM credentials overlap (spec 088).
+- **Every console screen has an address, every entity a page** (specs 079, 081, 084); Usage is open to every
+  administrator (spec 091).
+- **A user's profile wins over a stored claim of the same name** (spec 089); new buckets are closed to sign-up.
 
 ### Fixed
 
-- **A directory can no longer give an account an empty sign-in address.** A SCIM user whose `emails` listed a blank
-  entry before a real one passed the "at least one email" check and was then given the blank entry as its login; the
-  login is now chosen among the entries that hold an address.
-- **`db:setup:pg` no longer breaks a reserved bucket's address while repairing it.** On a PostgreSQL database
-  provisioned before buckets had addresses, the repair stored the console's and the default bucket's slug with
-  its quotes (`"\"admin\""`), so neither could be found by its address. The value is now written as text, and the
-  next `db:setup:pg` heals a slug the old repair damaged.
-- **A bucket moved to a new host no longer reads as reached** from the old host's traffic, and owners now see
-  their group's bucket deletions and address changes in their audit trail.
-- **Invitation links work.** The link in an invitation email opened a missing page; it now opens a page to
-  accept, and a new invitee who first submits without a password no longer spends the invitation.
+- Group audit visibility, invitation links, blank SCIM emails and `db:setup:pg` reserved-bucket slugs are fixed.
 
 ## [0.10.0] - 2026-10-10
 
-An instance can now be run as a service for other people. Every bucket counts its monthly and daily active users,
-a super administrator's **Usage** page shows each bucket beside the customer that owns it, and a bucket moves to
-another administrator group together with its projects. The administrators' bucket is configured like any other,
-with open sign-up, email verification and the second factor, and a personal group has exactly one member again.
-A DPoP proof dated ahead of the server's clock can no longer be replayed, and foxauth.dev is now also in Russian
-and Simplified Chinese.
-
-**Upgrading asks three things of an operator.** Take a backup. Run `db:setup` (or `db:setup:pg`) for the new
-`activityMarks` and `activityFigures` areas and the audit trail's new index. Then run `db:migrate`: migration
-`2026-10-09-personal-groups-single-member` removes every member but the owner from each personal group and cannot
-be undone, so list the shared ones (`group_list`, `kind: personal`) first. An agent that used `admin_settings_read`
-or `admin_settings_update` now uses `bucket_get`/`bucket_update` on the administrators' bucket, and a setting
-edited into the database by hand with the wrong type now stops startup until it is fixed.
+Active users are counted per bucket, and buckets move between groups. Upgrade: back up, run `db:setup` (or
+`db:setup:pg`), then `db:migrate`, which irreversibly leaves each personal group only its owner.
 
 ### Added
 
-- The administrators' bucket is configured on the ordinary bucket settings by a super administrator:
-  open sign-up for other administrators (each gets a personal group and nothing else), require them to
-  verify their email (refused until mail delivery is configured and your own address is verified — the
-  console's "Verify my address" sends the message), and the second factor. A super administrator can
-  correct another administrator's address. In every bucket, signing in with the right password to an
-  unverified account now sends the link or code instead of only saying "check your inbox" (with "Send the link again" for a lost letter), and sign-in
-  pages link to registration and password reset only where the bucket allows them.
-  **Breaking for agents:** `GET`/`PATCH /admin/api/admins/settings` and the MCP tools
-  `admin_settings_read`/`admin_settings_update` are removed; use `bucket_get`/`bucket_update` on the
-  administrators' bucket. Spec 078.
-- The super administrator's **Usage** page is a dashboard: every bucket's monthly active users beside the
-  customer that owns it (the group, or the group that owned it when it was deleted), a "by customer" view
-  with owners as contacts, instance totals, 13-month and day-by-day charts, the buckets that changed sharply
-  between two closed months, search and filters every total follows, and a formula-safe CSV export.
-  `GET /admin/api/activity` (MCP `activity_overview`) answers all of it; a super administrator can read a
-  reserved or deleted bucket's history by id; a deleted bucket's tombstone now records its owner. Spec 077.
-- site: foxauth.dev in Russian (`/ru/`) and Simplified Chinese (`/zh-cn/`) — the marketing pages, the docs
-  landing page and Get started, and the whole blog — shown only to a reader whose browser puts that language
-  first, with a switch to English and back; everyone else sees the English site unchanged. A blog post is
-  published in every language or none, a stale translation says so on the page, and the build checks each
-  page's language, its Chinese title lengths and that every section keeps its English id. Spec 074.
-- Moving a user bucket, with every project that uses it, or a project with no bucket, to another
-  administrator group — `PUT /admin/api/buckets/:id/owner`, `PUT /admin/api/projects/:id/owner`, a **Move**
-  action in the console and the `high` MCP tools `bucket_owner_change` / `project_owner_change`. It needs an
-  owner of the group left and a member of the group joined; a call without `confirm` previews what moves;
-  end users, clients and sign-in addresses are untouched, and the audit entry is read by both groups. Spec 075.
-- Monthly and daily active users per bucket, the default and administrators buckets included: every
-  person a bucket issued tokens to, counted once per UTC month and day and broken down into local sign-in,
-  upstream sign-in, renewal and directory-provisioned. A closed period is frozen and never changes, and the
-  history survives deleting people and the bucket itself. Read on the bucket's page and on a super-admin
-  **Usage** page, through `GET /admin/api/buckets/:id/activity` and `GET /admin/api/activity`, and by the MCP
-  tools `bucket_activity_get` / `activity_overview`. Re-run `bun run db:setup` / `db:setup:pg` for the new
-  `activityMarks` and `activityFigures` areas. Spec 076.
-- `eventBus` is typed: `ServerEvents`, `ServerEventName` and `ServerListener` are exported from the
-  package entry, so a subscriber to an event the server does not emit, or one expecting arguments it does
-  not pass, fails to compile instead of never running.
+- **Active users per bucket and a Usage page** (specs 076, 077); **moving buckets between groups** (spec 075).
+- **Breaking:** `admin_settings_read`/`admin_settings_update` are removed; edit the admins' bucket (spec 078).
+- **foxauth.dev in Russian and Simplified Chinese** (spec 074), and a typed `eventBus` (`ServerEvents`).
 
 ### Changed
 
-- **A personal group has exactly one member.** Adding a member, inviting someone and accepting an earlier
-  invitation into a personal group are refused; shared work goes into a regular group and is moved there.
-  **Upgrade:** migration `2026-10-09-personal-groups-single-member` removes every member but the owner from
-  each personal group, one audit entry per group, and cannot be undone — list the shared personal groups
-  (`group_list`, `kind: personal`, more than one member) before running `db:migrate`, then re-run
-  `db:setup` for the new audit index. Spec 075.
-- `richAuthorizationRequests.types` is shape-checked even while RAR is off, because the consent screen reads
-  its labels on every render; an instance whose stored map is malformed now refuses to start until it is
-  fixed. A `getResourceServerInfo` override must answer a `scope` string and an `accessTokenFormat` of `jwt`
-  or `opaque`; anything else is refused when the resource is resolved instead of minting a token with no
-  scopes.
-- A stored setting override whose type is not its setting's — a flag stored as the string `"false"`, a
-  number stored as text — now refuses startup, naming the key. The settings API never wrote one; a value
-  edited into the database by hand would otherwise have been trusted as typed.
-- The `rotateRefreshToken` and `rarFor*` addon defaults are async, so an override of one may now be async
-  too; every caller already awaited them. A Set-valued setting holding a member that is not a string now
-  refuses startup instead of being stored.
+- **A personal group has one member** (spec 075): migration `2026-10-09-personal-groups-single-member`.
+- **Startup refuses a stored setting of the wrong type** or a malformed `richAuthorizationRequests.types`.
 
 ### Fixed
 
-- Two registrations for the same address arriving together could answer one of them with a server error;
-  both now get the same non-committal answer, in every bucket. Spec 078.
-- An agent calling a two-step admin tool without `confirm` — `bucket_address_change`, and now the move tools —
-  receives the route's preview (the clients that will stop validating tokens, the projects that will move) as
-  `preview`; it was answered only `conflict: the operation was refused`.
-- A bucket addressed by its own hostname no longer has its session cookie expired on every request. Its
-  cookie is the bare `_session`, which the server still cleared as a pre-bucket legacy name, so an
-  anonymous session not re-issued in the same response was dropped.
-- `GET /session/end` with an `id_token_hint` whose claims set is JSON `null` answered 500, and filed a
-  defect in the error store, to an unauthenticated caller; a JWT whose header or claims set is not an
-  object is now refused as undecodable (`invalid_request`).
-- Changing a protected resource's access-token lifetime in the admin console failed with 422: the field
-  sent the number as a string. It is a number input now.
+- Concurrent registrations and `/session/end` with a `null` claims set no longer answer a server error.
 
 ### Security
 
-- **A DPoP proof dated ahead of the server's clock can no longer be replayed after five minutes.** A proof
-  without a nonce is accepted while its `iat` is within 300 seconds of now, but its `jti` was remembered for
-  300 seconds from first use, so a captured request whose proof came from a fast client clock was accepted
-  again once the record lapsed. The record now lasts as long as the proof is acceptable (RFC 9449 §11.1).
-  The nonce check also counts matches instead of XOR-ing comparison results, which was correct only by
-  coincidence.
+- **A DPoP proof dated ahead of the server's clock can no longer be replayed** after five minutes (RFC 9449 §11.1).
 
 ## [0.9.0] - 2026-10-07
 
-A sign-out at the upstream provider now reaches this server. A bucket accepts OpenID Connect Back-Channel Logout
-from the Keycloak, Auth0 or Ping providers an administrator opts in, and ends the sessions that came from the
-upstream session it names; signing in through Keycloak, which could not complete before, does. Releases now deploy
-themselves as the signed image they published, the image takes Alpine's security patches on every build again,
-and a Compose deployment upgraded by pulling a newer image runs its migrations instead of refusing to start.
-
-**Upgrading asks one thing of an operator:** run `db:setup` (or `db:setup:pg`) for the new `UpstreamSession` area.
-This release declares no migration. A Compose deployment that skipped `db:migrate` when moving to 0.7.0 or 0.8.0
-gets it from the updated `docker-compose.yml`; take the backup those releases asked for first.
+Upstream sign-out now reaches this server; run `db:setup` (or `db:setup:pg`) for the new `UpstreamSession` area.
 
 ### Added
 
-- **A sign-out at Keycloak, Auth0 or Ping now signs the person out here.** A bucket receives OpenID Connect
-  Back-Channel Logout from upstream providers an administrator opted in (`acceptsBackChannelLogout`), at
-  `<bucket issuer>/federation/backchannel-logout`, and ends the sessions that came from the upstream session named,
-  telling its relying parties and keeping offline access. Signatures are checked as global token revocation's are,
-  with no setting to relax them. Run `db:setup` / `db:setup:pg` for the new `UpstreamSession` area; sessions from
-  before the upgrade are not reached.
+- **Back-Channel Logout from Keycloak, Auth0 or Ping**, for providers opted in with `acceptsBackChannelLogout`.
 
 ### Fixed
 
-- **Signing in through Keycloak completes.** Keycloak adds `session_state` to every return, and the federation
-  callback refused any parameter it did not declare, so no Keycloak sign-in could finish; unknown return
-  parameters are now ignored, as RFC 6749 §4.1.2 requires. Found by running back-channel logout against a real
-  Keycloak 26.8.0.
-- **Upgrading a Compose deployment runs the migrations too.** The shipped `docker-compose.yml` and
-  `docker-compose.postgres.yml` ran only `db:setup`, so pulling 0.7.0 or 0.8.0 over an existing database left a
-  server that refused to start; their `setup` service now runs `db:migrate` after it, as `fly.toml` does, and the
-  Kubernetes and Atlas guides say the same.
+- **Signing in through Keycloak completes**: unknown callback parameters such as `session_state` are ignored.
+- **Compose upgrades run `db:migrate`** after `db:setup`, so pulling 0.7.0 or 0.8.0 no longer fails to start.
 
 ### Security
 
-- **The image takes Alpine's security patches on every build again.** Its `apk upgrade` layer was served from
-  the build cache, so 0.8.0 shipped zlib 1.3.2-r0 after Alpine had published 1.3.2-r1 (CVE-2026-85091). The
-  upgrade now runs in the final stage and is re-run by every release, scan and deploy build, while the
-  dependency and build stages stay cached.
-
-### Changed
-
-- **A release deploys itself, and only a release reaches production.** A version tag's signed image is deployed
-  by digest, its signature verified first, to the conformance instance and then (pre-releases excepted) to
-  production, with nothing rebuilt or retested. The manual deploy is now the conformance instance's alone, from
-  source, once CI has passed for the commit. The image installs its production dependencies in a stage cached
-  by the lockfile, so a code change no longer reinstalls them.
+- **The image takes Alpine's security patches on every build again** (CVE-2026-85091, zlib shipped in 0.8.0).
 
 ## [0.8.0] - 2026-10-07
 
-An enterprise directory can now run a bucket's users. Microsoft Entra ID, Okta or any SCIM 2.0 client creates,
-updates, deactivates and deletes them and their groups through a provisioning connection, an upstream provider
-can sign one of them out of everything, and a guard holds a connection that starts deprovisioning too many at
-once. Roles become groups, which relying parties read in a `groups` claim, and ending a user's access — by
-deactivation, a lock or deletion — now ends their sessions and tokens at once rather than only their next
-sign-in. The instance's signing keys rotate without a restart, and the rest is the protocol held to its specs:
-`amr` in every ID token, the grant types discovery advertises and no others, and a client, assertion, DPoP proof
-or request object checked against the bucket it was sent to.
-
-**Upgrading asks three things of an operator.** Take a backup, then run `db:setup` and `db:migrate` in that
-order: this release carries two schema migrations — the root signing keys move into the store a bucket's keys
-use, and every role and its holders become a group and its members — and neither can be undone. A deployment
-whose clients refresh without the `offline_access` scope among the supported scopes will see
-`unsupported_grant_type` from now on, and `refreshToken.enabled` is gone. And a script or agent that sets
-`roles` on an administrator, a bucket or an end user — through the admin API or over MCP — now grants membership
-of Super administrators (`admin_super_grant`, `admin_super_withdraw`) or of a bucket group instead. The
-[upgrade guide](https://foxauth.dev/docs/deploy/upgrade/) walks through the steps.
+An enterprise directory can provision a bucket's users and groups over SCIM 2.0, roles become groups, and ending a
+user's access ends their sessions and tokens at once. **Upgrading:** back up, then run `db:setup` and `db:migrate` in
+that order (two irreversible migrations); refresh needs `offline_access` among supported scopes; `roles` writes become
+memberships of Super administrators or of a bucket group.
 
 ### Added
 
-- **An upstream identity provider can sign a user out of everything here (Okta Universal Logout).** With
-  `globalTokenRevocation.enabled` on and a federation provider opted in, a request to
-  `<bucket issuer>/global-token-revocation` signed with the provider's own keys ends every session and token the
-  user holds, with back-channel logout to relying parties; the account stays active. It implements an expired
-  individual draft (draft-parecki-oauth-global-token-revocation-06) in the shape Okta sends, so it is off by
-  default. Administrators get the same action as **Sign out everywhere** (console, admin API, MCP
-  `bucket_user_sign_out`).
-
-- **A mass-deprovisioning guard per SCIM connection.** An optional threshold (deprovisionings per rolling window)
-  holds the connection once exceeded: further deactivations and deletions answer `429` and are retried by the
-  directory after an administrator releases the hold; everything else keeps flowing, and the bucket's
-  administrators are emailed. **Re-run `bun run db:setup` / `db:setup:pg`** for the new `DeprovisionSlot` area.
-
-- **Roles are replaced by groups.** A bucket's roles become bucket groups — named sets of end users, kept by
-  an administrator or owned by a SCIM connection — with their own routes, console tab and agent tools, and
-  relying parties read them from a built-in `groups` scope and claim (display names; above 200, a userinfo
-  reference). SCIM gains `/Groups` (IPSIE AL2 §6.2). The administrator `super_admin` role becomes membership of
-  a reserved Super administrators group, granted and withdrawn by operations of their own; `project_admin`,
-  which granted nothing, is gone. **Run `bun run db:migrate`**: it turns every role and assignment into a group
-  and membership, losing none.
-
-- **An enterprise directory can provision a bucket's users over SCIM 2.0.** An administrator connects
-  Microsoft Entra ID, Okta or any SCIM client to a bucket through a provisioning connection bound to one of
-  its sign-in providers; the directory then creates, updates, deactivates and deletes users at
-  `<bucket issuer>/scim/v2`, and they sign in through the same provider, matched by the directory's own
-  identifier rather than by email. Targets the OpenID IPSIE SCIM profile (AL1, AL2), with each deviation
-  behind a setting — see `CONFORMANCE.md`. Off by default (`scim.enabled`).
-- **The claims each scope releases are a setting an operator can edit.** `claims` joins the settings
-  catalog as a JSON value, so `profile`, `email`, `address` and `phone` — or any scope of your own — can
-  be defined from the console or by an agent and are advertised in discovery as soon as they are saved.
-  A definition that is neither a claim nor a list of claim names is now refused, at boot and on save.
-- **An end user's claims can be set from the console and by an agent.** Creating or editing an account
-  now takes the claims it releases — name, locale, address and the rest — replacing the whole set. The
-  identity claims (`sub`, `email`, `email_verified`) and the protocol claims the server asserts itself
-  are refused, and the audit trail records that claims changed, never their values. The agent tool's
-  description no longer promises an email change it never made.
-- **The console and agents register every client dynamic registration can.** `private_key_jwt` and
-  `client_secret_jwt`, a key set or its URL, and the per-client protections FAPI asks for — pushed
-  authorization, DPoP-bound tokens, signed Request Objects and their algorithm — plus ID Token and JARM
-  signing algorithms, back-channel logout and pairwise subjects. Each is checked by the same validator
-  as a self-registered client; on an edit, null removes one.
-- **The instance's signing keys rotate without a restart.** They take the lifecycle a bucket's keys
-  have: a generated key is published first, can be promoted to sign once every instance serves it, and a
-  retired key keeps verifying for a day and is then hidden — kept on record, never deleted. Promote and
-  retire are in the console, the admin API and MCP (`jwks_promote`, `jwks_retire`, both confirmed
-  twice); the restart-gated delete and `jwks_delete` are gone.
-- **Sign-out by form post.** `POST /logout` answers as the GET does, at every bucket's address, as
-  RP-Initiated Logout requires. A cross-site post arrives without the `Lax` session cookie, so it is
-  re-posted once from this origin rather than handled bare — handled bare it would say "signed out"
-  and replace the sign-in with an empty one.
-- **Discovery says how to authenticate to introspection and revocation.**
-  `introspection_endpoint_auth_methods_supported`, `revocation_endpoint_auth_methods_supported` and
-  their signing-algorithm companions (RFC 8414) are published while each endpoint is enabled.
+- **SCIM 2.0 provisioning** (`scim.enabled`, off by default). Entra ID, Okta or any SCIM client manages a bucket's users
+  at `<bucket issuer>/scim/v2`, targeting the IPSIE SCIM profile (AL1, AL2).
+- **Mass-deprovisioning guard.** An optional per-connection threshold answers `429` until an administrator releases the
+  hold. Re-run `bun run db:setup` / `db:setup:pg` for the new `DeprovisionSlot` area.
+- **Groups replace roles.** Bucket groups, released in a `groups` scope and claim; SCIM gains `/Groups`; `super_admin`
+  becomes Super administrators membership (`admin_super_grant`, `admin_super_withdraw`); `project_admin` is gone.
+- **Okta Universal Logout** (`globalTokenRevocation.enabled`, off by default). An opted-in upstream provider ends a
+  user's sessions and tokens; administrators get **Sign out everywhere** (`bucket_user_sign_out`).
+- **Editable claims.** `claims` is a settings-catalog value, and an end user's claims can be set in the console or by an
+  agent.
+- **Full client registration in the console and MCP**, with `private_key_jwt`, `client_secret_jwt` and FAPI options.
+- **Instance signing keys rotate without a restart** (`jwks_promote`, `jwks_retire`); `jwks_delete` is gone.
+- **`POST /logout`** as RP-Initiated Logout requires; discovery lists introspection and revocation auth methods.
 
 ### Changed
 
-- **The token endpoint accepts exactly the grant types discovery advertises.** `refresh_token` is
-  supported while `offline_access` is a supported scope; without it a refresh token is refused as
-  `unsupported_grant_type`, one issued earlier included. `refreshToken.enabled`, which changed
-  nothing observable, is removed.
-- **Retiring a key names it.** A retire, instance or bucket, is refused unless its body carries
-  `{ "confirm": "<kid>" }`, and the console makes the operator type the kid.
-- **One key signs per algorithm, not per key type**, so an issuer can sign RS256 for its default clients
-  and PS256 for a FAPI client at once. The bucket keys' required-algorithm refusal is gone: no step can
-  leave an algorithm without a signer any more.
-- **Upgrading: run `bun run db:migrate`.** Migration `2026-09-30-root-keys-lifecycle` moves the stored
-  root keys into the new store, keeping the key that signed as the signer of its algorithm (on
-  PostgreSQL, the lowest kid) and printing its choice; startup refuses a database that has not run it.
-- **The dependency audit gates on what the image ships.** It audits a production install of the
-  server, as the Dockerfile makes one; an advisory against development tooling or the website no longer
-  fails the run, and Scorecard no longer reads the website's lockfile.
+- **The token endpoint accepts exactly the advertised grant types.** Without `offline_access`, refresh is
+  `unsupported_grant_type`; `refreshToken.enabled` is removed.
+- **Retiring a key needs `{ "confirm": "<kid>" }`**, and one key signs per algorithm rather than per key type.
+- **Migration `2026-09-30-root-keys-lifecycle`** moves root keys into the bucket key store; startup refuses without it.
 
 ### Fixed
 
-- **Deactivating, locking or deleting an end user ends their access at once.** Deactivation used to block
-  only new sign-ins: sessions stayed alive, access tokens introspected as active, no relying party was told.
-  Now each session gets a back-channel logout and every session, grant and token is swept. Alongside it
-  (spec 069, groundwork for SCIM): an emergency lock only an administrator lifts, a username, external
-  identifier and profile on the user — released under `profile`/`phone`, now mapped by default on new
-  instances — and users a provisioning connection owns are read-only in the console.
-- **A client registered at a bucket's address belongs to that bucket.** A bucket's discovery
-  advertises its own `/reg`, but a client registered there was refused `unauthorized_client` at that
-  bucket's `/auth` and accepted at the root. The registration now records the bucket, from the address
-  alone; a registration at the root is unchanged.
-- **A client assertion is checked against the bucket it was sent to.** At a bucket's address the
-  accepted `aud` values were the instance's, so `private_key_jwt` and `client_secret_jwt` clients were
-  refused when they named the bucket's issuer or token endpoint, and accepted when they named the root.
-  An assertion naming the root is now refused at a bucket's address.
-- **A DPoP proof is checked against the bucket it was sent to.** Its `htu` was compared with the
-  instance's URL at every address, so every DPoP-bound exchange at a bucket's address failed with
-  `invalid_dpop_proof`. It is now compared with the addressed bucket's endpoint.
-- **A request object is checked against the bucket it was sent to.** Its `aud` was compared with the
-  instance's identifier, so a signed request object pushed to a bucket's PAR endpoint was refused. A
-  `request_uri` one issuer hands out is no longer accepted by another.
-- **A bucket's endpoints know which endpoint they are.** At a bucket's address the request context
-  carried the route pattern `/:bucket/par`, so checks against the endpoint's name failed there: a
-  pushed request with an unregistered `redirect_uri` was refused as `invalid_redirect_uri` rather than
-  `invalid_request`, and `par.allowUnregisteredRedirectUris` never applied.
-- **The sign-out pages are styled on their first showing.** Their styles were extracted before the
-  page was rendered, so the first one after a restart came out unstyled and later ones carried whatever
-  earlier renders had left behind.
-- **A requested claim value is honoured (OIDC Core §5.5.1).** With `claimsParameter.enabled`, a
-  subject named only in `sub.values` was ignored and a code issued for whoever was signed in; it now
-  fails like `sub.value`. A claim whose value differs from a requested `value`/`values` is left out
-  of the ID token and userinfo (`sub`, `acr` and `amr` keep their own rules).
-- **ID tokens state how the end user signed in (`amr`).** Recorded since the second factor shipped but
-  never emitted, it is now in every ID token from a sign-in — code, device, CIBA and refresh alike —
-  as `["pwd"]`, or `["pwd", "otp", "mfa"]` with a one-time code; a federated sign-in carries none, and a
-  CIBA integration's reported methods are passed through. It is listed in `claims_supported` whatever
-  the stored claims setting holds. **Behaviour change:** password-only ID tokens gain `"amr": ["pwd"]`;
-  test for `otp` or `mfa`, not for the claim's presence (#46).
-- **A device can be approved by someone who is not already signed in.** The verification page now sends
-  the session its anti-forgery check needs, and signing in or consenting during a device sign-in finishes
-  it instead of failing with `invalid_redirect_uri`. Every failure on that step — an unmet
-  authentication context, a withdrawn resource, a fault — now reaches the device's next poll with its own
-  error code instead of leaving it on `authorization_pending` until the code expires.
-- **This server can no longer be used to forward users to an attacker-registered site.** For a client
-  whose redirect URIs no operator vouched for — created by dynamic registration or described by a
-  metadata document — an authorization error (a malformed request, a declined consent, a silent
-  `prompt=none`) is offered on this server's page, naming the destination host, instead of redirected
-  (RFC 9700 §4.11.2). Administrator-created clients and successful responses are unchanged.
-- **Errors after sign-in reach the client** (#47). Declining consent, an unmet authentication context,
-  a resource withdrawn mid-flow or a fault while completing sign-in now redirect to the client's
-  `redirect_uri` with the error, `state` and `iss`, in the requested response mode, instead of leaving
-  the user on an error page; a cancelled interaction can no longer be resumed into a code. A client or
-  redirect URI removed while the user was signing in is refused on-page and is no longer sent a code.
-  Faults delivered as `server_error` are now recorded in the error store, and a redirected
-  `error_description` stays within RFC 6749's character set.
-- **A confirmed sign-out returns to the relying party.** The confirmation page's `form-action 'self'`
-  had Chrome block the 303 to `post_logout_redirect_uri`, after the session had already ended, so the
-  user stayed on "Do you want to sign-out?". The page now admits the validated address's origin.
-- **A sign-out at a path-addressed bucket can be confirmed.** Its confirmation form posted to the
-  default bucket's `/logout/confirm`, which holds none of that sign-out's state, so it failed with
-  "could not find logout details".
-- **A signing key in a new algorithm is usable without a restart.** Generating, say, the ES256 key a
-  FAPI 2.0 deployment needs signed at once, but discovery did not advertise ES256 and a client could not
-  register for it until the server restarted. The advertised algorithms now follow the live key set.
-- **Seven settings no longer claim to need a restart.** The rate limiter, the three sign-in throttle
-  settings, federation, the MCP control plane and Sentry reporting all apply on save, as the console
-  already reported, while their descriptions still ended "Applied at startup". A catalog guard now
-  refuses a description that contradicts the setting's own apply behaviour.
-- **A refused client registration reaches the console as the admin plane's error.** It arrived as `400`
-  in the protocol's shape, with no message to show, although the admin routes' tests expected `422` —
-  they mounted the routes alone. It is now `422` with the validator's reason.
-- **A Request Object is held to its own rules, not a client assertion's.** `jti` is optional and `aud`
-  may be a list naming this server (RFC 9101 §4, RFC 7519 §4.1.3), and a missing or malformed registered
-  claim answers `invalid_request_object` rather than `invalid_request` (RFC 9101 §6.2); a bad
-  authorization parameter inside the object is still refused as that parameter. The first alone refused
-  every signed push in FAPI 2.0 Message Signing.
-- **A sign-out without `id_token_hint` can be confirmed on MongoDB.** The pending sign-out's unset
-  members were stored as nulls, the session then failed its schema and read as no session, and the
-  confirmation answered "could not find logout details". Protocol records are now written with undefined
-  members absent, as the admin stores already were. Found by the conformance suite's RP-initiated
-  logout plan; the in-memory adapter the test suite runs on could not show it.
-- **A federated sign-in refuses an ID token with no `iat`, and follows an upstream key rotation.** The
-  claim is REQUIRED (OIDC Core §2) and was checked only when present; a rotation refused sign-ins for 30
-  seconds, or for ten minutes when the new key carried no `kid`. Both found by the conformance suite's
-  client plans.
+- **Deactivating, locking or deleting an end user ends their access at once** (spec 069), with an emergency lock.
+- **Bucket addresses are honoured**: client registration, assertion `aud`, DPoP `htu` and request object `aud`.
+- **ID tokens carry `amr`.** Behaviour change: password-only tokens gain `["pwd"]`; test for `otp` or `mfa` (#46).
+- **Errors after sign-in reach the client** (#47); unvouched redirect URIs get the error on-page (RFC 9700 §4.11.2).
+- **Device flow** can be approved by someone not yet signed in, and its failures reach the next poll.
+- **Requested claim values are honoured** (OIDC Core §5.5.1); Request Objects follow RFC 9101.
+- **Sign-out** returns to the relying party in Chrome, works at path-addressed buckets and on MongoDB, styled at once.
+- **Federated sign-in** refuses an ID token without `iat` and follows an upstream key rotation.
+- **Smaller fixes**: a new key algorithm is advertised without a restart, seven settings stop claiming one, and a
+  refused registration reaches the console as `422`.
 
 ## [0.7.0] - 2026-09-29
 
-Tenants stop sharing what should have been theirs alone. A declared protected resource is unique per
-issuer rather than across the instance, and a bucket with an address of its own signs with keys of its
-own, so one tenant can neither claim another's MCP server nor mint a token that verifies at another's
-resource server. A security audit found the rest: sign-ins that another browser could continue,
-single-use artifacts and attempt caps that parallel requests got through, outbound requests that
-reached private addresses, client metadata that named internal attributes, an agent token that worked
-on the management API directly, and a consent waiver and password policy that did not hold for every
-bucket. Each is fixed below, and so are signed responses from a named bucket that named the root
-issuer.
-
-**Upgrading asks four things of an operator.** Take a backup, then run `db:setup` and `db:migrate` in
-that order: this release carries the first schema migration, it re-keys declared resources, and it
-cannot be undone. A resource server of a bucket with an address must verify against that bucket's own
-`jwks_uri`, which the bucket's metadata now names; tokens the bucket signed before the upgrade stop
-verifying there, and the instance issuer's keys and metadata are unchanged. A deployment reading a
-forwarded client certificate switches on `mTLS.trustProxyCertificateHeader` once its proxy sets
-`Client-Cert` and strips any incoming copy — no certificate is read until then. And declaring a
-resource for a project without a bucket of its own is now a super administrator's; give such a project
-a bucket with an address to declare it yourself. The [upgrade
-guide](https://foxauth.dev/docs/deploy/upgrade/) walks through each.
+Tenants are isolated: declared resources are unique per issuer, an addressed bucket signs with its own keys, and a
+security audit's findings are fixed. **Upgrading:** back up, then `db:setup` and `db:migrate` (first, irreversible
+migration); resource servers of addressed buckets verify against that bucket's `jwks_uri`; set
+`mTLS.trustProxyCertificateHeader` to read forwarded client certificates.
 
 ### Security
 
-- **A sign-in can be continued only in the browser that began it.** The sign-in screens checked that an
-  interaction cookie was present but never compared its value, so anyone holding an interaction's
-  address — which appears in every URL of the flow — could continue it from another browser. After the
-  end user's password in a bucket requiring a second factor, that exposed the new authenticator secret
-  and let the other browser enrol its own and leave signed in as the account. Regression since
-  `53341c6`; a foreign cookie is now refused exactly as an unknown address is.
-- **Client metadata can no longer name the model's internal attributes.** A dynamic registration
-  body, a registration update or a client ID metadata document that spelled a canonical key had it
-  copied into the client: `clientId` overwrote any stored client, the console's own included,
-  `consent.require: false` switched off the consent screen, and a document's `clientSecret` survived
-  the rule that such clients hold no secret. Wire input now carries snake_case metadata only; those
-  keys are dropped as unrecognised.
-- **A self-registered client stays marked as one after updating its registration.** `PUT /reg/:id`
-  rebuilt the record from the body alone, dropping the self-registration marking — which lifted the
-  refusal of such clients on the administrative MCP surface — and the record of its first completed
-  authorization, which returned a client in use to the sweep of unused registrations.
-- **An enrolment secret completes only the sign-in of the account it was offered to.** The password
-  step can be submitted again inside one interaction, and the secret was keyed by the interaction
-  alone: someone holding a victim's password but not their authenticator could sign in as an
-  unenrolled account of their own, take its secret, submit the victim's password and prove that
-  secret, leaving signed in as the victim with two factors recorded.
-- **A federated sign-in no longer links to an account that holds only a password on its own.** The
-  assertion proved control of the address, not of whoever set the matching account's password, and a
-  bucket that does not verify addresses lets anybody register one: registering a victim's address first
-  turned the victim's first federated sign-in into access for the registrant. The identity now waits on
-  the interaction and is linked once that account's own sign-in completes, second factor included; an
-  account that already holds an upstream identity links as before.
-- **An agent's token no longer works on the management API directly.** What an agent is withheld
-  from and asked to confirm is decided in the `/mcp` transport, but the management API accepted the
-  same token from the network too, so an agent able to make an HTTP request could delete a project,
-  bucket or group, permit another client identity onto the administrative plane, or delete a signing
-  key without confirmation. The token is now accepted there only for requests the agent surface
-  dispatches itself. The threat model also states that the confirmation step is answered by the same
-  agent it asks.
-- **A client credentials token for a declared resource goes only to that project's clients.** No end
-  user consents to such a token, and the grant took its bucket from the request address, so any
-  confidential client of any tenant, or one that registered itself, could mint a token carrying another
-  tenant's resource as its audience, that tenant's issuer and its scopes. It is now refused with
-  `invalid_target` unless the client belongs to the project that declared the resource.
-- **Every address a client supplies is fetched through one egress boundary.** The sector document,
-  the client's key set and the CIBA and back-channel logout notifications went through plain `fetch`:
-  redirects followed anywhere, private and link-local addresses reachable, no bound on time or size,
-  and the sector refusal repeated the status the target answered. They now share the address check,
-  per-hop redirect check, timeout and streaming byte bound the client ID metadata document fetch had,
-  and the sector refusal is one message whatever went wrong.
-- **Codes, rotating refresh tokens, pushed requests and assertion `jti`s are single use under
-  concurrency.** Each was checked on a copy read earlier in the request and then spent with an
-  unconditional write, so parallel requests all won: one authorization code yielded five sets of
-  tokens, a rotating refresh token forked into several chains without tripping reuse detection, and a
-  captured client assertion or DPoP proof authenticated every concurrent replay. The adapter's
-  `consume` now answers whether this call spent the record, a new `create` stores only when the id is
-  free, and every caller decides on that answer, in all three backends.
-- **Attempt caps hold against a burst of parallel guesses.** The emailed verification code, the TOTP
-  failure window and the password door each read their count, verified, and wrote the count plus one,
-  so a burst advanced them by one: fifteen passwords were hashed against a cap of five, and the right
-  code was accepted after fifteen wrong ones. Each now counts the attempt first through a new atomic
-  `increment` and admits it only within the cap; the verification code's expiry is also checked on
-  read.
-- **Being added to someone else's personal group no longer changes your default scope.** An
-  administrator's personal group was found as any personal group they belonged to, so after a
-  colleague added them to theirs, sign-in could land them in the colleague's group and their new
-  projects, clients and buckets were created there. It is now the one whose first member, its owner,
-  they are, in every backend and in the scope fallback.
-- **The password reset request no longer reveals whether an address has an account.** Its cooldown
-  and daily cap are kept only for addresses with an account, and refusing with a "please wait" page
-  meant that asking twice within a minute told anybody the address was registered; the SMTP send,
-  awaited only for such an address, told the same by response time. Every outcome now renders the
-  one accepted page, which states the limits, and the mail is sent after the response.
-- **A datastore's duplicate-key error no longer carries an end user's address into the error store
-  or Sentry.** Two registrations of one address racing past the lookup made MongoDB raise `E11000 …
-dup key: { email: "…" }`, and the fault's message is stored and sent. The user stores now raise
-  their value-free "already exists" error for it, and any duplicate-key message is recorded as
-  `duplicate key`.
-- **First-run setup, reset links and group invitations are single use under concurrency.** Each
-  checked, then acted, then marked, so parallel requests all got through: two setups made two super
-  administrators, two submissions of one reset link both set a password, and two acceptances of one
-  invitation both applied. Each is now claimed once, atomically, before anything is written.
-- **A forwarded client certificate is read only when the operator says the proxy sets it.** With the
-  mTLS features on, the default hook took the certificate from any `x-client-cert` header, and a
-  certificate is public, so a caller the proxy did not strip the header from could authenticate as a
-  self-signed TLS client or present a stolen certificate-bound token. The new
-  `mTLS.trustProxyCertificateHeader` setting, off by default, gates it; when on, RFC 9440's
-  `Client-Cert` is read, with `x-client-cert` as the fallback.
-- **Requests to an upstream identity provider go through the egress boundary.** Discovery, the code
-  exchange, GitHub's token exchange and the upstream key set used plain `fetch`, although any group
-  member can set a provider's issuer and an unauthenticated visitor re-triggers the requests by
-  starting a sign-in; they now share the address, redirect, time and size checks, and discovery
-  refuses a document naming any endpoint that is not https.
-- **A client that skips consent does so only for its own group's users.** Any group member could
-  create a project with no bucket and a consent-free client in it; such a client signs into the shared
-  default bucket, where it received any signed-in user's claims with `prompt=none` and no page shown.
-  The flag is now honoured only when the sign-in bucket belongs to the client's project group.
-- **A bucket's password, reset, registration and second-factor policy holds for a client in no
-  project.** Those doors resolved the bucket from the client alone while the sign-in used the resource
-  the request named, so a federated-only bucket reached through a declared resource verified
-  passwords, mailed resets that set a password on a federated account, and accepted registrations,
-  while its required enrolment looped back to the login page. They now resolve the same bucket, and a
-  bucket with password sign-in off also refuses a reset link issued before it closed.
-- **The outbound address check no longer depends on how an address is spelled.** It matched text, and
-  URL parsing rewrites `https://[::ffff:169.254.169.254]/` to the host `[::ffff:a9fe:a9fe]`, which the
-  dotted-form pattern let through to the cloud metadata endpoint; NAT64, 6to4 and compatible forms and
-  several reserved ranges passed too. It now compares numerically and judges the IPv4 an IPv6 address
-  carries.
-- **The server image no longer takes in environment files or the repository's history.** The image is
-  built with `COPY . .` and `.dockerignore` excluded only four conventional dotenv names, so a
-  `.env.production` on the building machine would have been baked in and loaded; it now excludes every
-  `.env*`, `.git`, CI and agent configuration, specs, wiki and docs.
-- **A tenant can no longer claim another tenant's MCP server.** A declared protected resource was
-  unique across the instance and first come, first served, so any group member could declare someone
-  else's server, leave its owner a permanent conflict and route its clients into their own bucket. A
-  declaration is now unique within its issuer: a bucket with an address of its own declares without any
-  outbound check, and at the shared root issuer only a super administrator declares.
-- **A token from one bucket no longer verifies at another bucket's resource server.** Every bucket
-  signed with the instance keys, so tenant separation there rested on the resource server checking
-  `iss`. A bucket with an address now signs with keys of its own and publishes them at its own
-  `jwks_uri`; the root issuer's keys and metadata are unchanged.
-- **An end user's own password is held to eight characters.** Registration and the reset form enforced
-  the minimum only through the form's `required` attribute, so a direct POST set any password, and an
-  empty one reached the hash and answered 500. Both now refuse a short password as a form to correct,
-  the same eight every administrator-set password is held to.
+- **A sign-in continues only in the browser that began it** (regression since `53341c6`).
+- **An enrolment secret completes only the account it was offered to.**
+- **Client metadata is snake_case only**, so wire input sets no internal keys; `PUT /reg/:id` keeps self-registration.
+- **Federated sign-in no longer links to a password-only account** until that account's own sign-in completes.
+- **An agent's token works on the management API only through `/mcp`.**
+- **Client credentials for a declared resource** go only to that project's clients; consent skip only for its own group.
+- **One egress boundary for every outbound request**, with a numeric address check that closes IPv6-mapped bypasses.
+- **Single use under concurrency** for codes, rotating refresh tokens, pushed requests, `jti`s, setup, resets and
+  invitations; attempt caps count atomically.
+- **Forwarded client certificates** are read only with `mTLS.trustProxyCertificateHeader` (off by default).
+- **No account enumeration or address leaks** through password reset or duplicate-key errors.
+- **Bucket policy holds for clients in no project**; end-user passwords need eight characters server-side.
+- **Personal groups are found by owner**, and the image excludes every `.env*`, `.git` and repository metadata.
+- **Tenant isolation**: a resource is unique per issuer and only a super administrator declares at the root.
 
 ### Added
 
-- **Per-bucket key rotation.** A bucket's owning group generates, promotes and retires its keys from the
-  bucket's page or through MCP; a new key is published before it may sign and a retired one stays
-  published until every token it signed has expired.
-- **Whether a resource vouches for its declaration.** The console and the `resource_vouching_check`
-  tool report whether a declared resource's own RFC 9728 metadata lists the issuer its tokens carry,
-  following the full MCP discovery order. It blocks nothing.
+- **Per-bucket key rotation** in the console and MCP, and `resource_vouching_check` for RFC 9728 metadata.
 
 ### Fixed
 
-- **The first schema migration would never have run.** Both provisioning scripts marked every
-  declared migration applied on every run, and the release command runs them before `db:migrate`; they
-  now baseline only a database they provisioned from empty, and `db:migrate` hands a step its handle.
-- **A resource declared with a significant trailing slash keeps it.** Declaration canonicalized with
-  the default options, so the flag had no effect and both spellings were issued tokens.
-- **Every signed response from a named bucket carries that bucket's issuer.** The signed userinfo
-  response, the JWT introspection response, the JWT-secured authorization response and the back-channel
-  logout token were minted without the bucket and named the root issuer, so a relying party checking
-  `iss` against the bucket's metadata rejected them. The logout token now names the bucket the ended
-  session signed in to.
+- **The first schema migration now runs**; a significant trailing slash on a declared resource is kept.
+- **Signed responses from a named bucket carry that bucket's issuer.**
 
 ## [0.6.0] - 2026-09-28
 
-The server stops taking its own data on trust. Every record read back from storage — a token, a
-session, an account, a bucket — is checked against its schema on the way out, and the request context,
-request parameters and clients are typed from the schemas the endpoints validate against instead of
-asserted. Checking what is actually stored found what the assertions had hidden: on PostgreSQL every
-account update and every group-filtered audit read failed, and a lost race for a bucket hostname
-answered 500; MongoDB stored an undefined member as null; a host-addressed bucket forgot its
-sign-ins; and a client's `default_max_age` of 0 depended on whether a clock second had passed. Error
-codes at the token, device and CIBA endpoints, and several request parameters, now follow their RFCs.
-
-**Upgrading asks two things of an integration.** Extension functions, policy checks, registration
-policies and RAR validators receive the request context itself rather than `{ oidc }`, with no shim;
-and a client reading its registration with the access token in the query string sends it in the
-Authorization header instead. A stored record that does not match its schema now fails its request as
-a server error the error store records, rather than passing as a malformed value — the shapes 0.5.0
-writes are accepted, and no schema migration is declared. Deployments that lengthened a token lifetime
-will see older browser refresh-token chains sign in once more.
+Every record read back from storage is checked against its schema, and the request context is typed from the
+endpoints' schemas. **Upgrading:** extension functions receive the request context itself, not `{ oidc }` (no shim);
+no schema migration is declared.
 
 ### Fixed
 
-- authorization: a client registered with `default_max_age: 0` is asked to sign in again on every
-  request, as `max_age=0` is. The default was applied as the string `"0"`, which skipped the
-  re-authentication rule and left it to whether a clock second had passed since sign-in.
-- MongoDB: a member a writer leaves undefined is stored as absent rather than as null — a console
-  session's refresh token, a host-addressed bucket's slug, a federation provider's secrets.
-- PostgreSQL: account updates (roles, password, TOTP, federated links) and group-filtered audit reads
-  failed on every call — a JS array was bound as text PostgreSQL cannot read as an array. A lost race
-  for a bucket hostname answered 500 instead of "taken", because Bun reports SQLSTATE in `errno`.
-- Device verification refuses a confirmation when the session holds no form secret, instead of
-  comparing two absent values as a match; resuming an interaction after an account change re-saves it
-  with the same TTL floor the sign-in screens use, so a record about to expire is not left
-  non-expiring.
-- Host-addressed buckets: a sign-in at the bucket's host wrote a session cookie the host never read
-  (so it was forgotten), and authorization responses and tokens named `ISSUER/<id>` instead of the
-  bucket's origin its discovery document advertises; `GET /logout` there read the default bucket's
-  session. The bucket record now keeps its host, and `/logout` passes the request host. An interaction
-  aborted back to the client names the bucket's issuer, not the instance's.
-- ID Token claims beside a resource-bound access token: with `conformIdTokenClaims`, the
-  authorization-code, device and CIBA grants read the access token's audience off the instance (always
-  empty) and so left profile claims to UserInfo even when the access token, bound to a resource server,
-  cannot call it; they now read it from the token's payload, as the refresh grant already did.
-- CIBA: the `verifyUserCode` addon receives the request's `user_code`; it was handed the login hint
-  instead, so a deployment's user-code check never saw the code the client sent.
-- request parameters follow their specifications: `ui_locales` and `claims_locales` are one
-  space-separated string each (OIDC Core), no longer an array, and `ui_locales` sent twice is refused;
-  `registration`, and a disabled `request`/`request_uri`, are refused with the OIDC Core §3.1.2.6 codes
-  instead of `not_supported`; several or malformed `resource` values at `/token` are `invalid_target`
-  (RFC 8707), not `invalid_request`; a parameter sent twice to `GET /logout` is refused.
-- **breaking** — registration read (`GET /reg/:clientId`) no longer accepts the registration access
-  token in the query string (RFC 6750 §2.3, OAuth 2.1); send it in the Authorization header.
-- token, device authorization and CIBA endpoints answer as RFC 6749 §5.2 says: an unknown `grant_type` is
-  `unsupported_grant_type` (was `invalid_request`), and a grant the client is not registered for is
-  `unauthorized_client` (was `invalid_request`).
-- tokens: a browser application's rotated refresh tokens again expire when their chain's first token
-  would have, instead of each rotation granting a fresh lifetime — dead since `54ba556`, masked by the
-  equal default grant lifetime. `ttl.*` now take `(token, client)`. Deployments that lengthened a
-  lifetime will see older browser chains sign in once more.
-- buckets: device authorization and CIBA started at a named bucket now use its verification page,
-  session and `iss`, and refuse another bucket's client as `unauthorized_client`; registration there
-  returns a management URI beneath it. A `deviceInfo` override now takes effect (the default records the
-  caller's address as a string).
-- admin: editing a client in the console or through the agent's `client_update` no longer drops every
-  attribute the console does not display. A pairwise client stayed pairwise only until its first edit,
-  and a client authenticating with a private key could not be edited at all.
-- claims: a client requesting `claims.id_token.sub` as a non-object (`true`, a string, a number) now gets a
-  code, as for `null`, instead of `server_error`.
-- interactions: when a different account signed in during an interaction, confirming the sign-out
-  continues it again. The confirmation always answered 400 `could not find logout details`.
+- **PostgreSQL** account updates and group-filtered audit reads work; **MongoDB** stores undefined members as absent.
+- **Host-addressed buckets** keep their sign-ins and name their own issuer, also for device and CIBA.
+- **Error codes follow RFC 6749 §5.2 and RFC 8707**; `ui_locales` and `claims_locales` are space-separated strings.
+- **Breaking:** `GET /reg/:clientId` takes the registration access token only in the Authorization header.
+- **Browser refresh-token chains** expire with their first token again; `ttl.*` now take `(token, client)`.
+- **Smaller fixes**: `default_max_age: 0`, console client edits, CIBA `verifyUserCode`, device confirmation.
 
 ### Changed
 
-- authorization_details: declared in its RFC 9396 §3 wire form (`t.ArrayString`: one parameter, the
-  JSON array as text) at `/auth`, PAR, device and CIBA, and a repeat is refused as RFC 6749 §3.1
-  requires. A repeated parameter used to be accepted as one detail per copy.
-- models: a stored record becomes a model only if it satisfies that model's schema, now a static
-  `schema` on the class; one that does not (a malformed or foreign record) is treated as not found.
-  Until now nothing checked a model's own schema, on construction or on read.
-- storage: records read without a model class — federation state, the login, reset and resend
-  throttles, the verification and reset challenges, the TOTP records — are checked against their own
-  schema too, and one that does not match fails the request (a throttle read as absent would be a
-  fresh allowance).
-- storage: every PostgreSQL and MongoDB store document (accounts, buckets, groups, projects, sessions,
-  audit, errors, keys, settings) is checked against its schema when read; one that does not match fails
-  the request as a server error, recorded by the error store, instead of passing as the type. On
-  PostgreSQL, nested dates (a TOTP enrolment's, a federated link's) now come back as dates.
-- types: the typed (Eden) client sees what the endpoints answer — `/token` declares its 400/401 errors and
-  one token body, registration and introspection declare their RFC members, the request headers include
-  `accept` and `x-client-cert`, and the admin client schema's grant types and auth method are no longer
-  `never` (unions built from a mapped array); the interaction pages (`/ui/*`) and discovery declare
-  their answers, and every protocol route its 500. No response changes on the wire.
-- **breaking** — extension functions, policy checks, registration policies and RAR validators receive
-  the request context itself (`issueRefreshToken(oidc, client, code)`, `check: (oidc) => …`), not
-  `{ oidc }`. Request-scoped events carry it first; `grant.revoked` is `(oidc?, grantId)` and fires once
-  (a partial sign-out emitted it twice), `code_verification.error` is `(oidc, error)`. No shim.
-- request context: `OIDCContext` declares what it holds — built from an init object with a required
-  `bucket`, typed entities, `oidc.require(name)`. A getter is a guarantee: `oidc.client` and
-  `oidc.session` throw when absent (`authenticatedClient` is gone); optional entities are read as
-  `oidc.entities.X?`, replacing the `grant`, `account` and `deviceCode` getters. Unread fields removed.
-- request context: request parameters are typed from the schemas the endpoints validate against —
-  `PipelineParams` for the authorization, device and backchannel pipeline, `TokenParams` for the grant
-  handlers — and the type is closed, so TypeScript overrides reading their own extension parameter
-  need an explicit widening. `claims` members are `unknown` until read through `claimRequest()`;
-  the schema now declares them as records, accepting exactly the same inputs. JavaScript overrides are
-  unaffected.
-- client: the client's type names its closed value sets (authentication method, CIBA delivery mode,
-  signing algorithms) from the lists the configuration check uses, is read-only all the way down to
-  match the freeze.
-- client: the validated client has a type that matches it — the attributes a default always fills are
-  required, `client_name`, `contacts`, `default_acr_values` and `client_id_issued_at` are declared — and
-  the request context carries it typed (`oidc.client`; see the request-context entry above).
-- client: a client is written the same way from every surface, through `registerClient`, and its sector
-  identifier document is checked there and only there. Resolving a stored client no longer retrieves
-  it, so a pairwise client stays usable while its sector host is down; the console, which stored
-  without the check, now refuses an edit the document does not cover. A document-described client
-  keeps the check on resolution.
-- client: a resolved client is frozen data — no methods, no prototype — and is used through functions
-  (`redirectUriAllowed(client, uri)`, `clientMetadata(client)`, …). `Client` is an object holding
-  `find`/`tryFind`; back-channel logout and CIBA ping moved to `lib/shared/client_notifications.ts`.
-- client: a client's key material is derived beside it by `clientKeys(client)` instead of hanging off
-  the object, and its key set no longer writes certificate thumbprints onto the client's own keys. The
-  `clientAuthMethod` / `clientAuthSigningAlg` aliases are gone; read the registered attribute names.
-- client: each registration attribute's validation rules are declared once, in
-  `lib/consts/client_attributes.ts`, replacing five parallel lists that nothing kept in step. No
-  behaviour change, verified against 33,159 registrations; three rules that could never fire, and one
-  check that never ran, are removed.
+- **Schema-checked storage**: a record that does not match fails as a server error the error store records.
+- **Breaking:** extension functions, policy checks, registration policies and RAR validators take `oidc` directly.
+- **Typed `OIDCContext`**: `oidc.client` and `oidc.session` throw when absent; `authenticatedClient` is gone.
+- **A client is frozen data** written through `registerClient`; `clientAuthMethod` aliases are removed.
+- **`authorization_details`** uses its RFC 9396 wire form, and a repeated parameter is refused.
 
 ## [0.5.0] - 2026-09-21
 
-A user bucket finishes becoming a tenant. 0.4.0 gave it a path beneath the server; this release lets
-it hold a hostname of its own instead — `acme.auth.example.com` rather than `auth.example.com/acme` —
-which is what puts its sign-in cookie on an origin of its own and publishes one metadata location
-where a path-bearing issuer forces two. A bucket holds one form of address or the other, never both,
-since two addresses would be two issuer identifiers for one population. Changing an address is its
-own operation and an administrator of the instance's alone: it names every client that will stop
-validating tokens before anything changes, and completes only on a second call.
-
-Signing in to a bucket stops being only a password. Google, Microsoft, Apple and GitHub can each be
-connected to a bucket by name, asking only for what that provider actually issues, and the console
-now shows the callback address to register — which differs per bucket and appeared nowhere before.
-Projects and user buckets can also be deleted from the console, which the management API has always
-accepted and nothing in the console reached; a container may take its contents with it, on an
-election made separately from confirming, and neither deletion completes by clicking.
-
-**Upgrading signs your administrators in once.** The session cookie is now named after the bucket the
-client signs into rather than the address the request arrived at, because the administrators' bucket
-and the default one are both served at the root and only the client says which population a sign-in
-is for. That is what fixes a console login failing with `interaction session and authentication
-session mismatch` whenever the browser already held an end-user sign-in from the same server; the
-price is that a console session held from before this release is not read, and the administrator
-signs in again. End users are unaffected, no schema migration is declared, and nothing is lost —
-accounts, grants, consent and refresh tokens are untouched.
+A user bucket can hold a hostname of its own, and Google, Microsoft, Apple and GitHub connect by name. **Upgrading**
+signs administrators in once more; end users are unaffected and no schema migration is declared.
 
 ### Added
 
-- A user bucket can be addressed by a hostname of its own rather than a path beneath the server, and
-  holds one form or the other — never both, since two addresses would be two issuer identifiers for one
-  population. A host isolates the bucket's sign-in cookie by origin, which path addressing cannot do at
-  all, and publishes one metadata location instead of the two a path-bearing issuer forces. It costs a
-  DNS record and a certificate the operator provides; the console names the record to create and reports
-  whether any request has yet arrived, and claims nothing about whether the name resolves. Changing an
-  address is its own operation, available only to an administrator of the instance: it names every client
-  that will stop validating tokens before anything changes and completes only on a second call. Spec 056.
-
-- site: a blog article can carry inline SVG diagrams. Three colour tokens in the stylesheet make a
-  diagram follow the site palette and the reader's theme, and a diagram's labels are left out of the
-  page's extracted text, so they neither run together in the Markdown alternate nor get judged as
-  prose by the rules that read it. The first article, on DPoP, is rewritten around three of them.
-- site: the public site has a blog, and publishing to it is writing one file. The page, the index entry,
-  the sitemap entry with its date, the social card, the plain-text alternate, the `llms.txt` entry and
-  the feed item are all derived from that file, so nothing is remembered and nothing is half-applied.
-  The blog is not exempt from anything: every rule that already fails the build for a marketing page
-  fails it for an article, and the rule that catches copy claiming the server stores its data in one
-  datastore now reaches articles too — an article genuinely about one backend earns its exemption by
-  printing a line telling the reader it is scoped, rather than by being added to a list of excused
-  pages. A draft or a future-dated article exists nowhere: no page, no sitemap entry, no feed item, no
-  card. Articles are attributed to the project, carry their publication and revision dates where a
-  reader can see them, and say so themselves once they are old enough to deserve a second look.
-
-- admin: Microsoft, Apple and GitHub can be connected to a user bucket by name, alongside Google. Each
-  asks only for what it actually issues — two values for GitHub, three for Microsoft (including who may
-  sign in: one organisation or any Microsoft account, stated with its consequence and not chosen for
-  you), four for Apple. Apple needs no client secret: it supplies a signing key and this server produces
-  the credential Apple wants on every exchange, so nothing expires and nothing is ever renewed by hand.
-  GitHub is not an OpenID Connect provider and asserts no identity, so the signed-in person is read back
-  from GitHub — including the primary verified address of an account whose profile hides one, and never
-  an unverified one. Each provider gets its own branded button, rendered from an inline mark so loading a
-  login page still tells no provider that somebody is there.
-
-- admin: Google can be connected to a user bucket by name. The console now shows what to do at Google,
-  links straight to it, and — the part that was missing entirely — the exact callback address to
-  register, which differs per bucket and appeared nowhere before; the administrator supplies only the
-  client id and secret Google issued. Everything else comes from a recognised-provider catalogue that is
-  data, not behaviour: the stored provider is indistinguishable from one configured by hand, so nothing
-  can branch on how it was made, and a Google provider configured by hand years ago now renders with its
-  own branded button without a migration. The same route serves agents, so an agent connects it the same
-  way, with the same checks and one audit entry. A bucket with no slug is told its callback address is
-  provisional, because assigning a slug later invalidates it.
-
-- admin: projects and user buckets can be deleted from the console, which was impossible before — the
-  management API accepted both deletions and nothing in the console reached them. A container may now
-  take its contents with it, a project its OAuth clients and a bucket its end-user accounts, on an
-  election the administrator makes separately from confirming; the request carries what they reviewed,
-  so a client or account that arrived since is refused rather than destroyed on a stale consent.
-  Neither deletion completes by clicking: the administrator types `delete`. A project never reaches
-  the bucket it pointed at, under any election, because buckets are shared and hold people no project
-  knows about. One deletion writes one audit entry carrying what went by kind and count — replacing
-  one entry per withdrawn protected-resource declaration, which a bucket-sized deletion would have
-  turned into a trail nobody could read.
+- **Hostname-addressed buckets** (spec 056): path or host, never both; only an instance administrator changes it.
+- **Google, Microsoft, Apple and GitHub sign-in by name**, with branded buttons and the callback address shown.
+- **Deleting projects and buckets from the console**, optionally with their contents, confirmed by typing `delete`.
+- **site:** a blog, with inline SVG diagrams.
 
 ### Fixed
 
-- admin: signing in to the console no longer fails with `interaction session and authentication session
-mismatch` when the browser already holds an end-user sign-in from the same server, and no longer asks
-  for the password on every authorization request. The default bucket and the administrators' bucket are
-  both served at the root, so the address alone cannot say which population a sign-in is for — only the
-  client can, which is how the rest of the sign-in has always decided it. Naming the session cookie from
-  the address meant the authorization request and its resumption read two different cookies and saw two
-  different sessions.
-
-- A client can no longer sign an end user out of a user bucket it does not belong to. A sign-out ends
-  whatever sign-in the address it was requested at holds, and nothing checked that the client asking
-  shared that sign-in — an `id_token_hint` is validated against the issuer, and a bucket served at the
-  root shares the server's own, so a token minted for one population could end another's. Buckets that
-  share a session cookie still end each other's sign-in, which is what their clients have always done at
-  the bare endpoints; anything else is refused.
-
-- admin: two administrators assigning one hostname at the same moment now both get an answer they can
-  act on. The route asks the store whether a name is free and writes after the answer, so both reads
-  can return "free" and the datastore's own constraint refuses the second write — `UniqueValueTaken`,
-  a class introduced precisely so that refusal would be a 409 rather than an internal fault. Nothing
-  caught it, on either the create or the address-change route, so the operator who lost the race got a
-  500 and a recorded defect. Found by a coverage report rather than by a person: the class was raised
-  by all three bucket stores and reached by nothing.
-
-- ci: a commit that touches the PostgreSQL adapter no longer fails the coverage gate for doing so.
-  `bun test` runs on the in-memory adapter, so a store's function bodies need a live server and can only
-  run under `database/verify_postgres.ts`, which the default run deliberately cannot reach; they report
-  4–17% rather than 0% because the import-safety sweep executes their top level and nothing else.
-  Seventeen stores and the plumbing they issue SQL through held the project number at 90.92% — which
-  Codecov then holds every later commit to — and one duly failed at 84% of a diff whose 62 worst lines
-  sat in a single such file. The `codecov.yml` ignore list now names the connection-bound files and only
-  those: everything under that directory which runs in process stays measured, because a low number
-  there is a real gap, and MongoDB's stores stay measured as well, having no equivalent verification run
-  to be judged in instead.
-
-- test: the constant-time comparison cases now judge a timing difference by its size rather than by its
-  statistical significance. Welch's t divides by the machine's noise floor, so the 0.1–0.4% residue a
-  correct comparison always leaves — where the strings landed, not what the comparison did, as two
-  candidates with identical content produce the same spread — scores about three times higher on a
-  Linux runner than on the Windows machine whose 100 ns clock the threshold was calibrated against.
-  That reddened CI on an unmodified tree, and it meant load made the cases pass while a quiet, precise
-  machine failed them. A leak is instead a fraction of the work, and that fraction transfers between
-  platforms: 52% on Linux and 59.5% on Windows for a first-difference mutant, against a floor of 2%.
-
-- federation: the authorization code is now bound to the request that asked for it at every recognised
-  upstream that supports the binding. Support was read from what a provider publishes, and three of the
-  four publish nothing — Microsoft recommends the binding while advertising no method, GitHub has
-  supported it since July 2025 while publishing no metadata at all — so those legs were silently going
-  without. A provider nobody has vouched for is still judged by its metadata, and nothing is sent where
-  support is unknown, because an unrecognised parameter breaks sign-in for everyone.
-
-- admin: an Apple signing key is masked on every read of a provider and of the bucket containing it, the
-  same rule the client secret follows and in the same place, so a second credential could not repeat the
-  leak the first one had.
-
-- admin: the console's dialogs offered the administrator's own saved credentials. A browser reads an
-  address or an identifier sitting beside a password field as a sign-in form, so creating an admin,
-  creating an end user, resetting somebody's password and entering an upstream provider's credentials
-  were all autofilled from the password store — one distracted confirmation away from creating an
-  account with the operator's own email and password, or from overwriting a working provider secret.
-- admin: dialogs sat a flat 100px below the top of the window whatever its height, which on a laptop
-  is a sixth of the screen and pushed taller dialogs off the bottom. Short viewports now get a small
-  offset; large monitors are unchanged.
-- interactions: a mistyped password removed the provider buttons from the login page. The refusal
-  re-rendered from defaults rather than from the bucket's options, so a page that had just offered a
-  federated sign-in came back offering only a password box; the unverified-email refusal did the same.
-- admin: the administrators' bucket and the default end-user bucket could be deleted by a super
-  administrator while empty. The bucket deletion route does not go through the loader that carries the
-  reserved-bucket guard, so it reached no such guard at all; both are now refused before the bucket is
-  loaded, whatever is elected and whoever asks.
+- **Console sign-in no longer fails** with `interaction session and authentication session mismatch`.
+- **A client can no longer sign out a bucket it does not belong to.**
+- **A lost race for a hostname answers 409**, not 500.
+- **Federation binds the authorization code to its request** at every recognised upstream that supports it.
+- **Console and login page fixes**: Apple key masked, dialogs not autofilled, provider buttons kept, reserved buckets
+  undeletable.
 
 ## [0.4.0] - 2026-09-16
 
-One thing defines this release: a user bucket is a tenant of its own. It is addressed in the URL,
-publishes its own metadata, mints tokens carrying itself as `iss`, and holds its own sign-in — so a
-browser can be signed in to two buckets at once and neither disturbs the other. The default bucket
-keeps the bare issuer and the bare paths, which is what makes the change deliverable to an existing
-deployment without a flag day.
-
-Two sign-in defects found on the way are fixed with it, and both had the same shape: a browser rule
-no headless test could see. A sign-in that started at a relying party answered `422` for every real
-client while the identical URL opened by hand returned `200`, because `SameSite=Strict` withholds a
-cookie on exactly the navigation the flow is made of. And the "Remember me" checkbox had never
-decided anything.
-
-**Upgrading signs your end users in once.** A session cookie now carries the bucket it belongs to;
-one written before this release does not, is never read, and is expired on the first request that
-presents it. Nothing is lost — accounts, grants, consent and refresh tokens are untouched — and the
-[upgrade guide](https://foxauth.dev/docs/deploy/upgrade/) says what to expect. The admin console
-stays at `/admin`.
+A user bucket is now a tenant with its own address, issuer and sign-in, while the default bucket keeps the bare issuer
+and paths. **Upgrading signs end users in once**: a session cookie written before this release carries no bucket and is
+expired on first use (accounts, grants, consent and refresh tokens are untouched).
 
 ### Added
 
-- buckets: a user bucket is now a tenant with its own issuer. An operator gives a bucket an address
-  and it is served beneath it — `https://auth.example.com/acme` publishes its own metadata at both
-  well-known locations a path-bearing issuer has, serves every protocol endpoint, and mints tokens
-  carrying itself as `iss`. A client integrates with one exactly as with any authorization server, and
-  can finally tell one population's tokens from another's. A client of an addressed bucket is refused
-  at any other bucket's address, and a token records which bucket issued it, so a token presented to a
-  bucket that did not issue it is reported inactive as RFC 7662 §2.2 requires. **The default bucket is
-  unchanged**: it keeps the bare issuer and the bare paths, so nothing integrated before this needs
-  reconfiguring and tokens in circulation stay valid. Two reserved buckets — the default one and the
-  administrators' — are served at the root by design: they are not addressable and their tokens carry
-  the instance's own issuer, which is why the admin console stays at `/admin` and why an agent's
-  connection to the administrative MCP plane keeps working. The console's Buckets table reports those
-  two as served at the root rather than at the slug they hold, because the Address column is what an
-  operator copies when pointing a client at a bucket. A bucket's address is fixed once chosen; renaming would invalidate every
-  client integrated with it and wants an operation of its own.
+- **Bucket as issuer**. A bucket given an address (e.g. `https://auth.example.com/acme`) serves every protocol endpoint
+  and its own metadata, and mints tokens with itself as `iss`.
 
 ### Fixed
 
-- buckets: a browser can hold a sign-in in more than one user bucket at a time. The session cookie is
-  now named after the bucket that wrote it, so two sign-ins are two cookies and neither disturbs the
-  other. Before this, signing in to a second bucket overwrote the first bucket's sign-in and the end
-  user was silently signed out of an application they had never touched — the buckets were isolated
-  from each other, which is what the earlier work proved, but they could not coexist, which nothing
-  had checked. A sign-out now ends the sign-in of the bucket its address names and no other, tells no
-  other bucket's applications about it, and "Remember me" declined in one bucket says nothing about
-  another's lifetime. The administrators bucket is a population like any other here: signing out of
-  the console ends its sign-in rather than every sign-in the browser holds. **Everyone signed in when
-  this is deployed signs in once more**: the old cookie carried no bucket, is never read, and is
-  expired on the first request that presents it.
-
-- buckets: reaching a second user bucket in one browser no longer fails. An authorization request for
-  one bucket from a browser signed into another answered `server_error`, leaving the end user with
-  nothing to retry: the sign-in check read the account identifier the session happened to carry rather
-  than the account that actually resolved, so it suppressed the sign-in prompt for a request that had
-  no account at all, and the first consent check to reach inside the absent grant faulted. And where a
-  sign-in as the second person did complete, it was read as an account change and answered with a
-  sign-out confirmation whose only working button ended every sign-in the browser held — a demand to
-  abandon one product in order to use another. A sign-in now records the bucket it belongs to, and
-  buckets are compared before account identifiers, because identifiers from two buckets are always
-  unequal and say nothing about who is signing in.
-
-- interactions: sign-in works again when it starts at a relying party. The `_interaction` and
-  `_session` cookies were written `SameSite=Strict`, which a browser withholds on a
-  cross-site-initiated top-level navigation — the shape of the whole flow, since the relying party
-  navigates to `/auth`, which sets the cookie and redirects to `/ui/:uid/login`, whose guard requires
-  it. Every such sign-in answered `422 Invalid interaction cookie`; opening or reloading the identical
-  URL by hand returned 200, because a browser-initiated navigation counts as same-site, which is what
-  hid it. `_session` shared the constant and failed more quietly: invisible at `/auth`, an established
-  session made a second relying party re-prompt a user who was already signed in. Both are now `Lax`,
-  which still withholds them on the cross-site POSTs and subresource requests that carry the CSRF
-  property. The admin console's cookie is a separate constant and stays `Strict`.
-
-- admin: a project's assigned user bucket can now be changed and removed. Assigning was one-way — the
-  only route took a bucket id and had no value meaning "none" — and the console had no control for it
-  at all, so a bucket could be set only through the MCP surface and never unset, however wrong it was.
-  The Projects table now has a **Bucket** editor offering the buckets that share the project's owning
-  group — the only ones the server will accept — plus "Not set", which is how the default bucket is
-  chosen: it belongs to no group, so it is assignable to nothing and needs to be, since a project with
-  no bucket already signs its users in from it. Clearing is its own operation on both surfaces
-  (`DELETE /admin/api/projects/:id/bucket`,
-  published to agents as `project_bucket_clear`). A project with no bucket signs its users in from the
-  default bucket, as it always has. Clearing is its own audited action rather than an assignment
-  carrying an empty value, because the audit trail records field names and never values: one action
-  could not have told an operator which of the two had happened. This also makes the documented
-  procedure in "Your first client" true — it described a console control that did not exist.
-
-- admin: the reserved administrators' bucket can no longer be assigned as an ordinary project's user
-  bucket. It appeared to be protected by the rule that a project and its bucket share an owning group,
-  but that rule did not cover it: the admin bucket sits in the reserved System group, and a super
-  administrator whose active scope is empty creates projects into that same group — so the comparison
-  was `unassigned` against `unassigned`, which passes. Such a project's end-users were the accounts
-  that administer the instance. The route now refuses the reserved bucket outright, the same refusal
-  the bucket routes already make.
-
-- mcp: `settings_update` now tells an agent what each server setting accepts. Its published schema
-  described no setting at all — the route behind it validates every value in its handler rather than
-  in its body schema, so there was nothing there to publish — and a client with no type to check a
-  value against sends the text it was handed: `par.enabled: true` arrived as `"true"` and `scopes` as
-  one string, both correctly refused, with no encoding available that satisfied caller and server at
-  once. Two unrelated clients hit it. Every catalogue key is now published with its type, its allowed
-  values where it has them, and a one-line description, all derived from the same catalogue the
-  handler enforces. The published schema describes without enforcing, so a setting the catalogue does
-  not declare still reaches the handler and is refused by name rather than silently dropped.
-
-- interactions: the "Remember me" checkbox on the sign-in screen now decides how long the sign-in
-  lasts. It never had, on any path: the answer was recorded under one name and read under another,
-  the answer that was recorded was inverted, nothing anywhere read the resulting flag, and a
-  sign-in that asked to be remembered could not clear an earlier decline — four independent breaks
-  on one path, each sufficient alone. Declining now yields a session cookie the browser discards
-  when it closes; accepting keeps today's behaviour, up to the configured sign-in lifetime. The
-  choice survives a one-time-code step, and a path that offers no checkbox — federated sign-in —
-  still keeps the sign-in. Nobody who leaves the box ticked sees any change. (spec 049, issue #45)
+- **Sign-in to several buckets at once**. The session cookie is named per bucket, a sign-out ends only the addressed
+  bucket's sign-in, and reaching a second bucket in one browser no longer answers `server_error`.
+- **Sign-in started at a relying party**. `_interaction` and `_session` are now `SameSite=Lax`, ending the `422`.
+- **A project's user bucket**. It can be changed and cleared (MCP `project_bucket_clear`), and the reserved
+  administrators' bucket can no longer be assigned.
+- **`settings_update` schema**. The MCP tool now publishes each setting's type, allowed values and description.
+- **"Remember me"** (spec 049, issue #45). Declining now ends the sign-in when the browser closes.
 
 ## [0.3.0] - 2026-09-14
 
-Three things define this release. The server runs on PostgreSQL as well as MongoDB, behind a
-schema-migration layer that gates startup on either. The OpenID Foundation conformance suite was run
-against it for the first time — twelve plans, 16 680 conditions — and the twelve defects those runs
-found are fixed here, from the PAR response's content type to the `code_verifier` alphabet, with
-`CONFORMANCE.md` recording where it stands and the five that are still open. And a server setting
-now takes effect when it is saved, without a restart.
+The server runs on PostgreSQL as well as MongoDB, behind a schema-migration layer, and a saved setting takes effect
+without a restart. The first OpenID Foundation conformance runs found twelve defects, fixed here.
 
 ### Added
 
-- admin: a server setting now takes effect when it is saved, without restarting the server. Every
-  setting carries a class on its console descriptor — applied on save by default, or waiting for the
-  next start with a written reason — and the console's standing "waiting for a restart" banner is
-  replaced by one that names only the settings genuinely waiting, of which there are none today. The
-  settings state reports what is in force on the instance that answered, so a deployment running more
-  than one instance is told which values that instance is actually running; the agent-facing surface
-  reports the same. A refused submission still changes neither the store nor the running server, and a
-  change that would leave a running process holding a configuration it could not have booted with is
-  withheld rather than half-applied. Fixes the Sentry card, which claimed "applies immediately" while
-  its own endpoint reported the opposite.
-
-- conformance: the server now reports which authentication context a sign-in satisfied. A password
-  sign-in, one with a second factor and one delegated to an upstream provider are distinguished, and
-  the `acrValues` setting changes from a free-form list to a map from those three to the value each
-  is reported as — so an operator can name the vocabulary their relying parties already expect, while
-  `acr_values_supported` is derived from those values and cannot advertise a context no sign-in
-  produces. Two behaviour changes an integrator could notice: `acr_values_supported` and the `acr`
-  entry in `claims_supported` now appear where they were absent, and an unmeetable essential `acr`
-  request answers with the registered `unmet_authentication_requirements` instead of looping on the
-  login page — with `prompt=none` that replaces `login_required`. On the backchannel path the same
-  requirement, unmet, ends the transaction as `transaction_failed` rather than issuing a token whose
-  context does not match. A request that asks for no context is unchanged.
-
-- conformance: `pkce.required`, a super-admin setting that relaxes the proof-of-possession demand for
-  clients which authenticate at the token endpoint. On by default, so nothing changes for a
-  deployment that leaves it alone. It exists because the OpenID Connect Basic profile sends a code
-  challenge in one of its 35 modules, so the other 34 were refused before they tested anything, and
-  OAuth 2.1 §7.5.1.1 provides for exactly this carve-out — for a confidential client only. A client
-  registered with no client authentication is still refused for omitting a challenge whatever the
-  setting says, which keeps this server's own public console and agent clients protected by an
-  operator's conformance choice.
-
-- conformance: `CONFORMANCE.md` records what the OpenID Foundation suite says about this server —
-  twelve plans and 16 680 conditions across two instance profiles, the nine OpenID Provider plans
-  among them carrying no failure attributable to this server, and the five defects still open written
-  out with the evidence for each. It also records the setup a run needs, because most of the cost of
-  a conformance run is not the run. Certification has not been applied for; `SECURITY.md` and the
-  assurance page now say that, rather than that the suite has never been run.
-
-- test: coverage for six properties the suite claimed and did not hold — the MongoDB secret round trip
-  through the real BSON codec, the PostgreSQL document-column encoding, the timing of both
-  constant-time secret comparisons, the discovery document following `ISSUER` rather than a forwarded
-  header, and every published agent tool having a route the dispatcher serves. Each was verified by
-  reintroducing the defect and confirming the gate fails.
-
-- test: a request to an origin no spec registered used to reach the real network; it is now refused by
-  name, with interception installed for every spec so the runner's file order stops deciding it. A
-  per-case bound also means a wedged case names itself in twenty seconds instead of idling in silence.
-
-- storage: PostgreSQL is now a supported datastore alongside MongoDB. A deployment picks one by
-  which connection string it sets — `POSTGRES_URL` or `MONGODB_URI` — and setting both is refused at
-  startup rather than resolved by precedence, since a server that quietly chose the other database
-  is indistinguishable from total data loss. `bun run db:setup:pg` provisions the schema and
-  `--check` reports on it without writing; documents are stored as `jsonb`, and expired rows are
-  reclaimed by a sweeper because PostgreSQL has no TTL index. Nothing above the storage layer
-  changed, and existing MongoDB deployments are unaffected.
-- storage: a schema-migration layer for both backends, applied by `bun run db:migrate` (`--plan` to
-  gate a deploy). Migrations are declared as an ordered set with a checksum, recorded as they run,
-  and serialised by a renewable lease so two replicas rolling at once cannot both apply a step. The
-  server refuses to start against a database that is behind, ahead, or holding a record for a
-  migration whose declaration has since changed. The one-off `managedBy → ownerGroupId` conversion
-  has been retired rather than carried into it: a deployment predating ownership groups must upgrade
-  through an earlier release first.
-- ops: `GET /ready` joins `GET /health`, splitting "don't route to me" from "restart me". Liveness
-  answers from the process alone and stays exempt from the rate limiter; readiness reaches the
-  datastore, is metered as `public`, holds its last answer for a second so a probe storm cannot
-  become database load, shares one outstanding probe rather than starting one per caller, and
-  recovers on its own. The probe carries its own five-second deadline, because a driver's timeout
-  bounds establishing a connection and not a query on one it already holds: measured against a
-  database that was up, connected and no longer answering, an unbounded probe took 30 seconds to
-  report anything. Pointing both probes at `/health` turns a database
-  outage invisible, since the process is alive and the probe passes while requests keep arriving;
-  pointing liveness at `/ready` restarts healthy processes for a database's outage. Both are the
-  mistake this split exists to prevent.
-- ops: two Fly configurations instead of one. `fly.toml` now describes a deployment that must always
-  answer — machines are never stopped for want of traffic, deploys are blue-green so a single-machine
-  release costs no downtime, and both probes are wired — while the new `fly.conformance.toml`
-  describes a separate app for the OpenID conformance suite that stops when idle and keeps its own
-  database. `ISSUER` and `DATABASE_NAME` moved out of secrets into each file's `[env]`, since neither
-  is a credential and a config that names its own issuer lets the deploy workflow check the
-  advertised one against it. The workflow takes the target as an input, and the release command now
-  runs `db:migrate` after `db:setup` so a release carrying its first migration cannot deploy an image
-  that refuses to boot.
-- security: the release assets now carry provenance of their own. `docs-export.json` and the
-  `CHANGELOG.md` a release ships are covered by a single signed SLSA v1 statement, produced the same
-  keyless way as the image's and attached to the release as `release-assets.intoto.jsonl`, so a
-  download can be verified without reaching back to GitHub for the statement; the release fails if
-  the bundle it is about to attach does not verify. The previous argument — that documentation
-  nobody executes needs no signature — held for the changelog but not for reference data another
-  project's build reads, which is worth a statement naming the commit and the run behind it.
-
-### Changed
-
-- site: a copy-edit of the marketing, comparison and documentation prose for voice (spec 048).
-  Sentence rhythm now varies, em-dashes are roughly halved, the repeated "X, not Y" contrast is
-  thinned, and judgments (advice, a diagnosis, an assessment of another product) carry a hedge
-  where statements of what the server does, a protocol rule or a licence term do not. No
-  instruction, command, protocol statement, numeric claim or quoted competitor text changed; the
-  build's title, description, FAQ and datastore rules all still pass. `website/DESIGN.md` §Voice
-  records the conventions so a new page does not reintroduce the habits.
+- **Settings apply on save**. A saved server setting takes effect without a restart.
+- **Authentication context (`acr`)**. `acrValues` changes from a list to a map from password, second-factor and
+  federated sign-in to the reported value; an unmeetable essential `acr` answers `unmet_authentication_requirements`.
+- **`pkce.required`**. A super-admin setting, on by default, that lets a confidential client omit PKCE.
+- **`CONFORMANCE.md`**. Records the OpenID Foundation suite results and the five defects still open.
+- **PostgreSQL datastore**. Selected by `POSTGRES_URL` (setting `MONGODB_URI` too is refused), set up by `db:setup:pg`.
+- **Schema migrations**. Applied by `bun run db:migrate` (`--plan` to gate a deploy); startup refuses a database that is
+  behind, ahead or diverged. A deployment predating ownership groups must upgrade through an earlier release first.
+- **`GET /ready`**. A readiness probe that checks the datastore, beside the `GET /health` liveness probe.
+- **Fly configurations**. `fly.toml` and `fly.conformance.toml`; the release runs `db:migrate` after `db:setup`.
+- **Release asset provenance**. `docs-export.json` and the shipped `CHANGELOG.md` carry a signed SLSA v1 statement.
 
 ### Fixed
 
-- protocol: a request parameter the server does not define no longer refuses the request. Ignoring
-  one is a `MUST` in RFC 6749 §3.1 **and** §3.2, RFC 8628 §3.1 and CIBA §7.1, and RFC 9126 §2.1
-  inherits it for PAR — so `/auth`, `/par`, `/device/auth`, `/backchannel` and `/token` all answer a
-  request carrying an extension parameter exactly as they answer one without it, and a Request Object
-  may carry extension claims as RFC 9101 §4 permits. The undeclared keys are dropped before
-  validation rather than carried, so nothing a client invents is persisted in a pushed request object
-  or an interaction record. Because absence from a schema now means "ignore", parameters this server
-  must _reject_ are declared explicitly instead: `request_uri` at the pushed endpoint, `request` and
-  `request_uri` inside a Request Object, and `authorization_details` at the token endpoint, where
-  silently ignoring a client's attempt to narrow its grant would return a broader token than it asked
-  for. Elysia's own `normalize` was measured as the alternative and rejected: it also cleans request
-  headers, which strips the client certificate and breaks certificate-bound tokens.
-
-- claims: a `claims` request value carrying a top-level member the server does not define is ignored
-  rather than refused, at every surface that accepts one. It was declared a closed object, so a value
-  naming `id_token`, `userinfo` and anything else was rejected outright where OIDC Core §5.5 says
-  other members MAY be present and unrecognised ones MUST be ignored — the defect fixed in `1437341`
-  for request parameters, one level deeper, inside a parameter's value. The refusal also named the
-  wrong cause: one error string covered every object-level failure, so it reported `userinfo` and
-  `id_token` as unsatisfied while both were present. Unknown members are now dropped before anything
-  persists the request, so a client cannot make the server keep arbitrary content.
-
-- protocol: a request the schema refuses now answers `400`, not the framework validator's `422`. The
-  body was already correct (`invalid_request` with a description); only the status was the
-  framework's rather than the protocol's, and RFC 6749 §5.2 defines it as `400`. Scoped to the OAuth
-  endpoints: the admin API and `/mcp` keep `422`, where distinguishing a well-formed request with an
-  invalid body is what the console and the agent act on.
-
-- pkce: a `code_verifier` containing `.` or `~` is accepted. RFC 7636 §4.1 defines the verifier over
-  RFC 3986's `unreserved` set, which includes both; the pattern here was base64url, the alphabet the
-  _challenge_ is encoded in and the one this project happens to generate verifiers with. A client
-  whose verifier used the full range was refused at schema validation before the grant ran, so its
-  code could not be redeemed by any verifier — and since PKCE is mandatory here, that client could
-  not use the authorization code grant at all. This is the second correction to the same pattern
-  after its length, and both survived for the same reason: nothing this server or its suite produces
-  is outside base64url, so it could never trip over itself.
-
-- par: a successful push answered with a JSON body and no `Content-Type`, which goes out as
-  `application/octet-stream`, and with status 200 rather than the 201 [RFC
-  9126](https://datatracker.ietf.org/doc/html/rfc9126) §2.2 requires — a client that checks the media
-  type before parsing, as a FAPI client must, got nothing usable out of the `request_uri`. Only the
-  success path was affected; refusals were already correct. The handler now returns the object and
-  lets the declared response schema serialize it, which also puts that schema to work for the first
-  time: it was bypassed by the hand-built response, and the `status: 201` beside it was never a hook
-  Elysia reads.
-
-- par: a pushed `request_uri` is spent by the authorization response it produces even when the user
-  had to sign in or consent along the way. One-time use was implemented and correctly placed, but the
-  lookup that finds the pushed request after an interaction read `parJti` as a top-level property
-  where the value lives on the payload, so it silently found nothing and the record was never marked.
-  In practice a `request_uri` survived its own flow and was good for one more authorization — the
-  replay RFC 9126 §7.3 describes. The same read appeared in the carry-forward between interactions,
-  so a sign-in followed by a consent lost the link entirely. Four reads corrected; no new mechanism.
-
-- userinfo: a request carrying no credentials is answered the way a protected resource must answer
-  one — `401` with a `WWW-Authenticate` challenge, and no error information at all. It was being
-  treated as an ordinary schema refusal, so the caller got a status RFC 6750 does not use and no
-  challenge to act on; the challenge advertises `DPoP` alongside `Bearer` only when DPoP is switched
-  on. A credential that is present and unusable is unchanged: that one is refused with `invalid_token`
-  and keeps its error body.
-
-- userinfo: the access token may be presented in a form-encoded POST body, which OpenID Connect Core
-  §5.3.1 describes alongside the header form. The body form is honoured only under the conditions
-  RFC 6750 §2.2 attaches — a POST whose body is form-encoded — and a request that uses both methods
-  at once is refused with the `invalid_request` §3.1 specifies; the query-parameter form of §2.3 is
-  still not implemented, since OAuth 2.1 removes it and a token in a URL reaches access logs and
-  browser history. A DPoP-bound token cannot be presented this way, because RFC 9449 defines no body
-  form for it. Two consequences of the same change: a request carrying no credential at all is still
-  answered with the bare RFC 6750 §3 challenge, now raised by the handler rather than by the header
-  schema, which can no longer require the header; and the route's DPoP proof check asserted
-  `htm: "GET"` whatever the method was, so a conforming proof on a `POST /userinfo` was refused as an
-  `htm` mismatch — an existing defect nothing had exercised.
-
-- jwks: key generation offers every asymmetric signing algorithm the server knows — `RS256`/`384`/
-  `512`, `PS256`/`384`/`512`, `ES256`/`384`/`512`, `EdDSA` and `Ed25519` — in the console and through
-  the agent tool, read from the algorithm register rather than restated beside it. It offered only the
-  three RSA `RS*` algorithms, which meant a FAPI 2.0 deployment could not be assembled through this
-  server's own management surface at all: the profile requires PS256 or ES256, and the operator had to
-  write a key straight into the key store. An existing RSA key is still not made to sign PS256 —
-  RFC 7517 §4.4 makes a key's `alg` the algorithm it is intended for, and honouring a key past its
-  declared intent would let a deployment that pinned a key to one algorithm quietly use another.
-  Generating the key you need is the route. The key page also now says when a generated algorithm is
-  not yet advertised: discovery's algorithm lists are built at startup, so such a key signs
-  immediately but no client asks for it until a restart — previously the page reported no restart
-  required, which was true of the key and misleading about the deployment.
-
-- conformance: two findings from the OpenID Foundation suite runs. The `form_post` delivery page
-  submits itself with a classic script placed after the form rather than a module script in `<head>`,
-  so a user agent that runs scripts but not ES modules — some embedded webviews, and the suite's own
-  scripted browser — is no longer left on a page with no way forward at all; the module-capable and
-  scripting-disabled paths are unchanged. And a pushed authorization request refused for an
-  unregistered `redirect_uri` now answers `invalid_request`, or `invalid_request_object` where the
-  value arrived inside a request object, instead of `invalid_redirect_uri` — a dynamic-registration
-  code (RFC 7591) that has no definition in a PAR response, where RFC 9126 §2.3 prints the former.
-  The authorization endpoint and dynamic registration are untouched. A third item reported alongside
-  them — that client assertion audiences are accepted too widely — was investigated and is not a
-  defect: RFC 9126 §2 requires a non-FAPI deployment to accept its issuer identifier, token endpoint
-  URL and PAR endpoint URL alike, and the narrow FAPI 2.0 rule was already implemented and is now
-  covered for all three audience shapes. `CONFORMANCE.md` records the correction and names
-  `fapi.enabled` among the settings a FAPI conformance target needs.
+- **Unknown request parameters**. `/auth`, `/par`, `/device/auth`, `/backchannel` and `/token` ignore extension
+  parameters, as does a `claims` value with an unknown top-level member.
+- **`400` for schema refusals**. The OAuth endpoints answer `400` instead of `422`; the admin API and `/mcp` keep `422`.
+- **PKCE verifier alphabet**. A `code_verifier` containing `.` or `~` is accepted (RFC 7636 §4.1).
+- **PAR**. A successful push answers `201` with a JSON content type, and a pushed `request_uri` can no longer be
+  replayed once after a sign-in or consent.
+- **Userinfo**. A request with no credentials gets `401` and a `WWW-Authenticate` challenge; a token may come in a form
+  POST body.
+- **Signing key algorithms**. Key generation offers every asymmetric algorithm, so FAPI 2.0 keys need no manual step.
+- **Conformance findings**. `form_post` works without ES modules; a PAR's bad `redirect_uri` answers `invalid_request`.
 
 ## [0.2.0] - 2026-09-08
 
-Two things define this release. The server is now an authorization server **for** third-party MCP
-servers rather than only for its own administrative plane, and SECURITY.md has evidence behind it: a
-written threat model, a scanning pipeline, and a container image that is signed and ships an SBOM and
-build provenance. A plain OAuth 2.1 client can also discover a deployment at last, through RFC 8414
-metadata.
+The server becomes an authorization server for third-party MCP servers, SECURITY.md gets evidence behind it, and RFC
+8414 metadata lets a plain OAuth 2.1 client discover a deployment.
 
 ### Added
 
-- mcp: the server is now an authorization server **for** MCP servers, not only for its own admin
-  plane. An administrator declares a third-party MCP server as a protected resource of a project — its
-  canonical identifier, the scopes it recognises, how its tokens are verified, their lifetime — and the
-  token endpoint mints audience-bound tokens for it with no source change and no restart; previously
-  every audience but `${ISSUER}/mcp` was refused, so protecting one meant writing an addon override.
-  A client with no prior relationship gets its project from the declared resource the request names,
-  which is what lets it sign in the right deployment's end-users. Client ID Metadata Documents are
-  supported as the mechanism the current MCP authorization revision names first: a `client_id` that is
-  an https URL resolves by retrieval and validation and creates no client record
-  (`clientIdMetadataDocument.enabled`, off by default). The administrative plane admits document
-  identifiers through a super-admin allowlist read live, so a withdrawal takes effect on the agent's
-  next call; a dynamically registered client can never administer the instance. A new guide,
-  [Protect your MCP server with OAuth](https://foxauth.dev/docs/get-started/protect-your-mcp-server/),
-  walks it end to end, and the README's compatibility note is replaced by which identity works where.
-- security: published evidence behind SECURITY.md, which until now was a policy with nothing standing
-  behind it. A written [threat model](https://foxauth.dev/docs/security/threat-model/) names the
-  assets, trust boundaries and attackers (RFC 9700 §3) and, for each threat, the control in the code
-  and the test that holds it — including the limitations that are true today (secrets unencrypted at
-  rest, CSRF resting on `SameSite=Strict`, the image running as root), because a threat model that
-  lists only the good news is not one to plan around. A `Security` workflow runs CodeQL (TypeScript
-  and the workflows themselves), `bun audit` on both lockfiles failing on high, dependency review on
-  pull requests and a Trivy scan of the built image, on every push and weekly; a `Scorecard` workflow
-  publishes an OpenSSF Scorecard; a Dependabot configuration keeps the lockfiles and actions current.
-  An [assurance page](https://foxauth.dev/docs/security/assurance/) says where each result is read
-  and states plainly what does not exist: no external audit, no paid bounty, no OpenID Foundation
-  certification. SECURITY.md gained the same section and the README the badges.
-
-- security: the published container image is now **signed, and ships an SBOM and build provenance**.
-  `release.yml` signs it with `cosign` over the digest — keyless, so verification names this
-  repository, workflow and tag instead of a key we ask you to trust — and BuildKit attaches an SBOM
-  and a `mode=max` provenance document to the pushed index that the signature covers; a signed SLSA
-  v1 statement also goes to a transparency log for `gh attestation verify` and admission
-  controllers. The release verifies its own signature before finishing, so an unverifiable one fails
-  the release rather than reaching an operator. The SBOM matters here because the `Dockerfile` runs
-  `apk upgrade`, which makes the package set unrecoverable from the repository. Release assets stay
-  unsigned on purpose: documentation, not something anyone executes. Verification commands are on
-  the [assurance page](https://foxauth.dev/docs/security/assurance/).
-
-- protocol: authorization server metadata at `GET /.well-known/oauth-authorization-server`
-  ([RFC 8414](https://datatracker.ietf.org/doc/html/rfc8414), spec 038, issue #30). A plain OAuth 2.1
-  client that is not an OpenID Connect relying party looks for this path and no other, so until now
-  it could not discover a deployment at all — the endpoint URLs had to be configured by hand, one
-  path away from where the server was already publishing them. Served unconditionally, readable from
-  any origin and in the public rate class, for the reason the OIDC document is: metadata a client
-  cannot read is metadata it cannot use.
-
-  The document is pruned rather than a copy. Both documents come from one builder, so they cannot
-  disagree on a shared member, but the OAuth one drops the fourteen members whose subject matter is
-  OpenID Connect — the userinfo endpoint and its algorithms, ID token algorithms, subject types, ACR
-  values, the claims members, RP-initiated logout and back-channel logout. Membership is decided by
-  the registering specification, never by presence in the IANA registry: RFC 8414 invites other
-  specifications into that registry and OIDC Discovery accepted, so all 51 members are registered
-  there and the obvious check would have admitted the exact document the pruning exists to avoid.
-  Twelve members an OpenID specification registered are kept anyway, because an OAuth-registered
-  member is unreadable without them — request-object algorithms beside RFC 9101's
-  `require_signed_request_object`, the CIBA endpoint beside the CIBA grant in
-  `grant_types_supported`, the JARM algorithms beside the `jwt` response modes. Each records that
-  anchor as data, and a guard fails naming the member if the anchor is removed or reclassified, so
-  the justification cannot outlive what it depends on.
-
-- site: the SEO guardrail now checks that structured data is _present_, not only that it is correct
-  (spec 037). It could tell whether a description was well-formed and truthful but not that one
-  should exist, which is how the comparison pages shipped with no article markup past twenty passing
-  rules. `STRUCTURED_COVERAGE` says what each kind of page must carry, an unclassified route fails
-  the build naming the file to edit, and both were shown failing before being trusted.
-
-  Around that: the comparison pages went from one inbound link each to twelve, anchored on the
-  competitor's name and derived from the collection so a new one appears everywhere on arrival; the
-  pricing and comparison pages publish their questions and answers as structured data from the same
-  array the page renders, so the two cannot drift and the existing overclaim rule proves it; the
-  documentation index grew from 30 words to a real orientation page and the comparison index gained
-  a prose summary; and `llms.txt`, generated in the previous release and pointed at by nothing, is
-  now named in `robots.txt` and linked from the footer. Claims about other products are reported as
-  due for review after 180 days, in the build log and on the page itself — without failing a build,
-  because staleness is the passage of time rather than a mistake to block on. Three comparisons
-  were added — Ory Hydra, Zitadel and authentik — each researched against that product's own
-  documentation, recording a capability their documentation does not describe as not documented
-  rather than as absent.
-
-- site: search and AI discoverability, enforced by the build (spec 036). Every page now carries a
-  checked title and summary, a per-page `lastmod` from git, structured data and its own social card —
-  documentation pages included, which had none of it because Starlight builds its own head. For
-  assistants, `/llms.txt` lists every page where it listed none, `/llms-full.txt` covers the
-  marketing and comparison pages it previously omitted, each page is available as Markdown at its
-  address plus `.md`, and `robots.txt` names ten AI crawlers with the source and date each was
-  checked against. Screenshots are declared in an image sitemap.
-
-  Indexing is now one decision in `website/src/data/seo.ts` — the styleguide used to be excluded by a
-  `noindex` in one file and an unrelated string match in another — and twenty rules check the shipped
-  HTML, failing the build with the page and the rule. Two defects it caught on its first run are
-  fixed: the licence page had two top-level headings, and the settings reference skipped a level.
+- **Authorization for MCP servers**. An administrator declares a third-party MCP server as a protected resource of a
+  project, and the token endpoint mints audience-bound tokens for it with no restart.
+- **Client ID Metadata Documents**. An https `client_id` resolves by retrieval (`clientIdMetadataDocument.enabled`).
+- **Security evidence**. A threat model, an assurance page, a `Security` scanning workflow and OpenSSF Scorecard.
+- **Signed container image**. Signed keylessly with `cosign`, with an SBOM and SLSA build provenance attached.
+- **RFC 8414 metadata** (spec 038, issue #30). Served at `GET /.well-known/oauth-authorization-server`.
+- **Site discoverability** (specs 036, 037). Build-enforced SEO, `llms.txt`, three new product comparisons.
 
 ### Fixed
 
-- security: three latent injection sinks closed, none of them reachable today, which is the only
-  reason this is a hardening note and not an advisory. The `WWW-Authenticate` challenge escaped the
-  quote in a parameter value and left the backslash alone — the one combination that fails, because a
-  value ending in a backslash then escaped the _closing_ quote instead: the quoted string ran on and
-  everything after it parsed as further auth-params. Values are now stripped rather than escaped,
-  which is what [RFC 6750](https://datatracker.ietf.org/doc/html/rfc6750) §3 asks for (NQCHAR holds
-  neither character), and nothing dynamic reaches a 401 description today only by accident. The
-  rendered error page and the device pages interpolated their document title raw, where the plain
-  interaction pages already escaped the same position; there is now one escaper in `lib/html/escape.ts`
-  with all four callers on it, rather than one file getting it right and its neighbours not.
-
-  The reason the title mattered more than an unreachable sink usually does: the content security
-  policy is derived _from_ the finished document, so an injected inline script would have been hashed
-  and then authorized by the very header meant to stop it. That chain is now pinned by a test that was
-  watched failing — it emitted a `sha256-` for `alert(1)` — rather than left as an argument.
-
-  Separately, every tag and attribute matcher in the policy derivation now reads a document by the
-  grammar a browser uses rather than a stricter one. Three spellings of that mistake were found, and
-  each of the last two only after the previous was fixed: a tag name is case-insensitive, so `<SCRIPT>`
-  was a different tag to the deriver than to the parser; and an end tag may carry both whitespace and
-  attributes, so `</script >` and `</script foo="bar">` ended a script everywhere except here. All
-  three failed the same way — the block went unrecognized, its hash was never issued, the browser
-  blocked a script the page still believed it served, and the page rendered perfectly with the
-  capability silently gone. None is a hole; all are the kind of wrong that reports itself nowhere.
-
-  The end-tag pattern is now taken from the corpus the analyser itself checks a regex against rather
-  than reasoned about one spelling at a time, which is what produced two of the three rounds. It
-  deliberately does not accept `</scriptfoo>` — a tag named `scriptfoo` — since reading that as a close
-  would hash the wrong span rather than none.
-
-- test: the invariants behind the escaping and the policy derivation are now checked against generated
-  input rather than examples (`test/properties/invariants.spec.ts`, `fast-check` as a dev dependency).
-  Both had just cost three rounds each of the same shape: a fix was written for the one spelling that
-  had been reported, the suite went green, and the next spelling arrived on the next scan. An example
-  answers "does it handle this?"; these state what is true of every input — a challenge carries no
-  character that could end a parameter early, every inline script a document serves is authorized by
-  the policy derived from it whatever the tags are spelled, `</scriptfoo>` is never read as a close, the
-  escaper leaves nothing that could escape its position, and a base32 secret survives being retyped in
-  a different case with spaces in it.
-
-  Each property was checked by reintroducing the bug it exists to catch, which is the only way to know
-  a property has teeth — and the first draft did not. It passed against the restored escaping bug,
-  because a full-Unicode generator has no reason to favour one ASCII character and that invariant is
-  about exactly two of them; five hundred runs produced no `"` at all. Generating from the characters
-  that actually break the function fails it on the fifth case and shrinks the counterexample to a
-  single quotation mark. The lesson is in the file, next to the generator.
-
-- build: the container image no longer ships known-vulnerable OpenSSL, and the base it inherits is now
-  a reference rather than a moving target. One package accounted for twenty of the twenty-five open
-  scanner alerts — `libssl3`/`libcrypto3` 3.5.7-r0, two high, six medium, twelve low — and the standing
-  plan of waiting for the base image to be rebuilt turned out not to work: measured on a fresh pull,
-  `oven/bun:alpine` still carried 3.5.7-r0 while Alpine's v3.22 repository already served the fixed
-  3.5.8-r0, so cutting a release would have rebuilt from the same vulnerable layer.
-
-  `FROM` is now pinned by digest, and to a versioned tag rather than the floating `alpine`, because
-  that is the only form anything keeps current: Dependabot moves a digest when the tag's version
-  changes and has no mechanism for "same tag, newer digest"
-  ([dependabot-core#1971](https://github.com/dependabot/dependabot-core/issues/1971)), so
-  `alpine@sha256:...` would have frozen the image at the day it was written — which is exactly why it
-  had been left unpinned. A `docker` entry in the Dependabot configuration keeps the pin moving, and
-  `apk upgrade --no-cache` takes the distribution's patches at build time rather than inheriting the
-  unpatched half of the digest. Reproducibility over time is the deliberate cost; within a run the
-  scan and the release still build identically, and `bun.lock` still pins the application's own
-  dependencies. Verified with the Security workflow's own Trivy flags: zero fixable findings at every
-  severity, down from twenty.
-
-- ci: the release workflow no longer grants every job write access. `contents: write` and
-  `packages: write` sat at the top level, so the test job — which runs whatever a version tag points
-  at — held a token that could push to the repository and publish to the registry, for no reason
-  beyond the two jobs beside it needing one each. Read at the top, write only where a write happens,
-  the shape the security workflow already used. CodeQL also stops scanning `test/`: thirteen of twenty
-  high-severity alerts were test assertions — a `redirect_uri` written as a regex with an unescaped
-  dot, a `<script>` string a CSP test looks for, a password hashed by a fixture — ranked beside two
-  real findings in `lib/` that nobody could see for the noise. An alert list is a queue, and a queue
-  that is two-thirds false is not read.
-
-- ci: a commit that touches only the console's React components no longer fails the coverage gate.
-  Those components are pulled into the coverage run by the shell's module graph but never rendered by
-  it, so they report between 1% and 10%, and their 5,923 lines drag the project number from 97% to
-  82% — which Codecov then holds every other commit to. One duly failed at 63% of a diff that was a
-  single `.tsx` file. A `codecov.yml` ignores the browser bundle and changes no target, because every
-  commit scored on server code has hit 100% of its diff; the two modules beside those components that
-  `bun test` does exercise stay measured. They are verified where they run, by the Playwright capture
-  in the site build.
-
-- test: the login throttle specs no longer sit one second away from bun's 5s default timeout. Each
-  spends the failure cap and each attempt costs an argon2 verification, so the file runs at roughly 3s
-  per test and contention from the rest of the suite decides the rest — which it did once, and a
-  timeout is reported as a failing assertion, reading like a broken throttle rather than a slow one.
-  The budget is stated once at the top of the file.
-
-- site: the home page no longer scrolls sideways on a phone. Below the `lg` breakpoint the hero grid
-  declared no base column count, so it formed a single implicit `auto` track sized to its content —
-  the page laid out 839px wide inside a 375px viewport, with the headline running off-screen. A grid
-  track's automatic minimum is `min-content`, so one unbreakable string sets the width of the whole
-  page; `overflow-x-auto` on the element does not save it, because by then the ancestor track has
-  already grown. Every grid now carries an explicit `grid-cols-1`, the settings reference uses
-  `minmax(0,1fr)` rather than `1fr` for the same reason, and long identifiers in prose break instead
-  of widening the page. Three pages were affected, the settings reference and the changelog beside
-  the home page; all thirteen now measure no overflow at fourteen widths from 320px up, with the
-  desktop layout unchanged.
+- **Injection hardening**. `WWW-Authenticate` values, page titles and CSP tag matching are hardened; none was reachable.
+- **Container OpenSSL**. The base image is pinned by digest and upgraded, removing `libssl3`/`libcrypto3` 3.5.7-r0.
+- **Release workflow permissions**. Write access is granted only to the jobs that write.
 
 ### Security
 
-- ci: every GitHub Action is pinned to a full commit SHA with the version beside it in a comment,
-  where all twenty were previously mutable tags and one — the Fly deployment's `setup-flyctl` — was
-  the `master` branch. A tag is a pointer its owner can move, so the workflows granted whatever
-  those repositories held at the moment a job started, including the ones holding the registry
-  credential and the release token. This is the OpenSSF Scorecard `Pinned-Dependencies` check, which
-  scored 0 against the badge the README publishes, and the gap was invisible in review precisely
-  because a version tag reads like a version. Dependabot updates a pinned SHA and its comment
-  together, so the pins stay current rather than merely frozen.
-
-  Landed with the five action upgrades this made necessary to resolve — `checkout` to v7.0.1,
-  `upload-artifact` to v7.0.1, `upload-pages-artifact` to v5.0.0, `metadata-action` to v6.2.0 and
-  `action-gh-release` to v3.0.3. `upload-pages-artifact` stops including dotfiles as of v4, which the
-  site build does not emit; `deploy-pages` stays on v4, which that version still requires.
+- **Actions pinned to commit SHAs**. Every GitHub Action is pinned to a full SHA, kept current by Dependabot.
 
 ## [0.1.0] - 2026-09-03
 
@@ -2151,289 +520,52 @@ The first tagged release: everything the server accumulated before a version num
 
 ### Added
 
-- Reported faults now name where in the server they happened (spec 035). An operator paged about a
-  failure could see which endpoint broke but not which line broke it, and had to open the internal
-  console and look the reference up to find out — while every fault on one endpoint arrived under a
-  byte-identical title, so a list of alerts could not be scanned at all. A reported fault now carries
-  the code location the internal record already held, is titled with the diagnostic message rather
-  than a synthetic endpoint string, and is located by a second line built from the method, the route
-  pattern and that code location. The file is also a searchable tag, so an operator can ask what is
-  failing in one part of the server rather than only inspecting one fault at a time. Grouping is
-  untouched: the store's own key is still the only thing the destination groups on, and it already
-  incorporated the code location. Nothing else was widened — the location joined the explicit list of
-  permitted outbound fields, which is now enforced one level deeper so a value added inside it later
-  cannot ship unnoticed, and a raw stack, an error object, or a frame still carrying the failure
-  message remain unsendable.
-- Optional Sentry reporting for recorded faults (spec 034). The error store already kept a durable
-  record of every unexpected internal fault, but nothing told anyone one had happened — an operator
-  learned about a failure by going to look for it. With `sentry.enabled` on and an ingestion
-  credential configured, each fault the store records is also reported to the operator's own Sentry
-  project, carrying the endpoint, the kind of failure, the client it is attributable to and the same
-  `error_reference` the caller received, so an alert leads straight back to the full internal record.
-  The environment and release labels are read from what the deployment already declares — `NODE_ENV`
-  and the `package.json` version — rather than typed into the console, because a label maintained by
-  hand is stale from the next deploy onwards, and a stale release label sends an investigation to a
-  build that never ran. No new environment variable was introduced for it; the console shows the
-  resolved values read-only instead.
-
-  Off by default, one instance-wide destination, super-admin only, and it requires the error store:
-  the outbound event is projected _from_ the internal record, so reporting is an additional
-  destination and never an alternative to recording. The ingestion credential is write-only through
-  the admin surface — a read reports only whether one is stored, and the audit trail records that it
-  changed without recording its value.
-
-  The **official `@sentry/elysia` plugin is deliberately not used**, and that is the substance of the
-  work. Reading its source (v10.73.0) showed three disqualifying behaviours: its capture predicate
-  reads the response status and reports when it is still `undefined`, so routine `invalid_grant` /
-  `invalid_client` rejections — the normal traffic of a token endpoint — would ship as unhandled
-  faults; it attaches the full request URL and headers unconditionally, which on `/authorize` means
-  `state`, `code_challenge`, `id_token_hint`, `login_hint`, `request_uri` and on an error redirect
-  `code`, plus `Authorization` and `DPoP`; and it writes `sentry-trace`/`baggage` onto every response
-  while opening spans across all nine Elysia lifecycle phases. Instead `@sentry/bun` is used directly
-  with `defaultIntegrations: false` and no integrations, as an envelope-and-transport layer only.
-  `lib/sentry/` registers no Elysia hook at all, so there is no code on the request path to add a
-  header, add latency, or fail; the event is assembled from a named list of permitted fields
-  (excluding `actor` and `userAgent`) rather than by scrubbing a captured request, and dispatch
-  happens from exactly one place — inside `captureFault`'s record continuation, which runs only after
-  the fault is classified and locally recorded. Outbound volume is bounded by `sentry.queueDepth`
-  with counted drops, so an error storm cannot amplify into the monitoring channel. The default test
-  run performs no outbound delivery yet can inspect exactly what would have been sent, which is what
-  makes the data-protection guarantees assertions rather than review opinions.
-  `wiki/concepts/sentry-plugin-not-used.md` records the reasoning; `test/sentry/` holds it.
-
-- Brute-force protection on the password sign-in door (issue #9, spec 032). `POST /ui/:uid/login`
-  accepted unlimited guesses against any address, each one buying a full password hash on a
-  shared-CPU machine — so the door was both a credential-stuffing opportunity and a cheap
-  CPU-exhaustion vector, and the only unbounded secret surface left in the server. Failed attempts
-  are now counted per `${bucketId}:${email}` in a new `LoginThrottle` area; at the cap the door shuts
-  for that address and refuses everything — **including the correct password** — until the window
-  ends, and each further exhaustion shuts it for longer, doubling 15 → 30 → 60 minutes. That holds a
-  sustained attack to roughly 120 guesses a day against unlimited before, and a refused attempt does
-  no lookup and no hashing, so the CPU half of the issue closes with the guessing half.
-  The refusal is the door's existing invalid-credentials page, produced by the _same expression_ the
-  two ordinary failure paths use rather than a copy of the wording, and failures are counted for
-  addresses that resolve to no account — so neither the response nor the existence of a counter is
-  evidence that an address is registered. Two things clear a counter, and both are proofs an attacker
-  guessing passwords does not hold: a password that verifies, and a **completed** password reset.
-  The second is why no "enter the code from your email" step was built — consuming the emailed secret
-  already proves control of the address, through a flow that has its own cooldown and cap, while a
-  dedicated step would have been an account-existence oracle, an email-bombing vector, a hard mail
-  dependency for sign-in, and unavailable to the one bucket with no reset at all. Requesting a reset
-  clears nothing.
-  Three decisions are worth reading the code for. The record's retention (24h from the last failure)
-  must **outlive** its own lockout window or the escalation silently never happens — a counter reaped
-  when the door reopens restores the opening allowance, so an attacker who waits is never escalated;
-  the boot validator enforces the ordering. The escalation ceiling is the first window wherever the
-  bucket sets `totpRequired`, read from the bucket's policy and never from its identity, because a
-  guessed password is not a sign-in there while the lockout it risks — the admin console, which has no
-  self-service reset — is the one nobody can undo. And the counter's key is built by one new
-  `emailScopedId` helper stating its rule as parity with `findByEmail`'s normalization: a key built
-  from the raw submission would have given a 16-letter address 65,536 independent counters, and every
-  test written in lower case would still have passed. That helper replaced three copies of the
-  expression and one inlined fourth in the end-user delete route which had dropped its `toLowerCase()`
-  — under the in-memory adapter, whose user store does not normalise what it stores, that line was
-  already missing the email-scoped records of mixed-case accounts and reporting success.
-  Bounds are `loginThrottle.failureCap`, `.windowSeconds` and `.windowCeilingSeconds`, super-admin
-  editable and boot-only. There is deliberately no `loginThrottle.enabled`: unlike the per-origin
-  limiter this is persisted, holds across restarts and machines, and is therefore a security boundary
-  rather than a resource protection — a kill switch for it is a switch that reopens the vulnerability,
-  so the validator bounds the numbers to a range in which the protection still means something instead.
-
-- The last three security headers issue #2 asked for (issues #10 and #2, spec 029).
-  `Strict-Transport-Security: max-age=63072000; includeSubDomains` and a `Permissions-Policy` denying
-  seventeen high-privilege browser features now ride on every response, from the same pre-routing hook
-  that already carried `nosniff`, `Referrer-Policy` and the non-page content policy — so they reach the
-  error pipeline, the named admin instance and static assets, which after-the-fact response hooks miss
-  silently. `preload` is deliberately omitted and the reason recorded: the deployment host is already
-  preloaded through the whole `dev` TLD, submission needs an apex domain this deployment does not own,
-  and the effect is global and slow to undo — a self-hoster's choice to add at their own edge. HSTS is
-  emitted unconditionally, including over plaintext, because TLS terminates at the proxy so the hop RFC
-  6797 governs is HTTPS, and the alternatives are either spoofable (`X-Forwarded-Proto`) or invisible
-  to the merge gate. `clipboard-write` is **not** denied, and a named test enforces that: antd's
-  `copyable` reaches for `navigator.clipboard.writeText` first, so denying it would have stranded five
-  secret-copy surfaces — the TOTP enrolment secret among them — on the deprecated `execCommand` path.
-  The legacy `X-Frame-Options: DENY` is emitted by `htmlResponse` on rendered pages only, derived from
-  the same single evaluation as `frame-ancestors` and therefore absent on the one deliberately framable
-  page, the `form_post` hand-off; a blanket emission was not merely inelegant but unimplementable,
-  since a returned `Response` can override a merged header but never remove one and the header has no
-  permissive value, so it would have broken silent authentication with no downstream fix
-- Per-origin request rate limiting (issue #1). An origin that spends its allowance inside a window is
-  refused with `429` and a `Retry-After`, before the endpoint does any work. Allowances are tiered by
-  route class rather than blanket — strict on the unauthenticated and expensive surface, loose on
-  static assets and discovery, the liveness probe exempt — declared as a third dimension on the route
-  table under the same two-way drift guard as the feature gate and CORS. Counting is per instance and
-  never persisted, so no storage area is added; the price is that the effective allowance multiplies
-  by concurrent machine count and clears on restart, which is why this is a resource protection and
-  not a security boundary. The per-identity throttles are unchanged, and the login door's brute-force
-  protection remains issue #9. Nine `rateLimit.*` settings, editable from the console; invalid values
-  refuse the boot rather than serving with limiting silently absent. `elysia-rate-limit` was evaluated
-  and not adopted: its single static `errorResponse` cannot produce this server's three channel
-  shapes, and its default refunds requests whose handler threw — which is every failed credential
-  guess
-- The administration console can be put behind the second factor. A new settings resource under
-  `/admin/api/admins` carries the reserved admin bucket's `totpRequired` — audited as
-  `admin.settings.update`, exposed to MCP as `admin_settings_read` and `admin_settings_update`, with
-  a switch on the Admins page. The generic bucket routes still refuse that bucket; this is the
-  surface their 403 already pointed at. Nobody is locked out by turning it on: an administrator
-  without an authenticator enrols at their next sign-in
-- TOTP second factor per user bucket: `totpRequired` makes a password sign-in also require a
-  six-digit authenticator code, with enrolment at registration and at the first sign-in of an
-  existing account, RFC 4226/6238 implemented in-repo against the published test vectors, replay and
-  two-tier throttling, `amr: ['pwd','otp']` on the ID token, and operator recovery via
-  `DELETE /admin/api/buckets/:id/users/:uid/totp` (audited, ends sessions, exposed to MCP as
-  `bucket_user_totp_clear`). Federated sign-in is not gated (spec 027)
-- CORS support: preflight handling, open CORS on discovery/JWKS, client-based CORS on the token
-  family driven by a per-project `corsOrigins` allow-list, `cors.enabled` setting (spec 011)
-- Hardening headers on every response that is not a rendered page — `nosniff`, `no-referrer`, and a
-  content policy of `default-src 'none'` plus `frame-ancestors 'none'` — across the protocol
-  endpoints, the admin API, MCP and the static surface, including responses built by the error
-  pipeline. Rendered pages keep their own derived policy (spec 026)
-- Content-Security-Policy on every rendered page, derived per document — `script-src 'none'` on
-  script-free pages, hashed inline styles; hydrated pages use precompiled antd CSS under
-  `zeroRuntime` (specs 018/032, `74cc208`, `1a4628d`)
-- Admin audit trail covers all 23 mutating admin routes and became readable:
-  `GET /admin/api/audit` + an Audit page in the console (spec 016)
-- Rich Authorization Requests (RFC 9396) work end to end on the code and refresh flows: consent
-  display, grant persistence, working hook defaults, per-client `authorizationDetailsTypes` via
-  the admin API (spec 015)
-- Self-service end-user password reset, bucket-scoped, with throttling (spec 020)
-- Upstream OIDC federation per bucket — end users sign in through their own identity provider;
-  admin management plane included (spec 022)
-- Admin MCP control plane: administer the instance from an AI agent at `POST /mcp`, served as an
-  OAuth 2.1 protected resource of the server itself (spec 024)
-- Durable server error store an operator can read — internal faults no longer vanish with the
-  console (spec 025)
-- `bun run db:setup` provisions every collection and index from a declared storage inventory under
-  a drift guard, including TTLs for verification areas and unique per-bucket email indexes
-  (spec 012)
+- **Fault reporting** (specs 034, 035). Optional reporting of recorded faults to the operator's Sentry
+  (`sentry.enabled`, off by default), each carrying its code location.
+- **Password brute-force protection** (issue #9, spec 032). Failed sign-ins lock the address for 15, 30, then 60 min.
+- **Security headers** (issues #2, #10, specs 026, 029). HSTS, `Permissions-Policy`, `nosniff`, `Referrer-Policy` and a
+  restrictive content policy on every non-page response, and `X-Frame-Options: DENY` on rendered pages.
+- **Content-Security-Policy on pages** (specs 018/032). Derived per document, with hashed inline styles.
+- **Rate limiting** (issue #1). An origin over its allowance gets `429` with `Retry-After`, tiered by route class.
+- **TOTP second factor** (spec 027). `totpRequired` per bucket, the admin console included; operators can clear one.
+- **CORS** (spec 011). Preflight, open CORS on discovery and JWKS, and per-project `corsOrigins` on the token family.
+- **Administration** (specs 016, 024, 025). A readable admin audit trail, the admin MCP control plane at `POST /mcp`,
+  and a durable error store.
+- **Protocol and accounts** (specs 015, 020, 022). Rich Authorization Requests (RFC 9396), self-service password reset,
+  and upstream OIDC federation per bucket.
+- **`bun run db:setup`** (spec 012). Provisions every collection and index from a declared storage inventory.
 
 ### Changed
 
-- Groups read as themselves in the admin console, and a personal group is nobody else's to work in.
-  Four things were wrong at once, all of them about the same list. Every personal group displayed as
-  the bare word "Personal" — including in a super administrator's list, where N administrators
-  produced N identical rows and the owner's email that is _stored_ as the group's name was thrown
-  away by both display sites. Personal groups appeared in the Groups table at all, which is a page
-  about the teams work is shared with. `GET /admin/api/scope` offered a super administrator every
-  group on the instance, other people's personal groups among them, and `PUT` accepted them — so the
-  console could be pointed at one person's own workspace by somebody who was never in it. And the
-  reserved holding group was called "Unassigned", which reads like a data-quality problem rather than
-  the name of the one group that is not a tenant.
-  It is now: **System** (`SYSTEM_GROUP_NAME`, `$set` by the deployment seed so an existing database is
-  renamed too, and preferred over the stored name by the console so it does not wait on `db:setup`);
-  no personal rows in the Groups table; and one `groupLabel` helper shared by the table and the scope
-  switcher, rendering "Personal" for your own and "Personal — owner@email" for a personal group you
-  were added to. Both scope routes now apply the same carve-out — the list never offers what the
-  switch would refuse — and all three of the switch's refusals still say one thing, so it cannot be
-  used to learn which ids are real or which of them are personal. Whether a personal group is your
-  own is answered by the server from `members[0]`, the only place that can answer it: a shared
-  personal group may promote a second owner, and `findPersonalFor` matches any personal group you are
-  a member of
-- Switching the console's active scope no longer writes to the audit trail. `PUT /admin/api/scope`
-  changes `AdminSession.activeGroupId` and nothing else, and grants no access a member did not already
-  have — while which scope a change was made from is already carried by `ownerGroupId` on that change's
-  own entry. It joins `POST /admin/api/logout` in `excludedAdminRoutes`, whose reason already described
-  it: session lifecycle, not a change to a managed entity. `scope_switch` is withdrawn from the agent
-  surface with it, as `inapplicable` — an agent has no console session, so the tool could only ever
-  answer 400
-- `README.md` and `AGENTS.md` now describe the server that exists (issue #20, spec 031). The endpoint
-  table was wrong on six of eleven rows — `/authorize`, `/introspect`, `/revoke`, `/register`,
-  `/session/end` and `/request` are really `/auth`, `/token/introspect`, `/token/revocation`, `/reg`,
-  `/logout` and `/par` — and was missing twelve routes and every method on `/userinfo` but `GET`. It is
-  now derived from `lib/consts/route_classification.ts`, which pairs each route with its governing flag
-  and is already guarded both ways against `elysia.routes`, and it is split by availability because 23
-  of the 28 feature flags default off and a disabled endpoint is deliberately indistinguishable from
-  one that does not exist. Five Features bullets had presented opt-in capabilities as shipping
-  defaults, Client Credentials and Refresh Token among them; the Features list now separates what a
-  default install serves from what a deployment switches on, and drops the claim of static client
-  registration, which was removed when clients became DB-backed. The Standards table gained eleven
-  implemented specifications plus a flag column, and admits CIBA, JARM and OAuth 2.1, which its
-  RFC-only shape had excluded. `AGENTS.md` had pointed contributors and agents at `/interaction/*`
-  routes; login and consent are served under `/ui/:uid/*`. Two claims the issue asked for were dropped
-  after checking the code: RFC 8414 is not implemented, and no `/.well-known/oauth-authorization-server`
-  is served
-- **BREAKING:** feature flags now gate their endpoints — a disabled feature's routes answer 404
-  instead of staying silently live (spec 010)
-- **BREAKING:** deletion means what it reads as — projects/buckets refuse deletion while non-empty
-  (409 with machine-readable blockers); deleting a client or end-user cascades to their sessions,
-  grants and tokens (spec 019)
-- **BREAKING:** pairwise `sub` values derive from stored server state instead of `os.hostname()`.
-  They change exactly once, on first start of this version, for clients registered
-  `subjectType: 'pairwise'` — then never again across restarts and scale-out (spec 023)
-- **BREAKING:** `richAuthorizationRequests.types` is now a serializable descriptor map (`label`,
-  per-common-field constraints, `allowUnknownFields`) editable in the admin settings; enabling the
-  feature with an empty map fails validation. A code-registered `validate` remains an optional
-  escape hatch (spec 015)
-- **BREAKING:** `allowOmittingSingleRegisteredRedirectUri` moved into the Application
-  Configuration (`authorization.allowOmittingSingleRegisteredRedirectUri`) and now defaults to
-  **disabled**; enable it in the admin settings and restart to restore the old behavior
-- Interaction UI: post-registration "check your inbox" notice renders, registration refusals are
-  styled pages, consent permissions carry headings and friendly labels, decorative Google button
-  removed (spec 021)
+- **BREAKING: feature flags gate their endpoints** (spec 010). A disabled feature's routes answer 404.
+- **BREAKING: deletion** (spec 019). Non-empty projects and buckets refuse deletion (409); client and user deletes
+  cascade.
+- **BREAKING: pairwise `sub`** (spec 023). Derived from stored state, so values change once, on first start of 0.1.0.
+- **BREAKING: `richAuthorizationRequests.types`** (spec 015). Now a serializable descriptor map.
+- **BREAKING: `authorization.allowOmittingSingleRegisteredRedirectUri`**. Moved into the Application Configuration and
+  now disabled by default; enable it in the settings to restore the old behaviour.
+- **Console groups**. The holding group is renamed **System** (by `db:setup`), personal groups leave the Groups table
+  and other people's scope switcher, and a scope switch is no longer audited.
+- **Documentation and interaction UI** (specs 021, 031). `README.md` lists the real endpoints; UI pages tidied.
 
 ### Removed
 
-- Seven unreferenced modules deleted (issue #19, spec 030): the whole `lib/views/` directory of legacy
-  interaction templates — safe because spec 015's `'rar-detail'` consent group had taken over the RAR
-  rendering that was its one unique job — plus the `Stub.tsx` admin placeholder, `helpers/params.ts`,
-  `helpers/set_www_authenticate.ts` and `helpers/_/pick_by.ts`. The two addon functions the issue
-  suspected of being dead are **kept**: `assertClaimsParameter` and
-  `assertJwtClientAuthClaimsAndHeader` are live override seams reached through the call-time registry
-  in `lib/addon/index.ts`, so an empty body is their default rather than an abandoned stub, and each
-  now carries a comment saying so. `AGENTS.md`'s source-tree map lost three stale entries it had kept
-  describing — `views/`, the long-deleted `provider.ts`, and CORS under `shared/`. Test counts, type-error
-  count and lint findings all held at their pre-change values.
+- **Unreferenced modules** (issue #19, spec 030). The legacy `lib/views/` templates and four unused helpers.
 
 ### Fixed
 
-- A super administrator's scope switch is no longer accepted and then silently discarded.
-  `resolveActiveGroup` (`lib/admin/auth/rbac.ts`) re-validated the session's choice against membership
-  alone, with no exception for the role that is allowed to switch without one — so a super
-  administrator switching into a group answered 200, and on the very next request their active scope
-  resolved to empty and `assertActiveGroup` sent everything they created to the `unassigned` holding
-  group while the console went on showing the group they picked. Their choice is now honoured after
-  one re-read of the group, which also refuses it if the group has since been deleted or is an
-  administrator's personal group
-
-- An agent naming an operation the MCP surface withholds now hears why, instead of `Tool <name> not
-found`. The refusal text existed and never ran: the call that delivered it sat in the tool
-  registration loop, where it can only fire for a name that _is_ registered, and an excluded operation
-  never is. It now also runs in the transport, before the SDK and after the credential, answering a
-  failed tool call rather than a JSON-RPC error. A genuine typo still gets the SDK's not-found, so a
-  mistake is not dressed up as a policy decision
-- The server could not boot against MongoDB: the DPoP nonce secret came back from the driver as a
-  BSON `Binary` and failed its own round-trip check (`71d9b53`)
-- PKCE accepts the full RFC 7636 verifier length range (43–128), not only 43 (`6dce3f7`)
-- Native clients can complete an interactive sign-in (`ba5629d`)
-- Interaction pages can hand off to a foreign callback under the CSP (`271d518`)
-- The settings audit records only the fields a save actually changed (`b630c73`)
-- Logging out of the admin console actually signs the operator out: it now ends the provider
-  session as well as the console's own, and clears both cookies with the `Path` they were set with
-  (Elysia's `cookie.remove()` omits `Path`, so the browser defaulted it to the request's directory
-  and cleared a different cookie)
-- The interaction cookie is cleared at its own path and expires with the interaction: the clear went
-  out with `Path=/` while the cookie lives at `/ui/<uid>` (a different cookie, so a browser kept it),
-  and its `Max-Age` was set in milliseconds -- a ~41-day lifetime for a one-hour interaction
-- Small-batch fixes: duplicate first-run admin setup surface removed, error pages carry the real
-  status and illustration, stale `interaction.returnTo` corrected, unimplemented CIBA `push` mode
-  removed from the admin schema (spec 018)
+- **Admin console**. A super administrator's scope switch is honoured; an agent calling a withheld MCP tool is told why.
+- **Boot and PKCE**. The server boots against MongoDB again, and PKCE accepts verifiers of 43 to 128 characters.
+- **Sign-in and logout**. Native clients complete interactive sign-in, interaction pages hand off under the CSP, admin
+  logout ends the provider session, and cookies are cleared at their own path.
+- **Small fixes** (spec 018). Error pages carry the real status, and the unimplemented CIBA `push` mode is removed.
 
 ### Security
 
-- The reserved admin bucket can no longer be gated on email verification. Both paths that create an
-  administrator write `verified: false` and no verification mail is ever sent for that bucket, so the
-  flag would have refused every administrator at the door with no way back short of editing the
-  database. It was unreachable through the API rather than prevented; it is now refused at the point
-  of enforcement
-- The end-user cookies (`_session`, `_interaction`) carry `Secure` -- and the `/ui/*` responses,
-  which is where the authenticated `_session` is first written, now carry the full
-  `HttpOnly; SameSite=Strict; Secure` set instead of no attributes at all: that route family
-  declared a second, option-less cookie schema, so a `Set-Cookie` from it inherited nothing.
-  Both schemas now build from one `endUserCookieAttributes` owner
-- The admin console verifies its id_token's signature (plus `nonce`, expiry, audience) against the
-  live keystore before trusting it — previously a documented decode-only shortcut (spec 017)
-- The DPoP nonce secret is self-provisioned at startup, making the requireNonce-without-secret 500
-  state unrepresentable (spec 014)
+- **Admin bucket email verification**. The reserved admin bucket can no longer require it (it would lock admins out).
+- **End-user cookies**. `_session` and `_interaction` carry `Secure`, and `/ui/*` responses set the full attribute set.
+- **Admin id_token** (spec 017). The console verifies its signature, `nonce`, expiry and audience.
+- **DPoP nonce secret** (spec 014). Provisioned at startup, so `requireNonce` can no longer answer 500.
 
 [Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.0...HEAD
 [2.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...v2.0.0
