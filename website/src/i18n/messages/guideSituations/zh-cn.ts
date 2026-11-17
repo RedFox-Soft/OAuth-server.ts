@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'eca193b6df0e';
+export const source = '051f01d6af79';
 
 export default {
 	questions: {
@@ -414,7 +414,7 @@ export default {
 				'智能体的权限与你的完全相同。',
 				'最危险的操作，例如删除项目，仍然只能在控制台中进行。',
 				'在超级管理员于服务器设置中开启之前，它处于关闭状态。FoxAuth Cloud 上已经开启。',
-				'只有超级管理员允许的智能体才能连接。'
+				'智能体通过 FoxAuth 自带的 MCP 客户端连接，或者作为超级管理员许可的应用连接；自行注册的应用永远无法连接。'
 			],
 			actionLabel: '打开 MCP 工具'
 		},

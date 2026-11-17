@@ -4,7 +4,7 @@ import type { GuideTexts } from '../../guide-texts.ts';
  * \u00AD is a soft hyphen. A lane is about 52 px wide on a phone, and not every browser hyphenates Russian, so a
  * long word in a lane or a step label gets its break point by hand.
  */
-export const source = 'eca193b6df0e';
+export const source = '051f01d6af79';
 
 export default {
 	questions: {
@@ -517,7 +517,7 @@ export default {
 				'Агент действует ровно с вашими правами.',
 				'Самые опасные действия, например удаление проекта, доступны только в консоли.',
 				'Эта возможность выключена, пока суперадминистратор не включит её в настройках сервера. В FoxAuth Cloud она включена.',
-				'Подключиться может только агент, которого разрешил суперадминистратор.'
+				'Агент подключается через собственный MCP-клиент FoxAuth или как приложение, которое разрешил суперадминистратор; приложение, зарегистрировавшее себя само, не подключится никогда.'
 			],
 			actionLabel: 'Открыть инструменты MCP'
 		},

@@ -494,8 +494,8 @@ Contributions are welcome! Please open an issue or pull request. For significant
 
 OAuth-server.ts is licensed under the [Functional Source License, Version 1.1, ALv2 Future
 License](LICENSE) (`FSL-1.1-ALv2`) — the same license Sentry uses. In short: you may use, modify,
-self-host and redistribute it for any purpose except offering it to others as a competing hosted
-service, and each version converts to the Apache License 2.0 two years after its release.
+self-host and redistribute it for any purpose except offering it to others in a commercial product or
+service that competes with it, and each version converts to the Apache License 2.0 two years after its release.
 
 This project began in April 2025 as a fork of [node-oidc-provider](https://github.com/panva/node-oidc-provider)
 by Filip Skokan, distributed under the MIT License. Its notice is preserved in [NOTICE](NOTICE).

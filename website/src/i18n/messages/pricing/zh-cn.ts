@@ -1,14 +1,14 @@
 import type english from './en.ts';
 
-export const source = '650a9082b6d3';
+export const source = '63e7d141da54';
 
 export default {
 	title: '定价',
 	description:
-		'FoxAuth Cloud 在测试期间免费，包含全部功能且不限用户数。Enterprise 是你自己的独立实例，仅限受邀。',
+		'FoxAuth Cloud 在测试期间免费，不限用户数。Enterprise 是你自己的独立实例，仅限受邀。',
 	eyebrow: '定价',
 	heading: '在我们的云上免费。独立实例仅限受邀。',
-	lead: 'FoxAuth Cloud 在测试期间免费，包含全部功能且不限用户数：创建账户，几分钟内就能拥有一个可用的授权服务器。在测试期间加入的团队，在付费方案推出后还可以再免费使用一年。需要独立实例的公司，可以申请邀请。',
+	lead: 'FoxAuth Cloud 在测试期间免费，不限用户数：创建账户，几分钟内就能拥有一个可用的授权服务器。在测试期间加入的团队，在付费方案推出后还可以再免费使用一年。需要独立实例的公司，可以申请邀请。',
 	cloudFree: {
 		badge: '测试期间免费',
 		name: 'Cloud',
@@ -16,7 +16,7 @@ export default {
 		tagline:
 			'我们在 auth.foxauth.dev 上运行的实例。无需信用卡，无需电话，不限用户数。',
 		items: [
-			'全部功能，每月活跃用户、应用和 API 数量不限',
+			'每月活跃用户、应用和 API 数量不限',
 			'每位管理员最多 10 个项目，每个项目都是独立的 OpenID Connect 签发者，地址由你选择',
 			'通过 Google、Apple、GitHub 和 Microsoft 登录，也可以通过任意 OpenID 提供方登录，包括 Okta 或单个组织的 Entra ID',
 			'服务间令牌、设备登录、发送方约束令牌（DPoP）、推送授权请求（PAR），以及 AI 智能体通过 MCP 进行管理',
@@ -47,7 +47,7 @@ export default {
 		{
 			question: 'FoxAuth 是开源的吗？',
 			answer:
-				'FoxAuth 以 FSL-1.1-ALv2 许可发布，属于源码可用（source-available），并非开源许可。你可以阅读、修改、自托管和再分发代码，也可以围绕它开展业务。唯一不允许的是把它作为竞争性的托管服务提供给他人。每个版本发布两年后，该版本即转为 Apache License 2.0，因此这项限制会按公开的时间表到期，不由我们自行决定。'
+				'FoxAuth 以 FSL-1.1-ALv2 许可发布，属于源码可用（source-available），并非开源许可。你可以阅读、修改、自托管和再分发代码，也可以围绕它开展业务。唯一不允许的是把它放进与 FoxAuth 竞争的商业产品或服务中提供给他人，无论是否托管。每个版本发布两年后，该版本即转为 Apache License 2.0，因此这项限制会按公开的时间表到期，不由我们自行决定。'
 		},
 		{
 			question: 'FoxAuth 现在就能用于生产环境吗？',
@@ -57,7 +57,7 @@ export default {
 		{
 			question: 'FoxAuth Cloud 真的免费吗？',
 			answer:
-				'FoxAuth Cloud 在测试期间免费，也不需要信用卡。包含全部功能：每月活跃用户、应用和 API 数量不限，每位管理员最多十个项目，每个项目的地址由你选择，并可通过任意 OpenID 提供方登录。自己的域名可应要求设置。在测试期间加入的团队，在付费方案推出后还可以再免费使用一年。目前暂无 SLA。提供 SLA 的付费方案正在开发中。'
+				'FoxAuth Cloud 在测试期间免费，也不需要信用卡。每月活跃用户、应用和 API 数量不限，包含每位管理员最多十个项目，每个项目的地址由你选择，并可通过任意 OpenID 提供方登录。少数需要超级管理员的功能，例如开发者自行注册应用，只能在你自己的服务器上运行。自己的域名可应要求设置。在测试期间加入的团队，在付费方案推出后还可以再免费使用一年。目前暂无 SLA。提供 SLA 的付费方案正在开发中。'
 		},
 		{
 			question: '你们提供咨询服务吗？',

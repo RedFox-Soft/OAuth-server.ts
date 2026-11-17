@@ -11,10 +11,10 @@
 export default {
 	title: 'Pricing',
 	description:
-		'FoxAuth Cloud is free during the beta, with every feature and no user limit. Enterprise, an instance of your own, is by invitation.',
+		'FoxAuth Cloud is free during the beta, with no limit on users. Enterprise, an instance of your own, is by invitation.',
 	eyebrow: 'Pricing',
 	heading: 'Free in our cloud. An instance of your own by invitation.',
-	lead: 'FoxAuth Cloud is free during the beta, with every feature and no limit on users: create an account and have a working authorization server in minutes. Teams that join during the beta keep it free for a year after paid plans launch. A company that needs an instance of its own asks for an invitation.',
+	lead: 'FoxAuth Cloud is free during the beta, with no limit on users: create an account and have a working authorization server in minutes. Teams that join during the beta keep it free for a year after paid plans launch. A company that needs an instance of its own asks for an invitation.',
 	cloudFree: {
 		badge: 'Free during the beta',
 		name: 'Cloud',
@@ -22,7 +22,7 @@ export default {
 		tagline:
 			'Our instance at auth.foxauth.dev. No card, no call, no user limit.',
 		items: [
-			'Every feature, with no limit on monthly active users, applications or APIs',
+			'No limit on monthly active users, applications or APIs',
 			'Up to 10 projects per administrator, each its own OpenID Connect issuer at an address you choose',
 			'Sign-in with Google, Apple, GitHub and Microsoft, and through any OpenID provider, including Okta or one organisation’s Entra ID',
 			'Machine-to-machine tokens, device sign-in, sender-constrained tokens (DPoP), pushed authorization requests (PAR), and administration by an AI agent over MCP',
@@ -53,7 +53,7 @@ export default {
 		{
 			question: 'Is FoxAuth open source?',
 			answer:
-				'FoxAuth is source-available under FSL-1.1-ALv2, which is not an open-source license. You may read, modify, self-host and redistribute the code, and build a business around it. The only thing you may not do is offer it to others as a competing hosted service. Two years after each version ships, that version converts to the Apache License 2.0, so the restriction expires on a published schedule with nothing left to our discretion.'
+				'FoxAuth is source-available under FSL-1.1-ALv2, which is not an open-source license. You may read, modify, self-host and redistribute the code, and build a business around it. The only thing you may not do is offer it to others in a commercial product or service that competes with FoxAuth, hosted or not. Two years after each version ships, that version converts to the Apache License 2.0, so the restriction expires on a published schedule with nothing left to our discretion.'
 		},
 		{
 			question: 'Can I run FoxAuth in production today?',
@@ -63,7 +63,7 @@ export default {
 		{
 			question: 'Is FoxAuth Cloud really free?',
 			answer:
-				'FoxAuth Cloud is free during the beta and asks for no card. Every feature is included: no limit on monthly active users, applications or APIs, up to ten projects per administrator, an address you choose for each, and sign-in through any OpenID provider. Your own domain is set up on request. Teams that join during the beta keep it free for a year after paid plans launch. There is no SLA yet. Paid plans with an SLA are in development.'
+				'FoxAuth Cloud is free during the beta and asks for no card. There is no limit on monthly active users, applications or APIs, and it includes up to ten projects per administrator, an address you choose for each, and sign-in through any OpenID provider. The few features that need a super administrator, such as developers registering their own apps, run only on your own server. Your own domain is set up on request. Teams that join during the beta keep it free for a year after paid plans launch. There is no SLA yet. Paid plans with an SLA are in development.'
 		},
 		{
 			question: 'Do you offer consulting?',

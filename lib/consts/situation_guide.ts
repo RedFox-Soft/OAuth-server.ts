@@ -1139,7 +1139,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'The agent acts with exactly your rights.',
 			'The most dangerous acts, such as deleting a project, stay in the console.',
 			'It is off until a super administrator switches it on in the server’s settings. FoxAuth Cloud has it on.',
-			'Only an agent a super administrator has permitted can connect.'
+			'The agent connects through FoxAuth’s own MCP client or as an application a super administrator has permitted; an app that registered itself never can.'
 		],
 		prompt: [
 			'Connect to the FoxAuth administrative MCP of the server whose console is at {console}. The address is the /mcp path of that server, and sign-in goes through OAuth.',

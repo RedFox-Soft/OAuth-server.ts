@@ -29,7 +29,7 @@ faq:
   - question: 'Does FoxAuth support SAML like Zitadel does?'
     answer: "FoxAuth does not support SAML, and none is planned. Besides OAuth 2.1 and OpenID Connect it serves SCIM 2.0, so a directory can provision users and groups into it, but it never speaks SAML. Zitadel documents SAML 2.0 and SCIM 2.0 alongside OIDC. If any application in your estate can only speak SAML, that settles it in Zitadel's favour and no other row on this page matters."
   - question: 'How do the licences differ?'
-    answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it as a competing hosted service. Each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-service restriction rule out different things, so which is the problem depends on what you are building."
+    answer: "Zitadel is AGPL-3.0 with Apache 2.0 and MIT exceptions for specific directories, and sells an enterprise contract whose commercial licence replaces the AGPL. FoxAuth is FSL-1.1-ALv2: you may read, modify, self-host and redistribute it and build a business around it, but not offer it to others in a commercial product or service that competes with it. Each version converts to Apache 2.0 two years after it ships. AGPL's network-copyleft and FSL's competing-use restriction rule out different things, so which is the problem depends on what you are building."
   - question: 'Can I migrate from Zitadel to FoxAuth?'
     answer: "OIDC clients port over with an issuer and client id change. What does not port is anything relying on Zitadel's SAML support, its organisation model, or its management API; a directory that provisions over SCIM can be pointed at a FoxAuth project's `/scim/v2` instead. FoxAuth models tenancy as projects. A FoxAuth project is a tenant, not to be confused with a Zitadel project. Each one is its own issuer, addressed by a path beneath the server's URL, a subdomain of the instance or a hostname of its own, so a client integrates with one exactly as it would with any authorization server. Assess the migration by how much of your estate is OIDC-only, because that part is usually straightforward and the rest is not."
   - question: 'Which is more production-ready?'
@@ -295,7 +295,7 @@ groups:
             text: 'AGPL-3.0, with Apache 2.0 and MIT exceptions for specific directories.'
           }
         verdict: different
-        why: "Neither is permissive. AGPL's network copyleft and FSL's competing-service restriction rule out different things."
+        why: "Neither is permissive. AGPL's network copyleft and FSL's competing-use restriction rule out different things."
         note: 'Zitadel sells an enterprise contract whose commercial licence replaces the AGPL.'
       - dimension: Maturity
         us:
@@ -329,7 +329,7 @@ documentation does not make.
 The second is the licence, and only for some readers. AGPL-3.0 is an obstacle if you
 distribute software or offer a network service built on it, and the enterprise contract that
 replaces it is a commercial conversation. FSL-1.1-ALv2 has a narrower restriction: you may do
-anything except offer FoxAuth as a competing hosted service. It also expires on a schedule, with each
+anything except offer FoxAuth to others in a commercial product or service that competes with it. It also expires on a schedule, with each
 version converting to Apache 2.0 two years after it ships.
 
 Neither licence is permissive. If you need a permissive licence, neither of these is your answer.
