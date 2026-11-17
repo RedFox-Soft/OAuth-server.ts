@@ -22,6 +22,8 @@ export interface PlaceNames {
 	/* The token's client for an API row, by name. */
 	client: string | null;
 	provider: string | null;
+	/* A sign-in row's API that turned the sign-in away, by name (specs/130); absent where none did. */
+	asking?: string | null;
 }
 
 interface Values {
@@ -35,6 +37,7 @@ interface Values {
 	provider: string;
 	count: number;
 	requireCode: boolean;
+	asking: string | null;
 }
 
 const OUTCOMES: Record<PersonActivityRow['outcome'], string> = {
@@ -56,7 +59,9 @@ const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	code_required: (v) =>
 		v.kind === 'api'
 			? `Signed in without a code; ${v.api} asks for one`
-			: `${v.app} asks for a code; this sign-in gave none`,
+			: v.asking
+				? `Signed in to ${v.app} without a code; ${v.asking} asks for one`
+				: `${v.app} asks for a code; this sign-in gave none`,
 	provider_closed: (v) =>
 		`Signed in through ${v.provider}, but the account is locked or deactivated`,
 	not_in_group: (v) =>
@@ -112,7 +117,7 @@ function sawTextOf(reason: ActivityReason, v: Values): string | null {
 			});
 		case 'code_required':
 			return v.kind === 'signIn'
-				? fill(signIn.codeRequired.headingApp, { app: v.app })
+				? fill(signIn.codeRequired.headingApp, { app: v.asking ?? v.app })
 				: null;
 		case 'provider_closed':
 			return PLAIN_TEXTS.en.federation.inactive.title;
@@ -179,7 +184,8 @@ export function wordsOf(row: PersonActivityRow, names: PlaceNames): RowWords {
 		tool: toolWords(row.place.tool),
 		provider: names.provider ?? 'a provider',
 		count: row.count,
-		requireCode: row.freshness?.requireCode === true
+		requireCode: row.freshness?.requireCode === true,
+		asking: names.asking ?? null
 	};
 	return {
 		outcome: OUTCOMES[row.outcome],
@@ -210,7 +216,8 @@ export function reasonWords(
 		tool: null,
 		provider: 'a provider',
 		count: 0,
-		requireCode: false
+		requireCode: false,
+		asking: null
 	});
 }
 

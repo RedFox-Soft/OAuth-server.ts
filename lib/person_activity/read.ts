@@ -224,6 +224,11 @@ async function viewOf(
 	} else if (row.place.clientId) {
 		place = await names.client(row.place.clientId);
 	}
+	/* A sign-in turned away because an API it asked for wants a code names that API (specs/130). */
+	const asking =
+		row.kind === 'signIn' && row.place.resource
+			? ((await names.api(row.place.resource))?.name ?? null)
+			: null;
 	const provider = row.place.providerId
 		? names.provider(row.place.providerId)
 		: null;
@@ -233,7 +238,7 @@ async function viewOf(
 		kind: row.kind,
 		outcome: row.outcome,
 		reason: row.reason,
-		words: wordsOf(row, { place, client, provider }),
+		words: wordsOf(row, { place, client, provider, asking }),
 		place: { ...row.place, name: place },
 		client,
 		address: row.address ?? null,

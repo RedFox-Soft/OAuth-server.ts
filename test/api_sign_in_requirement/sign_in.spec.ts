@@ -15,6 +15,8 @@ import { resetSentEmails } from 'lib/mail/mailer.ts';
 import { setSystemTime } from 'bun:test';
 import { present } from '../shape.ts';
 import { typePassword } from '../require_code/helpers.ts';
+import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
+import { activityOf } from '../person_activity/helpers.ts';
 import {
 	apis,
 	Browser,
@@ -115,6 +117,26 @@ describe('a sign-in for an API that requires a code or a recent sign-in', () => 
 		expect(payloadOf(tokens.access_token)).toMatchObject({
 			acr: configuration.acrMap.multi_factor
 		});
+	});
+
+	it('keeps in the person’s activity that the API asked for the code, by the API’s name', async () => {
+		await apis({ requireCode: true });
+		const { email, accountId } = await person();
+
+		await signIn(new Browser(), email, false);
+		const { rows } = await activityOf(
+			await adminCookie(),
+			DEFAULT_BUCKET_ID,
+			accountId
+		);
+		const stopped = rows.find((row) => row.outcome === 'refused');
+
+		expect(stopped?.words.reason).toEndWith(
+			'without a code; Files asks for one'
+		);
+		expect(stopped?.words.sawText).toBe(
+			'Files asks for a code from an authenticator app'
+		);
 	});
 
 	it('sends a person who goes back without a code back to the app with the standard error', async () => {

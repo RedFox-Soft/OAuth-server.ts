@@ -9,6 +9,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Fixed
+
+- **A person's activity names the API that asked for a code.** A sign-in turned away because an API it asked for
+  requires a code from an authenticator app was recorded as the application asking ("Claude Code asks for a code").
+  It now reads "Signed in to Claude Code without a code; Files asks for one", as the sign-in page already said.
+
 ## [2.0.1] - 2026-11-17
 
 A patch: Claude Code can sign in to an MCP server through its client metadata document. Nothing to set up or

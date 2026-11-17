@@ -2212,13 +2212,20 @@ export const ui = new Elysia()
 			if (variant === 'signIn') {
 				return Response.redirect(buildUILoginPath(uid), 303);
 			}
-			/* The account signed in and the app turned it away for want of a code: the person's activity keeps it. */
+			/*
+			 * The account signed in and the app, or the API it asked for, turned it away for want of a code: the person's
+			 * activity keeps it, naming the API when only the API asks, as the page does.
+			 */
+			const asking = appRequiresCode(interaction)
+				? undefined
+				: interaction.payload.prompt?.details.api;
 			noteSignInRefused({
 				bucketId,
 				accountId: refused.user._id,
 				reason: 'code_required',
 				clientId: clientIdOf(interaction),
 				providerId: refused.session.payload.upstream?.providerId,
+				...(typeof asking === 'string' ? { resource: asking } : {}),
 				request
 			});
 			return codeRequiredServer(uid, {

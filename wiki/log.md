@@ -430,3 +430,5 @@ Operations:
 ## [2026-11-17] update | [[situation-guide]] — `behindproxy` and `mcpproxy` moved from the chips to answers of question 2 (a person, an AI agent); line citations moved.
 
 ## [2026-11-17] update | [[loopback-redirect-port-matching]] — a metadata document that names no `application_type` and offers only plain-http loopback targets is read as native, so Claude Code's CIMD document can come back on its ephemeral port (found by the spec 130 live run; 2.0.1).
+
+## [2026-11-17] update | [[api-sign-in-requirement]] — the spec 130 live run with Claude Code 2.1.220 on 2.0.1: the requirement ends the call with a re-authentication in `/mcp`, the client renews by itself in between, and it speaks MCP 2025-11-25 without `Mcp-Name`; claude.ai not tried.

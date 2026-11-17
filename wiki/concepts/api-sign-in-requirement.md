@@ -4,7 +4,7 @@ title: "An API's sign-in requirement: a code, or a recent sign-in"
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-12
-updated: 2026-11-12
+updated: 2026-11-17
 ---
 
 # An API's sign-in requirement: a code, or a recent sign-in
@@ -30,6 +30,14 @@ answers both, so it makes the requirement hold itself:
 The behaviour a person sees still depends on the client (Claude Code: reconnect in `/mcp`; ChatGPT, Codex: an error),
 so the console says that in plain words and links to the site's client table. Getting this wrong in the console
 ("FoxAuth makes it work") was the UX critique's first finding.
+
+Tried live on 2026-11-17 with Claude Code 2.1.220 against 2.0.1, an API at a Caddy proxy behind a tunnel. Its sign-in
+through its client metadata document failed on 2.0.0 ([[loopback-redirect-port-matching]]). With a code required, and
+later past a one-hour interval mid-session, the check answered `401 insufficient_user_authentication`; Claude Code
+retried once without the token, failed the call and marked the server as needing authentication, and the person
+authenticated again in `/mcp`. It renewed its 15-minute token by itself in between. Setting a code up through the mailed
+link during that sign-in can outlast its wait for the redirect. It speaks MCP 2025-11-25 and sends no `Mcp-Method` or
+`Mcp-Name`, so an API whose tools have conditions refuses it. claude.ai was not tried.
 
 ## One answer everywhere
 

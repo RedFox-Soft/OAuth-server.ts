@@ -218,6 +218,8 @@ export function noteSignInRefused(input: {
 	reason: SignInRefusal;
 	clientId: string | undefined;
 	providerId?: string;
+	/* The API whose own requirement turned the sign-in away, when the application did not (specs/130). */
+	resource?: string;
 	request: Request;
 }): void {
 	if (!recording(input.bucketId)) return;
@@ -229,12 +231,15 @@ export function noteSignInRefused(input: {
 				kind: 'signIn',
 				outcome: 'refused',
 				reason: input.reason,
-				place: signInPlace(
-					input.bucketId,
-					input.clientId,
-					undefined,
-					input.providerId
-				),
+				place: {
+					...signInPlace(
+						input.bucketId,
+						input.clientId,
+						undefined,
+						input.providerId
+					),
+					...(input.resource === undefined ? {} : { resource: input.resource })
+				},
 				at: new Date(),
 				address: signInAddress(input.request)
 			})
