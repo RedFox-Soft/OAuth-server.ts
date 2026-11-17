@@ -88,7 +88,11 @@ already refuses an absent secret:
   algorithm signs instead.
 - **Singletons.** An unreadable singleton reads as zero bytes, which every caller finds unusable and replaces.
   The DPoP resolver already did that; the error-origin salt now does it too (`lib/error_store/redact.ts:58`).
-  The replacement is recorded, because old error records stop correlating with new ones.
+  The replacement is recorded, because old error records stop correlating with new ones. Two singletons from spec
+  136 are the exception: `instanceSigningKey` is never replaced (FoxTrust binds the instance to its first pair for
+  good, so an unreadable one is reported as `key-unreadable` and the report goes without `instanceKey`), and
+  `foxtrustKey` is replaced only by FoxTrust's next key ([[address-lookup]]). `noteRegenerated` is reached only for
+  the DPoP secret and the error-origin salt (`lib/sealing/decorators.ts`).
 
 **Why no placeholder.** A placeholder string would flow into a comparison or a credential: a placeholder client
 secret would authenticate whoever presented it.

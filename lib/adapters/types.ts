@@ -708,6 +708,62 @@ export const TelemetryDayCounts = t.Object({
 });
 export type TelemetryDayCounts = Static<typeof TelemetryDayCounts>;
 
+export const RegistrationOutcome = t.Union([
+	t.Literal('key'),
+	t.Literal('not_yet'),
+	t.Literal('muted'),
+	t.Literal('key_mismatch'),
+	t.Literal('invalid'),
+	t.Literal('limited'),
+	t.Literal('unavailable'),
+	t.Literal('unreachable')
+]);
+export type RegistrationOutcome = Static<typeof RegistrationOutcome>;
+
+export const Registration = t.Object({
+	lastClaimedDay: t.Optional(t.String()),
+	firstKeyReportAt: t.Optional(t.String()),
+	notBefore: t.Optional(t.String()),
+	lastIssuedAt: t.Optional(t.String()),
+	lastAnswer: t.Optional(
+		t.Object({
+			at: t.String(),
+			outcome: RegistrationOutcome,
+			retryAfterDays: t.Optional(t.Integer({ minimum: 0 })),
+			/* One of FoxTrust's six body field names; anything else it names is dropped before it is stored. */
+			field: t.Optional(
+				t.Union([
+					t.Literal('format'),
+					t.Literal('instanceId'),
+					t.Literal('instanceKey'),
+					t.Literal('issuedAt'),
+					t.Literal('nonce'),
+					t.Literal('signature')
+				])
+			)
+		})
+	),
+	stopped: t.Optional(t.Union([t.Literal('muted'), t.Literal('key_mismatch')]))
+});
+export type Registration = Static<typeof Registration>;
+
+export const LookupKey = t.Object({
+	receivedAt: t.String(),
+	dailyQuota: t.Integer({ minimum: 0 }),
+	burst: t.Integer({ minimum: 0 }),
+	droppedAt: t.Optional(t.String())
+});
+export type LookupKey = Static<typeof LookupKey>;
+
+export const LookupFigures = t.Object({
+	day: t.String(),
+	limit: t.Optional(t.Integer({ minimum: 0 })),
+	remaining: t.Optional(t.Integer({ minimum: 0 })),
+	at: t.String(),
+	exhaustedDay: t.Optional(t.String())
+});
+export type LookupFigures = Static<typeof LookupFigures>;
+
 export const TelemetryState = t.Object({
 	instanceId: t.String(),
 	lastClaimedDay: t.Optional(t.String()),
@@ -735,7 +791,16 @@ export const TelemetryState = t.Object({
 	 * R1): the later of the full file's and its update's. Kept so an older signed pair is refused after a restart
 	 * too; only ever raised.
 	 */
-	networkFactsBuiltAt: t.Optional(t.String())
+	networkFactsBuiltAt: t.Optional(t.String()),
+	/*
+	 * Getting a FoxTrust key without an account (specs/136 data-model §3): when this instance may next ask, what
+	 * FoxTrust last answered, and the `issuedAt` of the last request, which only ever rises (SI-5).
+	 */
+	registration: t.Optional(Registration),
+	/* The key in use, never the key itself: that is the sealed `foxtrustKey` secret beside this document. */
+	lookupKey: t.Optional(LookupKey),
+	/* The key's day as FoxTrust last reported it, shared by every process of this instance. */
+	lookups: t.Optional(LookupFigures)
 });
 export type TelemetryState = Static<typeof TelemetryState>;
 
@@ -770,6 +835,28 @@ export interface TelemetryStateStoreInstance {
 	raiseAttackerListBuiltAt(builtAt: string): Promise<void>;
 	/* The same for `networkFactsBuiltAt` (specs/129). */
 	raiseNetworkFactsBuiltAt(builtAt: string): Promise<void>;
+	/*
+	 * Claims today's registration (specs/136). MUST be one atomic statement that succeeds only while the stored
+	 * `registration.lastClaimedDay` is absent or earlier, for the reason `claimDay` gives.
+	 */
+	claimRegistrationDay(day: string): Promise<boolean>;
+	/*
+	 * Merges `changes` into `registration` after removing the members named in `clear`; a member in neither stays
+	 * as it is. One statement, so a reader never sees the removal without the change.
+	 */
+	updateRegistration(
+		changes: Partial<Registration>,
+		clear?: readonly (keyof Registration)[]
+	): Promise<void>;
+	/* Replaces `lookupKey` with a new key, or, given only `droppedAt`, marks the stored one dropped. */
+	setLookupKey(value: LookupKey | { droppedAt: string }): Promise<void>;
+	/*
+	 * Replaces `lookups`. When the stored figures are for the same day and carry `exhaustedDay`, that is kept unless
+	 * the new figures carry their own: a used-up day never comes back within the day.
+	 */
+	recordLookups(figures: LookupFigures): Promise<void>;
+	/* Sets `registration.firstKeyReportAt` only when it is absent, atomically: the first such report wins. */
+	noteFirstKeyReport(at: string): Promise<void>;
 	read(): Promise<TelemetryState | null>;
 }
 
@@ -2519,6 +2606,22 @@ export const PersonActivityRow = t.Object({
 			categories: t.Array(ActivityCategory)
 		})
 	),
+	/*
+	 * The network owner and location of `address`, looked up at FoxTrust's API at the flush (specs/136 data-model
+	 * §4): only these five members, ever, and only on a row with an address. It follows its address when rows merge.
+	 */
+	lookup: t.Optional(
+		t.Object(
+			{
+				asn: t.Optional(t.Integer({ minimum: 0 })),
+				asName: t.Optional(t.String({ maxLength: 200 })),
+				regionCode: t.Optional(t.String({ maxLength: 8 })),
+				region: t.Optional(t.String({ maxLength: 200 })),
+				city: t.Optional(t.String({ maxLength: 200 }))
+			},
+			{ additionalProperties: false }
+		)
+	),
 	device: t.Optional(
 		t.Object({ browser: ActivityBrowser, system: ActivitySystem })
 	),
@@ -2533,6 +2636,7 @@ export const PersonActivityRow = t.Object({
 	expiresAt: t.Date()
 });
 export type PersonActivityRow = Static<typeof PersonActivityRow>;
+export type ActivityLookup = NonNullable<PersonActivityRow['lookup']>;
 
 /* Where a page of a person's timeline ended: the next page starts strictly before it. */
 export interface PersonActivityCursor {

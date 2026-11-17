@@ -1931,6 +1931,26 @@ const personAppUsageFence: Migration = {
 	postgres: { noop: true, reason: PERSON_APP_USAGE_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/136 research R14). People's activity rows now carry the network owner and location of
+ * their address (`lookup`), and the usage-reporting state holds this instance's registration at FoxTrust; an older
+ * release's schemas know neither, and would also not keep an owner from sitting beside another address. Recording
+ * this migration makes its startup gate refuse the database instead.
+ */
+const ADDRESS_LOOKUP_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than looking up the owner and location of addresses refuses to start against a database that may hold them.';
+
+const addressLookupFence: Migration = {
+	id: '2026-11-18-address-lookup-fence',
+	description:
+		"Mark the database as holding the network owner and location of addresses in people's activity, and this server's registration at FoxTrust, so that an older release refuses to start against it rather than failing to read them",
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: ADDRESS_LOOKUP_FENCE_REASON },
+	postgres: { noop: true, reason: ADDRESS_LOOKUP_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1951,5 +1971,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	apiSignInRequirementFence,
 	apiToolConditionsFence,
 	personActivityFence,
-	personAppUsageFence
+	personAppUsageFence,
+	addressLookupFence
 ];

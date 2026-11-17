@@ -12,7 +12,8 @@ export default {
 				'Every sign-in: when, to which application, and how (a password, a password and a code, or a provider). The network address this server attributed the request to, the same one its rate limits use. The browser and system family, for example "Chrome on Windows". When network facts are turned on, the country and network kind (Tor, VPN, hosting) from FoxTrust’s snapshot, looked up on the server itself.',
 				'Every failed sign-in where the account was found: a wrong password or code, a locked or deactivated account, a missing code, or an unverified address. An attempt on an address no account holds keeps nothing.',
 				'Every time an app behind the operator’s proxy, or an API checked at it, asked the person to sign in again or refused them, with the reason. At an app, the person’s address is kept only when the proxy proves with the project’s proxy key that it passes the address. At an API, no address is kept: the caller there is the agent’s machine, not the person.',
-				'What the person used there: one entry per app behind the proxy, or per API and application, and day, with the first and last time and how many checks the proxy made. For an API, the tools of its table the person called. Never an address, a country or a path.'
+				'What the person used there: one entry per app behind the proxy, or per API and application, and day, with the first and last time and how many checks the proxy made. For an API, the tools of its table the person called. Never an address, a country or a path.',
+				'Beside each kept address, its network owner (the AS number and name), region and city, while the setting "Look up network owner and location at FoxTrust" is on. It is on by default. About a minute after the sign-in or refusal, the server sends the address to FoxTrust’s API, in a batch with others, and nothing else about the person. FoxTrust keeps none of these addresses.'
 			]
 		},
 		{
@@ -23,7 +24,7 @@ export default {
 				'Tokens, passwords, codes or session identifiers.',
 				'A tool name an MCP client sent that is not in the API’s table of tools.',
 				'The address, country or path of a request the proxy let through.',
-				'The network owner, the region or the city of an address.'
+				'Anything FoxTrust’s API says about an address beyond its network owner, region and city.'
 			]
 		},
 		{
@@ -39,7 +40,8 @@ export default {
 			heading: 'Why',
 			items: [
 				'Knowing who signed in, from where, and why someone was refused protects the service and the people who use it. Processing this for that purpose is a legitimate interest in network and information security (GDPR, Recital 49).',
-				'The operator of a project is the controller of this data. FoxAuth Cloud processes it on the operator’s behalf.'
+				'The operator of a project is the controller of this data. FoxAuth Cloud processes it on the operator’s behalf.',
+				'For the lookups of network owner and location, RedFox Software (FoxTrust) is the operator’s processor, under FoxTrust’s terms at foxtrust.dev/terms.'
 			]
 		},
 		{

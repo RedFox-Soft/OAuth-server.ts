@@ -46,6 +46,11 @@ or API and application, that let them through (see "What a person used" below). 
   IPv4, never unattributed, private or a trusted proxy's own address; behind a proxy the server does not trust it is
   the proxy's address, exactly as rate limits see it. An app row keeps the address only when `proves(flags)`; an API
   row never. Country and categories come from `factsAt` on the local snapshot, only when known ([[network-facts]]).
+  Since spec 136 (2026-11-17) a row with an address may also carry `lookup` (AS number and name, region code and
+  name, city), added by `withLookups` in the flush between `withoutTheDeleted` and the write
+  (`lib/person_activity/flush.ts`), never on a request. It follows its address when rows merge (`lookupAfter`,
+  `lib/adapters/person_activity_rows.ts`; MongoDB writes address rows through an update pipeline for it)
+  ([[address-lookup]]).
 - **Notes never touch the datastore.** Every `note*` is a synchronous `Map` operation that never throws
   (`buffer.ts:63`), so the password door costs a found and a missing account the same reads (tested).
 - **The administrators' project is never recorded** (`recording`, `record.ts:49`, and again at the flush).

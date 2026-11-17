@@ -1,6 +1,9 @@
 import crypto from 'crypto';
 
 import type {
+	LookupFigures,
+	LookupKey,
+	Registration,
 	TelemetryCountDeltas,
 	TelemetryState,
 	TelemetryStateStoreInstance
@@ -93,6 +96,62 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 		) {
 			state.networkFactsBuiltAt = builtAt;
 		}
+	}
+
+	async claimRegistrationDay(day: string): Promise<boolean> {
+		const state = this.state;
+		if (!state) return false;
+		const claimed = state.registration?.lastClaimedDay;
+		if (claimed !== undefined && claimed >= day) return false;
+		state.registration = { ...(state.registration ?? {}), lastClaimedDay: day };
+		return true;
+	}
+
+	async updateRegistration(
+		changes: Partial<Registration>,
+		clear: readonly (keyof Registration)[] = []
+	): Promise<void> {
+		const state = this.state;
+		if (!state) return;
+		const registration: Partial<Registration> = {
+			...(state.registration ?? {})
+		};
+		for (const member of clear) delete registration[member];
+		for (const [member, value] of Object.entries(changes)) {
+			Reflect.set(registration, member, value);
+		}
+		state.registration = registration;
+	}
+
+	async setLookupKey(value: LookupKey | { droppedAt: string }): Promise<void> {
+		const state = this.state;
+		if (!state) return;
+		if ('receivedAt' in value) {
+			state.lookupKey = { ...value };
+		} else if (state.lookupKey) {
+			state.lookupKey = { ...state.lookupKey, droppedAt: value.droppedAt };
+		}
+	}
+
+	async recordLookups(figures: LookupFigures): Promise<void> {
+		const state = this.state;
+		if (!state) return;
+		const kept =
+			figures.exhaustedDay === undefined &&
+			state.lookups?.day === figures.day &&
+			state.lookups.exhaustedDay !== undefined
+				? { exhaustedDay: state.lookups.exhaustedDay }
+				: {};
+		state.lookups = { ...figures, ...kept };
+	}
+
+	async noteFirstKeyReport(at: string): Promise<void> {
+		const state = this.state;
+		if (!state || state.registration?.firstKeyReportAt !== undefined) return;
+		state.registration = {
+			...(state.registration ?? {}),
+			firstKeyReportAt: at
+		};
 	}
 
 	async read(): Promise<TelemetryState | null> {

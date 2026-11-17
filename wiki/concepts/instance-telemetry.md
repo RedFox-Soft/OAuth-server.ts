@@ -101,3 +101,8 @@ page (`/docs/reference/telemetry/`, via the docs export) all read it.
   (`REPORTED_SETTINGS`), so the receiver can tell "no attacks" from "off". Since spec 125 (2026-11-09) it also
   carries whether the server takes FoxTrust's attacker list back (`attackerList.enabled`), and the state document
   holds the build time of the last list accepted (`attackerListBuiltAt`, [[shared-attacker-list]]).
+- **Address lookup** ([[address-lookup]], spec 136). The report carries the instance's public key (`instanceKey`,
+  43 base64url characters) from the first report on, so FoxTrust's standing for a key counts per key pair, not per
+  forgeable `instanceId`. The 15-minute tick runs `registrationPass` after the report pass, and the state document
+  holds the registration (`registration`), the key in use (`lookupKey`, never the key) and the day's figures
+  (`lookups`). A delivered report with the key sets `registration.firstKeyReportAt` once.

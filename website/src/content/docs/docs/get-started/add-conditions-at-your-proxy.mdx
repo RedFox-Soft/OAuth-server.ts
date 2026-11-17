@@ -105,9 +105,11 @@ The key and the address are set in each of the three places that call the check.
 - A CDN in front of your proxy is not supported, except Cloudflare when your proxy accepts connections only from
   Cloudflare's addresses.
 - The address is compared with your ranges and, with network facts, looked up in your server's own copy of
-  FoxTrust's snapshot. It never goes to a log line and is never sent anywhere. When a path refuses a person or asks
-  them to sign in again, their Activity tab keeps the address for 90 days, because your proxy proved it with the
-  project's key ([what FoxAuth records about people](/people-records/)).
+  FoxTrust's snapshot. The check never writes it to a log line or sends it anywhere. When a path refuses a person or
+  asks them to sign in again, their Activity tab keeps the address for 90 days, because your proxy proved it with the
+  project's key. While **Look up network owner and location at FoxTrust** is on, which is the default, the server then
+  sends that kept address to FoxTrust's API to show its network owner, region and city beside it
+  ([what FoxAuth records about people](/people-records/)).
 
 A VPN or a residential proxy can still get around a list of ranges. A network condition slows an attacker down. It
 does not stop one. Network facts keep out the VPN services FoxTrust lists, but a residential proxy still gets through.
@@ -134,8 +136,10 @@ internet addresses. Your server downloads the snapshot and checks it itself.
 3. The card under the setting shows when the snapshot was built, its age, how many address ranges it holds, and the
    last failure, if there was one.
 
-People's addresses are never sent to FoxTrust or anywhere else. Your server only looks them up in its own copy.
-FoxTrust learns only that the file was downloaded.
+For a condition, people's addresses are never sent to FoxTrust or anywhere else. Your server only looks them up in
+its own copy, and FoxTrust learns only that the file was downloaded. Showing the network owner and location of the
+addresses a person's activity keeps is a separate setting, **Look up network owner and location at FoxTrust**, which
+does send those addresses to FoxTrust's API.
 
 ### What you can keep out {#network-facts-categories}
 

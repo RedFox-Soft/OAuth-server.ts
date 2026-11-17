@@ -5,7 +5,11 @@ import {
 } from '../../consts/sealed_fields.js';
 import type { ConnectedAccountStore } from './connectedAccountStore.js';
 import { ROOT_KEY_OWNER } from '../../consts/key_owner.js';
-import type { SealKind, SealTarget } from '../../consts/sealed_fields.js';
+import type {
+	SealKind,
+	SealTarget,
+	SingletonSecretKind
+} from '../../consts/sealed_fields.js';
 import type {
 	BucketKeysStoreInstance,
 	SealedLeaf,
@@ -26,7 +30,7 @@ export interface MemorySealingSources {
 	keys(): BucketKeysStoreInstance;
 	smtp(): SmtpSettingsStoreInstance;
 	connectedAccounts(): ConnectedAccountStore;
-	secret(kind: 'dpopNonceSecret' | 'errorOriginSalt'): SecretStoreInstance;
+	secret(kind: SingletonSecretKind): SecretStoreInstance;
 }
 
 function same(a: unknown, b: string | Uint8Array): boolean {
@@ -199,7 +203,9 @@ export class SealingStore implements SealingStoreInstance {
 				}
 				return leaves;
 			case 'dpopNonceSecret':
-			case 'errorOriginSalt': {
+			case 'errorOriginSalt':
+			case 'instanceSigningKey':
+			case 'foxtrustKey': {
 				const value = await this.sources.secret(kind).read();
 				if (value instanceof Uint8Array) {
 					leaves.push({ target: { kind }, value });
@@ -317,7 +323,9 @@ export class SealingStore implements SealingStoreInstance {
 				return true;
 			}
 			case 'dpopNonceSecret':
-			case 'errorOriginSalt': {
+			case 'errorOriginSalt':
+			case 'instanceSigningKey':
+			case 'foxtrustKey': {
 				const store = this.sources.secret(target.kind);
 				const written = await store.replace(observed, Buffer.from(next));
 				return written instanceof Uint8Array && same(written, next);

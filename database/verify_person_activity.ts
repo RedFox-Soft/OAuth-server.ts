@@ -409,6 +409,167 @@ check(
 );
 for (const id of made) await users.destroy(id);
 
+/* ---------------------------------------------------------- owner and location (spec 136) */
+
+const MUNICH = {
+	asn: 64500,
+	asName: 'Example Net',
+	regionCode: 'BY',
+	region: 'Bavaria',
+	city: 'Munich'
+};
+/* Compared with sorted keys: a jsonb column hands an object back with its keys reordered. */
+function canonical(value: unknown): string {
+	return JSON.stringify(value, (_key, inner: unknown) =>
+		typeof inner === 'object' && inner !== null && !Array.isArray(inner)
+			? Object.fromEntries(
+					Object.entries(inner).sort(([a], [b]) => (a < b ? -1 : 1))
+				)
+			: inner
+	);
+}
+const signInFrom = (address: string, lookup?: Row['lookup']): Row =>
+	row('owner', {
+		accountId: 'olga',
+		method: 'password',
+		address,
+		addressFrom: 'sign_in',
+		...(lookup === undefined ? {} : { lookup })
+	});
+const owner = async () =>
+	(await page('olga')).rows.find((r) => r._id === 'owner');
+
+await store.write([signInFrom('203.0.113.7', MUNICH)]);
+check(
+	'a row keeps the owner and location written with its address',
+	canonical((await owner())?.lookup) === canonical(MUNICH),
+	JSON.stringify((await owner())?.lookup)
+);
+await store.write([signInFrom('203.0.113.7')]);
+check(
+	'a write of the same address without a lookup keeps the one kept',
+	canonical((await owner())?.lookup) === canonical(MUNICH)
+);
+await store.write([signInFrom('203.0.113.7', { asn: 64501 })]);
+check(
+	'a new lookup of the same address replaces the one kept',
+	canonical((await owner())?.lookup) === canonical({ asn: 64501 })
+);
+await store.write([signInFrom('198.51.100.4')]);
+const moved = await owner();
+check(
+	'a write of another address drops the owner and location of the old one',
+	moved?.address === '198.51.100.4' && moved.lookup === undefined,
+	JSON.stringify(moved?.lookup)
+);
+check(
+	'rows with an address still add up and keep their method',
+	moved?.count === 4 && moved.method === 'password',
+	`${String(moved?.count)} ${String(moved?.method)}`
+);
+
+const { getTelemetryStateStore, instanceSigningKeyStore, foxtrustKeyStore } =
+	await import('../lib/adapters/index.js');
+const telemetry = getTelemetryStateStore();
+await telemetry.instanceId();
+/* The day after any an earlier run claimed in this database, so it never stands in the way. */
+const claimedBefore = (await telemetry.read())?.registration?.lastClaimedDay;
+const claimAt =
+	claimedBefore === undefined
+		? Date.UTC(3000, 0, 1)
+		: new Date(`${claimedBefore}T00:00:00.000Z`).getTime() + DAY;
+const claimDay = new Date(claimAt).toISOString().slice(0, 10);
+const dayAfterClaim = new Date(claimAt + DAY).toISOString().slice(0, 10);
+const claims = await Promise.all([
+	telemetry.claimRegistrationDay(claimDay),
+	telemetry.claimRegistrationDay(claimDay),
+	telemetry.claimRegistrationDay(claimDay)
+]);
+check(
+	'one registration day is claimed by exactly one of three racing processes',
+	claims.filter(Boolean).length === 1,
+	JSON.stringify(claims)
+);
+await Promise.all([
+	telemetry.noteFirstKeyReport('2999-01-01T00:00:00.000Z'),
+	telemetry.noteFirstKeyReport('2999-01-02T00:00:00.000Z')
+]);
+const firstNoted = (await telemetry.read())?.registration?.firstKeyReportAt;
+await telemetry.noteFirstKeyReport('2999-01-03T00:00:00.000Z');
+check(
+	'the first report with the key is noted once and never moved',
+	firstNoted !== undefined &&
+		(await telemetry.read())?.registration?.firstKeyReportAt === firstNoted,
+	String(firstNoted)
+);
+await telemetry.updateRegistration({ stopped: 'muted', notBefore: 'x' });
+await telemetry.updateRegistration(
+	{ lastAnswer: { at: 'y', outcome: 'key' } },
+	['stopped', 'notBefore']
+);
+const registration = (await telemetry.read())?.registration;
+check(
+	'a registration update removes what it clears and keeps the rest',
+	registration !== undefined &&
+		registration.stopped === undefined &&
+		registration.notBefore === undefined &&
+		registration.lastAnswer?.outcome === 'key' &&
+		registration.lastClaimedDay === claimDay,
+	JSON.stringify(registration)
+);
+await telemetry.recordLookups({
+	day: claimDay,
+	at: 'a',
+	exhaustedDay: claimDay
+});
+await telemetry.recordLookups({ day: claimDay, at: 'b', remaining: 3 });
+const kept = (await telemetry.read())?.lookups;
+check(
+	'figures of the same day keep the day used up',
+	kept?.exhaustedDay === claimDay && kept.remaining === 3,
+	JSON.stringify(kept)
+);
+await telemetry.recordLookups({ day: dayAfterClaim, at: 'c', remaining: 9 });
+check(
+	'figures of the next day start without it',
+	(await telemetry.read())?.lookups?.exhaustedDay === undefined
+);
+await telemetry.setLookupKey({
+	receivedAt: 'r',
+	dailyQuota: 1000,
+	burst: 5
+});
+await telemetry.setLookupKey({ droppedAt: 'd' });
+check(
+	'a dropped key keeps when it was received',
+	canonical((await telemetry.read())?.lookupKey) ===
+		canonical({
+			receivedAt: 'r',
+			dailyQuota: 1000,
+			burst: 5,
+			droppedAt: 'd'
+		}),
+	JSON.stringify((await telemetry.read())?.lookupKey)
+);
+
+const pkcs8Sized = Buffer.from(Array.from({ length: 48 }, (_, i) => i));
+const kept48 = await instanceSigningKeyStore.create(pkcs8Sized);
+const read48 = await instanceSigningKeyStore.read();
+check(
+	'the instance key comes back as the same bytes',
+	read48 instanceof Uint8Array &&
+		Buffer.from(read48).equals(
+			kept48 instanceof Uint8Array ? Buffer.from(kept48) : Buffer.alloc(0)
+		)
+);
+const key = Buffer.from(`ftk_abcdefghijkl_${'K'.repeat(43)}`, 'utf8');
+const storedKey =
+	(await foxtrustKeyStore.read()) ?? (await foxtrustKeyStore.create(key));
+check(
+	'the FoxTrust key comes back as bytes',
+	storedKey instanceof Uint8Array && storedKey.length > 0
+);
+
 /* ---------------------------------------------------------- deletion */
 
 await store.write([row('elsewhere', { bucketId: other })]);

@@ -31,8 +31,9 @@ export function personAddressOf(caller: CallerAddress): Address | null {
 
 /*
  * FoxTrust's country and categories for an address, from this process's own copy of the snapshot (research R7):
- * nothing is sent anywhere, and nothing but the country and the categories is read. Undefined whenever the facts are
- * off, not loaded or stale, so no row ever says "unknown country".
+ * nothing is sent anywhere for these, and nothing but the country and the categories is read. Undefined whenever the
+ * facts are off, not loaded or stale, so no row ever says "unknown country". The owner and location come from
+ * FoxTrust's API at the flush instead (specs/136).
  */
 export function factsOf(address: Address, nowMs: number): Facts | undefined {
 	const facts = factsAt(address, nowMs);

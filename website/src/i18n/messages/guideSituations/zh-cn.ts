@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'e2cdf357ab87';
+export const source = '814215c0b4e1';
 
 export default {
 	questions: {
@@ -621,7 +621,7 @@ export default {
 		networkfacts: {
 			title: '不让 Tor、VPN 和其他国家访问某个路径',
 			sentence:
-				'在代理后应用某个路径的“From where”中加入网络信息：不允许来自 Tor、商业 VPN 或托管服务，并且只允许来自您选择的国家。服务器从 FoxTrust 签名的快照中得知一个地址是什么，从不把地址发送到任何地方。',
+				'在代理后应用某个路径的“From where”中加入网络信息：不允许来自 Tor、商业 VPN 或托管服务，并且只允许来自您选择的国家。服务器从 FoxTrust 签名的快照中得知一个地址是什么，这类条件从不把地址发送到任何地方。',
 			protocol: 'Forward auth · 签名的 IP 快照（FoxTrust）· DB-IP 国家数据',
 			problemCaption: '任何人都可以通过 Tor 尝试打开您的管理页面。',
 			fixCaption: 'Tor、VPN 和其他国家进不来。',
@@ -647,7 +647,7 @@ export default {
 				},
 				{
 					label: '查找地址',
-					text: '项目在服务器自己的快照副本中查找这个地址。地址不会被发送到任何地方。'
+					text: '项目在服务器自己的快照副本中查找这个地址。这次检查不会把地址发送到任何地方。'
 				},
 				{
 					label: '不能从这里打开',
@@ -714,6 +714,7 @@ export default {
 			sees: ['和以前一样的拒绝页面：对此人来说什么都没变'],
 			goodToKnow: [
 				'每个项目都会保留：登录的应用、方式、网络地址，开启网络信息时还有 FoxTrust 提供的国家和网络类型，以及浏览器和系统。',
+				'地址旁边会显示网络所有者、地区和城市。只要在 Settings → Integrations 中开启“Look up network owner and location at FoxTrust”，服务器就通过 FoxTrust 的 API 查到它们。这项设置默认开启。FoxTrust 不保存其中任何地址。',
 				'只有在找到账户时才保留失败的登录：密码或验证码错误、账户被锁定或停用、缺少验证码，或地址未验证。',
 				'在你的代理处，只有代理用项目的代理密钥证明了地址，才会保留此人的地址。API 的记录从不带地址。',
 				'所有记录保留 90 天，锁定后仍然保留，并会随此人和项目一起删除。读取记录会写入审计日志。',

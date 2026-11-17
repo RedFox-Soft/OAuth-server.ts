@@ -115,6 +115,7 @@ lib/
   error_store/          ← the one place a fault becomes a record (capture.ts is the choke point)
   sentry/               ← optional outbound reporting; registers NO Elysia hook
   telemetry/            ← the daily anonymous usage report to FoxTrust (claim, counters, report, send)
+  address_lookup/       ← owner and location of activity addresses: instance key, registration, batch, status
 database/               ← provisioning (mongodb.ts, postgres.ts), migrate.ts, real-DB verify scripts
 test/                   ← test_helper.ts bootstrap; one dir per feature with *.config.ts + *.spec.ts
 ```
@@ -275,8 +276,8 @@ Each rule is the part that is easy to break. Read the named page before changing
   that cannot be delivered is never an error; the console setting is the only switch, with no environment
   variable, and the destination has no override. An attack type, probe path or attack report field is declared
   in `lib/consts/attack_report_fields.ts`; an attack is counted by one synchronous `noteAttack` beside the
-  refusal, only when a credential was presented, and its address never goes to a log line or a bus event.
-  → `instance-telemetry.md`, `attack-reports.md`
+  refusal, only when a credential was presented, and its address never goes to a log line or a bus event. The usage
+  report also carries the instance's public key, never its private half. → `instance-telemetry.md`, `attack-reports.md`
 - **An API's sign-in requirement** — a code, or a recent sign-in, declared on the API and enforced by this server,
   never by the client: judged on the sign-in's own `acr` and `auth_time` through `signInRequirementUnmet`, at the
   sign-in, at every grant for a person, at a refresh before it rotates, and at the proxy; a token no sign-in can fix
@@ -285,8 +286,13 @@ Each rule is the part that is easy to break. Read the named page before changing
   never an older pair than one accepted, and they fail CLOSED: off, not loaded or more than 26 hours old is
   `{ known: false }`, which closes every path with a network facts condition. Looked up only for the address the check
   believes, and for an address a person's activity records, and handed to the decision as facts, never as the
-  snapshot; only categories and the country are read,
+  snapshot; only categories and the country are read from the snapshot, and a condition never sends an address,
   never FoxTrust's risk, level or reasons. → `network-facts.md`
+- **Owner and location of an address** — looked up at FoxTrust's API only in the activity flush, never on a request,
+  only for public addresses on rows being written, in batches, with a key the instance registered for itself; only the
+  AS number and name, the region and the city are kept, on the row with its address and following it when rows merge.
+  The instance key pair is created once and never replaced, also when unreadable; a registration is signed, at most
+  one a UTC day, never with an `issuedAt` at or before the last; every failure is quiet. → `address-lookup.md`
 - **FoxTrust's attacker list** — the list is downloaded and verified per process against the pinned keys in
   `lib/consts/attacker_list.ts`, its build time only ever raised, and it fails open: missing, stale or unverifiable
   refuses nobody. It is asked only at the password door, only about `callerAddressOf`'s address, never a trusted

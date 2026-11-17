@@ -220,7 +220,7 @@ export default {
 				},
 				proxyNetworkFacts: {
 					title: 'Network facts at your proxy: Tor, VPNs, hosting, countries',
-					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and looks people's addresses up only in its own copy, so no address is sent anywhere. A matching address is refused or, on an app, asked to sign in again, with a code if you ask for one. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
+					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and looks people's addresses up only in its own copy, so a condition sends no address anywhere. A matching address is refused or, on an app, asked to sign in again, with a code if you ask for one. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
 				},
 				apiSignInRequirement: {
 					title:

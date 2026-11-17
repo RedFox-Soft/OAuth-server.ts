@@ -6,6 +6,9 @@ import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
 	TelemetryState,
+	type LookupFigures,
+	type LookupKey,
+	type Registration,
 	type TelemetryCountDeltas,
 	type TelemetryStateStoreInstance
 } from '../types.js';
@@ -133,6 +136,91 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 			SET doc = jsonb_set(doc, '{networkFactsBuiltAt}', to_jsonb(${builtAt}::text))
 			WHERE id = ${this.stateId}
 			  AND (doc->>'networkFactsBuiltAt' IS NULL OR doc->>'networkFactsBuiltAt' < ${builtAt})
+		`;
+	}
+
+	async claimRegistrationDay(day: string): Promise<boolean> {
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(
+				doc,
+				'{registration}',
+				COALESCE(doc->'registration', '{}'::jsonb) || jsonb_build_object('lastClaimedDay', ${day}::text)
+			)
+			WHERE id = ${this.stateId}
+			  AND (doc->'registration'->>'lastClaimedDay' IS NULL
+			    OR doc->'registration'->>'lastClaimedDay' < ${day})
+			RETURNING id
+		`;
+		return rows.length > 0;
+	}
+
+	async updateRegistration(
+		changes: Partial<Registration>,
+		clear: readonly (keyof Registration)[] = []
+	): Promise<void> {
+		const handle = sql();
+		const set = { ...changes };
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(
+				doc,
+				'{registration}',
+				(COALESCE(doc->'registration', '{}'::jsonb) - ${handle.array([...clear], 'text')}::text[]) || ${set}::jsonb
+			)
+			WHERE id = ${this.stateId}
+		`;
+	}
+
+	async setLookupKey(value: LookupKey | { droppedAt: string }): Promise<void> {
+		const handle = sql();
+		if ('receivedAt' in value) {
+			await handle`
+				UPDATE ${handle(this.area)}
+				SET doc = doc || ${{ lookupKey: { ...value } }}
+				WHERE id = ${this.stateId}
+			`;
+			return;
+		}
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(doc, '{lookupKey,droppedAt}', to_jsonb(${value.droppedAt}::text))
+			WHERE id = ${this.stateId} AND doc ? 'lookupKey'
+		`;
+	}
+
+	/* The used-up day of the stored figures is kept in the same statement that replaces them. */
+	async recordLookups(figures: LookupFigures): Promise<void> {
+		const handle = sql();
+		const keepExhausted = figures.exhaustedDay === undefined;
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = doc || jsonb_build_object(
+				'lookups',
+				${{ ...figures }}::jsonb || CASE
+					WHEN ${keepExhausted}::boolean
+					 AND doc->'lookups'->>'day' = ${figures.day}::text
+					 AND doc->'lookups' ? 'exhaustedDay'
+					THEN jsonb_build_object('exhaustedDay', doc->'lookups'->'exhaustedDay')
+					ELSE '{}'::jsonb
+				END
+			)
+			WHERE id = ${this.stateId}
+		`;
+	}
+
+	async noteFirstKeyReport(at: string): Promise<void> {
+		const handle = sql();
+		await handle`
+			UPDATE ${handle(this.area)}
+			SET doc = jsonb_set(
+				doc,
+				'{registration}',
+				COALESCE(doc->'registration', '{}'::jsonb) || jsonb_build_object('firstKeyReportAt', ${at}::text)
+			)
+			WHERE id = ${this.stateId}
+			  AND doc->'registration'->>'firstKeyReportAt' IS NULL
 		`;
 	}
 

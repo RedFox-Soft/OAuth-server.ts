@@ -7,12 +7,14 @@ import {
 	adapter,
 	dpopNonceSecretStore,
 	errorOriginSaltStore,
+	foxtrustKeyStore,
 	getBucketKeysStore,
 	getBucketStore,
 	getConnectedAccountStore,
 	getSealingStore,
 	getSmtpSettingsStore,
-	getUserStore
+	getUserStore,
+	instanceSigningKeyStore
 } from 'lib/adapters/index.ts';
 import {
 	bindingOf,
@@ -215,6 +217,14 @@ const writers: Record<
 		);
 		return (target) =>
 			target.kind === 'signInTokenInTransit' && target.id === 'sealed-handoff';
+	},
+	async instanceSigningKey() {
+		await instanceSigningKeyStore.create(Buffer.alloc(48, 3));
+		return (target) => target.kind === 'instanceSigningKey';
+	},
+	async foxtrustKey() {
+		await foxtrustKeyStore.create(Buffer.from('ftk_sealedkey01_value', 'utf8'));
+		return (target) => target.kind === 'foxtrustKey';
 	}
 };
 

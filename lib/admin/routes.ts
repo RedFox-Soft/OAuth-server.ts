@@ -33,6 +33,7 @@ import { telemetrySettingsRoutes } from './settings/telemetry/routes.js';
 import { attackReportsSettingsRoutes } from './settings/attack_reports/routes.js';
 import { attackerListSettingsRoutes } from './settings/attacker_list/routes.js';
 import { networkFactsSettingsRoutes } from './settings/network_facts/routes.js';
+import { addressLookupSettingsRoutes } from './settings/address_lookup/routes.js';
 import { networkFactsRoutes } from './network_facts/routes.js';
 import { clientAddressSettingsRoutes } from './settings/client_address/routes.js';
 import { jwksRoutes } from './jwks/routes.js';
@@ -150,6 +151,7 @@ adminApiRoutes.use(telemetrySettingsRoutes);
 adminApiRoutes.use(attackReportsSettingsRoutes);
 adminApiRoutes.use(attackerListSettingsRoutes);
 adminApiRoutes.use(networkFactsSettingsRoutes);
+adminApiRoutes.use(addressLookupSettingsRoutes);
 adminApiRoutes.use(networkFactsRoutes);
 // The caller address check (specs/115), for the same reason.
 adminApiRoutes.use(clientAddressSettingsRoutes);

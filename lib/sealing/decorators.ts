@@ -3,7 +3,8 @@ import {
 	bindingOf,
 	CONNECTED_ACCOUNT_TOKEN_FIELDS,
 	PRIVATE_JWK_MEMBERS,
-	type SealTarget
+	type SealTarget,
+	type SingletonSecretKind
 } from '../consts/sealed_fields.js';
 import type {
 	BucketKey,
@@ -701,7 +702,7 @@ export function sealedFederationStateAdapter<T>(
  */
 export function sealedSecretStore(
 	store: SecretStoreInstance,
-	kind: 'dpopNonceSecret' | 'errorOriginSalt'
+	kind: SingletonSecretKind
 ): SecretStoreInstance {
 	const target: SealTarget = { kind };
 	const binding = bindingOf(target);
@@ -738,10 +739,15 @@ export function sealedSecretStore(
 						? stored.get(observed)
 						: undefined;
 				// Replacing the placeholder an unreadable value read as is a regeneration the status reports.
+				/*
+				 * Only the two secrets the server makes for itself are regenerated; the FoxTrust key is replaced by
+				 * FoxTrust's next answer, and the instance key never is (specs/136 research R2).
+				 */
 				if (
 					raw !== undefined &&
 					observed instanceof Uint8Array &&
-					observed.length === 0
+					observed.length === 0 &&
+					(kind === 'dpopNonceSecret' || kind === 'errorOriginSalt')
 				) {
 					await noteRegenerated(kind);
 				}

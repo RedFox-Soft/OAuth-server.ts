@@ -65,6 +65,7 @@ import {
 } from './AuthorizationRequest.js';
 import { setAddonBaseline } from './addon_baseline.js';
 import { resetKeyringForTests } from '../lib/sealing/keyring.ts';
+import { forgetLookupsForTests } from '../lib/address_lookup/lookups.ts';
 import { resetUnreadableForTests } from '../lib/sealing/unreadable.ts';
 import { TEST_KEYRING } from './sealing/fixtures.ts';
 import { interactionPolicy } from '../lib/addon/index.js';
@@ -523,6 +524,7 @@ function forgetProcessState(): void {
 	resetTelemetryCountsForTests();
 	resetAttackTallyForTests();
 	resetPersonActivityForTests();
+	forgetLookupsForTests();
 	resetAttackSchedulerForTests();
 	resetClientUseForTests();
 	forgetSignUpReadings();

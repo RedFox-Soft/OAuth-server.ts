@@ -6,6 +6,9 @@ import { STORE_AREAS } from '../../consts/storage_inventory.js';
 import { documentOf } from '../documents.js';
 import {
 	TelemetryState,
+	type LookupFigures,
+	type LookupKey,
+	type Registration,
 	type TelemetryCountDeltas,
 	type TelemetryStateStoreInstance
 } from '../types.js';
@@ -154,6 +157,98 @@ export class TelemetryStateStore implements TelemetryStateStoreInstance {
 				]
 			},
 			{ $set: { networkFactsBuiltAt: builtAt } }
+		);
+	}
+
+	async claimRegistrationDay(day: string): Promise<boolean> {
+		const result = await this.collection().updateOne(
+			{
+				_id: this.stateId,
+				$or: [
+					{ 'registration.lastClaimedDay': { $exists: false } },
+					{ 'registration.lastClaimedDay': { $lt: day } }
+				]
+			},
+			{ $set: { 'registration.lastClaimedDay': day } }
+		);
+		return result.modifiedCount === 1;
+	}
+
+	async updateRegistration(
+		changes: Partial<Registration>,
+		clear: readonly (keyof Registration)[] = []
+	): Promise<void> {
+		const set: Record<string, unknown> = {};
+		for (const [member, value] of Object.entries(changes)) {
+			set[`registration.${member}`] = value;
+		}
+		const unset: Record<string, ''> = {};
+		for (const member of clear) {
+			if (!(`registration.${member}` in set)) {
+				unset[`registration.${member}`] = '';
+			}
+		}
+		const update = {
+			...(Object.keys(set).length > 0 ? { $set: set } : {}),
+			...(Object.keys(unset).length > 0 ? { $unset: unset } : {})
+		};
+		if (Object.keys(update).length === 0) return;
+		await this.collection().updateOne({ _id: this.stateId }, update);
+	}
+
+	async setLookupKey(value: LookupKey | { droppedAt: string }): Promise<void> {
+		if ('receivedAt' in value) {
+			await this.collection().updateOne(
+				{ _id: this.stateId },
+				{ $set: { lookupKey: { ...value } } }
+			);
+			return;
+		}
+		await this.collection().updateOne(
+			{ _id: this.stateId, lookupKey: { $exists: true } },
+			{ $set: { 'lookupKey.droppedAt': value.droppedAt } }
+		);
+	}
+
+	/*
+	 * A pipeline update, so the used-up day of the stored figures is kept in the same statement that replaces them.
+	 * `$literal` because a value beginning with `$` would otherwise be read as a field path.
+	 */
+	async recordLookups(figures: LookupFigures): Promise<void> {
+		if (figures.exhaustedDay !== undefined) {
+			await this.collection().updateOne(
+				{ _id: this.stateId },
+				{ $set: { lookups: { ...figures } } }
+			);
+			return;
+		}
+		await this.collection().updateOne({ _id: this.stateId }, [
+			{
+				$set: {
+					lookups: {
+						$cond: [
+							{ $eq: ['$lookups.day', { $literal: figures.day }] },
+							{
+								$mergeObjects: [
+									{ $literal: figures },
+									{ exhaustedDay: '$lookups.exhaustedDay' }
+								]
+							},
+							{ $literal: figures }
+						]
+					}
+				}
+			}
+		]);
+	}
+
+	async noteFirstKeyReport(at: string): Promise<void> {
+		await this.collection().updateOne(
+			{
+				_id: this.stateId,
+				'registration.firstKeyReportAt': { $exists: false }
+			},
+			{ $set: { 'registration.firstKeyReportAt': at } }
 		);
 	}
 

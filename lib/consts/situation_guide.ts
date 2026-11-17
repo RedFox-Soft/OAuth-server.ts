@@ -1486,7 +1486,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		tab: 'product',
 		title: 'Keep Tor, VPNs and other countries away from a path',
 		sentence:
-			'Add network facts to “From where” on a path of an app behind your proxy: not from Tor, a commercial VPN or hosting, and only from the countries you choose. Your server learns what an address is from FoxTrust’s signed snapshot, and never sends the address anywhere.',
+			'Add network facts to “From where” on a path of an app behind your proxy: not from Tor, a commercial VPN or hosting, and only from the countries you choose. Your server learns what an address is from FoxTrust’s signed snapshot, and a condition never sends the address anywhere.',
 		protocol:
 			'Forward auth · Signed IP snapshot (FoxTrust) · DB-IP country data',
 		lanes: lanes('browser', 'proxy', 'proxied', 'fox', 'foxtrust'),
@@ -1513,7 +1513,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'fox',
 				'fox',
 				'Looks the address up',
-				'The project looks the address up in the server’s own copy of the snapshot. The address is not sent anywhere.'
+				'The project looks the address up in the server’s own copy of the snapshot. For this check, the address is not sent anywhere.'
 			),
 			step(
 				'fox',
@@ -1628,6 +1628,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		},
 		goodToKnow: [
 			'Kept for every project: sign-ins with the application, the method, the network address, FoxTrust’s country and network kind when network facts are on, and the browser and system.',
+			'Beside the address, its network owner, region and city, looked up at FoxTrust’s API while “Look up network owner and location at FoxTrust” is on in Settings → Integrations. It is on by default, and FoxTrust keeps none of the addresses.',
 			'Failed sign-ins are kept only where the account was found: a wrong password or code, a locked or deactivated account, a missing code or an unverified address.',
 			'At your proxy the person’s address is kept only when your proxy proves it with the project’s proxy key. An API row never has one.',
 			'Everything is kept 90 days, survives a lock, and goes with the person and the project. Reading it is recorded in the audit trail.',

@@ -11,6 +11,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ### Added
 
+- **Network owner and location beside a person's addresses** (spec 136). A person's Activity tab shows, beside each
+  recorded address, its network owner and place ("AS64500 Example Net · Bavaria, Munich"), and agents read the same
+  through `project_user_activity_list`. A server gets the FoxTrust key it needs by itself, with no account: its daily
+  usage report now carries a public instance key, and about a week later the server registers at FoxTrust. The
+  status is under Settings → Integrations and `address_lookup_status_get`. **Upgrade note:** the addresses people's
+  activity records are now sent to FoxTrust's API by default, in batches, about a minute after each sign-in or
+  refusal, with nothing else about the person. FoxTrust keeps none of them and acts as your processor (RedFox
+  Software, terms at https://foxtrust.dev/terms). Only the AS number and name, region and city are kept. Turn it off
+  with **Look up network owner and location at FoxTrust**. The first key needs usage reporting on and arrives about a
+  week after upgrading. Keep your keyring: the instance key is sealed with it, and a lost one cannot be replaced
+  without FoxTrust support. Run `db:migrate` (a fence).
 - **People see their own recent sign-ins** (spec 135). Every project's account page has a fourth page, Recent sign-ins
   (`/account/sign-ins`), in English, Russian and Chinese: the person's last ten sign-ins with the app, the time, how
   they signed in, the browser and the country, never the address. It opens only after a sign-in within 15 minutes.

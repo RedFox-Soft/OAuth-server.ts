@@ -59,9 +59,19 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 			...(row.address === undefined
 				? {}
 				: { address: row.address, addressFrom: row.addressFrom }),
+			...(row.lookup === undefined ? {} : { lookup: row.lookup }),
 			...(row.facts === undefined ? {} : { facts: row.facts }),
 			...(row.device === undefined ? {} : { device: row.device })
 		};
+		/*
+		 * The owner and location follow their address (specs/136 research R5): a write with an address and no lookup
+		 * drops the kept one only when the address changes; one with a lookup replaces it through `replaced`.
+		 */
+		const dropsLookup = row.address !== undefined && row.lookup === undefined;
+		const kept = dropsLookup
+			? tx`CASE WHEN activity.doc->>'address' IS DISTINCT FROM ${row.address ?? null}::text
+				THEN activity.doc - 'lookup' ELSE activity.doc END`
+			: tx`activity.doc`;
 		/*
 		 * An API use row's tools (specs/134 research R3): the names kept, then the new ones not kept, in their order, cut
 		 * at twenty — the same list the buffer and MongoDB keep. A new name's position is offset past any kept one.
@@ -87,7 +97,7 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 			INSERT INTO ${tx(this.area)} AS activity (id, doc, expires_at)
 			VALUES (${row._id}, ${row}, ${row.expiresAt})
 			ON CONFLICT (id) DO UPDATE
-			SET doc = (activity.doc || ${replaced})
+			SET doc = (${kept} || ${replaced})
 				|| jsonb_build_object(
 					'count', COALESCE((activity.doc->>'count')::int, 0) + ${row.count}::int,
 					'firstAt', LEAST(activity.doc->>'firstAt', EXCLUDED.doc->>'firstAt'),

@@ -29,6 +29,7 @@ import {
 	type RowWords,
 	type ToolsView
 } from './words.js';
+import { lookupState, type LookupState } from '../address_lookup/status.js';
 
 /*
  * Reading a person's activity (specs/133 contracts/admin-api.md). Names are looked up as they are today, for the
@@ -68,6 +69,14 @@ export interface ActivityRowView {
 	address: string | null;
 	addressFrom: 'sign_in' | 'proxy' | null;
 	facts: { country: string | null; categories: string[] } | null;
+	/* The address's network owner and location, looked up at FoxTrust's API (specs/136), or null. */
+	lookup: {
+		asn: number | null;
+		asName: string | null;
+		regionCode: string | null;
+		region: string | null;
+		city: string | null;
+	} | null;
 	newAddress: boolean;
 	count: number;
 	/* A use row (specs/134): the proxy checks behind it, said only in a tooltip, never as a count of visits. */
@@ -86,6 +95,8 @@ export interface ActivityPageView {
 	rows: ActivityRowView[];
 	next: string | null;
 	busyDays: string[];
+	/* Why rows may lack an owner and location, as the instance stands now (specs/136 research R13). */
+	lookupState: LookupState;
 }
 
 export interface ActivityPageQuery {
@@ -233,6 +244,15 @@ async function viewOf(
 					categories: [...row.facts.categories]
 				}
 			: null,
+		lookup: row.lookup
+			? {
+					asn: row.lookup.asn ?? null,
+					asName: row.lookup.asName ?? null,
+					regionCode: row.lookup.regionCode ?? null,
+					region: row.lookup.region ?? null,
+					city: row.lookup.city ?? null
+				}
+			: null,
 		newAddress,
 		count: row.count,
 		checks: row.reason === 'used' ? checksWords(row.count) : null,
@@ -299,9 +319,10 @@ export async function activityPage(
 		page.rows.map((row) => viewOf(row, names, fresh.has(row._id)))
 	);
 	const days = [...new Set(page.rows.map((row) => row.day))];
-	const [busyDays, startedAt] = await Promise.all([
+	const [busyDays, startedAt, lookups] = await Promise.all([
 		store.overflowDays(bucket._id, days, now),
-		recordingBegan()
+		recordingBegan(),
+		lookupState()
 	]);
 	return {
 		recording: ApplicationConfig['personActivity.enabled'],
@@ -309,7 +330,8 @@ export async function activityPage(
 		keptDays: PERSON_ACTIVITY_DAYS,
 		rows,
 		next: page.next ? encodeCursor(page.next) : null,
-		busyDays: busyDays.sort()
+		busyDays: busyDays.sort(),
+		lookupState: lookups
 	};
 }
 

@@ -10,11 +10,14 @@ export function addTo(
 	existing: PersonActivityRow,
 	next: PersonActivityRow
 ): PersonActivityRow {
+	const { lookup: _kept, ...rest } = existing;
+	const lookup = lookupAfter(existing, next);
 	return {
-		...existing,
+		...rest,
 		...(next.address === undefined
 			? {}
 			: { address: next.address, addressFrom: next.addressFrom }),
+		...(lookup === undefined ? {} : { lookup }),
 		...(next.facts === undefined ? {} : { facts: next.facts }),
 		...(next.device === undefined ? {} : { device: next.device }),
 		...(existing.tools === undefined && next.tools === undefined
@@ -25,6 +28,20 @@ export function addTo(
 		lastAt: later(existing.lastAt, next.lastAt),
 		expiresAt: later(existing.expiresAt, next.expiresAt)
 	};
+}
+
+/*
+ * A row's network owner and location follow its address (specs/136 research R5): a new answer replaces the kept one,
+ * a write without one keeps the kept one while the address is the same, and a different address drops it, so an owner
+ * never sits beside an address it was not found for and a minute whose lookups were used up erases nothing.
+ */
+export function lookupAfter(
+	existing: PersonActivityRow,
+	next: PersonActivityRow
+): PersonActivityRow['lookup'] {
+	if (next.address === undefined) return existing.lookup;
+	if (next.lookup !== undefined) return next.lookup;
+	return next.address === existing.address ? existing.lookup : undefined;
 }
 
 /*

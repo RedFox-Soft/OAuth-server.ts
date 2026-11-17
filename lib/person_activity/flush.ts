@@ -7,6 +7,7 @@ import {
 	PERSON_ACTIVITY_USE_FLUSH_MS
 } from '../consts/person_activity.js';
 import { takeAll, takeUse } from './buffer.js';
+import { withLookups } from '../address_lookup/lookups.js';
 
 /*
  * Writing what this process noted (specs/133 research R11, R12). Once a minute, everything held goes to the store in
@@ -59,8 +60,14 @@ async function withoutTheDeleted(
 async function flushOnce(take: () => PersonActivityRow[]): Promise<void> {
 	const taken = take();
 	if (taken.length === 0) return;
-	const rows = await withoutTheDeleted(taken);
-	if (rows.length === 0) return;
+	const kept = await withoutTheDeleted(taken);
+	if (kept.length === 0) return;
+	/*
+	 * The owner and location of each address, before the write (specs/136 research R4): the one place a person's
+	 * address leaves this server, here because no request waits on a flush (SI-4). Bounded at a few seconds, and a
+	 * row without an answer is written without one.
+	 */
+	const rows = await withLookups(kept);
 	try {
 		const { failed } = await getPersonActivityStore().write(rows);
 		if (failed > 0) {

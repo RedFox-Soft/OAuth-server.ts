@@ -35,6 +35,13 @@ export interface ActivityRow {
 	address: string | null;
 	addressFrom: 'sign_in' | 'proxy' | null;
 	facts: { country: string | null; categories: string[] } | null;
+	lookup: {
+		asn: number | null;
+		asName: string | null;
+		regionCode: string | null;
+		region: string | null;
+		city: string | null;
+	} | null;
 	newAddress: boolean;
 	count: number;
 	/* A use row (specs/134): the proxy's checks behind it, said only in a tooltip, never as a count of visits. */
@@ -57,6 +64,33 @@ interface ActivityPage {
 	rows: ActivityRow[];
 	next: string | null;
 	busyDays: string[];
+	lookupState: LookupState;
+}
+
+type LookupState = 'on' | 'off' | 'no-key' | 'used-up';
+
+/* Why an address has no owner and location (specs/136 contracts/console.md §1), as the instance stands now. */
+const NOT_LOOKED_UP: Record<LookupState, string> = {
+	off: 'Looking up network owner and location is turned off in Settings.',
+	'no-key':
+		'This server has no FoxTrust key yet. A super administrator can see why in Settings.',
+	'used-up':
+		"Today's lookups are used up. Records from the next UTC day get them again.",
+	on: 'Not looked up when this record was written: FoxTrust did not answer in time, or the record is older.'
+};
+
+/* "AS64500 Example Net · Bavaria, Munich", with nothing said for a part FoxTrust did not know. */
+function ownerAndLocation(lookup: NonNullable<ActivityRow['lookup']>): string {
+	const owner = [
+		lookup.asn === null ? null : `AS${String(lookup.asn)}`,
+		lookup.asName
+	]
+		.filter((part): part is string => part !== null)
+		.join(' ');
+	const place = [lookup.region, lookup.city]
+		.filter((part): part is string => part !== null)
+		.join(', ');
+	return [owner, place].filter((part) => part !== '').join(' · ');
 }
 
 const KINDS: { value: Kind | 'all'; label: string }[] = [
@@ -136,7 +170,13 @@ function checkHref(
 	return `${apiHref(bucketId, row.check.api, 'access')}?${params.toString()}`;
 }
 
-function Address({ row }: { row: ActivityRow }) {
+function Address({
+	row,
+	lookupState
+}: {
+	row: ActivityRow;
+	lookupState: LookupState;
+}) {
 	if (row.kind === 'api') return null;
 	if (!row.address) {
 		if (row.kind !== 'app') return null;
@@ -166,6 +206,21 @@ function Address({ row }: { row: ActivityRow }) {
 					<Typography.Text type="secondary">
 						{' '}
 						· {facts.join(' · ')}
+					</Typography.Text>
+				</Tooltip>
+			)}
+			{row.lookup ? (
+				<Tooltip title="Network owner and location, looked up at FoxTrust when this was recorded.">
+					<Typography.Text type="secondary">
+						{' '}
+						· {ownerAndLocation(row.lookup)}
+					</Typography.Text>
+				</Tooltip>
+			) : (
+				<Tooltip title={NOT_LOOKED_UP[lookupState]}>
+					<Typography.Text type="secondary">
+						{' '}
+						· Owner and location not looked up
 					</Typography.Text>
 				</Tooltip>
 			)}
@@ -238,11 +293,13 @@ function UseRow({ row }: { row: ActivityRow }) {
 function Row({
 	bucketId,
 	userId,
-	row
+	row,
+	lookupState
 }: {
 	bucketId: string;
 	userId: string;
 	row: ActivityRow;
+	lookupState: LookupState;
 }) {
 	if (row.reason === 'used') return <UseRow row={row} />;
 	const check =
@@ -299,7 +356,10 @@ function Row({
 						{row.words.method && (
 							<Typography.Text>{row.words.method}</Typography.Text>
 						)}
-						<Address row={row} />
+						<Address
+							row={row}
+							lookupState={lookupState}
+						/>
 						{row.words.device && (
 							<Tooltip title="As the browser reported it.">
 								<Typography.Text type="secondary">
@@ -311,7 +371,10 @@ function Row({
 				) : (
 					<>
 						<Typography.Text>{row.words.reason}</Typography.Text>
-						<Address row={row} />
+						<Address
+							row={row}
+							lookupState={lookupState}
+						/>
 					</>
 				)}
 				{check && <Link href={check}>Check this now</Link>}
@@ -402,6 +465,7 @@ export function UserActivityTab({
 	};
 
 	const rows = useMemo(() => pages.flatMap((page) => page.rows), [pages]);
+	const lookupState = pages.at(-1)?.lookupState ?? 'on';
 	const busy = useMemo(
 		() => new Set(pages.flatMap((page) => page.busyDays)),
 		[pages]
@@ -510,6 +574,7 @@ export function UserActivityTab({
 								bucketId={bucketId}
 								userId={userId}
 								row={row}
+								lookupState={lookupState}
 							/>
 						))}
 					</Flex>

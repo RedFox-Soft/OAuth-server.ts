@@ -46,7 +46,9 @@ const KIND_LABELS: Record<string, string> = {
 	dpopNonceSecret: 'DPoP nonce secret',
 	errorOriginSalt: 'Error log address key',
 	connectedServiceSecret: 'Connected service secret',
-	connectedAccountToken: "A person's connected account"
+	connectedAccountToken: "A person's connected account",
+	instanceSigningKey: 'Instance key (FoxTrust)',
+	foxtrustKey: 'FoxTrust key'
 };
 
 /* Where the reset path of an unreadable value is (specs/116 FR-017), or null when it has none to open. */

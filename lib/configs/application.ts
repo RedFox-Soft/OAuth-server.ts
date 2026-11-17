@@ -1149,8 +1149,9 @@ export const ApplicationConfig = {
 	 * description: Each server process downloads FoxTrust's signed snapshot (a full file a day, about 13 MB,
 	 *   and an hourly update against it; specs/129), checks it, and keeps it in memory. Conditions at the proxy
 	 *   can then keep Tor, commercial VPNs, hosting or clouds, or countries out of a path. The address of a
-	 *   person is only looked up inside this server and never sent anywhere; a person's activity keeps the country
-	 *   and categories of the addresses it records (specs/133).
+	 *   person is only looked up inside this server and never sent anywhere for a condition; a person's activity
+	 *   keeps the country and categories of the addresses it records (specs/133). Their network owner and location
+	 *   come from FoxTrust's API instead, under addressLookup.enabled below (specs/136).
 	 *
 	 * Off by default; free on every plan. The only switch: there is no environment variable, and the
 	 *   publication and its keys are constants. The opposite of the attacker list on failure: facts that are off,
@@ -1170,7 +1171,22 @@ export const ApplicationConfig = {
 	 *   environment variable. Turning it off stops new recording and drops what is waiting; what is kept stays
 	 *   readable until it expires.
 	 */
-	'personActivity.enabled': true
+	'personActivity.enabled': true,
+	/*
+	 * addressLookup.enabled
+	 *
+	 * title: Look up network owner and location at FoxTrust
+	 *
+	 * description: The addresses people's activity records are looked up at FoxTrust's API, in batches, at the
+	 *   activity flush and never on a request, and each record keeps the AS number and name, the region and the city
+	 *   (specs/136). The key needs no account: this server registers itself with its instance key once its usage
+	 *   reports have carried that key for a week.
+	 *
+	 * On by default (owner, 2026-11-16), which the setting, the site and the changelog say. The only switch: there is
+	 *   no environment variable, and both destinations are constants. Turning it off stops every lookup and
+	 *   registration and keeps a key already received.
+	 */
+	'addressLookup.enabled': true
 	/*
 	 * There are deliberately no `sentry.environment` or `sentry.release` settings.
 	 *

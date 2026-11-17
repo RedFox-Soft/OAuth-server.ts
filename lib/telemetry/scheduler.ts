@@ -3,6 +3,7 @@ import { now } from './clock.js';
 import { flushCounts } from './counters.js';
 import { buildReport } from './report.js';
 import { sendReport } from './send.js';
+import { registrationPass } from '../address_lookup/register.js';
 import { reportingAllowed } from './status.js';
 import { minuteOfDay, slotOf } from './slot.js';
 
@@ -43,6 +44,10 @@ export async function reportPass(
 		const delivered = await send(report);
 		// The same serialisation sendReport makes, so the console shows the bytes that left.
 		await store.recordSend(JSON.stringify(report), delivered ? at : null);
+		/* FoxTrust's standing for a key counts from the first report it saw with the instance key (specs/136 R10). */
+		if (delivered && report.instanceKey !== undefined) {
+			await store.noteFirstKeyReport(at.toISOString());
+		}
 		return delivered ? 'delivered' : 'not-delivered';
 	} catch {
 		return 'no-report';
@@ -58,7 +63,8 @@ const TICK_MS = 15 * 60 * 1000;
  */
 export function startTelemetry(intervalMs: number = TICK_MS): () => void {
 	const timer = setInterval(() => {
-		void reportPass();
+		/* Registration after the report, so a first report with the instance key is noted before it is counted. */
+		void reportPass().then(() => registrationPass());
 	}, intervalMs);
 	timer.unref();
 	return () => clearInterval(timer);

@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'ac8ca88285de';
+export const source = 'f0d2e4860084';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -216,7 +216,7 @@ export default {
 				},
 				proxyNetworkFacts: {
 					title: '在你的代理处使用网络信息：Tor、VPN、托管服务、国家',
-					body: '开启 FoxTrust 签名的快照后，代理后应用的某个路径，或由代理检查的 API，可以挡住 Tor、商业 VPN 以及托管服务和云，并允许或拒绝所选的国家。每台服务器每天下载约 13 MB，每小时下载一次更新，验证签名，并且只在自己的副本中查找用户的地址，因此不会把任何地址发送到任何地方。符合条件的地址会被拒绝；在应用上也可以改为要求重新登录，并可要求验证码。超过 26 小时的快照会关闭这些路径，直到加载新的快照。所有套餐免费。国家数据：IP Geolocation by DB-IP，CC BY 4.0。'
+					body: '开启 FoxTrust 签名的快照后，代理后应用的某个路径，或由代理检查的 API，可以挡住 Tor、商业 VPN 以及托管服务和云，并允许或拒绝所选的国家。每台服务器每天下载约 13 MB，每小时下载一次更新，验证签名，并且只在自己的副本中查找用户的地址，因此这类条件不会把任何地址发送到任何地方。符合条件的地址会被拒绝；在应用上也可以改为要求重新登录，并可要求验证码。超过 26 小时的快照会关闭这些路径，直到加载新的快照。所有套餐免费。国家数据：IP Geolocation by DB-IP，CC BY 4.0。'
 				},
 				apiSignInRequirement: {
 					title: '要求验证码或近期登录的 API 或 MCP 服务器',

@@ -111,16 +111,86 @@ function toolsUpsertOf(
 	};
 }
 
+/*
+ * A row that carries an address is written by an update pipeline too (specs/136 research R5): its owner and location
+ * follow the address, so whether the kept one stays depends on the address stored before this write, which only an
+ * expression can read. One `$set` stage, whose expressions all see the document as it was. Values in `$literal`, for
+ * the reason above.
+ */
+function addressUpsertOf(
+	row: PersonActivityRow,
+	address: string
+): AnyBulkWriteOperation<PersonActivityRow> {
+	const lookup =
+		row.lookup === undefined
+			? {
+					$cond: [
+						{ $eq: ['$address', { $literal: address }] },
+						'$lookup',
+						'$$REMOVE'
+					]
+				}
+			: { $literal: row.lookup };
+	return {
+		updateOne: {
+			filter: { _id: row._id },
+			update: [
+				{
+					$set: {
+						bucketId: { $literal: row.bucketId },
+						accountId: { $literal: row.accountId },
+						day: { $literal: row.day },
+						kind: { $literal: row.kind },
+						outcome: { $literal: row.outcome },
+						reason: { $literal: row.reason },
+						place: { $literal: row.place },
+						...(row.method === undefined
+							? {}
+							: { method: { $ifNull: ['$method', { $literal: row.method }] } }),
+						...(row.freshness === undefined
+							? {}
+							: {
+									freshness: {
+										$ifNull: ['$freshness', { $literal: row.freshness }]
+									}
+								}),
+						address: { $literal: address },
+						...(row.addressFrom === undefined
+							? {}
+							: { addressFrom: { $literal: row.addressFrom } }),
+						lookup,
+						...(row.facts === undefined
+							? {}
+							: { facts: { $literal: row.facts } }),
+						...(row.device === undefined
+							? {}
+							: { device: { $literal: row.device } }),
+						count: { $add: [{ $ifNull: ['$count', 0] }, row.count] },
+						firstAt: {
+							$min: [{ $ifNull: ['$firstAt', row.firstAt] }, row.firstAt]
+						},
+						lastAt: {
+							$max: [{ $ifNull: ['$lastAt', row.lastAt] }, row.lastAt]
+						},
+						expiresAt: {
+							$max: [{ $ifNull: ['$expiresAt', row.expiresAt] }, row.expiresAt]
+						}
+					}
+				}
+			],
+			upsert: true
+		}
+	};
+}
+
 function upsertOf(
 	row: PersonActivityRow
 ): AnyBulkWriteOperation<PersonActivityRow> {
 	if (row.tools !== undefined && row.tools.length > 0) {
 		return toolsUpsertOf(row, row.tools);
 	}
+	if (row.address !== undefined) return addressUpsertOf(row, row.address);
 	const replaced = {
-		...(row.address === undefined
-			? {}
-			: { address: row.address, addressFrom: row.addressFrom }),
 		...(row.facts === undefined ? {} : { facts: row.facts }),
 		...(row.device === undefined ? {} : { device: row.device })
 	};

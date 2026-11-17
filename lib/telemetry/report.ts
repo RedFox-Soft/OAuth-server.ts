@@ -14,6 +14,7 @@ import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { readPeriodForBuckets } from '../activity/read.js';
 import { monthOf } from '../activity/periods.js';
 import { packageVersion } from '../helpers/package_version.js';
+import { instancePublicKey } from '../address_lookup/instance_key.js';
 import {
 	RANGE_LABELS,
 	REPORT_FORMAT,
@@ -51,6 +52,8 @@ export const UsageReport = t.Object({
 		administrators: Range,
 		monthlyActiveUsers: Range
 	}),
+	/* This server's public instance key (specs/136): what lets FoxTrust give it a key without an account. */
+	instanceKey: t.Optional(t.String()),
 	day: t.Optional(
 		t.Object({
 			date: t.String(),
@@ -159,6 +162,7 @@ export async function buildReport(
 	}
 	const version = packageVersion();
 	const day = await dayFigures(at);
+	const instanceKey = await instancePublicKey();
 	const config = ApplicationConfig as Record<string, unknown>;
 	return {
 		format: REPORT_FORMAT,
@@ -175,6 +179,7 @@ export async function buildReport(
 			REPORTED_SETTINGS.map((key) => [key, config[key] === true])
 		),
 		size,
-		...(day === undefined ? {} : { day })
+		...(day === undefined ? {} : { day }),
+		...(instanceKey === null ? {} : { instanceKey })
 	};
 }

@@ -105,6 +105,7 @@ import {
 	resetKeyringCheckForTests,
 	useKeyringStateStore
 } from '../sealing/startup.js';
+import type { SingletonSecretKind } from '../consts/sealed_fields.js';
 import { selectBackend } from './selectBackend.js';
 import type { Static, TObject } from '@sinclair/typebox';
 import { documentOf } from './documents.js';
@@ -168,10 +169,7 @@ let sealingStoreFactory: () => SealingStoreInstance = () =>
 			/* Only the memory store is built here: this factory is replaced for both persistent backends. */
 			return store as MemoryConnectedAccountStore;
 		},
-		secret: (kind) =>
-			kind === 'dpopNonceSecret'
-				? rawDpopNonceSecretStore
-				: rawErrorOriginSaltStore
+		secret: (kind) => rawSecretStores[kind]
 	});
 export let configStore: AdapterConfigStore = memoryConfig;
 
@@ -320,6 +318,46 @@ export const errorOriginSaltStore: SecretStoreInstance = sealedSecretStore(
 	rawErrorOriginSaltStore,
 	'errorOriginSalt'
 );
+
+/*
+ * The private half of this instance's key pair and the key FoxTrust issued it (specs/136 research R2, R3), sealed
+ * like the two above. Created once and adopted on a lost race, as every singleton secret is; the instance key is
+ * never replaced, which lib/address_lookup/instance_key.ts, its only writer, keeps. `let` only so that
+ * resetStoresForTests() can give each spec file an instance that has neither yet.
+ */
+let rawInstanceSigningKeyStore: SecretStoreInstance = new SecretStoreClass(
+	'instanceSigningKey'
+);
+export let instanceSigningKeyStore: SecretStoreInstance = sealedSecretStore(
+	rawInstanceSigningKeyStore,
+	'instanceSigningKey'
+);
+let rawFoxtrustKeyStore: SecretStoreInstance = new SecretStoreClass(
+	'foxtrustKey'
+);
+export let foxtrustKeyStore: SecretStoreInstance = sealedSecretStore(
+	rawFoxtrustKeyStore,
+	'foxtrustKey'
+);
+
+const rawSecretStores: Record<SingletonSecretKind, SecretStoreInstance> = {
+	dpopNonceSecret: rawDpopNonceSecretStore,
+	errorOriginSalt: rawErrorOriginSaltStore,
+	instanceSigningKey: rawInstanceSigningKeyStore,
+	foxtrustKey: rawFoxtrustKeyStore
+};
+
+function resetInstanceSecretsForTests(): void {
+	rawInstanceSigningKeyStore = new SecretStoreClass('instanceSigningKey');
+	instanceSigningKeyStore = sealedSecretStore(
+		rawInstanceSigningKeyStore,
+		'instanceSigningKey'
+	);
+	rawFoxtrustKeyStore = new SecretStoreClass('foxtrustKey');
+	foxtrustKeyStore = sealedSecretStore(rawFoxtrustKeyStore, 'foxtrustKey');
+	rawSecretStores.instanceSigningKey = rawInstanceSigningKeyStore;
+	rawSecretStores.foxtrustKey = rawFoxtrustKeyStore;
+}
 
 export const cache = new Map<string, ModelAdapter<StoredRecord>>();
 
@@ -747,6 +785,7 @@ export function resetStoresForTests(): void {
 	schemaMigrationStoreSingleton = null;
 	migrationLeaseStoreSingleton = null;
 	telemetryStateStoreSingleton = null;
+	resetInstanceSecretsForTests();
 	smtpSettingsStoreSingleton = null;
 	rawSmtpSettingsStoreSingleton = null;
 	keyringStateStoreSingleton = null;

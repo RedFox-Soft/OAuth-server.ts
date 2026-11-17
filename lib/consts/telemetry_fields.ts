@@ -112,7 +112,9 @@ export const REPORTED_SETTINGS: readonly string[] = [
 	'attackerList.enabled',
 	/* How many instances keep anonymising networks or countries out of a path decides whether the snapshot stays free. */
 	'networkFacts.enabled',
-	'personActivity.enabled'
+	'personActivity.enabled',
+	/* How many servers keep lookups on decides whether the instance allowance stays free. */
+	'addressLookup.enabled'
 ];
 
 export const UNREPORTED_SETTINGS: Readonly<Record<string, string>> = {
@@ -143,6 +145,14 @@ export const REPORT_FIELDS: readonly ReportField[] = [
 		meaning:
 			'A random identifier this server generated for itself and keeps in its database. It is derived from nothing, so it says nothing about who runs the server; it only lets reports from one server be grouped.',
 		values: 'a UUID'
+	},
+	{
+		path: 'instanceKey',
+		meaning:
+			"This server's public key, generated once and kept with its identifier. It shows that reports and requests come from the same server, so FoxTrust can give the server a key for looking up the network owner and location of addresses without an account.",
+		values: '43 base64url characters',
+		absentWhen:
+			'the key cannot be read, for example without the keyring that sealed it'
 	},
 	{
 		path: 'foxauth.version',

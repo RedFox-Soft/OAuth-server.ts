@@ -302,7 +302,9 @@ export class SealingStore implements SealingStoreInstance {
 				return leaves;
 			}
 			case 'dpopNonceSecret':
-			case 'errorOriginSalt': {
+			case 'errorOriginSalt':
+			case 'instanceSigningKey':
+			case 'foxtrustKey': {
 				// The singleton store is the undecorated one, and the one place a stored Binary is unwrapped.
 				const value = await new SingletonSecretStore(kind).read();
 				if (value instanceof Uint8Array)
@@ -418,7 +420,9 @@ export class SealingStore implements SealingStoreInstance {
 				return result.matchedCount === 1;
 			}
 			case 'dpopNonceSecret':
-			case 'errorOriginSalt': {
+			case 'errorOriginSalt':
+			case 'instanceSigningKey':
+			case 'foxtrustKey': {
 				const written = await new SingletonSecretStore(target.kind).replace(
 					observed,
 					Buffer.from(next)

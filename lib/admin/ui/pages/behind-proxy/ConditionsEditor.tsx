@@ -577,9 +577,9 @@ function NetworkFactsFields({
 				</>
 			)}
 			<Typography.Text type="secondary">
-				Looked up in this server’s copy of FoxTrust’s snapshot: people’s
-				addresses are never sent anywhere. While the download is off or the
-				snapshot is more than 26 hours old, this part closes the path.
+				Looked up in this server’s copy of FoxTrust’s snapshot: a condition
+				sends no address anywhere. While the download is off or the snapshot is
+				more than 26 hours old, this part closes the path.
 			</Typography.Text>
 		</Flex>
 	);

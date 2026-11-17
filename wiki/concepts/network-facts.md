@@ -21,8 +21,10 @@ The owner chose (2026-11-11) that the address of a person is only ever looked up
 no `/verify` beside the proxy. Since spec 133 (2026-11-16) the same local lookup also gives a person's activity the
 country and categories of a recorded sign-in address or proven proxy address, and nothing else ([[person-activity]]). FoxTrust's API answers from the same snapshot loader, so it is not fresher. FoxTrust's
 spec 040 moved AS data, region and city out of the published files (13.2 MB full after it), so the ordinary snapshot
-is small enough to download as it is; nothing is built for FoxAuth. AS number and organisation are left to a later
-spec, through FoxTrust's API on an administrator's action.
+is small enough to download as it is; nothing is built for FoxAuth. AS number and organisation, region and city came
+in spec 136 (2026-11-17), not on an administrator's action as planned here but by default, at the activity flush,
+through FoxTrust's API with a key the instance registers for itself ([[address-lookup]]). That is the one place a
+person's address leaves the server; a condition still never sends one.
 
 ## The download: each process its own, only the build time shared
 

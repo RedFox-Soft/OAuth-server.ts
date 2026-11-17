@@ -21,7 +21,17 @@ export type SealKind =
 	| 'errorOriginSalt'
 	| 'connectedServiceSecret'
 	| 'connectedAccountToken'
-	| 'signInTokenInTransit';
+	| 'signInTokenInTransit'
+	| 'instanceSigningKey'
+	| 'foxtrustKey';
+
+/*
+ * The server-wide secrets held one to a `serviceConfig` document by a SecretStore. The first two are regenerated when
+ * unreadable; the instance key never is (specs/136 research R2), and the FoxTrust key is replaced only by FoxTrust's
+ * next answer.
+ */
+export type SingletonSecretKind =
+	'dpopNonceSecret' | 'errorOriginSalt' | 'instanceSigningKey' | 'foxtrustKey';
 
 export interface SealedField {
 	kind: SealKind;
@@ -113,6 +123,23 @@ export const SEALED_FIELDS: readonly SealedField[] = [
 		area: 'FederationState',
 		path: 'kept.tokens',
 		owner: 'a sign-in in progress'
+	},
+	/*
+	 * The private half of this instance's key pair, which FoxTrust knows it by (specs/136). Never replaced: FoxTrust
+	 * binds the instance id to its first pair for good, so an unreadable one is reported, not regenerated.
+	 */
+	{
+		kind: 'instanceSigningKey',
+		area: 'serviceConfig',
+		path: 'instanceSigningKey.secret',
+		owner: 'the instance'
+	},
+	/* The key FoxTrust issued this instance for looking up addresses (specs/136). */
+	{
+		kind: 'foxtrustKey',
+		area: 'serviceConfig',
+		path: 'foxtrustKey.secret',
+		owner: 'the instance'
 	}
 ];
 
@@ -214,7 +241,7 @@ export type SealTarget =
 	  }
 	| { kind: 'totpSecret'; bucketId: string; userId: string }
 	| { kind: 'totpPending'; uid: string; bucketId: string; accountId: string }
-	| { kind: 'dpopNonceSecret' | 'errorOriginSalt' }
+	| { kind: SingletonSecretKind }
 	| { kind: 'connectedServiceSecret'; bucketId: string; serviceId: string }
 	| {
 			kind: 'connectedAccountToken';
@@ -258,6 +285,10 @@ export function bindingOf(target: SealTarget): string {
 			return 'serviceConfig/dpopNonceSecret/secret';
 		case 'errorOriginSalt':
 			return 'serviceConfig/errorOriginSalt/secret';
+		case 'instanceSigningKey':
+			return 'serviceConfig/instanceSigningKey/secret';
+		case 'foxtrustKey':
+			return 'serviceConfig/foxtrustKey/secret';
 		case 'connectedServiceSecret':
 			return `userBuckets/${target.bucketId}/connectedServices/${target.serviceId}/clientSecret`;
 		case 'connectedAccountToken':
