@@ -9,6 +9,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-11-17
+
+A patch: Claude Code can sign in to an MCP server through its client metadata document. Nothing to set up or
+migrate.
+
 ### Fixed
 
 - **Claude Code signs in to an MCP server through its client metadata document.** Its document lists
@@ -575,7 +580,8 @@ The first tagged release: everything the server accumulated before a version num
 - **Admin id_token** (spec 017). The console verifies its signature, `nonce`, expiry and audience.
 - **DPoP nonce secret** (spec 014). Provisioned at startup, so `requireNonce` can no longer answer 500.
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.1...HEAD
+[2.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...v2.0.0
 [1.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.5.0...v1.6.0

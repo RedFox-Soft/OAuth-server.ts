@@ -817,6 +817,12 @@ What an operator sees afterwards:
   "From where" can then keep Tor, commercial VPNs, hosting or some countries out of a path or an API. See
   [Add conditions at your proxy](/docs/get-started/add-conditions-at-your-proxy/#network-facts).
 
+### Then 2.0.1
+
+2.0.1 has no migration and nothing to set up. It fixes one sign-in: Claude Code, which identifies itself with a client
+metadata document listing `http://localhost/callback` without a port, was refused with a redirect_uri mismatch when it
+came back on the port it binds at sign-in. It now signs in to an MCP server behind FoxAuth.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
