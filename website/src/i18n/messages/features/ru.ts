@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'f0d2e4860084';
+export const source = '0963a3cf4eda';
 
 const plural = new Intl.PluralRules('ru');
 
@@ -142,7 +142,7 @@ export default {
 				},
 				assertionAudience: {
 					title: 'Только issuer в аудитории client assertion',
-					body: 'Сервер принимает client assertion, только если в ней единственным получателем указан issuer этого сервера. Такое правило закрывает атаку подмены аудитории, против которой написан rfc7523bis. По умолчанию правило выключено, пока rfc7523bis не станет RFC.'
+					body: 'Сервер принимает client assertion, только если в ней единственным получателем указан issuer этого сервера. Такое правило закрывает атаку подмены аудитории, против которой написан RFC 10070. По умолчанию правило включено. Администратор может выключить его для старых клиентов, которые вместо issuer указывают адрес token endpoint.'
 				},
 				encryption: {
 					title: 'Шифрование токенов и ответов',

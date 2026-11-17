@@ -55,7 +55,7 @@ finds them all. Discovery is the one exception: it reads `config['ipsieSl1.enabl
 | A signed response with no registered algorithm, or with the RS256 default a save wrote, is signed for PS256, written into the record when it is next saved; registering RS256 afresh is refused | CR §3.3 | `lib/models/client/schema.ts`, `lib/models/client/register.ts` |
 | JWT access tokens and ID-JAGs default to PS256 | CR §3.3 | `lib/models/formats/jwt.ts:27`, `lib/assertions/id_jag.ts:48` |
 | Client-assertion and request-object algorithms narrow to the SL1 set at request time | CR §3.3 | `lib/sl1/rules.ts:150` |
-| The client-assertion `aud` must be the issuer, as a string (FAPI's rule) | SL1 §3.2.1 | `lib/shared/token_jwt_auth.ts:129` |
+| The client-assertion `aud` must be the issuer, as a string (FAPI's rule) | SL1 §3.2.1 | `lib/shared/token_jwt_auth.ts:131` |
 | `acr_values` binds: an unsatisfied request ends in `unmet_authentication_requirements` (CIBA: `transaction_failed`) | SL1 §3.2.1 | `lib/helpers/interaction_policy/prompts/login.ts:204`, `lib/actions/authorization/backchannel_result.ts:61` |
 | Discovery advertises only what is accepted: SL1 algorithms, `code`, no `client_secret_jwt`, no metadata-document support | OIDC Discovery | `lib/configs/discoverySupport.ts:170` |
 

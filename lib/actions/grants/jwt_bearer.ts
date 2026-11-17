@@ -29,7 +29,7 @@ import {
 } from '../../assertions/verify.js';
 
 /*
- * The JWT bearer authorization grant (RFC 7523 §2.1 as updated by draft-ietf-oauth-rfc7523bis), and its
+ * The JWT bearer authorization grant (RFC 7523 §2.1 as updated by RFC 10070), and its
  * DPoP-bound form `jwt-dpop` — the receiving side of MCP enterprise-managed authorization (specs/108). An
  * agent presents an assertion a provider the project trusts signed about a person, and gets an access token
  * for one of the project's APIs: no browser, no consent (ID-JAG §4.1), no refresh token (ID-JAG §4.4.3).

@@ -67,9 +67,9 @@ function unauthenticated(status: number) {
 
 /**
  * @proves Where a captured client assertion can be spent is bounded at every endpoint that accepts
- * one rather than only at the token endpoint: each accepts the audiences RFC 9126 §2 and CIBA §7.1
- * require a server to accept, refuses one naming somebody else, and — once the operator turns on
- * the rfc7523bis rule — accepts the issuer identifier alone.
+ * one rather than only at the token endpoint: by default each accepts the issuer identifier alone, as
+ * RFC 10070 requires, and refuses one naming somebody else; only an operator who turns that rule off
+ * gets the audiences RFC 9126 §2 and CIBA §7.1 named before it.
  */
 describe('client assertion audience, at every endpoint that authenticates a client', () => {
 	let key: Awaited<ReturnType<typeof importJWK>>;
@@ -136,17 +136,44 @@ describe('client assertion audience, at every endpoint that authenticates a clie
 		}
 	});
 
-	it('accepts an assertion audienced at the token endpoint url at every one of them', async function () {
-		for (const { name, send } of ENDPOINTS) {
-			const { status } = await send({
-				client_assertion: await assertion(`${ISSUER}${routeNames.token}`),
-				client_assertion_type: ASSERTION_TYPE
-			});
-			expect(
-				status,
-				`${name} refused an assertion audienced at the token endpoint`
-			).not.toBe(401);
-		}
+	/*
+	 * The compatibility rule an operator chooses for clients that cannot yet follow RFC 10070: RFC 9126 §2
+	 * before RFC 10070, and CIBA §7.1 still, named the token endpoint url and the receiving endpoint's url.
+	 */
+	describe('while the issuer-only rule is off', () => {
+		beforeAll(function () {
+			ApplicationConfig['clientAuth.issuerOnlyAudience'] = false;
+		});
+
+		afterAll(function () {
+			ApplicationConfig['clientAuth.issuerOnlyAudience'] = true;
+		});
+
+		it('accepts an assertion audienced at the token endpoint url at every one of them', async function () {
+			for (const { name, send } of ENDPOINTS) {
+				const { status } = await send({
+					client_assertion: await assertion(`${ISSUER}${routeNames.token}`),
+					client_assertion_type: ASSERTION_TYPE
+				});
+				expect(
+					status,
+					`${name} refused an assertion audienced at the token endpoint`
+				).not.toBe(401);
+			}
+		});
+
+		it("accepts an assertion audienced at the endpoint's own url at every one of them", async function () {
+			for (const { name, send } of ENDPOINTS) {
+				const { status } = await send({
+					client_assertion: await assertion(`${ISSUER}${name}`),
+					client_assertion_type: ASSERTION_TYPE
+				});
+				expect(
+					status,
+					`${name} refused an assertion audienced at its own url`
+				).not.toBe(401);
+			}
+		});
 	});
 
 	it('refuses an assertion audienced at another server at every one of them', async function () {
@@ -159,19 +186,6 @@ describe('client assertion audience, at every endpoint that authenticates a clie
 				status,
 				`${name} accepted an assertion meant for another server`
 			).toBe(401);
-		}
-	});
-
-	it("accepts an assertion audienced at the endpoint's own url at every one of them", async function () {
-		for (const { name, send } of ENDPOINTS) {
-			const { status } = await send({
-				client_assertion: await assertion(`${ISSUER}${name}`),
-				client_assertion_type: ASSERTION_TYPE
-			});
-			expect(
-				status,
-				`${name} refused an assertion audienced at its own url`
-			).not.toBe(401);
 		}
 	});
 
@@ -195,32 +209,11 @@ describe('client assertion audience, at every endpoint that authenticates a clie
 	});
 
 	/*
-	 * draft-ietf-oauth-rfc7523bis §4 item 3b: the issuer identifier is the sole audience, and the token
-	 * endpoint url "MUST NOT be used". Off by default while RFC 9126 §2 and CIBA §7.1 still require the
-	 * other values, so these cases switch it on.
+	 * RFC 10070 §4 and §5: the issuer identifier is the sole audience, and the token endpoint url "MUST NOT
+	 * be used". The default, so these cases switch nothing; CIBA's endpoint follows it too, departing from
+	 * CIBA §7.1, which RFC 10070 does not update.
 	 */
-	describe('while the issuer-only rule is on', () => {
-		beforeAll(function () {
-			ApplicationConfig['clientAuth.issuerOnlyAudience'] = true;
-		});
-
-		afterAll(function () {
-			ApplicationConfig['clientAuth.issuerOnlyAudience'] = false;
-		});
-
-		it('accepts an assertion audienced at the issuer identifier at every one of them', async function () {
-			for (const { name, send } of ENDPOINTS) {
-				const { status } = await send({
-					client_assertion: await assertion(ISSUER),
-					client_assertion_type: ASSERTION_TYPE
-				});
-				expect(
-					status,
-					`${name} refused an assertion audienced at the issuer`
-				).not.toBe(401);
-			}
-		});
-
+	describe('under the issuer-only rule, the default', () => {
 		it('accepts the issuer identifier as a one-element list at every one of them', async function () {
 			for (const { name, send } of ENDPOINTS) {
 				const { status } = await send({
@@ -301,22 +294,23 @@ describe('client assertion audience, at every endpoint that authenticates a clie
 		});
 	});
 
-	it('refuses the token endpoint url on the next request after the issuer-only rule is switched on, with no restart', async function () {
-		await agent.token.post({
-			grant_type: 'client_credentials',
-			client_assertion: await assertion(`${ISSUER}${routeNames.token}`),
-			client_assertion_type: ASSERTION_TYPE
-		});
-		ApplicationConfig['clientAuth.issuerOnlyAudience'] = true;
+	it('refuses the token endpoint url again on the next request after the issuer-only rule is switched back on, with no restart', async function () {
+		ApplicationConfig['clientAuth.issuerOnlyAudience'] = false;
 		try {
 			const { status } = await agent.token.post({
 				grant_type: 'client_credentials',
 				client_assertion: await assertion(`${ISSUER}${routeNames.token}`),
 				client_assertion_type: ASSERTION_TYPE
 			});
-			expect(status).toBe(401);
+			expect(status).not.toBe(401);
 		} finally {
-			ApplicationConfig['clientAuth.issuerOnlyAudience'] = false;
+			ApplicationConfig['clientAuth.issuerOnlyAudience'] = true;
 		}
+		const { status } = await agent.token.post({
+			grant_type: 'client_credentials',
+			client_assertion: await assertion(`${ISSUER}${routeNames.token}`),
+			client_assertion_type: ASSERTION_TYPE
+		});
+		expect(status).toBe(401);
 	});
 });

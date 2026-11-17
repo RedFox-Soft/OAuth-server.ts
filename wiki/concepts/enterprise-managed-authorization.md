@@ -17,7 +17,7 @@ Spec 108 made a project able to take both roles of MCP enterprise-managed author
 
 - **Receiving authorization server.** An agent presents an ID-JAG — a short JWT an enterprise identity
   provider signed: "this person, through this agent, may get a token from you for this MCP server" — with
-  the JWT bearer grant (RFC 7523 §2.1 as updated by `draft-ietf-oauth-rfc7523bis`), and gets an access
+  the JWT bearer grant (RFC 7523 §2.1 as updated by RFC 10070), and gets an access
   token for one of the project's declared APIs. No browser, no consent screen, no refresh token.
 - **Identity provider.** An application holding a person's ID token or refresh token from the project
   exchanges it (RFC 8693) for an ID-JAG addressed to an outside authorization server the project is
@@ -177,7 +177,7 @@ by `aud_sub`; workload identity federation as Entra and GitHub practise it, whic
 authentication*, not this grant (RFC 7523 §3 item 2B requires such a JWT's `sub` to be the client id).
 
 7523bis's tightened client-authentication audience was listed here until spec 111 (2026-10-22), which made it
-an opt-in setting, `clientAuth.issuerOnlyAudience`, off until the RFC is published — see
+a setting, `clientAuth.issuerOnlyAudience`, on by default since the RFC was published as RFC 10070 (2026-11-17) — see
 [[client-assertion-audience]].
 
 The two-project flow on one instance (spec story 3) is not covered by `bun test`: discovery of a provider

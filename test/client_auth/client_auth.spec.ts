@@ -9,8 +9,10 @@ import {
 	expect,
 	mock,
 	beforeEach,
-	afterEach
+	afterEach,
+	afterAll
 } from 'bun:test';
+import { ApplicationConfig } from 'lib/configs/application.js';
 
 import nanoid from '../../lib/helpers/nanoid.ts';
 import { eventBus, type ServerListener } from '../../lib/index.ts';
@@ -543,82 +545,96 @@ describe('client authentication options', () => {
 				expect(data).toHaveProperty('access_token');
 			});
 
-			it('accepts the auth when aud is the token endpoint', async function () {
-				for (const aud of [ISSUER + '/token', [ISSUER + '/token']]) {
-					const assertion = await JWT.sign(
-						{
-							jti: nanoid(),
-							aud,
-							sub: 'client-jwt-secret',
-							iss: 'client-jwt-secret'
-						},
-						key,
-						'HS256',
-						{ expiresIn: 60 }
-					);
+			/*
+			 * The compatibility rule an operator chooses for clients that cannot yet follow RFC 10070: the token
+			 * endpoint URL and the receiving endpoint's URL, as RFC 9126 §2 and CIBA §7.1 named them.
+			 */
+			describe('while the issuer-only rule is off', () => {
+				beforeAll(function () {
+					ApplicationConfig['clientAuth.issuerOnlyAudience'] = false;
+				});
 
-					const { status, data } = await agent.token.post({
-						client_assertion: assertion,
-						grant_type: 'client_credentials',
-						client_assertion_type:
-							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
-					});
-					expect(status).toBe(200);
-					expect(data).toHaveProperty('access_token');
-				}
-			});
+				afterAll(function () {
+					ApplicationConfig['clientAuth.issuerOnlyAudience'] = true;
+				});
 
-			it('accepts the auth when aud is the token endpoint at another endpoint', async function () {
-				for (const aud of [ISSUER + '/token', [ISSUER + '/token']]) {
-					const assertion = await JWT.sign(
-						{
-							jti: nanoid(),
-							aud,
-							sub: 'client-jwt-secret',
-							iss: 'client-jwt-secret'
-						},
-						key,
-						'HS256',
-						{ expiresIn: 60 }
-					);
+				it('accepts the auth when aud is the token endpoint', async function () {
+					for (const aud of [ISSUER + '/token', [ISSUER + '/token']]) {
+						const assertion = await JWT.sign(
+							{
+								jti: nanoid(),
+								aud,
+								sub: 'client-jwt-secret',
+								iss: 'client-jwt-secret'
+							},
+							key,
+							'HS256',
+							{ expiresIn: 60 }
+						);
 
-					const { status, data } = await agent.token.introspect.post({
-						client_assertion: assertion,
-						client_assertion_type:
-							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-						token: 'foo'
-					});
-					expect(status).toBe(200);
-					expect(data).toEqual(introspectionAuthSucceeded);
-				}
-			});
+						const { status, data } = await agent.token.post({
+							client_assertion: assertion,
+							grant_type: 'client_credentials',
+							client_assertion_type:
+								'urn:ietf:params:oauth:client-assertion-type:jwt-bearer'
+						});
+						expect(status).toBe(200);
+						expect(data).toHaveProperty('access_token');
+					}
+				});
 
-			it('accepts the auth when aud is the url of another endpoint it is used at', async function () {
-				for (const aud of [
-					ISSUER + '/token/introspect',
-					[ISSUER + '/token/introspect']
-				]) {
-					const assertion = await JWT.sign(
-						{
-							jti: nanoid(),
-							aud,
-							sub: 'client-jwt-secret',
-							iss: 'client-jwt-secret'
-						},
-						key,
-						'HS256',
-						{ expiresIn: 60 }
-					);
+				it('accepts the auth when aud is the token endpoint at another endpoint', async function () {
+					for (const aud of [ISSUER + '/token', [ISSUER + '/token']]) {
+						const assertion = await JWT.sign(
+							{
+								jti: nanoid(),
+								aud,
+								sub: 'client-jwt-secret',
+								iss: 'client-jwt-secret'
+							},
+							key,
+							'HS256',
+							{ expiresIn: 60 }
+						);
 
-					const { status, data } = await agent.token.introspect.post({
-						client_assertion: assertion,
-						client_assertion_type:
-							'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
-						token: 'foo'
-					});
-					expect(status).toBe(200);
-					expect(data).toEqual(introspectionAuthSucceeded);
-				}
+						const { status, data } = await agent.token.introspect.post({
+							client_assertion: assertion,
+							client_assertion_type:
+								'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+							token: 'foo'
+						});
+						expect(status).toBe(200);
+						expect(data).toEqual(introspectionAuthSucceeded);
+					}
+				});
+
+				it('accepts the auth when aud is the url of another endpoint it is used at', async function () {
+					for (const aud of [
+						ISSUER + '/token/introspect',
+						[ISSUER + '/token/introspect']
+					]) {
+						const assertion = await JWT.sign(
+							{
+								jti: nanoid(),
+								aud,
+								sub: 'client-jwt-secret',
+								iss: 'client-jwt-secret'
+							},
+							key,
+							'HS256',
+							{ expiresIn: 60 }
+						);
+
+						const { status, data } = await agent.token.introspect.post({
+							client_assertion: assertion,
+							client_assertion_type:
+								'urn:ietf:params:oauth:client-assertion-type:jwt-bearer',
+							token: 'foo'
+						});
+						expect(status).toBe(200);
+						expect(data).toEqual(introspectionAuthSucceeded);
+					}
+				});
 			});
 		});
 
@@ -1162,7 +1178,7 @@ describe('client authentication options', () => {
 		});
 
 		/*
-		 * draft-ietf-oauth-rfc7523bis §4 (new RFC 7523 §3.2): a client SHOULD type its assertion, and a
+		 * RFC 10070 §4.2 (new RFC 7523 §3.2): a client SHOULD type its assertion, and a
 		 * server should not refuse one that is untyped — every other case here is untyped. A JWT typed for
 		 * another job is never a client credential, whichever audience rule is in force.
 		 */

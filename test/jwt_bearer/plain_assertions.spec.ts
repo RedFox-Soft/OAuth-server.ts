@@ -22,7 +22,7 @@ const SUBJECT = 'L-77';
 /**
  * @proves A plain assertion about a person, from a provider the project trusts for them, yields a token for
  * the application the trust names — once, within the APIs and scopes the trust allows, addressed to this
- * project's issuer or token endpoint (draft-ietf-oauth-rfc7523bis §4) — and nothing typed for another purpose
+ * project's issuer or token endpoint (RFC 10070 §4) — and nothing typed for another purpose
  * is ever taken for one.
  */
 describe('a plain assertion presented with the JWT bearer grant', () => {

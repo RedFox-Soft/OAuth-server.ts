@@ -6,7 +6,7 @@
 /* RFC 8693 §2.1. */
 export const TOKEN_EXCHANGE_GRANT =
 	'urn:ietf:params:oauth:grant-type:token-exchange';
-/* RFC 7523 §2.1, as updated by draft-ietf-oauth-rfc7523bis. */
+/* RFC 7523 §2.1, as updated by RFC 10070. */
 export const JWT_BEARER_GRANT = 'urn:ietf:params:oauth:grant-type:jwt-bearer';
 /*
  * draft-parecki-oauth-jwt-dpop-grant-01 §3.1: the same grant for an assertion bound to a DPoP key. That

@@ -232,21 +232,22 @@ export const ApplicationConfig = {
 	/*
 	 * clientAuth.issuerOnlyAudience
 	 *
-	 * title: Issuer-only audience for client assertions ([draft-ietf-oauth-rfc7523bis](https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/) §4 item 3b, §5)
+	 * title: Issuer-only audience for client assertions ([RFC 10070](https://www.rfc-editor.org/rfc/rfc10070.html) §4, §5)
 	 *
 	 * description: A `private_key_jwt` or `client_secret_jwt` assertion is accepted only when its `aud`
 	 * is this server's issuer identifier and nothing else (a string, or a one-element array). This closes
-	 * the audience-injection attack (CVE-2025-27370, CVE-2025-27371) that rfc7523bis and OpenID Connect
-	 * Core errata set 3 §9 answer: an assertion a client wrote for a malicious server, audienced at this
-	 * server's token endpoint, can no longer be spent here.
+	 * the audience-injection attack (CVE-2025-27370, CVE-2025-27371) that RFC 10070 answers: an assertion
+	 * a client wrote for a malicious server, audienced at this server's token endpoint, can no longer be
+	 * spent here.
 	 *
-	 * Off by default because, on, it departs from two texts still in force: RFC 9126 §2 ("MUST accept
-	 * its issuer identifier, token endpoint URL, or pushed authorization request endpoint URL") and CIBA
-	 * Core §7.1 (the same, with the Backchannel Authentication Endpoint URL). The default becomes `true`
-	 * once rfc7523bis is published as an RFC — IESG-approved 2026-04-30, at the RFC Editor since. Always
-	 * in force while `fapi.enabled` is on, which additionally requires a string.
+	 * On by default since RFC 10070 was published (November 2026), which requires it and removes RFC 9126
+	 * §2's duty to accept the token and PAR endpoint URLs. On, it still departs from CIBA Core §7.1, which
+	 * RFC 10070 does not update and which says the OP "MUST accept" its token endpoint and Backchannel
+	 * Authentication Endpoint URLs. Off is the compatibility setting for clients that cannot yet change,
+	 * and departs from RFC 10070. Always in force while `fapi.enabled` or `ipsieSl1.enabled` is on, which
+	 * additionally require a string.
 	 */
-	'clientAuth.issuerOnlyAudience': false,
+	'clientAuth.issuerOnlyAudience': true,
 
 	/*
 	 * features.clientCredentials
@@ -282,7 +283,7 @@ export const ApplicationConfig = {
 	 * jwtBearer.enabled
 	 *
 	 * title: [`RFC7523`](https://www.rfc-editor.org/rfc/rfc7523.html) - JWT Bearer authorization grant
-	 * (with draft-ietf-oauth-rfc7523bis), including ID-JAG and `jwt-dpop`
+	 * (as updated by [RFC 10070](https://www.rfc-editor.org/rfc/rfc10070.html)), including ID-JAG and `jwt-dpop`
 	 *
 	 * description: Lets a project accept signed assertions about a person from a sign-in provider it
 	 * trusts and answer them with an access token for one of its APIs — the receiving side of MCP

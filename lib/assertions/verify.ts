@@ -176,7 +176,7 @@ export async function verifyAssertion(
 		if (claims.client_id !== clientId) throw refused('client');
 	} else {
 		/*
-		 * draft-ietf-oauth-rfc7523bis §4 item 3a: for the grant, this server may be named by its issuer identifier
+		 * RFC 10070 §4 (RFC 7523 §3 item 3, authorization grant): for the grant, this server may be named by its issuer identifier
 		 * or its token endpoint URL, compared exactly; one value only (CHAIN §2.3.3), so it is ours alone.
 		 */
 		const audience = soleAudience(claims.aud);

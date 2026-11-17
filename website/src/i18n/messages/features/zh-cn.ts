@@ -1,6 +1,6 @@
 import type english from './en.ts';
 
-export const source = 'f0d2e4860084';
+export const source = '0963a3cf4eda';
 
 export default {
 	title: 'OAuth 2.1 与 OIDC 功能',
@@ -131,7 +131,7 @@ export default {
 				},
 				assertionAudience: {
 					title: '客户端断言仅接受签发者作为受众',
-					body: '只有当客户端断言把本服务器的签发者作为唯一受众时，服务器才接受该断言。此规则可防范 rfc7523bis 所针对的受众注入攻击。在 rfc7523bis 成为 RFC 之前，此规则默认关闭。'
+					body: '只有当客户端断言把本服务器的签发者作为唯一受众时，服务器才接受该断言。此规则可防范 RFC 10070 所针对的受众注入攻击。此规则默认开启。对于仍填写令牌端点地址而非签发者的旧客户端，管理员可以关闭此规则。'
 				},
 				encryption: {
 					title: '令牌与响应加密',

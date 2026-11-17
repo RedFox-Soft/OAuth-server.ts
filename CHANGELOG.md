@@ -76,6 +76,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   the console says why. Check access looks an address up in the server's own copy. Free on every plan. Run
   `db:migrate`; an older release then refuses to start against the database.
 
+### Changed
+
+- **A client assertion's audience must be the issuer alone, by default** (RFC 10070). draft-ietf-oauth-rfc7523bis is
+  now RFC 10070, so `clientAuth.issuerOnlyAudience` is on by default: a `private_key_jwt` or `client_secret_jwt`
+  assertion whose `aud` is the token endpoint URL, another endpoint's URL or several values is refused with
+  `invalid_client` at every endpoint, CIBA's included. **Upgrade note:** a client that puts anything but the issuer
+  in `aud` stops authenticating; turn the setting off only until it is fixed, since that reopens the
+  audience-injection attack (CVE-2025-27370/27371). An instance that stored `false` keeps it.
+
 ### Fixed
 
 - **An MCP header sent twice no longer slips past an API's tools table.** A request that sent `Mcp-Method`,

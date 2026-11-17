@@ -111,7 +111,7 @@ describe('a document client that authenticates with a private key', () => {
 			.setProtectedHeader({ alg: 'ES256' })
 			.setIssuer(identifier)
 			.setSubject(identifier)
-			.setAudience(`${ISSUER}/token`)
+			.setAudience(ISSUER)
 			.setIssuedAt()
 			.setExpirationTime('1m')
 			.sign(privateKey);
@@ -151,7 +151,7 @@ describe('a document client that authenticates with a private key', () => {
 			.setProtectedHeader({ alg: 'ES256' })
 			.setIssuer(identifier)
 			.setSubject(identifier)
-			.setAudience(`${ISSUER}/token`)
+			.setAudience(ISSUER)
 			.setIssuedAt()
 			.setExpirationTime('1m')
 			.sign(privateKey);

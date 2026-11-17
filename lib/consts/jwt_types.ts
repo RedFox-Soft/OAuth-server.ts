@@ -4,7 +4,7 @@
  * assertion grants — and a token minted for one job can never be replayed as another (RFC 8725 §3.11).
  */
 
-/* draft-ietf-oauth-rfc7523bis §4: the type a client authentication JWT SHOULD carry. */
+/* RFC 10070 §4.2: the type a client authentication JWT SHOULD carry. */
 export const CLIENT_AUTHENTICATION_JWT_TYPE = 'client-authentication+jwt';
 /* ID-JAG §3.1: the explicit JWT type an ID-JAG MUST carry. */
 export const ID_JAG_JWT_TYPE = 'oauth-id-jag+jwt';

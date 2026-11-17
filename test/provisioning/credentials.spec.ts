@@ -76,7 +76,7 @@ describe('provisioning connection credentials', () => {
 			.setProtectedHeader({ alg: 'ES256', kid: 'k1' })
 			.setIssuer(clientId)
 			.setSubject(clientId)
-			.setAudience(`http://e.ly${tokenPath(c)}`)
+			.setAudience(`http://e.ly/${slugOf(c.bucket)}`)
 			.setJti(crypto.randomUUID())
 			.setIssuedAt()
 			.setExpirationTime('2m')

@@ -118,10 +118,7 @@ const groups = [
 		{
 			...security.assertionAudience,
 			flag: 'clientAuth.issuerOnlyAudience',
-			spec: {
-				label: 'rfc7523bis',
-				href: 'https://datatracker.ietf.org/doc/draft-ietf-oauth-rfc7523bis/'
-			}
+			spec: rfc('10070')
 		},
 		{ ...security.encryption, flag: 'encryption.enabled' },
 		{ ...security.totp, spec: rfc('6238') },

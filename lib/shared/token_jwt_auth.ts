@@ -87,7 +87,7 @@ export async function tokenJwtAuth(
 	}
 	/*
 	 * A JWT typed for another job — a DPoP proof, an access token, an ID-JAG — is never a client credential
-	 * (RFC 8725 §3.11). An untyped assertion is accepted: rfc7523bis §4 (new RFC 7523 §3.2) has clients
+	 * (RFC 8725 §3.11). An untyped assertion is accepted: RFC 10070 §4.2 (new RFC 7523 §3.2) has clients
 	 * SHOULD type theirs and calls refusing an untyped one NOT RECOMMENDED.
 	 */
 	const typ = JWT.normalisedType(header.typ);
@@ -107,19 +107,21 @@ export async function tokenJwtAuth(
 	}
 
 	/*
-	 * Two rules, and which one is in force is a deliberate departure isolated behind a named setting, as
-	 * the constitution requires.
+	 * Two rules, and each departs from a text in force, so which one applies is isolated behind a named
+	 * setting, as the constitution requires.
 	 *
-	 * The issuer-only rule is draft-ietf-oauth-rfc7523bis §4 item 3b and §5: the issuer identifier "as its
-	 * sole value", and the token endpoint URL "MUST NOT be used". It answers the audience-injection attack
-	 * (CVE-2025-27370, CVE-2025-27371): a malicious server can make a client write an assertion audienced
-	 * at this server's token endpoint and spend it here. OpenID Connect Core errata set 3 §9 makes the same
-	 * change. A one-element array is still one value, which both texts allow.
+	 * The issuer-only rule, the default, is RFC 10070 §4 (RFC 7523 §3 item 3, client authentication) and §5
+	 * (RFC 9126 §2): the issuer identifier "as its sole value", the token endpoint URL "MUST NOT be used",
+	 * and "MUST reject any JWT that does not contain its issuer identifier as its sole audience value". It
+	 * answers the audience-injection attack (CVE-2025-27370, CVE-2025-27371): a malicious server can make a
+	 * client write an assertion audienced at this server's token endpoint and spend it here. RFC 10070 does
+	 * not restrict the claim's type, so a one-element array is still one value. It departs from CIBA Core
+	 * §7.1, which RFC 10070 does not update and which still says the OP "MUST accept" its Backchannel
+	 * Authentication Endpoint URL and token endpoint URL: a CIBA client audiencing either is refused.
 	 *
-	 * The lenient rule stays the default because, until rfc7523bis is published, RFC 9126 §2 says a server
-	 * "MUST accept its issuer identifier, token endpoint URL, or pushed authorization request endpoint URL",
-	 * and CIBA Core §7.1 the same with the Backchannel Authentication Endpoint URL. The default flips to
-	 * issuer-only once the RFC is out.
+	 * The lenient rule, with the setting off, is the compatibility answer for clients that cannot yet
+	 * change: it accepts the issuer, the token endpoint URL and the receiving endpoint's URL, as RFC 9126
+	 * §2 did before RFC 10070 and CIBA §7.1 still does, and so departs from RFC 10070.
 	 *
 	 * FAPI 2.0 Security Profile §5.3.2.1 cl. 8 implies the issuer-only rule and §5.3.3.1 cl. 5 adds "as a
 	 * string not as an item in an array", which the strict equality enforces: a one-element array is not

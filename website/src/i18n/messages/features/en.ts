@@ -134,7 +134,7 @@ export default {
 				},
 				assertionAudience: {
 					title: 'Issuer-only client assertion audience',
-					body: 'The server accepts a client assertion only when the assertion names this server’s issuer as its sole audience. The rule closes the audience-injection attack that rfc7523bis answers. The rule is off by default until rfc7523bis becomes an RFC.'
+					body: 'The server accepts a client assertion only when the assertion names this server’s issuer as its sole audience. The rule closes the audience-injection attack that RFC 10070 answers. The rule is on by default. An operator can turn it off for older clients that name the token endpoint instead.'
 				},
 				encryption: {
 					title: 'Token and response encryption',
