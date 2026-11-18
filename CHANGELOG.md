@@ -9,6 +9,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-18
+
+Super administrators can see where administrators sign in from, and an account is emailed about a sign-in from a
+new network or browser. Two fence migrations and one new storage area: run the usual setup and migrate steps.
+
 ### Added
 
 - **Where and how your administrators sign in.** Administrators' sign-ins and refused sign-ins of a known
@@ -605,7 +610,8 @@ The first tagged release: everything the server accumulated before a version num
 - **Admin id_token** (spec 017). The console verifies its signature, `nonce`, expiry and audience.
 - **DPoP nonce secret** (spec 014). Provisioned at startup, so `requireNonce` can no longer answer 500.
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.1...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...v2.0.0
 [1.7.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.6.0...v1.7.0

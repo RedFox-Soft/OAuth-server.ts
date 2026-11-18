@@ -823,6 +823,18 @@ What an operator sees afterwards:
 metadata document listing `http://localhost/callback` without a port, was refused with a redirect_uri mismatch when it
 came back on the port it binds at sign-in. It now signs in to an MCP server behind FoxAuth.
 
+### Then 2.1.0
+
+2.1.0 adds one storage area, which `db:setup` (or `db:setup:pg`) provisions, and two fence migrations, which
+`db:migrate` applies. They change no data. Once they are recorded, an older release refuses to start against the
+database, because it would stop recording administrators' sign-ins and stop sending the new emails without saying so.
+
+- **Administrators' sign-ins are kept from the upgrade on.** Nothing from before it exists. While address lookup is
+  on, their addresses are sent to FoxTrust's API for the network owner and place, as people's are.
+- **Administrators are emailed about a sign-in from a new network or browser by default.** It needs mail set up and
+  people's activity recording on. For a project's people it stays off until an administrator turns on "Email people
+  about sign-ins from a new network or browser" in the project's Sign-in tab.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
