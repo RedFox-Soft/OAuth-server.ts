@@ -107,6 +107,30 @@ alias; the verdicts are the RP's own answers (see [The client plans](#the-client
 - **Not exercised** — `userinfo-invalid-sub`, `scope-userinfo-claims` and the three refresh-token
   modules, whose subject is a call this RP never makes; each first sign-in is accepted.
 
+### FAPI 2.0 with DPoP on the hosted suite
+
+**2026-11-18, at `369faa09` (v2.1.0)**, on the hosted suite (5.3.4) against the deployed
+`conformance.foxauth.dev`, after the change that makes a DPoP proof's `htu` required and exact. The
+clients authenticate with `private_key_jwt`, sign with ES256 and have DPoP-bound tokens:
+
+| Plan                                     | Modules | Conditions | Failures |
+| ---------------------------------------- | ------- | ---------- | -------- |
+| `fapi2-security-profile-final-test-plan` | 53      | 4 049      | **none** |
+| `fapi2-message-signing-final-test-plan`  | 67      | 5 445      | **none** |
+
+Every DPoP module passes: proofs at PAR, at the token endpoint and at the resource, a proof's `iat`
+ten seconds either side, a mismatched `jkt`, and the negative tests. Two modules were run again alone
+with a corrected config, and both pass: `user-rejects-authentication`, with a browser script that
+presses Cancel on the consent page, and `refresh-token`, with `offline_access` in the config's scope.
+What is left is warnings: the ID token carries `session_expiry` (IPSIE SL1), a claim the suite does
+not know, and `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` ends in REVIEW, as
+before.
+
+A first Message Signing run failed 41 conditions, every one `FAPI2ValidateJarmSigningAlg`, which the
+suite added after the October runs: its test clients registered no `authorizationSignedResponseAlg`, so
+JARM was signed RS256 (see [Signing keys for a FAPI run](#signing-keys-for-a-fapi-run)). Registering
+ES256 fixed it.
+
 ### Open defects
 
 **None the suite has found.** Two results it will keep reporting are not defects: the Dynamic
@@ -157,6 +181,10 @@ Run as
 - `par-ensure-reused-request-uri-prior-to-auth-completion-succeeds` ends in REVIEW. It needs the first
   visit to stop at the login page, because signing in there spends the pushed request the second visit
   reuses; the rig's config gives the module a browser script that screenshots the page and stops.
+
+Since 2026-11-18 the hosted configs give `user-rejects-authentication` a script that presses Cancel and
+ask for `offline_access`, so in the [DPoP run](#fapi-20-with-dpop-on-the-hosted-suite) both modules
+pass and neither failures nor that skip remain.
 
 ### FAPI 2.0 Security Profile — 4
 
@@ -268,7 +296,8 @@ log exactly like a server defect**. That is the trap this section exists for.
 - **`scope` in the suite's own client configuration**, for every FAPI plan. The suite omits the
   parameter when its config names none, a FAPI request always carries `nonce`, and this server refuses
   `nonce` without `openid` (`lib/actions/authorization/check_openid_scope.ts`) — on the first PAR push
-  of every module.
+  of every module. Include `offline_access`, or `refresh-token` is skipped: no refresh token is due to
+  a client that did not ask for one.
 - **`require_signed_request_object: true` on the client**, for Message Signing, or
   `ensure-unsigned-request-at-par-endpoint-fails` fails: an unsigned push is accepted with `201`. It is
   a per-client registration, and `fapi.enabled` does not imply it.
