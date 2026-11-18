@@ -9,6 +9,25 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Where and how your administrators sign in.** Administrators' sign-ins and refused sign-ins of a known
+  administrator are now kept like people's, for 90 days, with the address, its network owner and location, and the
+  browser. A super administrator reads one administrator's under Administrators, Accounts, Sign-ins, everyone's at
+  once under Administrators, Activity, or with the MCP tools `admin_activity_list` and `admin_activity_feed`; every
+  read is recorded in the audit trail. Accounts shows each administrator's last sign-in and marks refusals since it. Each administrator sees their own last ten,
+  without addresses, from their email at the top of the console (`own_sign_in_list`). **Upgrade note:** run
+  `db:migrate` (one fence migration); recording of administrators starts at the upgrade, nothing earlier exists; their
+  addresses are sent to FoxTrust's API like people's while address lookup is on.
+
+- **An email about a sign-in from a new network or browser.** When an account signs in from a network (its owner,
+  else its country) or a browser it has not used in 90 days, its owner is emailed when, where, how and with which
+  browser, never the address, with a "This wasn't me" link that signs the account out everywhere; an administrator's
+  also tells the other super administrators. On by default for administrators; for people, turn on "Email people about
+  sign-ins from a new network or browser" in the project's Sign-in tab (`newSignInAlerts`). Proven addresses only, at
+  most five a day; the sign-in row says the email was sent. **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the
+  new area and `db:migrate` for the fence; it needs mail set up and people's activity recording on.
+
 ### Fixed
 
 - **A person's activity names the API that asked for a code.** A sign-in turned away because an API it asked for

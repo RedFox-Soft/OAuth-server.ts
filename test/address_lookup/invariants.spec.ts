@@ -183,8 +183,8 @@ describe('the FoxTrust key', () => {
 });
 
 /**
- * @proves SI-2: only public addresses on the rows being written leave the server, never one of the administrators'
- * project, never anything else about the person.
+ * @proves SI-2: only public addresses on the rows being written leave the server, an administrator's sign-in like a
+ * person's (specs/137), never anything else about the person.
  */
 describe('what is sent for a lookup', () => {
 	beforeEach(async () => {
@@ -229,7 +229,7 @@ describe('what is sent for a lookup', () => {
 		expect(fake.ipsSent()).not.toContain('192.168.1.4');
 	});
 
-	it("is never an address of the administrators' project", async () => {
+	it("is an administrator's sign-in address like a person's", async () => {
 		const administrator = await getUserStore(ADMIN_BUCKET_ID).create(
 			`admin-${Math.random().toString(36).slice(2)}@acme.test`,
 			await Bun.password.hash(PASSWORD),
@@ -244,7 +244,15 @@ describe('what is sent for a lookup', () => {
 		);
 		await flushPersonActivityNow();
 
-		expect(fake.ipsSent()).toEqual([]);
+		const { rows } = await getPersonActivityStore().listForPerson(
+			ADMIN_BUCKET_ID,
+			administrator._id,
+			{ limit: 10, now: new Date() }
+		);
+		expect([fake.ipsSent(), rows.map((row) => row.lookup?.city)]).toEqual([
+			['203.0.113.50'],
+			['Munich']
+		]);
 	});
 
 	it('carries nothing about the person', async () => {

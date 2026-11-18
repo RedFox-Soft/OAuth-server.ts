@@ -113,5 +113,28 @@ export const en = {
 		guessAdvice:
 			'Change your password: on the {service} sign-in page, choose "{forgot}".',
 		pageButton: 'Open two-step verification'
+	},
+	/* A sign-in from a new network or browser (specs/138). One fact a line; a link never inside a sentence. */
+	newSignIn: {
+		subject: 'New sign-in to {service}',
+		heading: 'A new sign-in to your account',
+		intro: 'Someone signed in to {service} as {email}.',
+		when: 'When: {when} (UTC)',
+		app: 'Signed in to: {app}',
+		method: 'How: {method}',
+		browser: 'Browser: {browser}',
+		place: 'Place: {place}',
+		network: 'Network: {network}',
+		whyNetwork:
+			'Nobody signed in to this account from this network in the last 90 days.',
+		whyBrowser:
+			'Nobody signed in to this account from this browser in the last 90 days.',
+		whyBoth:
+			'Nobody signed in to this account from this network or this browser in the last 90 days.',
+		ifYou: 'If this was you, you can ignore this email.',
+		ifNot:
+			'If it was not you, sign out everywhere now. The link works once, within 72 hours:',
+		button: 'This wasn’t me',
+		console: 'the FoxAuth console'
 	}
 } as const;

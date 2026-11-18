@@ -9,12 +9,8 @@ import {
 
 import bootstrap from '../test_helper.ts';
 import { adminCookie } from '../end_user_lifecycle/fixtures.ts';
-import { getPersonActivityStore, getUserStore } from 'lib/adapters/index.ts';
-import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ApplicationConfig, settingsApplied } from 'lib/configs/application.js';
-import { flushPersonActivityNow } from 'lib/person_activity/flush.ts';
 import {
-	PASSWORD,
 	PersonBrowser,
 	activityOf,
 	from,
@@ -162,41 +158,3 @@ describe("the address of a person's sign-in", () => {
 		expect(await addressAfterSignIn()).toBeNull();
 	});
 });
-
-/**
- * @proves Nothing is kept for the administrators' project: an administrator's sign-in to the console leaves no
- * activity anywhere.
- */
-describe("the administrators' project", () => {
-	beforeAll(async () => {
-		await bootstrap(import.meta.url);
-		cookie = await adminCookie();
-		from('203.0.113.9');
-	});
-
-	it("keeps nothing for an administrator's sign-in to the console", async () => {
-		hashAdmin ??= await Bun.password.hash(PASSWORD);
-		const administrator = await getUserStore(ADMIN_BUCKET_ID).create(
-			`admin-${Math.random().toString(36).slice(2)}@acme.test`,
-			hashAdmin,
-			true
-		);
-		const landed = await typePassword(
-			new PersonBrowser(),
-			administrator.email,
-			PASSWORD,
-			'admin-panel'
-		);
-		expect(landed.url).toStartWith('http://e.ly/admin/callback');
-
-		await flushPersonActivityNow();
-		const kept = await getPersonActivityStore().listForPerson(
-			ADMIN_BUCKET_ID,
-			administrator._id,
-			{ limit: 10, now: new Date() }
-		);
-		expect(kept.rows).toEqual([]);
-	});
-});
-
-let hashAdmin: string | undefined;

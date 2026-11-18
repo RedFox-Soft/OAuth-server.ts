@@ -20,6 +20,7 @@ export interface ActivityRow {
 		sawText: string | null;
 		method: string | null;
 		device: string | null;
+		alerted?: string | null;
 	};
 	place: {
 		clientId?: string;
@@ -55,6 +56,9 @@ export interface ActivityRow {
 	firstAt: string;
 	lastAt: string;
 	check: { app: string } | { api: string } | null;
+	/* On the administrators' feed only (specs/137): whose row it is. */
+	accountId?: string;
+	email?: string | null;
 }
 
 interface ActivityPage {
@@ -291,23 +295,24 @@ function UseRow({ row }: { row: ActivityRow }) {
 }
 
 function Row({
-	bucketId,
-	userId,
 	row,
-	lookupState
+	lookupState,
+	checkOf,
+	whoOf
 }: {
-	bucketId: string;
-	userId: string;
 	row: ActivityRow;
 	lookupState: LookupState;
+	checkOf: (row: ActivityRow) => string | null;
+	whoOf?: (row: ActivityRow) => { label: string; href: string } | null;
 }) {
+	const who = whoOf?.(row) ?? null;
 	if (row.reason === 'used') return <UseRow row={row} />;
-	const check =
-		row.outcome === 'let_in' ? null : checkHref(bucketId, userId, row);
+	const check = row.outcome === 'let_in' ? null : checkOf(row);
+	/* One time when the repeats fell within one minute, as a use row says it (specs/134). */
+	const first = timeWords(row.firstAt);
+	const latest = timeWords(row.lastAt);
 	const when =
-		row.count > 1
-			? `${timeWords(row.firstAt)}–${timeWords(row.lastAt)}`
-			: timeWords(row.lastAt);
+		row.count > 1 && first !== latest ? `${first}–${latest}` : latest;
 	const outcome =
 		row.count > 1
 			? `${row.words.outcome} ${String(row.count)} times`
@@ -338,6 +343,7 @@ function Row({
 				>
 					{outcome}
 				</Tag>
+				{who && <Link href={who.href}>{who.label}</Link>}
 				<Typography.Text strong>{placeOf(row)}</Typography.Text>
 				{row.kind === 'api' && row.client && (
 					<Typography.Text type="secondary">
@@ -345,6 +351,11 @@ function Row({
 					</Typography.Text>
 				)}
 				{row.newAddress && <Tag>New address</Tag>}
+				{row.words.alerted && (
+					<Tooltip title="The account's owner was emailed, with a link that signs it out everywhere.">
+						<Tag color="blue">{row.words.alerted}</Tag>
+					</Tooltip>
+				)}
 			</Flex>
 			<Flex
 				wrap
@@ -391,7 +402,6 @@ function Row({
 /*
  * What this server decided about the person (specs/133 contracts/console.md): sign-ins, failed sign-ins and stops,
  * and what apps behind the proxy and APIs checked at it asked or refused, newest first, grouped by the reader's day.
- * The filters live in the address, like the Users list, so a link shows the same view.
  */
 export function UserActivityTab({
 	bucketId,
@@ -399,6 +409,36 @@ export function UserActivityTab({
 }: {
 	bucketId: string;
 	userId: string;
+}) {
+	return (
+		<ActivityTimeline
+			endpoint={`/admin/api/projects/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(userId)}/activity`}
+			href={userHref(bucketId, userId, 'activity')}
+			checkOf={(row) => checkHref(bucketId, userId, row)}
+		/>
+	);
+}
+
+const NO_CHECK = () => null;
+
+/*
+ * The timeline a person's Activity tab and an administrator's Sign-ins page share (specs/137 research R7). The
+ * filters live in the address, like the Users list, so a link shows the same view. `signInsOnly` is for the
+ * administrators' project, where nothing else is kept.
+ */
+export function ActivityTimeline({
+	endpoint,
+	href,
+	checkOf = NO_CHECK,
+	signInsOnly = false,
+	whoOf
+}: {
+	endpoint: string;
+	href: string;
+	checkOf?: (row: ActivityRow) => string | null;
+	signInsOnly?: boolean;
+	/* Whose row it is, on a page that lists more than one person. */
+	whoOf?: (row: ActivityRow) => { label: string; href: string } | null;
 }) {
 	const { query } = useRoute();
 	const navigate = useNavigate();
@@ -414,16 +454,12 @@ export function UserActivityTab({
 	const load = useCallback(
 		async (before: string | null) => {
 			try {
-				const result = await request<ActivityPage>(
-					'POST',
-					`/admin/api/projects/${encodeURIComponent(bucketId)}/users/${encodeURIComponent(userId)}/activity`,
-					{
-						...(kind === 'all' ? {} : { kind }),
-						...(outcome === 'all' ? {} : { outcome }),
-						...(before ? { before } : {}),
-						limit: PAGE
-					}
-				);
+				const result = await request<ActivityPage>('POST', endpoint, {
+					...(kind === 'all' ? {} : { kind }),
+					...(outcome === 'all' ? {} : { outcome }),
+					...(before ? { before } : {}),
+					limit: PAGE
+				});
 				if (result.ok) {
 					setPages((earlier) =>
 						before ? [...earlier, result.data] : [result.data]
@@ -442,7 +478,7 @@ export function UserActivityTab({
 				setLoading(false);
 			}
 		},
-		[bucketId, userId, kind, outcome]
+		[endpoint, kind, outcome]
 	);
 	useEffect(() => {
 		void load(null);
@@ -455,13 +491,10 @@ export function UserActivityTab({
 			else params.set(key, value);
 		}
 		const qs = params.toString();
-		void navigate(
-			`${userHref(bucketId, userId, 'activity')}${qs ? `?${qs}` : ''}`,
-			{
-				replace: true,
-				scroll: false
-			}
-		);
+		void navigate(`${href}${qs ? `?${qs}` : ''}`, {
+			replace: true,
+			scroll: false
+		});
 	};
 
 	const rows = useMemo(() => pages.flatMap((page) => page.rows), [pages]);
@@ -502,10 +535,9 @@ export function UserActivityTab({
 			gap={12}
 		>
 			<Typography.Text type="secondary">
-				Sign-ins, and what apps behind your proxy and APIs checked at it
-				answered. Kept for {String(first?.keptDays ?? 90)} days. Sign-ins and
-				refusals are recorded up to a minute late, use of apps up to five
-				minutes.
+				{signInsOnly
+					? `Sign-ins and refused sign-ins. Kept for ${String(first?.keptDays ?? 90)} days, recorded up to a minute late.`
+					: `Sign-ins, and what apps behind your proxy and APIs checked at it answered. Kept for ${String(first?.keptDays ?? 90)} days. Sign-ins and refusals are recorded up to a minute late, use of apps up to five minutes.`}
 				{recent && began && (
 					<>
 						{' '}
@@ -531,20 +563,26 @@ export function UserActivityTab({
 					style={{ minWidth: 200 }}
 					onChange={(value) => go({ outcome: value })}
 				/>
-				<Select
-					aria-label="Kind"
-					value={kind}
-					options={KINDS}
-					style={{ minWidth: 140 }}
-					onChange={(value) => go({ kind: value })}
-				/>
+				{!signInsOnly && (
+					<Select
+						aria-label="Kind"
+						value={kind}
+						options={KINDS}
+						style={{ minWidth: 140 }}
+						onChange={(value) => go({ kind: value })}
+					/>
+				)}
 			</Flex>
 			{!loading && rows.length === 0 && (
 				<EmptyState
 					purpose={
-						began
-							? `No sign-ins, refusals or use of apps since recording began on ${dateWords(began)}.`
-							: 'No sign-ins, refusals or use of apps recorded yet.'
+						signInsOnly
+							? began
+								? `No sign-ins since recording began on ${dateWords(began)}.`
+								: 'No sign-ins recorded yet.'
+							: began
+								? `No sign-ins, refusals or use of apps since recording began on ${dateWords(began)}.`
+								: 'No sign-ins, refusals or use of apps recorded yet.'
 					}
 				/>
 			)}
@@ -571,10 +609,10 @@ export function UserActivityTab({
 						{list.map((row) => (
 							<Row
 								key={row.id}
-								bucketId={bucketId}
-								userId={userId}
 								row={row}
 								lookupState={lookupState}
+								checkOf={checkOf}
+								whoOf={whoOf}
 							/>
 						))}
 					</Flex>

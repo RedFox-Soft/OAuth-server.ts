@@ -4,7 +4,7 @@ title: 'Admin console sign-in'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-11-05
+updated: 2026-11-18
 graph:
   node_type: concept
 ---
@@ -103,6 +103,12 @@ attacker-triggerable, so an unconditional log line per refusal is a log-amplific
 the same reasoning that keeps the audit trail's writes behind authorization
 ([[admin-audit-trail]]), one severity tier down. Sign-in is also **not** audited, for the same reason
 `POST /admin/api/logout` is not: session lifecycle, not a state-changing administrative action.
+
+*Since spec 137 (2026-11-18)* where and how an administrator signed in is still not an audit entry, but it is kept: an
+administrator's sign-ins and refused sign-ins of a known account go into people's activity under the administrators'
+project, 90 days, read by super administrators with each read audited ([[person-activity]]). The trail stays out of
+it because it is immutable and forever, and a sign-in is neither a change nor worth keeping forever. Refusals before
+an account is read (the callback's `invalid_id_token`, an unknown email) are still kept nowhere.
 
 ## A refused sign-in comes back with `error`, not `code`
 

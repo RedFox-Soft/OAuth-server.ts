@@ -13,6 +13,7 @@ import { meView } from './me_view.js';
 import { ADMIN_BUCKET_ID } from './consts.js';
 import { planRightsOf } from '../plans/rights.js';
 import { guideFeatures } from '../situation_guide/features.js';
+import { ownAdminSignIns } from '../person_activity/own.js';
 
 /*
  * Who the caller is, as the admin plane resolved them: id, email, whether a super administrator, bucket
@@ -49,6 +50,18 @@ export const meRoutes = new Elysia({ name: 'admin-me' })
 			can: { ...meCan(ctx), ...(await planRightsOf(ctx)) },
 			features: guideFeatures()
 		};
+	})
+	/*
+	 * The caller's own last sign-ins (specs/137 contracts/admin-api.md), refused ones included, without any address:
+	 * only ever the caller's, so no parameter names whose, and not audited, since reading one's own record is no
+	 * administrative read.
+	 */
+	.get('/admin/api/me/sign-ins', async ({ admin }) => {
+		const ctx = assertAuth(admin);
+		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+		if (!bucket)
+			throw new AdminError(500, "the administrators' project is missing");
+		return ownAdminSignIns(bucket, ctx.userId, new Date());
 	})
 	/*
 	 * Mails the caller a verification message for their own address, in the administrators' bucket's

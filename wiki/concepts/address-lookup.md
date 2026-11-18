@@ -4,7 +4,7 @@ title: "Network owner and location of a person's addresses, with a FoxTrust key 
 tags: [architecture, contract, security, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-11-17
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 # Network owner and location of a person's addresses
@@ -64,8 +64,9 @@ registration a UTC day across processes).
 on it.
 
 - Only distinct addresses of rows being written, only when `isPublic` holds (the recording rules already keep
-  private and proxy addresses out; this is the second check at the exit), never one of the administrators' project
-  (dropped earlier by `withoutTheDeleted`).
+  private and proxy addresses out; this is the second check at the exit). Administrators' sign-in addresses are
+  looked up like people's since spec 137 (owner, 2026-11-18); until then the administrators' project was dropped by
+  `withoutTheDeleted` and spec 136's SI-2 said they never left.
 - At most 3 batches of 100 a flush, 200 ms apart, within 3 s; each batch 2.5 s (`lib/consts/address_lookup.ts`).
 - Answers are cached per process for the UTC day. **Gotcha:** when FoxTrust's own read times out, every entry comes
   back empty and nothing is counted, which per entry looks exactly like "nothing known". So a batch whose valid

@@ -2576,6 +2576,72 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		)
 	},
 	{
+		id: 'newsignin',
+		tab: 'product',
+		title: 'People hear about a sign-in from somewhere new',
+		sentence:
+			'When an account signs in from a network or a browser it has not used in 90 days, FoxAuth emails its owner where and how, with a link that signs it out everywhere.',
+		protocol: 'Sign-in notifications',
+		lanes: lanes('thief', 'fox', 'person'),
+		steps: [
+			step(
+				'thief',
+				'fox',
+				'Signs in',
+				'Someone signs in with the person’s password from a network the account has not used.'
+			),
+			step(
+				'fox',
+				'person',
+				'An email',
+				'FoxAuth emails the person when, where, how and with which browser.'
+			),
+			step(
+				'person',
+				'fox',
+				'This wasn’t me',
+				'The person opens the link and confirms.'
+			),
+			step(
+				'fox',
+				'fox',
+				'Every way in ended',
+				'FoxAuth ends every session and token of the account and mails a link to set a new password.',
+				'refusal'
+			)
+		],
+		problem: {
+			at: 'person',
+			mark: 'missing',
+			caption:
+				'A stolen password keeps working until someone happens to read the sign-in log.'
+		},
+		fixCaption:
+			'The person hears about it within minutes and shuts the thief out.',
+		sees: {
+			kind: 'none',
+			lines: [
+				'An email: when, where, how and which browser, never the address',
+				'A link that signs the account out everywhere'
+			]
+		},
+		needs: {},
+		action: {
+			kind: 'open',
+			label: 'Open the Sign-in tab',
+			target: { area: 'sign-in' }
+		},
+		goodToKnow: [
+			'Off by default for people: turn it on in the project’s Sign-in tab. Needs mail set up.',
+			'Administrators of the console get these emails by default.',
+			'A new address inside a known network is not new: at most five emails a day.'
+		],
+		prompt: prompt(
+			'Turn on the email about sign-ins from a new network or browser for my project.',
+			'project_update with newSignInAlerts: true'
+		)
+	},
+	{
 		id: 'bound',
 		tab: 'product',
 		title: 'A stolen token is useless',
@@ -3320,6 +3386,70 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		],
 		prompt:
 			'Explain how a super administrator adds the company’s sign-in provider to the administrators’ project, in the console at {console}, so administrators can sign in with company SSO.'
+	},
+	{
+		id: 'adminsignins',
+		tab: 'enterprise',
+		title: 'See where your administrators sign in from',
+		sentence:
+			'FoxAuth keeps every sign-in of your administrators for 90 days, refused ones too, and a super administrator sees each with its address, network and browser.',
+		protocol: 'Sign-in log · audited reads',
+		lanes: lanes('thief', 'fox', 'admin'),
+		steps: [
+			step(
+				'thief',
+				'fox',
+				'Signs in',
+				'Someone signs in to the console with an administrator’s password.'
+			),
+			step(
+				'fox',
+				'fox',
+				'Keeps it',
+				'FoxAuth keeps where and how, and refused tries too, for 90 days.'
+			),
+			step(
+				'admin',
+				'fox',
+				'Opens Sign-ins',
+				'A super administrator opens the administrator’s sign-ins under Accounts.'
+			),
+			step(
+				'fox',
+				'admin',
+				'Address, network, browser',
+				'FoxAuth shows the address, its network and city, and the browser.'
+			)
+		],
+		problem: {
+			at: 'thief',
+			mark: 'missing',
+			caption:
+				'A stolen administrator password shows only once the thief changes something.'
+		},
+		fixCaption: 'You see where every administrator signed in from.',
+		sees: {
+			kind: 'none',
+			lines: [
+				'Each sign-in and refused try, with address, network, city and browser',
+				'Each administrator’s own last ten, without addresses, under their email'
+			]
+		},
+		needs: { role: 'super' },
+		action: {
+			kind: 'open',
+			label: 'Open the administrators’ accounts',
+			target: { instance: 'administrators' }
+		},
+		goodToKnow: [
+			'There is nothing to switch on.',
+			'Every read of another administrator’s sign-ins is written to the audit trail.',
+			'An administrator sees their own sign-ins, without addresses, from their email at the top of the console.'
+		],
+		prompt: prompt(
+			'Show me where each of our administrators signed in from in the last week, and any refused sign-ins.',
+			'admin_list and admin_activity_list'
+		)
 	}
 ];
 

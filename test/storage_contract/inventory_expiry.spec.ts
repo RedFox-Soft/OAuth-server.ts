@@ -86,6 +86,11 @@ const REAPED_ON_EXPIRES_AT = [
 	 */
 	'TeamInvitationThrottle',
 	/*
+	 * Who was emailed about a new sign-in today (specs/138): a claim that never expired would keep an account from ever
+	 * being told again about that network and browser, and grow one record per new sign-in for good.
+	 */
+	'SignInAlertClaim',
+	/*
 	 * The second factor's three areas, and expiry is the control in each rather than housekeeping. An
 	 * enrolment offer that outlived its window would leave a secret nobody proved sitting against a
 	 * live account; a failure window that never expired would lock an account out for good on ten

@@ -251,5 +251,15 @@ export const en = {
 		'We couldn’t send the email now. On the {service} sign-in page, choose "{forgot}" later.',
 	signOutFailedTitle: 'Not every app could be signed out',
 	signOutFailed: 'Try again from your account page.',
-	backToAccount: 'Back to your account page'
+	backToAccount: 'Back to your account page',
+	/* "This wasn't me" from the email about a new sign-in (specs/138). */
+	notMeIntro:
+		'The email was about a sign-in to {service} as {email}. Confirming signs this account out of every app now.',
+	notMeAdministrator:
+		'Your console sessions end now, and the other super administrators are told. Ask one of them to set a new password for you.',
+	notMeAdministratorDone:
+		'You are signed out everywhere, and the other super administrators were told. Ask one of them to set a new password for you.',
+	notMeGoneTitle: 'This link no longer works',
+	notMeGone:
+		'It was used already, it is older than 72 hours, or this account was signed out everywhere since. If you still do not recognise the sign-in, choose "{forgot}" on the {service} sign-in page.'
 } as const;

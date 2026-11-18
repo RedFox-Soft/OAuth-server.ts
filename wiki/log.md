@@ -432,3 +432,9 @@ Operations:
 ## [2026-11-17] update | [[loopback-redirect-port-matching]] — a metadata document that names no `application_type` and offers only plain-http loopback targets is read as native, so Claude Code's CIMD document can come back on its ephemeral port (found by the spec 130 live run; 2.0.1).
 
 ## [2026-11-17] update | [[api-sign-in-requirement]] — the spec 130 live run with Claude Code 2.1.220 on 2.0.1: the requirement ends the call with a re-authentication in `/mcp`, the client renews by itself in between, and it speaks MCP 2025-11-25 without `Mcp-Name`; claude.ai not tried.
+
+## [2026-11-18] update | [[person-activity]], [[admin-console-signin]], [[address-lookup]] — spec 137: administrators' sign-ins and refused sign-ins are kept in people's activity (sign-ins only), read by super administrators at `POST /admin/api/admins/:id/activity` (audited `admin.activity.read`) and by each administrator without addresses at `GET /admin/api/me/sign-ins`; their addresses are looked up at FoxTrust like people's; fence `2026-11-18-admin-sign-in-log-fence`.
+
+## [2026-11-18] update | [[person-activity]] — spec 137 follow-up: every administrator's sign-ins on one page (`POST /admin/api/admins/activity`, audited `admins.activity.read`, merged from per-account timelines without an index) and a Last sign-in column in Accounts from `signInSummary`, unaudited because it carries no address or country.
+
+## [2026-11-18] create | [[new-sign-in-alerts]] — spec 138: an email about a sign-in from a new network or browser, decided in the activity flush and marked `alerted` on the row; This wasn't me at `/account/not-me` (spec 126's link store, purpose `notme`); updates in [[person-activity]] and [[totp-second-factor]].

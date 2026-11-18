@@ -213,6 +213,8 @@ export const routeNames = {
 	account_security_disown: '/account/security/disown',
 	/* The person's own recent sign-ins, and the one act beside them: signing out everywhere (specs/135). */
 	account_sign_ins: '/account/sign-ins',
+	/* "This wasn't me" about a sign-in from a new network or browser (specs/138), for people and administrators. */
+	account_not_me: '/account/not-me',
 	authorization: '/auth',
 	backchannel_authentication: '/backchannel',
 	code_verification: '/device',

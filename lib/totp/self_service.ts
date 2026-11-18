@@ -60,7 +60,8 @@ const LINK_BOUNDS = {
 	windowSeconds: LINK_WINDOW_SECONDS
 };
 
-const digestOf = (token: string) =>
+/* Exported for the "This wasn't me" link of a new sign-in (lib/sign_in_alerts/link.ts), digested the same way. */
+export const digestOf = (token: string) =>
 	crypto.createHash('sha256').update(token).digest('hex');
 
 /* The holder of an enrolment started on the person's page: their browser's sign-in session. */
@@ -222,6 +223,7 @@ export async function followLink(
 		!record ||
 		record.exp <= epochTime() ||
 		record.purpose === 'disown' ||
+		record.purpose === 'notme' ||
 		record.holder !== holder ||
 		record.accountId !== accountId ||
 		record.bucketId !== bucketId

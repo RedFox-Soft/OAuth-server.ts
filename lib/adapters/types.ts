@@ -2625,6 +2625,10 @@ export const PersonActivityRow = t.Object({
 	device: t.Optional(
 		t.Object({ browser: ActivityBrowser, system: ActivitySystem })
 	),
+	/* Why the account's owner was emailed about this sign-in (specs/138): it came from a new network, browser or both. */
+	alerted: t.Optional(
+		t.Union([t.Literal('network'), t.Literal('browser'), t.Literal('both')])
+	),
 	/*
 	 * An API use row's tools (specs/134 research R3): distinct, the names kept first, at most 20; each a tools-table
 	 * row name or `*another`, never the caller's text.
@@ -3093,6 +3097,11 @@ export const UserBucket = t.Object({
 	 * because its people have no account pages.
 	 */
 	totpSelfService: t.Optional(t.Boolean()),
+	/*
+	 * Whether the project's people are emailed about a sign-in from a new network or browser (specs/138). Absent means
+	 * off, except for the administrators' project, where absent means on: read it only through `alertsOn`.
+	 */
+	newSignInAlerts: t.Optional(t.Boolean()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -3183,6 +3192,7 @@ export interface UserBucketStoreInstance {
 				| 'proxyKeys'
 				| 'passwordGuessing'
 				| 'totpSelfService'
+				| 'newSignInAlerts'
 			>
 		>
 	): Promise<UserBucket | null>;

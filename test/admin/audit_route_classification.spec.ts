@@ -92,7 +92,8 @@ describe('admin audit route classification', () => {
 		 * setup (specs/116) + creating, changing and removing an app behind a proxy (specs/122) + issuing and
 		 * withdrawing a project's proxy key (specs/124) + looking an address up in FoxTrust's network facts, which
 		 * changes nothing and is recorded as the SMTP test is (specs/129) + reading who an app behind the proxy or an API
-		 * refused, audited reads like a person's activity (specs/134). A count that drifted
+		 * refused, audited reads like a person's activity (specs/134) + reading one administrator's sign-ins and every
+		 * administrator's at once, the same audited read over the administrators' project (specs/137). A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
@@ -101,8 +102,8 @@ describe('admin audit route classification', () => {
 		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(113);
-		expect(mounted).toHaveLength(116);
+		expect(auditedAdminRoutes).toHaveLength(115);
+		expect(mounted).toHaveLength(118);
 	});
 
 	it('declares each route pattern only once', () => {

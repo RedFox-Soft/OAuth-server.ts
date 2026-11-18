@@ -209,6 +209,8 @@ describe('route classification', () => {
 			'POST /account/security/disown',
 			// Signing out everywhere from Recent sign-ins (specs/135): it sweeps the account and may mail a reset.
 			'POST /account/sign-ins',
+			// "This wasn't me" from an email about a new sign-in (specs/138): it sweeps the account without a session.
+			'POST /account/not-me',
 			// Unauthenticated by construction — one is how the first super-admin comes to exist, the other
 			// is how somebody invited into a group accepts. Both perform an account write.
 			'POST /admin/api/setup',

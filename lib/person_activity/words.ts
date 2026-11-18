@@ -167,7 +167,15 @@ export interface RowWords {
 	sawText: string | null;
 	method: string | null;
 	device: string | null;
+	/* Why the account's owner was emailed about this sign-in (specs/138), or null when they were not. */
+	alerted: string | null;
 }
+
+const ALERTED: Record<NonNullable<PersonActivityRow['alerted']>, string> = {
+	network: 'Emailed about a new network',
+	browser: 'Emailed about a new browser',
+	both: 'Emailed about a new network and browser'
+};
 
 export function toolWords(tool: string | undefined): string | null {
 	if (tool === undefined) return null;
@@ -195,7 +203,8 @@ export function wordsOf(row: PersonActivityRow, names: PlaceNames): RowWords {
 			row.method === undefined
 				? null
 				: fill(METHODS[row.method], { provider: values.provider }),
-		device: deviceWords(row.device)
+		device: deviceWords(row.device),
+		alerted: row.alerted === undefined ? null : ALERTED[row.alerted]
 	};
 }
 

@@ -263,14 +263,18 @@ Each rule is the part that is easy to break. Read the named page before changing
   redeemed code, never on what the sign-in request said. → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`,
   `conditions-at-your-proxy.md`
 - **A person's activity** — noted only by a synchronous, never-throwing call beside the decision, never through the
-  event bus or a datastore read on the request path, and never for the administrators' project; a failed sign-in is
-  noted only where the account was already read. Nothing a request carries is stored: reasons are a closed set, a tool
+  event bus or a datastore read on the request path, and for the administrators' project only sign-ins, read by super
+  administrators alone with every read audited; a failed sign-in is noted only where the account was already read. Nothing a request carries is stored: reasons are a closed set, a tool
   is a tools-table row name or "another tool", a browser is a family. What a person used behind the proxy is one row a
   person, place and day, never with an address or a rule, its tools a list bounded at twenty, written by a buffer of
   its own every five minutes. A write adds and is never retried; a read of the timeline, or of who an app or an API
   refused, is an audited POST. A person reads their own sign-ins on their account page only after a sign-in of any
   method within fifteen minutes, never with an address or a network category, and signing out everywhere there never
-  locks the account. → `person-activity.md`, `connected-apps-page.md`
+  locks the account; an administrator reads their own, never with an address, and a sign-in is never an audit entry.
+  An email about a sign-in from a new network or browser is decided only in the flush, after the lookup and before
+  the write, marked `alerted` on the row and sent only after the write; it never carries the address, and its "This
+  wasn't me" link acts only at its own project's address, only by its POST, once.
+  → `person-activity.md`, `connected-apps-page.md`, `admin-console-signin.md`, `new-sign-in-alerts.md`
 - **Usage reporting** — everything a report may carry is declared in `lib/consts/telemetry_fields.ts`, and
   a new boolean setting is classified there (reported, or not with a reason) in the same change; a report
   that cannot be delivered is never an error; the console setting is the only switch, with no environment

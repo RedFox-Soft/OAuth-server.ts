@@ -149,7 +149,8 @@ export const RowView = Type.Object({
 		reason: Type.String(),
 		sawText: Type.Union([Type.String(), Type.Null()]),
 		method: Type.Union([Type.String(), Type.Null()]),
-		device: Type.Union([Type.String(), Type.Null()])
+		device: Type.Union([Type.String(), Type.Null()]),
+		alerted: Type.Optional(Type.Union([Type.String(), Type.Null()]))
 	}),
 	place: Type.Record(Type.String(), Type.Union([Type.String(), Type.Null()])),
 	client: Type.Union([Type.String(), Type.Null()]),

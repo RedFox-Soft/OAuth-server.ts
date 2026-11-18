@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '051f01d6af79';
+export const source = 'da1420712de7';
 
 export default {
 	questions: {
@@ -1256,6 +1256,37 @@ export default {
 			],
 			actionLabel: '打开“最近登录”'
 		},
+		newsignin: {
+			title: '用户会知道来自新地点的登录',
+			sentence:
+				'当账户从 90 天内没用过的网络或浏览器登录时，FoxAuth 会给账户主人发邮件，说明从哪里、如何登录，并附上一个让账户退出所有登录的链接。',
+			protocol: '登录通知',
+			problemCaption: '被盗的密码会一直有效，直到有人碰巧查看登录记录。',
+			fixCaption: '用户几分钟内就会知道，并把盗用者挡在外面。',
+			lanes: { thief: '拿到密码的人', fox: 'FoxAuth', person: '用户' },
+			steps: [
+				{ label: '登录', text: '有人用该用户的密码，从账户没用过的网络登录。' },
+				{
+					label: '一封邮件',
+					text: 'FoxAuth 告诉用户登录的时间、地点、方式和浏览器。'
+				},
+				{ label: '不是我', text: '用户打开链接并确认。' },
+				{
+					label: '所有登录已结束',
+					text: 'FoxAuth 结束该账户的所有会话和令牌，并发送设置新密码的链接。'
+				}
+			],
+			sees: [
+				'一封邮件：时间、地点、方式和浏览器，不含地址',
+				'一个让账户退出所有登录的链接'
+			],
+			goodToKnow: [
+				'对用户默认关闭：在项目的 Sign-in 标签页中开启。需要先设置好邮件。',
+				'控制台的管理员默认会收到这类邮件。',
+				'同一网络内的新地址不算新：每天最多五封邮件。'
+			],
+			actionLabel: '打开 Sign-in 标签页'
+		},
 		bound: {
 			title: '被盗的令牌毫无用处',
 			sentence:
@@ -1593,6 +1624,40 @@ export default {
 				'只有在超级管理员仍能通过身份提供商登录时，才能关闭密码登录。'
 			],
 			actionLabel: '打开管理员项目的身份提供商'
+		},
+		adminsignins: {
+			title: '查看管理员从哪里登录',
+			sentence:
+				'FoxAuth 把管理员的每次登录保存 90 天，失败的登录也保存。超级管理员可以看到每次登录的地址、网络和浏览器。',
+			protocol: '登录记录 · 读取会被审计',
+			problemCaption: '管理员的密码被盗后，要等盗用者改动了什么才会被发现。',
+			fixCaption: '你能看到每位管理员从哪里登录。',
+			lanes: { thief: '拿到密码的人', fox: 'FoxAuth', admin: '超级管理员' },
+			steps: [
+				{ label: '登录', text: '有人用管理员的密码登录控制台。' },
+				{
+					label: '保存',
+					text: 'FoxAuth 保存登录的来源和方式，失败的尝试也保存，保留 90 天。'
+				},
+				{
+					label: '打开 Sign-ins',
+					text: '超级管理员在 Accounts 中打开该管理员的登录记录。'
+				},
+				{
+					label: '地址、网络、浏览器',
+					text: 'FoxAuth 显示地址、所属网络和城市，以及浏览器。'
+				}
+			],
+			sees: [
+				'每次登录和每次失败的尝试：地址、网络、城市和浏览器',
+				'每位管理员自己最近十次登录，不含地址，点击其电子邮件即可查看'
+			],
+			goodToKnow: [
+				'无需开启任何设置。',
+				'每次读取其他管理员的登录记录都会写入审计日志。',
+				'管理员可以查看自己的登录记录，不含地址：点击控制台顶部自己的电子邮件。'
+			],
+			actionLabel: '打开管理员账户'
 		}
 	}
 } satisfies GuideTexts;

@@ -62,6 +62,7 @@ export type PageKey =
 	| 'administrators.provider'
 	| 'administrators.applications'
 	| 'administrators.activity'
+	| 'administrators.signIns'
 	| 'administrators.settings'
 	| 'usage'
 	| 'usage.bucket'
@@ -360,6 +361,14 @@ export const ROUTES: readonly RouteSpec[] = [
 		section: 'administrators',
 		instance: true,
 		area: 'Applications'
+	},
+	/* One administrator's sign-ins (specs/137), reached from their row in Accounts. */
+	{
+		key: 'administrators.signIns',
+		pattern: ['administrators', 'sign-ins', ':admin'],
+		section: 'administrators',
+		instance: true,
+		area: 'Accounts'
 	},
 	{
 		key: 'administrators.activity',

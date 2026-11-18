@@ -35,6 +35,14 @@ import {
 	withdrawSuperAdmin
 } from '../super_admins.js';
 import { revokeAccountAccess } from '../../end_users/revoke_access.js';
+import { UserActivityBody } from '../users-end/schema.js';
+import {
+	Names,
+	activityFeed,
+	activityPage,
+	signInSummary
+} from '../../person_activity/read.js';
+import { recordReadOnce } from '../../person_activity/audit.js';
 
 const store = () => getUserStore(ADMIN_BUCKET_ID);
 
@@ -132,14 +140,28 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			return adminErrorBody(error);
 		}
 	})
+	/*
+	 * `signIns` (specs/137): the last sign-in and what refused the administrator after it, with no address, country or
+	 * device, so the list stays an unaudited read; where from is behind Sign-ins, which is audited.
+	 */
 	.get('/admin/api/admins', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		const supers = new Set(await superAdminIds());
-		return (await store().list()).map((u) => ({
-			...presentUser(u),
-			superAdmin: supers.has(u._id)
-		}));
+		const accounts = await store().list();
+		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+		const names = bucket ? new Names(bucket) : null;
+		const now = new Date();
+		return Promise.all(
+			accounts.map(async (u) => ({
+				...presentUser(u),
+				superAdmin: supers.has(u._id),
+				signIns:
+					bucket && names
+						? await signInSummary(bucket, u._id, now, names)
+						: { lastSignIn: null, notLetInSince: null }
+			}))
+		);
 	})
 	/*
 	 * What turning password sign-in off would do to the console (specs/080): how this session signed in,
@@ -314,6 +336,49 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		await clearAttempts(ADMIN_BUCKET_ID, target._id);
 		return { sessions: await signOutAdministrator(target._id) };
 	})
+	/*
+	 * Every administrator's sign-ins on one page (specs/137), for the super administrator who does not yet know whose
+	 * password was taken. Audited like one administrator's, once per reader and day, against the administrators'
+	 * project.
+	 */
+	.post(
+		'/admin/api/admins/activity',
+		async ({ admin, body }) => {
+			const ctx = assertAuth(admin);
+			assertSuperAdmin(ctx);
+			const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+			if (!bucket)
+				throw new AdminError(404, "the administrators' project is missing");
+			await recordReadOnce(
+				ctx,
+				bucket,
+				'admins.activity.read',
+				ADMIN_BUCKET_ID
+			);
+			return activityFeed(bucket, await store().list(), body);
+		},
+		{ body: UserActivityBody }
+	)
+	/*
+	 * Where and how an administrator signed in (specs/137): the person's timeline reader over the administrators'
+	 * project, which `loadBucketForUsers` keeps closed to every project route. A POST because reading it is audited,
+	 * once per reader, administrator and day, as a person's timeline is; the audit is after the check, so a refused
+	 * caller leaves nothing.
+	 */
+	.post(
+		'/admin/api/admins/:id/activity',
+		async ({ admin, params, body }) => {
+			const ctx = assertAuth(admin);
+			assertSuperAdmin(ctx);
+			const target = await store().find(params.id);
+			if (!target) throw new AdminError(404, 'admin not found');
+			const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+			if (!bucket) throw new AdminError(404, 'admin not found');
+			await recordReadOnce(ctx, bucket, 'admin.activity.read', target._id);
+			return activityPage(bucket, target._id, body);
+		},
+		{ body: UserActivityBody }
+	)
 	.delete('/admin/api/admins/:id', async ({ admin, params }) => {
 		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);

@@ -100,6 +100,7 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_security_link,
 	routeNames.account_security_disown,
 	routeNames.account_sign_ins,
+	routeNames.account_not_me,
 	BEHIND_PROXY_CHECK_BASE
 ];
 
@@ -340,6 +341,9 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	 * account must always be able to look and to sign out everywhere.
 	 */
 	{ method: 'GET', path: routeNames.account_sign_ins },
+	/* "This wasn't me" from an email about a new sign-in (specs/138): a person in that moment must always reach it. */
+	{ method: 'GET', path: routeNames.account_not_me },
+	{ method: 'POST', path: routeNames.account_not_me },
 	{ method: 'POST', path: routeNames.account_sign_ins },
 	/*
 	 * The check a proxy makes for an app behind it (specs/122 R4). No instance switch: the endpoint does nothing
@@ -572,6 +576,8 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'POST', path: routeNames.account_security_disown, rate: 'strict' },
 	// Signing out everywhere sweeps every record of the account and may send a reset mail (specs/135).
 	{ method: 'POST', path: routeNames.account_sign_ins, rate: 'strict' },
+	// "This wasn't me" sweeps every record of the account like it (specs/138).
+	{ method: 'POST', path: routeNames.account_not_me, rate: 'strict' },
 	{ method: 'POST', path: '/verify-email/code', rate: 'strict' },
 	{ method: 'POST', path: '/verify-email/resend', rate: 'strict' },
 	{ method: 'POST', path: '/reset-password', rate: 'strict' },

@@ -127,6 +127,7 @@ export const MODEL_AREAS = [
 	'RegistrationAccessToken',
 	'ReplayDetection',
 	'Session',
+	'SignInAlertClaim',
 	'TeamInvitationThrottle',
 	'TotpAttempt',
 	'TotpEnrollment',
@@ -633,6 +634,12 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 */
 	modelArea('TotpLink', EXPIRES_AT, byAccount),
 	modelArea('TotpLinkThrottle', EXPIRES_AT, byAccount),
+	/*
+	 * Who has been emailed about a new sign-in today (specs/138): one claim per account, day, network and browser, and
+	 * one per each of an account's five daily slots, each written by an insert-if-absent so two processes send one
+	 * email. Account-owned, so signing out everywhere clears them with the rest; expiring two days after the day.
+	 */
+	modelArea('SignInAlertClaim', EXPIRES_AT, byAccount),
 	/*
 	 * An upstream session at one provider of one bucket → the account it signed in, keyed by
 	 * `sha256("<bucketId>:<providerId>:<sid>")`. Read only by the back-channel logout receiver, to resolve a

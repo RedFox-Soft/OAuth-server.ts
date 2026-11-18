@@ -1,12 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-	Layout as AntLayout,
-	Alert,
-	Badge,
-	Button,
-	Menu,
-	Typography
-} from 'antd';
+import { Layout as AntLayout, Alert, Badge, Button, Menu } from 'antd';
 import type { MenuProps } from 'antd';
 import {
 	DatabaseOutlined,
@@ -29,6 +22,8 @@ import { BucketDetail, type BucketTab } from './BucketDetail.js';
 import { AdminGroupPage } from './groups/AdminGroupPage.js';
 import { UserPage, type UserTab } from './users/UserPage.js';
 import { ProviderPage } from './providers/ProviderPage.js';
+import { AdminSignInsPage } from './administrators/AdminSignInsPage.js';
+import { OwnSignInsDrawer } from './OwnSignInsDrawer.js';
 import {
 	ConnectionPage,
 	type ConnectionTab
@@ -263,6 +258,7 @@ export function Layout() {
 				]
 			: [])
 	];
+	const [ownSignIns, setOwnSignIns] = useState(false);
 
 	async function logout() {
 		// Navigate even if the request failed. Leaving the operator on a panel they believe they
@@ -336,6 +332,14 @@ export function Layout() {
 					bucketId={route.params.project ?? ''}
 					connectionId={route.params.connection ?? ''}
 					tab={connectionTab}
+				/>
+			);
+		}
+		if (route.key === 'administrators.signIns') {
+			return (
+				<AdminSignInsPage
+					key={route.params.admin ?? ''}
+					adminId={route.params.admin ?? ''}
 				/>
 			);
 		}
@@ -448,7 +452,19 @@ export function Layout() {
 					}}
 				>
 					<ScopeSwitcher />
-					{me && <Typography.Text>{me.email}</Typography.Text>}
+					{me && (
+						<Button
+							type="link"
+							title="Your recent sign-ins"
+							onClick={() => setOwnSignIns(true)}
+						>
+							{me.email}
+						</Button>
+					)}
+					<OwnSignInsDrawer
+						open={ownSignIns}
+						onClose={() => setOwnSignIns(false)}
+					/>
 					<Button
 						type="link"
 						icon={<LogoutOutlined />}

@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-11-12
+updated: 2026-11-18
 graph:
   node_type: concept
   relationships:
@@ -193,7 +193,9 @@ the administrators' project.
   `otp`, at most 15 minutes old. A replacement writes only while the factor it replaces is still in place.
 - **Every change is mailed**, to a confirmed address only, and logged as `enduser.totp.enrol|replace|remove|disown`
   with the person as actor. The mail about a new factor carries a "This was not me" link (`TotpLink` purpose
-  `disown`, 72 hours) that removes *that* factor and ends all access: self-service binds the account to whoever proves
+  `disown`, 72 hours) that removes *that* factor and ends all access (since spec 138 the same store also holds purpose
+  `notme`, the "This wasn't me" of an email about a new sign-in, which `followLink` and the disown page refuse;
+  [[new-sign-in-alerts]]): self-service binds the account to whoever proves
   the password and the mailbox first, and this is the owner's way back when a thief read the mailbox once.
 - **After an administrator's removal** the account carries `totpProofRequired`, and the next factor anywhere —
   including at sign-in in a requiring project — needs a mailed link first, bound to the interaction

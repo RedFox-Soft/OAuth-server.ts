@@ -14,9 +14,14 @@ import type { AdminContext } from '../admin/auth/rbac.js';
 
 const pending = new Map<string, Promise<void>>();
 
-/* The audited reads of people's activity: a person's timeline, and who an app or an API refused (specs/134). */
+/*
+ * The audited reads of people's activity: a person's timeline, an administrator's sign-ins (specs/137), and who an
+ * app or an API refused (specs/134).
+ */
 export type ActivityReadAction =
 	| 'enduser.activity.read'
+	| 'admin.activity.read'
+	| 'admins.activity.read'
 	| 'behindproxy.refusals.read'
 	| 'resource.refusals.read';
 

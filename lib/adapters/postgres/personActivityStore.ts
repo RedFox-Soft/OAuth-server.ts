@@ -61,7 +61,8 @@ export class PersonActivityStore implements PersonActivityStoreInstance {
 				: { address: row.address, addressFrom: row.addressFrom }),
 			...(row.lookup === undefined ? {} : { lookup: row.lookup }),
 			...(row.facts === undefined ? {} : { facts: row.facts }),
-			...(row.device === undefined ? {} : { device: row.device })
+			...(row.device === undefined ? {} : { device: row.device }),
+			...(row.alerted === undefined ? {} : { alerted: row.alerted })
 		};
 		/*
 		 * The owner and location follow their address (specs/136 research R5): a write with an address and no lookup

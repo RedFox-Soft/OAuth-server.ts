@@ -12,7 +12,7 @@ import {
 	Typography
 } from 'antd';
 import type { FederationProvider } from '../../../../federation/types.js';
-import { DEFAULT_BUCKET_ID } from '../../../consts.js';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../../../consts.js';
 import { Link, useLeaveGuard } from '../../frame/router.js';
 import {
 	applicationHref,
@@ -35,6 +35,8 @@ interface Policy {
 	totpRequired: boolean;
 	/* Whether people may turn on two-step verification themselves (specs/126); absent on the project means yes. */
 	totpSelfService: boolean;
+	/* Whether people are emailed about a sign-in from a new network or browser (specs/138); absent: on only here for administrators. */
+	newSignInAlerts: boolean;
 	registrationOpen: boolean;
 	emailVerificationRequired: boolean;
 	verificationMethod: 'link' | 'code';
@@ -44,6 +46,7 @@ const LABELS: Record<keyof Policy, string> = {
 	passwordLogin: 'Password sign-in',
 	totpRequired: 'Require an authenticator app',
 	totpSelfService: 'Let people turn on two-step verification themselves',
+	newSignInAlerts: 'Email about sign-ins from a new network or browser',
 	registrationOpen: 'Self-service sign-up',
 	emailVerificationRequired: 'Require a verified email address',
 	verificationMethod: 'Verification method'
@@ -54,6 +57,7 @@ export function policyOf(bucket: BucketView): Policy {
 		passwordLogin: bucket.passwordLogin,
 		totpRequired: bucket.totpRequired,
 		totpSelfService: bucket.totpSelfService !== false,
+		newSignInAlerts: bucket.newSignInAlerts ?? bucket._id === ADMIN_BUCKET_ID,
 		registrationOpen: bucket.registrationOpen,
 		emailVerificationRequired: bucket.emailVerificationRequired,
 		verificationMethod: bucket.verificationMethod
@@ -533,6 +537,32 @@ export function SignInTab({
 							)}
 					</Setting>
 				)}
+				<Setting
+					title={
+						consoleBucket
+							? 'Email administrators about sign-ins from a new network or browser'
+							: 'Email people about sign-ins from a new network or browser'
+					}
+					control={
+						<Switch
+							aria-label={LABELS.newSignInAlerts}
+							checked={draft.newSignInAlerts}
+							onChange={(on) => set('newSignInAlerts', on)}
+						/>
+					}
+					effect={
+						draft.newSignInAlerts
+							? 'When an account signs in from a network (its owner, or its country) or a browser it has not used in 90 days, it is emailed where, how and with which browser, never the address, with a "This wasn’t me" link that signs it out everywhere. Only to proven addresses; at most five a day.'
+							: 'Nobody is emailed about new sign-ins. Each sign-in is still kept in Activity.'
+					}
+				>
+					{draft.newSignInAlerts && !mailReady && (
+						<Typography.Text type="warning">
+							Mail isn&apos;t set up on this server, so no email can go. Set up
+							SMTP in Settings first.
+						</Typography.Text>
+					)}
+				</Setting>
 				<Flex
 					vertical
 					gap={4}

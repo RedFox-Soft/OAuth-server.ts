@@ -570,6 +570,82 @@ check(
 	storedKey instanceof Uint8Array && storedKey.length > 0
 );
 
+/* ---------------------------------------------------------- an administrator's sign-in (spec 137) */
+
+const { ADMIN_BUCKET_ID } = await import('../lib/admin/consts.js');
+/* An account id no real administrator has, so the removal below can only take this script's row. */
+const administrator = `verify-admin-${stamp}`;
+await store.write([
+	row('admin-sign-in', {
+		bucketId: ADMIN_BUCKET_ID,
+		accountId: administrator,
+		outcome: 'let_in',
+		reason: 'signed_in',
+		place: { clientId: 'admin-panel' },
+		method: 'password_code',
+		address: '203.0.113.7',
+		addressFrom: 'sign_in',
+		lookup: MUNICH
+	})
+]);
+const adminRow = (
+	await store.listForPerson(ADMIN_BUCKET_ID, administrator, {
+		limit: 5,
+		now: new Date()
+	})
+).rows.at(0);
+check(
+	"an administrator's sign-in is kept in the administrators' project with its address and lookup",
+	adminRow?.bucketId === ADMIN_BUCKET_ID &&
+		adminRow.kind === 'signIn' &&
+		adminRow.method === 'password_code' &&
+		adminRow.address === '203.0.113.7' &&
+		canonical(adminRow.lookup) === canonical(MUNICH),
+	JSON.stringify(adminRow)
+);
+check(
+	"an administrator's sign-in expires 90 days after it was written",
+	adminRow?.expiresAt.getTime() === (adminRow?.lastAt.getTime() ?? 0) + 90 * DAY
+);
+await store.destroyPerson(ADMIN_BUCKET_ID, administrator);
+
+/* ---------------------------------------------------------- an email about a new sign-in (spec 138) */
+
+await store.write([
+	row('alerted-sign-in', {
+		accountId: 'alerted',
+		outcome: 'let_in',
+		reason: 'signed_in',
+		method: 'password',
+		address: '198.51.100.4',
+		addressFrom: 'sign_in',
+		alerted: 'both'
+	})
+]);
+const alertedRow = (await page('alerted')).rows.at(0);
+check(
+	'a sign-in its owner was emailed about keeps why',
+	alertedRow?.alerted === 'both',
+	JSON.stringify(alertedRow?.alerted)
+);
+const { checkedAdapter } = await import('../lib/adapters/index.js');
+const { SignInAlertClaimPayload } =
+	await import('../lib/sign_in_alerts/types.js');
+const alertClaims = checkedAdapter('SignInAlertClaim', SignInAlertClaimPayload);
+const claimId = `verify-claim-${stamp}`;
+const claimPayload = {
+	accountId: 'alerted',
+	exp: Math.floor(Date.now() / 1000) + 60
+};
+const firstClaim = await alertClaims.create(claimId, claimPayload, 60);
+const secondClaim = await alertClaims.create(claimId, claimPayload, 60);
+check(
+	'a claim to email about a sign-in is taken once',
+	firstClaim && !secondClaim,
+	`${String(firstClaim)} ${String(secondClaim)}`
+);
+await alertClaims.destroy(claimId);
+
 /* ---------------------------------------------------------- deletion */
 
 await store.write([row('elsewhere', { bucketId: other })]);

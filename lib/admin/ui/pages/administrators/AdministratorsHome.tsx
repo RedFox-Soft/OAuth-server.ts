@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Flex, Skeleton } from 'antd';
+import { Flex, Skeleton, Typography } from 'antd';
 import { PageHeader } from '../../frame/PageHeader.js';
 import { LoadFailed } from '../../frame/states.js';
 import { Link } from '../../frame/router.js';
@@ -13,6 +13,7 @@ import { BucketActivityPanel } from '../BucketActivityPanel.js';
 import { GeneralCard } from '../BucketSettings.js';
 import { Admins } from '../Admins.js';
 import { ApplicationsPanel } from './ApplicationsPanel.js';
+import { ActivityTimeline } from '../users/UserActivityTab.js';
 
 export type AdministratorsTab =
 	| 'accounts'
@@ -126,6 +127,33 @@ export function AdministratorsHome({ tab }: { tab: AdministratorsTab }) {
 						<BucketActivityPanel
 							bucketId={ADMIN_BUCKET_ID}
 							usageLink
+						/>
+						{/*
+						 * Every administrator's sign-ins (specs/137), for finding whose password is being used before
+						 * knowing whose to look at. Reading it is audited once a day, as one administrator's is.
+						 */}
+						<Typography.Title
+							level={5}
+							style={{ marginBottom: 0 }}
+						>
+							Sign-ins of all administrators
+						</Typography.Title>
+						<Typography.Text type="secondary">
+							Each time you open this tab, the audit trail records that you read
+							them, once a day.
+						</Typography.Text>
+						<ActivityTimeline
+							endpoint="/admin/api/admins/activity"
+							href="/admin/administrators/activity"
+							signInsOnly
+							whoOf={(row) =>
+								row.accountId
+									? {
+											label: row.email ?? 'An administrator',
+											href: `/admin/administrators/sign-ins/${encodeURIComponent(row.accountId)}`
+										}
+									: null
+							}
 						/>
 						{/* Changes to an administrator's account are recorded against the account, not a bucket. */}
 						<Link href="/admin/audit?targetType=AdminUser">

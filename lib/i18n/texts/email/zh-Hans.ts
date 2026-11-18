@@ -91,5 +91,24 @@ export const zhHans: EmailTexts = {
 			'有人用您账户{email}的密码登录了{service}，但随后未能提供身份验证器应用中的验证码。您的账户目前是安全的，但您的密码已不再是秘密。',
 		guessAdvice: '请修改密码：在{service}的登录页面上选择“{forgot}”。',
 		pageButton: '打开两步验证'
+	},
+	newSignIn: {
+		subject: '{service}有新的登录',
+		heading: '您的账户有新的登录',
+		intro: '有人以{email}的身份登录了{service}。',
+		when: '时间：{when}（UTC）',
+		app: '登录到：{app}',
+		method: '方式：{method}',
+		browser: '浏览器：{browser}',
+		place: '地点：{place}',
+		network: '网络：{network}',
+		whyNetwork: '过去 90 天内，没有人从这个网络登录过此账户。',
+		whyBrowser: '过去 90 天内，没有人用这个浏览器登录过此账户。',
+		whyBoth: '过去 90 天内，没有人从这个网络或用这个浏览器登录过此账户。',
+		ifYou: '如果是您本人，可以忽略这封邮件。',
+		ifNot:
+			'如果不是您，请立即退出所有登录。此链接只能使用一次，72 小时内有效：',
+		button: '不是我',
+		console: 'FoxAuth 控制台'
 	}
 };

@@ -85,10 +85,14 @@ export const TotpLinkPayload = t.Object({
 		t.Literal('enrol'),
 		t.Literal('replace'),
 		t.Literal('reenrol'),
-		t.Literal('disown')
+		t.Literal('disown'),
+		/* "This wasn't me" about a sign-in from a new network or browser (specs/138), not about a factor. */
+		t.Literal('notme')
 	]),
 	holder: t.Optional(t.String()),
 	enrolledAt: t.Optional(t.Number()),
+	/* For a `notme` link: the sign-in it was mailed about. */
+	signInId: t.Optional(t.String()),
 	exp: t.Number()
 });
 

@@ -61,6 +61,7 @@ import { federationBackChannelLogout } from './upstream_signals/back_channel_log
 import { accountPageRoutes } from './account_page/routes.js';
 import { accountServicesRoutes } from './account_page/services_routes.js';
 import { accountSecurityRoutes } from './account_page/security_routes.js';
+import { accountNotMeRoutes } from './account_page/not_me_routes.js';
 import { accountSignInsRoutes } from './account_page/sign_ins_routes.js';
 import { accountLinkRoutes } from './account_page/link_routes.js';
 import { behindProxyRoutes } from './behind_proxy/routes.js';
@@ -287,6 +288,11 @@ elysia.group('/:bucket', (bucketScoped) =>
 elysia.use(accountSignInsRoutes);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(accountSignInsRoutes)
+);
+// "This wasn't me" from the email about a new sign-in (specs/138), the same way.
+elysia.use(accountNotMeRoutes);
+elysia.group('/:bucket', (bucketScoped) =>
+	bucketScoped.use(accountNotMeRoutes)
 );
 // Where an agent's connect link leads (specs/119), the same way.
 elysia.use(accountLinkRoutes);

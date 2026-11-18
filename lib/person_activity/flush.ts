@@ -1,4 +1,3 @@
-import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { getPersonActivityStore, getUserStore } from '../adapters/index.js';
 import type { PersonActivityRow } from '../adapters/types.js';
 import {
@@ -8,6 +7,7 @@ import {
 } from '../consts/person_activity.js';
 import { takeAll, takeUse } from './buffer.js';
 import { withLookups } from '../address_lookup/lookups.js';
+import { alertsFor, sendAlerts } from '../sign_in_alerts/alerts.js';
 
 /*
  * Writing what this process noted (specs/133 research R11, R12). Once a minute, everything held goes to the store in
@@ -27,7 +27,6 @@ async function withoutTheDeleted(
 ): Promise<PersonActivityRow[]> {
 	const byProject = new Map<string, Set<string>>();
 	for (const row of rows) {
-		if (row.bucketId === ADMIN_BUCKET_ID) continue;
 		if (row.accountId === OVERFLOW_ACCOUNT) continue;
 		let ids = byProject.get(row.bucketId);
 		if (!ids) {
@@ -49,11 +48,11 @@ async function withoutTheDeleted(
 			});
 		}
 	}
+	/* The administrators' project is checked like any other: only its sign-ins are noted (specs/137 research R1). */
 	return rows.filter(
 		(row) =>
-			row.bucketId !== ADMIN_BUCKET_ID &&
-			(row.accountId === OVERFLOW_ACCOUNT ||
-				existing.has(`${row.bucketId}\u0000${row.accountId}`))
+			row.accountId === OVERFLOW_ACCOUNT ||
+			existing.has(`${row.bucketId}\u0000${row.accountId}`)
 	);
 }
 
@@ -68,6 +67,11 @@ async function flushOnce(take: () => PersonActivityRow[]): Promise<void> {
 	 * row without an answer is written without one.
 	 */
 	const rows = await withLookups(kept);
+	/*
+	 * Who to email about a sign-in from a new network or browser (specs/138 research R1): decided here, where the
+	 * owner is known and no request waits, and marked on the row before it is written.
+	 */
+	const alerts = await alertsFor(rows);
 	try {
 		const { failed } = await getPersonActivityStore().write(rows);
 		if (failed > 0) {
@@ -80,6 +84,8 @@ async function flushOnce(take: () => PersonActivityRow[]): Promise<void> {
 				projects: [...new Set(rows.map((row) => row.bucketId))].length
 			});
 		}
+		/* Only once the rows are kept: an email about a sign-in the log does not hold could not be checked. */
+		if (failed === 0) await sendAlerts(alerts);
 	} catch (error) {
 		console.error('activity not recorded', { rows: rows.length, error });
 	}

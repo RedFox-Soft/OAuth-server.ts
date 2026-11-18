@@ -4,7 +4,7 @@ title: "A person's activity: sign-ins, what the proxy refused and what people us
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-16
-updated: 2026-11-16
+updated: 2026-11-18
 ---
 
 # A person's activity: sign-ins and what the proxy refused
@@ -53,7 +53,11 @@ or API and application, that let them through (see "What a person used" below). 
   ([[address-lookup]]).
 - **Notes never touch the datastore.** Every `note*` is a synchronous `Map` operation that never throws
   (`buffer.ts:63`), so the password door costs a found and a missing account the same reads (tested).
-- **The administrators' project is never recorded** (`recording`, `record.ts:49`, and again at the flush).
+- **The administrators' project keeps sign-ins only** (spec 137): `recording(bucketId, kind)` (`record.ts:50`) lets
+  `ADMIN_BUCKET_ID` through for `kind: 'signIn'` and nothing else, so no proxy, API or use row is ever noted there.
+  Until spec 137 the project was not recorded at all (S15), which left a stolen administrator password invisible until
+  the thief changed something; the flush now checks its rows against the administrators' user store like any
+  project's. The sign-in itself is still never an audit entry ([[admin-console-signin]]).
 
 ## The buffer and the flush
 
@@ -82,7 +86,13 @@ or API and application, that let them through (see "What a person used" below). 
   filters `expiresAt > now`, so a MongoDB without `db:setup` (no TTL index) still shows nothing expired.
 - Fence `2026-11-16-person-activity-fence` (`lib/consts/migrations.ts:1901`): an older release would keep a deleted
   person's addresses and never sweep them. Its applied time is "Recording began on" (`recordingBegan`, `read.ts:39`).
-- `personActivity.enabled`, on by default, reported in usage reports; off drops what is waiting.
+- `personActivity.enabled`, on by default, reported in usage reports; off drops what is waiting. It governs the
+  administrators' sign-ins too: the site promises one switch for the whole server.
+- Fence `2026-11-18-admin-sign-in-log-fence` (`lib/consts/migrations.ts:1964`): an older release would silently stop
+  keeping administrators' sign-ins. For the administrators' project `recordingBegan(bucketId)` (`read.ts:67`) answers
+  the later of the two fences.
+- No path destroys an administrator account (`admin.deactivate` keeps the row), so their rows only expire. A path that
+  ever does must call `forgetPersonActivity(ADMIN_BUCKET_ID, id)`, as `removeEndUser` does for a person.
 
 ## Reading
 
@@ -95,6 +105,28 @@ or API and application, that let them through (see "What a person used" below). 
   "Last active" from the existing day and month marks read by id ([[monthly-active-users]]), so a token renewal
   counts. No address, country or device, so it is not audited.
 - MCP: `project_user_activity_list`, `consequence: 'ordinary'`.
+- **An administrator's sign-ins** (spec 137): `POST /admin/api/admins/:id/activity` (`lib/admin/users/routes.ts:327`),
+  super administrators only, the same `activityPage` over the administrators' project, audited once per reader and
+  day as `admin.activity.read` through `recordReadOnce`; MCP `admin_activity_list`. The project route stays closed to
+  that project (`loadBucketForUsers`), so no project administrator reaches these rows. The console page is
+  Administrators → Accounts → Sign-ins (`ActivityTimeline`, shared with the person's tab). `Names.client` names the
+  reserved `admin-panel` and `admin-mcp` clients ("Console", "Admin MCP (reserved client)"), which carry no
+  `clientName`.
+- **All administrators at once** (spec 137): `POST /admin/api/admins/activity` (`lib/admin/users/routes.ts:345`,
+  `activityFeed`, `read.ts:383`), MCP `admin_activity_feed`, the Administrators → Activity tab. No index of its own:
+  it merges each administrator's indexed timeline (`listForPerson`, limit each) in `newestFirst` order and cuts at the
+  limit, which is exact because the top N of a union lies within the union of each part's top N; the cursor is the
+  last shown row. Fine for tens of accounts, wrong for a project of people. Audited once per reader and day as
+  `admins.activity.read` against the administrators' project.
+- **Accounts' Last sign-in**: `GET /admin/api/admins` carries `signIns` per administrator (`signInSummary`,
+  `read.ts:544`, the Profile tab's first two lines shared): last sign-in and refusals since, no address, country or
+  device, so the list stays unaudited and the red "Refused N times since" mark links to the audited page.
+- **New sign-in emails** (spec 138): a sign-in row may carry `alerted` (`network`, `browser`, `both`), set in the
+  flush before the write when its owner is emailed ([[new-sign-in-alerts]]); `words.alerted` shows it.
+- **An administrator themselves**: `GET /admin/api/me/sign-ins` (`lib/admin/me.ts:59`, `ownAdminSignIns`,
+  `own.ts:100`), their ten newest sign-in rows, refused ones included, built field by field without address,
+  categories or lookup, so a thief holding the session learns nothing of where the real administrator signs in from;
+  not audited; MCP `own_sign_in_list`; the console opens it from the email in the header.
 
 - **The person themselves** (spec 135): Recent sign-ins on their account page reads their ten newest `signIn`
   `let_in` rows (`ownSignIns`, `lib/person_activity/own.ts:81`) through `listForPerson`, no new index. The view is

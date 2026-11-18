@@ -50,6 +50,7 @@ export default {
 				'The administrators of the project, on the person’s Activity tab, and the agents acting for them. Every read is written to the audit trail, once per reader, person and day.',
 				'The same administrators, on an app’s or an API’s Access tab, see who it refused or asked to sign in again in the last 24 hours. That read is written to the audit trail too, once per reader, app or API, and day.',
 				'The person themselves, on Recent sign-ins on their account page: their last ten sign-ins, with the app, the time, how they signed in, the browser and the country, but never the address. The page opens only after they sign in again within 15 minutes. From there they can sign out of every app at once, and a person with a password gets a link to set a new one.',
+				'The server’s own administrators are recorded too, but only their sign-ins and refused sign-ins, with the same details and the same 90 days. Only a super administrator reads another administrator’s, under Administrators, and every read is written to the audit trail, once per reader, administrator and day. Each administrator sees their own last ten, without the address.',
 				'A super administrator can turn recording off for the whole server in Settings.'
 			]
 		},
@@ -57,7 +58,8 @@ export default {
 			heading: 'Other records about people',
 			items: [
 				'To count monthly active users, a server marks each person once a day and once a month, without an address, when they sign in, when an app renews their tokens, and when the proxy lets them through. These marks outlive a deletion: a day’s mark for up to 40 days, a month’s mark for up to 13 months.',
-				'Sessions and tokens carry no address and no device.'
+				'Sessions and tokens carry no address and no device.',
+				'When a project turns it on, and for the server’s own administrators unless a super administrator turns it off, the server emails a person about a sign-in from a network or a browser their account has not used in 90 days: when, where, how and with which browser, never the address, with a link that signs the account out everywhere. Only to a proven address, at most five a day. The sign-in’s record notes that the email was sent.'
 			]
 		}
 	]

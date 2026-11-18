@@ -41,6 +41,7 @@ import type {
 	TotpSpentStepPayload
 } from '../totp/types.js';
 import type { UpstreamSessionPayload } from '../upstream_signals/types.js';
+import type { SignInAlertClaimPayload } from '../sign_in_alerts/types.js';
 import type {
 	VerificationChallengePayload,
 	VerificationResendPayload
@@ -90,6 +91,7 @@ export interface ModelPayloadByName {
 	RegistrationAccessToken: RegistrationAccessTokenPayloadType;
 	ReplayDetection: ReplayDetectionPayloadType;
 	Session: SessionPayloadType;
+	SignInAlertClaim: SignInAlertClaimPayload;
 	TeamInvitationThrottle: TeamInvitationThrottlePayload;
 	TotpAttempt: TotpAttemptPayload;
 	TotpEnrollment: TotpEnrollmentPayload;

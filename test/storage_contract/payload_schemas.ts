@@ -60,6 +60,7 @@ import {
 	TotpSpentStepPayload
 } from 'lib/totp/types.js';
 import { UpstreamSessionPayload } from 'lib/upstream_signals/types.js';
+import { SignInAlertClaimPayload } from 'lib/sign_in_alerts/types.js';
 
 export interface ReadableSchema {
 	readonly properties: Record<string, unknown>;
@@ -95,6 +96,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	RegistrationAccessToken: RegistrationAccessTokenPayload,
 	ReplayDetection: ReplayDetectionPayload,
 	Session: SessionPayload,
+	SignInAlertClaim: SignInAlertClaimPayload,
 	TeamInvitationThrottle: TeamInvitationThrottlePayload,
 	TotpAttempt: TotpAttemptPayload,
 	TotpEnrollment: TotpEnrollmentPayload,

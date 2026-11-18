@@ -221,6 +221,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'proxyKeys'
 				| 'passwordGuessing'
 				| 'totpSelfService'
+				| 'newSignInAlerts'
 			>
 		>
 	): Promise<UserBucket | null> {

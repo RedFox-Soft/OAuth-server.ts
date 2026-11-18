@@ -6,7 +6,7 @@ import {
 	formatDateTime,
 	formatList
 } from '../i18n/format.js';
-import { FORMAT_LOCALE, type Language } from '../i18n/languages.js';
+import type { Language } from '../i18n/languages.js';
 import { html, htmlWith, plural, text } from '../i18n/message.js';
 import {
 	ACCOUNT_TEXTS,
@@ -19,7 +19,11 @@ import type {
 	RarBlock
 } from '../interactions/consentView.js';
 import type { ApplicationRow } from './view.js';
-import type { ActivityBrowser, ActivitySystem } from '../adapters/types.js';
+import {
+	BROWSER_NAMES,
+	SYSTEM_NAMES,
+	countryWords
+} from '../person_activity/sign_in_words.js';
 import type { OwnSignIn, OwnSignInsView } from '../person_activity/own.js';
 import { foxVar } from '../html/theme/palette.js';
 
@@ -821,27 +825,80 @@ export function disownOutcomePage(
 	);
 }
 
+// ---------------------------------------------------------------- "This wasn't me" about a new sign-in (specs/138)
+
+/* What confirming will do, said before it is done: for a person what happens to their password, for an administrator who is told. */
+export type NotMeAfter =
+	| { kind: 'reset' }
+	| { kind: 'provider'; providers: string[] }
+	| { kind: 'none' }
+	| { kind: 'administrator' };
+
+/* Opening the link only shows this; the form's POST is the act, so a mail scanner following the link changes nothing. */
+export function notMeConfirmPage(
+	language: Language,
+	path: string,
+	token: string,
+	who: { service: string; email: string },
+	after: NotMeAfter
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const then =
+		after.kind === 'reset'
+			? esc(T.signOutMail)
+			: after.kind === 'provider'
+				? html(T.signOutProvider, { providers: after.providers.join(', ') })
+				: after.kind === 'administrator'
+					? esc(T.notMeAdministrator)
+					: null;
+	const response = page(
+		T.signOutTitle,
+		[
+			`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.signOutTitle)}</h1>`,
+			`<p style="overflow-wrap:anywhere;">${html(T.notMeIntro, who)}</p>`,
+			...(then === null ? [] : [`<p>${then}</p>`]),
+			`<form method="post" action="${esc(path)}">${hidden({ token })}<button type="submit" style="${BUTTON}">${esc(T.signOutEverywhere)}</button></form>`
+		].join(''),
+		200,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export function notMeGonePage(
+	language: Language,
+	service: string,
+	forgot: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const response = page(
+		T.notMeGoneTitle,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.notMeGoneTitle)}</h1><p>${html(T.notMeGone, { service, forgot })}</p>`,
+		400,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export function notMeAdministratorDonePage(
+	language: Language,
+	done: boolean
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const title = done ? T.signOutDoneTitle : T.signOutFailedTitle;
+	const response = page(
+		title,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1><p>${esc(done ? T.notMeAdministratorDone : T.signOutFailed)}</p>`,
+		done ? 200 : 500,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
 // ---------------------------------------------------------------- recent sign-ins (specs/135)
-
-const BROWSER_NAMES: Record<ActivityBrowser, string | null> = {
-	chrome: 'Chrome',
-	edge: 'Edge',
-	firefox: 'Firefox',
-	safari: 'Safari',
-	opera: 'Opera',
-	samsung: 'Samsung Internet',
-	other: null
-};
-
-const SYSTEM_NAMES: Record<ActivitySystem, string | null> = {
-	windows: 'Windows',
-	macos: 'macOS',
-	ios: 'iOS',
-	android: 'Android',
-	linux: 'Linux',
-	chromeos: 'ChromeOS',
-	other: null
-};
 
 function placeWords(row: OwnSignIn, T: AccountTexts): string {
 	switch (row.place.kind) {
@@ -873,20 +930,6 @@ function deviceWords(row: OwnSignIn, T: AccountTexts): string | null {
 	const browser = BROWSER_NAMES[row.device.browser] ?? T.otherBrowser;
 	const system = SYSTEM_NAMES[row.device.system];
 	return system === null ? browser : text(T.browserOn, { browser, system });
-}
-
-const countryNames = new Map<Language, Intl.DisplayNames>();
-
-function countryWords(code: string, language: Language): string | null {
-	let names = countryNames.get(language);
-	if (!names) {
-		names = new Intl.DisplayNames([FORMAT_LOCALE[language]], {
-			type: 'region'
-		});
-		countryNames.set(language, names);
-	}
-	const name = names.of(code);
-	return name && name !== code ? name : null;
 }
 
 function signInItem(row: OwnSignIn, language: Language, now: Date): string {

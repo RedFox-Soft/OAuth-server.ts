@@ -213,5 +213,14 @@ export const zhHans: AccountTexts = {
 		'现在无法发送邮件。请稍后在{service}的登录页面上选择“{forgot}”。',
 	signOutFailedTitle: '并非所有应用都已退出登录',
 	signOutFailed: '请从您的账号页面重试。',
-	backToAccount: '返回您的账号页面'
+	backToAccount: '返回您的账号页面',
+	notMeIntro:
+		'这封邮件说的是以{email}的身份登录{service}。确认后，此账号会立即退出所有应用。',
+	notMeAdministrator:
+		'您在控制台的会话会立即结束，其他超级管理员也会收到通知。请让其中一位为您设置新密码。',
+	notMeAdministratorDone:
+		'您已退出所有登录，其他超级管理员已收到通知。请让其中一位为您设置新密码。',
+	notMeGoneTitle: '此链接已失效',
+	notMeGone:
+		'它已经被使用过，或已超过 72 小时，或此账号之后已经退出过所有登录。如果您仍然不认识这次登录，请在{service}的登录页面上选择“{forgot}”。'
 };

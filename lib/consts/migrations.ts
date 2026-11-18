@@ -1951,6 +1951,49 @@ const addressLookupFence: Migration = {
 	postgres: { noop: true, reason: ADDRESS_LOOKUP_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/137 research R4). Administrators' sign-ins are now kept in people's activity. An older
+ * release reads none of them, but it would silently stop keeping them while the earlier ones stay readable after the
+ * next upgrade: a gap in the one log a thief with an administrator's password wants a gap in. Recording this
+ * migration makes its startup gate refuse the database instead. The time it was applied is also when keeping
+ * administrators' sign-ins began, which the console shows.
+ */
+const ADMIN_SIGN_IN_LOG_FENCE_REASON =
+	"Nothing to change on this backend: the record of this migration is its effect, so a release older than keeping administrators' sign-ins refuses to start against a database that keeps them.";
+
+export const ADMIN_SIGN_IN_LOG_FENCE_ID = '2026-11-18-admin-sign-in-log-fence';
+
+const adminSignInLogFence: Migration = {
+	id: ADMIN_SIGN_IN_LOG_FENCE_ID,
+	description:
+		"Mark the database as keeping administrators' sign-ins, so that an older release refuses to start against it rather than silently stop keeping them",
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: ADMIN_SIGN_IN_LOG_FENCE_REASON },
+	postgres: { noop: true, reason: ADMIN_SIGN_IN_LOG_FENCE_REASON }
+};
+
+/*
+ * A fence, not a change (specs/138 research R10). A sign-in row may now say its owner was emailed about it
+ * (`alerted`), a mailed link may be a "This wasn't me" about a sign-in (`notme`), and a new area holds who was emailed
+ * today; an older release's schemas know none of them, and it would stop emailing without saying so. Recording this
+ * migration makes its startup gate refuse the database instead.
+ */
+const NEW_SIGN_IN_ALERTS_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than emailing about new sign-ins refuses to start against a database that holds what it writes.';
+
+const newSignInAlertsFence: Migration = {
+	id: '2026-11-18-new-sign-in-alerts-fence',
+	description:
+		'Mark the database as emailing people about sign-ins from a new network or browser, so that an older release refuses to start against it rather than failing to read what it wrote',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: NEW_SIGN_IN_ALERTS_FENCE_REASON },
+	postgres: { noop: true, reason: NEW_SIGN_IN_ALERTS_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -1972,5 +2015,7 @@ export const MIGRATIONS: readonly Migration[] = [
 	apiToolConditionsFence,
 	personActivityFence,
 	personAppUsageFence,
-	addressLookupFence
+	addressLookupFence,
+	adminSignInLogFence,
+	newSignInAlertsFence
 ];

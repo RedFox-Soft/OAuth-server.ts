@@ -198,6 +198,23 @@ const routes = [
 		path: '/admin/api/admins/:id/totp',
 		targetType: 'AdminUser'
 	},
+	/*
+	 * A read, audited (specs/137): an administrator's sign-ins hold their network addresses, so which super
+	 * administrator read them is kept, once per reader, administrator and day, never what was read.
+	 */
+	{
+		action: 'admin.activity.read',
+		method: 'POST',
+		path: '/admin/api/admins/:id/activity',
+		targetType: 'AdminUser'
+	},
+	/* The same read over every administrator at once (specs/137): the target is the administrators' project. */
+	{
+		action: 'admins.activity.read',
+		method: 'POST',
+		path: '/admin/api/admins/activity',
+		targetType: 'UserBucket'
+	},
 
 	/*
 	 * Groups: the owner of every bucket, and therefore the thing that decides who may reach
@@ -949,6 +966,8 @@ export type AuditAction =
 export const AUDITED_READS: readonly AuditAction[] = [
 	'networkfacts.lookup',
 	'enduser.activity.read',
+	'admin.activity.read',
+	'admins.activity.read',
 	'behindproxy.refusals.read',
 	'resource.refusals.read'
 ];

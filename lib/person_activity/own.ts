@@ -10,6 +10,7 @@ import { COUNTRY_CODES } from '../consts/countries.js';
 import { PERSON_ACTIVITY_DAYS } from '../consts/person_activity.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { Names, recordingBegan } from './read.js';
+import { wordsOf } from './words.js';
 
 /*
  * A person's own recent sign-ins, for their account page (specs/135 data-model §1). Built field by field from the
@@ -76,6 +77,74 @@ function thisBrowserRow(
 	return best;
 }
 
+/*
+ * An administrator's own recent sign-ins (specs/137 data-model §4), refused ones included, for the console header. In
+ * the console's English words, built field by field like the person's: a thief signed in as the administrator must not
+ * learn where the real one signs in from, so no address, category, owner or location is copied (SI-3).
+ */
+export interface OwnAdminSignIn {
+	at: string;
+	outcome: 'let_in' | 'refused';
+	place: string;
+	method: string | null;
+	reason: string | null;
+	device: string | null;
+	country: string | null;
+}
+
+export type OwnAdminSignInsView =
+	| { state: 'off' }
+	| { state: 'empty'; since: string }
+	| { state: 'list'; rows: OwnAdminSignIn[] };
+
+export async function ownAdminSignIns(
+	bucket: UserBucket,
+	accountId: string,
+	now: Date
+): Promise<OwnAdminSignInsView> {
+	if (!ApplicationConfig['personActivity.enabled']) return { state: 'off' };
+	const page = await getPersonActivityStore().listForPerson(
+		bucket._id,
+		accountId,
+		{ kind: 'signIn', limit: OWN_SIGN_INS_SHOWN, now }
+	);
+	if (page.rows.length === 0) {
+		const began = (await recordingBegan(bucket._id)) ?? bucket.createdAt;
+		return {
+			state: 'empty',
+			since: new Date(
+				Math.max(began.getTime(), now.getTime() - PERSON_ACTIVITY_DAYS * DAY_MS)
+			).toISOString()
+		};
+	}
+	const names = new Names(bucket);
+	return {
+		state: 'list',
+		rows: await Promise.all(
+			page.rows.map(async (row): Promise<OwnAdminSignIn> => {
+				const place = row.place.clientId
+					? await names.client(row.place.clientId)
+					: null;
+				const provider = row.place.providerId
+					? names.provider(row.place.providerId)
+					: null;
+				const words = wordsOf(row, { place, client: null, provider });
+				const country = row.facts?.country;
+				const refused = row.outcome !== 'let_in';
+				return {
+					at: row.lastAt.toISOString(),
+					outcome: refused ? 'refused' : 'let_in',
+					place: place ?? 'An application that no longer exists',
+					method: refused ? null : words.method,
+					reason: refused ? words.reason : null,
+					device: words.device,
+					country: country && KNOWN_COUNTRIES.has(country) ? country : null
+				};
+			})
+		)
+	};
+}
+
 export async function ownSignIns(
 	bucket: UserBucket,
 	accountId: string,
@@ -90,7 +159,7 @@ export async function ownSignIns(
 	);
 	const rows = page.rows.filter((row) => row.reason === 'signed_in');
 	if (rows.length === 0) {
-		const began = (await recordingBegan()) ?? bucket.createdAt;
+		const began = (await recordingBegan(bucket._id)) ?? bucket.createdAt;
 		return {
 			state: 'empty',
 			since: new Date(

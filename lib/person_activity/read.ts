@@ -17,9 +17,15 @@ import {
 	NEW_ADDRESS_AFTER,
 	PERSON_ACTIVITY_DAYS
 } from '../consts/person_activity.js';
-import { PERSON_ACTIVITY_FENCE_ID } from '../consts/migrations.js';
+import {
+	ADMIN_SIGN_IN_LOG_FENCE_ID,
+	PERSON_ACTIVITY_FENCE_ID
+} from '../consts/migrations.js';
+import { ADMIN_BUCKET_ID, ADMIN_CLIENT_ID } from '../admin/consts.js';
+import { ADMIN_MCP_CLIENT_ID } from '../mcp/consts.js';
 import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { ApplicationConfig } from '../configs/application.js';
+import { newestFirst } from '../adapters/person_activity_rows.js';
 import { Client } from '../models/client.js';
 import { namespaceOf } from '../resources/namespace.js';
 import {
@@ -36,25 +42,39 @@ import { lookupState, type LookupState } from '../address_lookup/status.js';
  * console to show; the reason phrases come from the fixed table and name only what was recorded (research R18).
  */
 
-let began: Date | null = null;
+const RESERVED_CLIENT_NAMES: ReadonlyMap<string, string> = new Map([
+	[ADMIN_CLIENT_ID, 'Console'],
+	[ADMIN_MCP_CLIENT_ID, 'Admin MCP (reserved client)']
+]);
+
+const began = new Map<string, Date>();
+
+async function fenceAppliedAt(id: string): Promise<Date | null> {
+	const known = began.get(id);
+	if (known) return known;
+	const records = await getSchemaMigrationStore().all();
+	const fence = records.find((record) => record.id === id);
+	if (!fence) return null;
+	began.set(id, fence.appliedAt);
+	return fence.appliedAt;
+}
 
 /*
  * When recording began: the time the fence migration was recorded (research R14), on a fresh install the
  * provisioning. Kept once found, because it never changes; read again while absent, because `db:migrate` may record
- * it while the server runs.
+ * it while the server runs. Administrators' sign-ins began with a fence of their own (specs/137 research R4), so for
+ * the administrators' project it is the later of the two.
  */
-export async function recordingBegan(): Promise<Date | null> {
-	if (began) return began;
-	const records = await getSchemaMigrationStore().all();
-	const fence = records.find(
-		(record) => record.id === PERSON_ACTIVITY_FENCE_ID
-	);
-	if (fence) began = fence.appliedAt;
-	return began;
+export async function recordingBegan(bucketId?: string): Promise<Date | null> {
+	const people = await fenceAppliedAt(PERSON_ACTIVITY_FENCE_ID);
+	if (bucketId !== ADMIN_BUCKET_ID) return people;
+	const administrators = await fenceAppliedAt(ADMIN_SIGN_IN_LOG_FENCE_ID);
+	if (!people || !administrators) return administrators ?? people;
+	return administrators > people ? administrators : people;
 }
 
 export function forgetRecordingBeganForTests(): void {
-	began = null;
+	began.clear();
 }
 
 export interface ActivityRowView {
@@ -78,6 +98,8 @@ export interface ActivityRowView {
 		city: string | null;
 	} | null;
 	newAddress: boolean;
+	/* Why the owner was emailed about this sign-in (specs/138), or null. */
+	alerted: PersonActivityRow['alerted'] | null;
 	count: number;
 	/* A use row (specs/134): the proxy checks behind it, said only in a tooltip, never as a count of visits. */
 	checks: string | null;
@@ -184,6 +206,12 @@ export class Names {
 	}
 
 	client(id: string): Promise<string | null> {
+		/*
+		 * The console and the reserved MCP client carry no `clientName`, and they are where administrators sign in most
+		 * (specs/137 research R5): without a name every such row would read "The app".
+		 */
+		const reserved = RESERVED_CLIENT_NAMES.get(id);
+		if (reserved !== undefined) return Promise.resolve(reserved);
 		let found = this.clients.get(id);
 		if (!found) {
 			found = Client.tryFind(id).then((client) => client?.clientName ?? null);
@@ -259,6 +287,7 @@ async function viewOf(
 				}
 			: null,
 		newAddress,
+		alerted: row.alerted ?? null,
 		count: row.count,
 		checks: row.reason === 'used' ? checksWords(row.count) : null,
 		tools: toolsView(row.tools),
@@ -326,7 +355,7 @@ export async function activityPage(
 	const days = [...new Set(page.rows.map((row) => row.day))];
 	const [busyDays, startedAt, lookups] = await Promise.all([
 		store.overflowDays(bucket._id, days, now),
-		recordingBegan(),
+		recordingBegan(bucket._id),
 		lookupState()
 	]);
 	return {
@@ -335,6 +364,80 @@ export async function activityPage(
 		keptDays: PERSON_ACTIVITY_DAYS,
 		rows,
 		next: page.next ? encodeCursor(page.next) : null,
+		busyDays: busyDays.sort(),
+		lookupState: lookups
+	};
+}
+
+export interface FeedRowView extends ActivityRowView {
+	accountId: string;
+	email: string | null;
+}
+
+export interface ActivityFeedView extends Omit<ActivityPageView, 'rows'> {
+	rows: FeedRowView[];
+}
+
+/*
+ * Every administrator's sign-ins on one page, newest first (specs/137): the union of each account's own indexed
+ * timeline, cut to `limit` in the timeline's order, so paging with the last row's cursor neither drops nor repeats
+ * one. Only for the administrators' project, whose accounts are tens; a project of people would need an index.
+ */
+export async function activityFeed(
+	bucket: UserBucket,
+	accounts: readonly { _id: string; email: string }[],
+	query: Omit<ActivityPageQuery, 'kind'>
+): Promise<ActivityFeedView> {
+	const now = new Date();
+	const store = getPersonActivityStore();
+	const before = decodeCursor(query.before);
+	const limit = query.limit ?? 50;
+	const pages = await Promise.all(
+		accounts.map((account) =>
+			store.listForPerson(bucket._id, account._id, {
+				limit,
+				now,
+				kind: 'signIn',
+				...(query.outcome === undefined ? {} : { outcome: query.outcome }),
+				...(before === undefined ? {} : { before })
+			})
+		)
+	);
+	const merged = pages.flatMap((page) => page.rows).sort(newestFirst);
+	const shown = merged.slice(0, limit);
+	const last = shown.at(-1);
+	const more = merged.length > limit || pages.some((page) => page.next);
+	const names = new Names(bucket);
+	const emails = new Map(
+		accounts.map((account) => [account._id, account.email])
+	);
+	const fresh = new Set<string>();
+	for (const accountId of new Set(shown.map((row) => row.accountId))) {
+		const mine = shown.filter((row) => row.accountId === accountId);
+		for (const id of await newAddressIds(bucket._id, accountId, mine, now)) {
+			fresh.add(id);
+		}
+	}
+	const rows = await Promise.all(
+		shown.map(async (row) => ({
+			...(await viewOf(row, names, fresh.has(row._id))),
+			accountId: row.accountId,
+			email: emails.get(row.accountId) ?? null
+		}))
+	);
+	const days = [...new Set(shown.map((row) => row.day))];
+	const [busyDays, startedAt, lookups] = await Promise.all([
+		store.overflowDays(bucket._id, days, now),
+		recordingBegan(bucket._id),
+		lookupState()
+	]);
+	return {
+		recording: ApplicationConfig['personActivity.enabled'],
+		recordingBegan: startedAt?.toISOString() ?? null,
+		keptDays: PERSON_ACTIVITY_DAYS,
+		rows,
+		next:
+			more && last ? encodeCursor({ lastAt: last.lastAt, id: last._id }) : null,
 		busyDays: busyDays.sort(),
 		lookupState: lookups
 	};
@@ -432,28 +535,30 @@ async function lastActive(
 	return marked.get(accountId) ?? null;
 }
 
+export type SignInSummary = Pick<
+	ActivitySummary,
+	'lastSignIn' | 'notLetInSince'
+>;
+
 /*
- * The Profile tab's lines (FR-021). No address, country or device: it is read on every person's page, unaudited, so it
- * carries nothing the audit of the timeline protects (research R16).
+ * The last successful sign-in, and what turned the person away after it: the Profile tab's first two lines, and an
+ * administrator's line in Accounts (specs/137). No address, country or device, so reading it is not audited.
  */
-export async function activitySummary(
+export async function signInSummary(
 	bucket: UserBucket,
-	accountId: string
-): Promise<ActivitySummary> {
-	const now = new Date();
+	accountId: string,
+	now: Date,
+	names: Names
+): Promise<SignInSummary> {
 	const store = getPersonActivityStore();
-	const names = new Names(bucket);
-	const [recent, signedIn, startedAt, active, appsUsed] = await Promise.all([
+	const [recent, signedIn] = await Promise.all([
 		store.listForPerson(bucket._id, accountId, { limit: RECENT_ROWS, now }),
 		store.listForPerson(bucket._id, accountId, {
 			kind: 'signIn',
 			outcome: 'let_in',
 			limit: 1,
 			now
-		}),
-		recordingBegan(),
-		lastActive(bucket._id, accountId, now),
-		appsUsedBy(bucket, accountId, now, names)
+		})
 	]);
 	const last = signedIn.rows.at(0);
 	let lastSignIn: ActivitySummary['lastSignIn'] = null;
@@ -482,6 +587,26 @@ export async function activitySummary(
 			kind: latest.kind
 		};
 	}
+	return { lastSignIn, notLetInSince };
+}
+
+/*
+ * The Profile tab's lines (FR-021). No address, country or device: it is read on every person's page, unaudited, so it
+ * carries nothing the audit of the timeline protects (research R16).
+ */
+export async function activitySummary(
+	bucket: UserBucket,
+	accountId: string
+): Promise<ActivitySummary> {
+	const now = new Date();
+	const names = new Names(bucket);
+	const [{ lastSignIn, notLetInSince }, startedAt, active, appsUsed] =
+		await Promise.all([
+			signInSummary(bucket, accountId, now, names),
+			recordingBegan(bucket._id),
+			lastActive(bucket._id, accountId, now),
+			appsUsedBy(bucket, accountId, now, names)
+		]);
 	return {
 		recordingBegan: startedAt?.toISOString() ?? null,
 		keptDays: PERSON_ACTIVITY_DAYS,

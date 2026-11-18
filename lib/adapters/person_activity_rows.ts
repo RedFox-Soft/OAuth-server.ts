@@ -20,6 +20,7 @@ export function addTo(
 		...(lookup === undefined ? {} : { lookup }),
 		...(next.facts === undefined ? {} : { facts: next.facts }),
 		...(next.device === undefined ? {} : { device: next.device }),
+		...(next.alerted === undefined ? {} : { alerted: next.alerted }),
 		...(existing.tools === undefined && next.tools === undefined
 			? {}
 			: { tools: unionOfTools(existing.tools, next.tools) }),

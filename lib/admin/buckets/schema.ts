@@ -157,6 +157,11 @@ export const UpdateBucketBody = t.Object({
 	 */
 	totpSelfService: t.Optional(t.Boolean()),
 	/*
+	 * Whether the project's people are emailed about a sign-in from a new network or browser, with a link that signs
+	 * them out everywhere (specs/138). Absent means off, and on for the administrators' project.
+	 */
+	newSignInAlerts: t.Optional(t.Boolean()),
+	/*
 	 * What a password sign-in from an address on FoxTrust's attacker list meets (specs/125): `nothing`, `count` or
 	 * `refuse`, and networks never checked against the list, each optionally until a date. Choosing `refuse` is a
 	 * tightening and goes through the preview below; it is refused on the administrators' project.

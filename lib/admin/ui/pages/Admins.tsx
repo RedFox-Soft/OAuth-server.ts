@@ -21,12 +21,22 @@ import { RowActions, type RowAction } from '../frame/RowActions.js';
 import { LoadFailed, NoMatch } from '../frame/states.js';
 import { useMe } from '../frame/me.js';
 import { useHydrated } from '../frame/hydrated.js';
+import { useNavigate } from '../frame/router.js';
 
 /* What the list answers: the account without its password or secret, and whether it holds the instance privilege. */
 type AdminUser = Pick<User, '_id' | 'email' | 'active' | 'verified'> & {
 	superAdmin: boolean;
 	totpEnrolled: boolean;
 	totpEnrolledAt: string | null;
+	/* The last sign-in and the refusals after it (specs/137): never where from, which only Sign-ins shows. */
+	signIns: {
+		lastSignIn: {
+			at: string;
+			name: string | null;
+			method: string | null;
+		} | null;
+		notLetInSince: { at: string; count: number; reason: string } | null;
+	};
 };
 
 type StatusFilter = 'active' | 'deactivated' | 'super' | 'unverified';
@@ -37,6 +47,50 @@ const MATCHES: Record<StatusFilter, (a: AdminUser) => boolean> = {
 	super: (a) => a.superAdmin,
 	unverified: (a) => !a.verified
 };
+
+/*
+ * When an administrator last signed in, and a red mark when sign-ins were refused after it (specs/137): a password
+ * being tried shows here before anyone opens the audited Sign-ins page, which the mark links to.
+ */
+function LastSignIn({ row, onOpen }: { row: AdminUser; onOpen: () => void }) {
+	const { lastSignIn, notLetInSince } = row.signIns;
+	return (
+		<Space
+			size={6}
+			wrap
+		>
+			{lastSignIn ? (
+				<Tooltip
+					title={[lastSignIn.name, lastSignIn.method]
+						.filter(Boolean)
+						.join(' · ')}
+				>
+					<Typography.Text>
+						{new Date(lastSignIn.at).toLocaleString(undefined, {
+							dateStyle: 'medium',
+							timeStyle: 'short'
+						})}
+					</Typography.Text>
+				</Tooltip>
+			) : (
+				<Typography.Text type="secondary">None recorded</Typography.Text>
+			)}
+			{notLetInSince && (
+				<Tooltip
+					title={`Last: ${notLetInSince.reason}, ${new Date(notLetInSince.at).toLocaleString()}`}
+				>
+					<Tag
+						color="red"
+						style={{ cursor: 'pointer' }}
+						onClick={onOpen}
+					>
+						{`Refused ${notLetInSince.count === 1 ? 'once' : `${String(notLetInSince.count)} times`}${lastSignIn ? ' since' : ''}`}
+					</Tag>
+				</Tooltip>
+			)}
+		</Space>
+	);
+}
 
 interface CreateAdminValues {
 	email: string;
@@ -58,6 +112,7 @@ export function Admins({
 	verificationRequired: boolean;
 }) {
 	const feedback = useFeedback();
+	const navigate = useNavigate();
 	const confirm = useConfirm();
 	const { me } = useMe();
 	const [admins, setAdmins] = useState<AdminUser[]>([]);
@@ -264,6 +319,16 @@ export function Admins({
 	function rowActions(row: AdminUser): RowAction[] {
 		const self = row._id === me?.userId;
 		const items: RowAction[] = [
+			/* Where and how they signed in (specs/137): on their own row too, since a super administrator reads it here. */
+			{
+				key: 'signIns',
+				label: 'Sign-ins',
+				group: 'edit',
+				onClick: () =>
+					void navigate(
+						`/admin/administrators/sign-ins/${encodeURIComponent(row._id)}`
+					)
+			},
 			{
 				key: 'email',
 				label: 'Change email…',
@@ -425,6 +490,20 @@ export function Admins({
 							) : (
 								<Typography.Text type="secondary">—</Typography.Text>
 							)
+					},
+					{
+						title: 'Last sign-in',
+						key: 'signIns',
+						render: (_: unknown, row: AdminUser) => (
+							<LastSignIn
+								row={row}
+								onOpen={() =>
+									void navigate(
+										`/admin/administrators/sign-ins/${encodeURIComponent(row._id)}`
+									)
+								}
+							/>
+						)
 					},
 					{
 						title: '',

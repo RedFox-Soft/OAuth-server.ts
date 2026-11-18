@@ -165,6 +165,9 @@ function addressUpsertOf(
 						...(row.device === undefined
 							? {}
 							: { device: { $literal: row.device } }),
+						...(row.alerted === undefined
+							? {}
+							: { alerted: { $literal: row.alerted } }),
 						count: { $add: [{ $ifNull: ['$count', 0] }, row.count] },
 						firstAt: {
 							$min: [{ $ifNull: ['$firstAt', row.firstAt] }, row.firstAt]
@@ -192,7 +195,8 @@ function upsertOf(
 	if (row.address !== undefined) return addressUpsertOf(row, row.address);
 	const replaced = {
 		...(row.facts === undefined ? {} : { facts: row.facts }),
-		...(row.device === undefined ? {} : { device: row.device })
+		...(row.device === undefined ? {} : { device: row.device }),
+		...(row.alerted === undefined ? {} : { alerted: row.alerted })
 	};
 	return {
 		updateOne: {

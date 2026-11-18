@@ -31,8 +31,9 @@ import { deviceOf } from './device.js';
 /*
  * The four places a person's activity is noted from (specs/133 contracts/recording.md). Each call is synchronous,
  * never throws and never reads anything: it is on the path of a sign-in or a proxy check, and at the password door
- * it must cost a found account exactly what a missing one costs (S5). Nothing is noted for the administrators'
- * project, nor while the instance setting is off.
+ * it must cost a found account exactly what a missing one costs (S5). Nothing is noted while the instance setting is
+ * off, and for the administrators' project only sign-ins are (specs/137 research R1): a stolen administrator password
+ * should show where it was used, and nothing there is behind the proxy.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,10 +47,9 @@ onSettingsApplied((appliedKeys) => {
 	}
 });
 
-function recording(bucketId: string): boolean {
-	return (
-		ApplicationConfig['personActivity.enabled'] && bucketId !== ADMIN_BUCKET_ID
-	);
+function recording(bucketId: string, kind: PersonActivityRow['kind']): boolean {
+	if (!ApplicationConfig['personActivity.enabled']) return false;
+	return bucketId !== ADMIN_BUCKET_ID || kind === 'signIn';
 }
 
 /* The place in a fixed key order, so the same place always digests to the same row id. */
@@ -171,7 +171,7 @@ export function noteSignedIn(input: {
 	login: Login;
 	request: Request;
 }): void {
-	if (!recording(input.bucketId)) return;
+	if (!recording(input.bucketId, 'signIn')) return;
 	safely(() => {
 		const providerId = input.login.upstream?.providerId;
 		const method: PersonActivityRow['method'] =
@@ -222,7 +222,7 @@ export function noteSignInRefused(input: {
 	resource?: string;
 	request: Request;
 }): void {
-	if (!recording(input.bucketId)) return;
+	if (!recording(input.bucketId, 'signIn')) return;
 	safely(() => {
 		note(
 			rowOf({
@@ -275,7 +275,7 @@ export function noteAppCheck(input: {
 }): void {
 	const { app, accountId, decision } = input;
 	if (accountId === null || decision.outcome === 'allow') return;
-	if (!recording(app.bucketId)) return;
+	if (!recording(app.bucketId, 'app')) return;
 	const reason = APP_REASONS[decision.reason];
 	if (reason === undefined) return;
 	safely(() => {
@@ -355,7 +355,7 @@ export function noteApiCheck(input: {
 }): void {
 	const { api, accountId } = input;
 	if (accountId === null) return;
-	if (!recording(api.bucketId)) return;
+	if (!recording(api.bucketId, 'api')) return;
 	const reason = API_REASONS[input.reason];
 	if (reason === undefined) return;
 	safely(() => {
@@ -389,7 +389,7 @@ export function noteAppUse(input: {
 	accountId: string;
 }): void {
 	const { app, accountId } = input;
-	if (!recording(app.bucketId)) return;
+	if (!recording(app.bucketId, 'app')) return;
 	safely(() => {
 		note(
 			rowOf({
@@ -416,7 +416,7 @@ export function noteApiUse(input: {
 	tool: string | null;
 }): void {
 	const { api, accountId } = input;
-	if (!recording(api.bucketId)) return;
+	if (!recording(api.bucketId, 'api')) return;
 	safely(() => {
 		const tool = recordedTool(api.tools, input.tool);
 		note(
