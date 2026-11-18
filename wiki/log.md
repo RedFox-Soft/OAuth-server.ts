@@ -438,3 +438,5 @@ Operations:
 ## [2026-11-18] update | [[person-activity]] — spec 137 follow-up: every administrator's sign-ins on one page (`POST /admin/api/admins/activity`, audited `admins.activity.read`, merged from per-account timelines without an index) and a Last sign-in column in Accounts from `signInSummary`, unaudited because it carries no address or country.
 
 ## [2026-11-18] create | [[new-sign-in-alerts]] — spec 138: an email about a sign-in from a new network or browser, decided in the activity flush and marked `alerted` on the row; This wasn't me at `/account/not-me` (spec 126's link store, purpose `notme`); updates in [[person-activity]] and [[totp-second-factor]].
+
+## [2026-11-18] update | [[api-sign-in-requirement]] — a fresh sign-in before one tool (4d-C) postponed by the owner until an MCP client sends `Mcp-Name`; none known does; the design notes from the live run kept on the page.

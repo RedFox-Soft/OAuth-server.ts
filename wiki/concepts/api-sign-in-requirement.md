@@ -4,7 +4,7 @@ title: "An API's sign-in requirement: a code, or a recent sign-in"
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-12
-updated: 2026-11-17
+updated: 2026-11-18
 ---
 
 # An API's sign-in requirement: a code, or a recent sign-in
@@ -104,6 +104,17 @@ throws building a header with a value outside Latin-1 (that was a `500`), and a 
 
 ## Not here (later specs)
 
-A fresh sign-in before one tool (it needs a server-side mark so a refresh fails only for
-that tool); verifying a provider's own `auth_time`. The API's own console page came with spec 132: the requirement is
+A fresh sign-in before one tool; verifying a provider's own `auth_time`.
+
+**A fresh sign-in before one tool is postponed** (owner, 2026-11-18) until some MCP client sends `Mcp-Name`, which
+MCP 2026-07-28 asks for. The check learns the tool only from that header, and no client known on 2026-11-18 sends it:
+Claude Code 2.1.220 speaks 2025-11-25, and the site's client table says No for Codex, VS Code, Cursor, Zed and Gemini
+CLI (claude.ai and ChatGPT unchecked). Such a requirement would therefore refuse every known client the whole API, as
+a tool's conditions already do. When it comes back, the live run changes the design: Claude Code answers this 401 by
+asking the person to authenticate again in `/mcp`, not by a refresh, so for it applying the strictest tool freshness
+at `/auth` is enough. A server-side mark that makes a refresh fail is needed only for clients that refresh on a 401.
+If one is built, it is bound to the sign-in that caused it (`auth_time`, and the grant for an opaque token), set only
+by a request carrying the project's proxy key, never read by the check, and cleared only by a sign-in that meets the
+requirement. A requirement the person cannot meet (a provider sign-in, or no authenticator when the project does not
+let people set one up) answers 403 and sets no mark, so the other tools keep working. The API's own console page came with spec 132: the requirement is
 set on its Access tab, beside the conditions it is judged with.
