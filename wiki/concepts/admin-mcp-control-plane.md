@@ -20,7 +20,7 @@ high-consequence, until spec 102 added the plan tools: 123 then, 41 of them high
 Later specs added reads and writes; after spec 116 added `keyring_status_get` (2026-10-29) the catalogue
 published 135 tools, 44 of them declared high-consequence; spec 117 added the eight connected-service tools
 (2026-11-02), two of them high (`connected_service_delete`, `connected_account_delete`): 143 tools, 46 high; spec 122 added the five `behind_proxy_app_*` tools (2026-11-05),
-create and delete high and update high when it sets `rules` or `address`: 148 tools, 48 high. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
+create and delete high and update high when it sets `rules` or `address`: 148 tools, 48 high. Spec 140 added the three passkey tools (2026-11-19): `project_user_passkey_list` and the two revocations, both high. That made 165 tools, 52 of them high. Before spec 099, `project_*` tools such as `project_create` and `project_bucket_assign`
 administered the old Project entity, now called a retired project; where this page names them it says so.
 
 An AI agent administers this instance over MCP at `POST /mcp`, as an OAuth 2.1 protected resource of

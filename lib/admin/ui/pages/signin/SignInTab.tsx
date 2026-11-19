@@ -527,6 +527,37 @@ export function SignInTab({
 									People can&apos;t add passkeys until email is set up.
 								</Typography.Text>
 							)}
+							{/*
+							 * Who holds a passkey that signs in at this address (specs/140), and, before anyone can, that
+							 * passkeys are tied to the instance's address for a project at its root or at a path.
+							 */}
+							{counts?.passkeyHolders !== undefined &&
+								(bucket.passkeyLogin ? (
+									<Typography.Text type="secondary">
+										{counts.passkeyHolders.toLocaleString()} of{' '}
+										{plural(counts.users, 'person has', 'people have')} a
+										passkey.
+									</Typography.Text>
+								) : counts.passkeyHolders > 0 ? (
+									<Typography.Text type="secondary">
+										{plural(
+											counts.passkeyHolders,
+											'person has passkeys',
+											'people have passkeys'
+										)}
+										, which don&apos;t work while passkeys are off.
+									</Typography.Text>
+								) : (bucket.addressForm === 'root' ||
+										bucket.addressForm === 'path' ||
+										bucket.addressForm === 'unaddressed') &&
+								  bucket.issuer ? (
+									<Typography.Text type="secondary">
+										Passkeys are tied to this project&apos;s address,{' '}
+										{new URL(bucket.issuer).hostname}. If you plan to give the
+										project an address of its own, do it before people create
+										passkeys.
+									</Typography.Text>
+								) : null)}
 						</Setting>
 					)}
 				</Flex>

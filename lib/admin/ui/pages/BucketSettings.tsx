@@ -266,12 +266,13 @@ function AddressCard({ bucket }: { bucket: BucketView }) {
 
 /* What the change affects, as the server listed it (data-model §6). */
 function AddressPreviewView({ preview }: { preview: AddressPreview }) {
+	const lost = preview.passkeys;
 	const none =
 		preview.applications.length +
 			preview.connections.length +
 			preview.providers.length +
 			preview.resources.length ===
-		0;
+			0 && lost === undefined;
 	return (
 		<Flex
 			vertical
@@ -363,6 +364,36 @@ function AddressPreviewView({ preview }: { preview: AddressPreview }) {
 						</div>
 					)}
 				</>
+			)}
+			{lost && (
+				<div>
+					<Typography.Text strong>Passkeys that stop working</Typography.Text>
+					<Flex
+						vertical
+						gap={4}
+					>
+						<Typography.Text>
+							{lost.passkeys} {lost.passkeys === 1 ? 'passkey' : 'passkeys'} of{' '}
+							{lost.people} {lost.people === 1 ? 'person' : 'people'}{' '}
+							{lost.passkeys === 1 ? 'is' : 'are'} tied to the current address
+							and {lost.passkeys === 1 ? 'stops' : 'stop'} working after the
+							move.
+						</Typography.Text>
+						{lost.withOtherWay > 0 && (
+							<Typography.Text type="secondary">
+								{lost.withOtherWay} of them can sign in another way and create a
+								new passkey afterwards.
+							</Typography.Text>
+						)}
+						{lost.withoutOtherWay > 0 && (
+							<Alert
+								type="error"
+								showIcon
+								title={`${String(lost.withoutOtherWay)} ${lost.withoutOtherWay === 1 ? 'has' : 'have'} no other way to sign in and cannot sign in after the move: ${lost.without.join(', ')}${lost.more > 0 ? `, and ${String(lost.more)} more` : ''}. Set a password for them, or tell them before you move.`}
+							/>
+						)}
+					</Flex>
+				</div>
 			)}
 			{preview.namespaceMove && (
 				<Typography.Text type="secondary">

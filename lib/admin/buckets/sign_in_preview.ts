@@ -6,11 +6,12 @@ import {
 import type {
 	EndUserTally,
 	PasswordGuessingSetting,
-	User,
 	UserBucket
 } from '../../adapters/types.js';
 import { countsFor } from '../../attacker_list/counters.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
+import { rpIdFor } from '../../passkeys/relying_party.js';
+import { otherWayIn, usersOf } from '../../passkeys/ways_in.js';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from '../consts.js';
 import {
 	loadReachabilityState,
@@ -213,26 +214,25 @@ export async function signInPreview(
 }
 
 /*
- * The people of the bucket who hold a passkey and would have no other way in: no password the bucket still accepts,
- * and no link to a provider it offers (data-model "last way in"). Read person by person from the holders, who are
- * few next to the bucket's people.
+ * The people of the bucket who hold a passkey that signs in here and would have no other way in, with passwords as the
+ * change leaves them (lib/passkeys/ways_in.ts). Only passkeys of the current site and not refused as copied count:
+ * someone holding nothing else was locked out already (specs/140 research R6).
  */
 async function passkeyOnlyPeople(
 	bucket: UserBucket,
 	passwordsAfter: boolean
 ): Promise<number> {
-	const enabled = new Set(
-		bucket.federation
-			.filter((provider) => provider.enabled)
-			.map((provider) => provider.id)
+	const holders = await getPasskeyStore().holdingIn(
+		bucket._id,
+		rpIdFor(bucket)
 	);
-	const users = getUserStore(bucket._id);
-	const holders = await getPasskeyStore().holdersIn(bucket._id);
-	const people = await Promise.all(holders.map((id) => users.find(id)));
-	const otherWay = (user: User) =>
-		(passwordsAfter && user.passwordSet !== false) ||
-		(user.federated ?? []).some((link) => enabled.has(link.providerId));
-	return people.filter((user) => user !== null && !otherWay(user)).length;
+	const people = await usersOf(
+		bucket._id,
+		holders.map((holder) => holder.accountId)
+	);
+	return people.filter(
+		(user) => !otherWayIn(bucket, user, { passwordsOpen: passwordsAfter })
+	).length;
 }
 
 /* The confirmation is of the counts previewed: every one of them, as fresh, and nothing else compared. */

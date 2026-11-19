@@ -97,7 +97,10 @@ export const ChangeBucketAddressBody = t.Object({
 			applications: PreviewCount,
 			connections: PreviewCount,
 			providers: PreviewCount,
-			resources: PreviewCount
+			resources: PreviewCount,
+			/* Present when the preview said passkeys stop working (specs/140). */
+			passkeyPeople: t.Optional(PreviewCount),
+			passkeyOnly: t.Optional(PreviewCount)
 		})
 	)
 });

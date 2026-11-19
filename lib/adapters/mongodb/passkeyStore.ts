@@ -147,18 +147,22 @@ export class PasskeyStore implements PasskeyStoreInstance {
 	}
 
 	/* A `$group`, not `distinct`: `distinct` is outside Stable API version 1, which this server's client runs under strictly. */
-	async holdersIn(bucketId: string): Promise<string[]> {
+	async holdingIn(
+		bucketId: string,
+		rpId: string
+	): Promise<{ accountId: string; passkeys: number }[]> {
+		// `copiedAt: null` matches a field that is absent as well as one that is null.
 		const groups = await this.collection
-			.aggregate<{ _id: unknown }>([
-				{ $match: { bucketId } },
-				{ $group: { _id: '$accountId' } }
+			.aggregate<{ _id: unknown; passkeys: unknown }>([
+				{ $match: { bucketId, rpId, copiedAt: null } },
+				{ $group: { _id: '$accountId', passkeys: { $sum: 1 } } }
 			])
 			.toArray();
-		return groups
-			.map((group) => group._id)
-			.filter(
-				(accountId): accountId is string => typeof accountId === 'string'
-			);
+		return groups.flatMap((group) =>
+			typeof group._id === 'string' && typeof group.passkeys === 'number'
+				? [{ accountId: group._id, passkeys: group.passkeys }]
+				: []
+		);
 	}
 
 	private recordOf(found: unknown): Passkey | null {

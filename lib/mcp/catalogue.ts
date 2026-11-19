@@ -434,7 +434,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Count what a project holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its groups of end users (`groups`); its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no project's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); `applications` and `apis` count the applications and declared APIs it holds; on the default project a sign-in change's preview also counts the applications signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. `plan`, while plans are enforced (to a super administrator always), is the project's plan: its `limits`, `features`, `usage`, `warnings` (`near` at 80% of a limit, `reached` at 100%) and `signUpsPaused` (new self-service accounts paused at the monthly-active-user cap; sign-ins never are); null for a System project, which has none. Readable by anyone who may read the project (project_get's `can.read`)."
+			"Count what a project holds, computed when asked: its accounts (`users`), how many are unverified, without an authenticator and without any linked upstream identity; its groups of end users (`groups`); its provisioning connections and how many are holding a deprovisioning (`held`); its identity providers (`providers.enabled`, and `providers.creating` — enabled ones that create accounts on first sign-in); whether mail delivery is configured; and whether federation is switched on for the instance (`federationEnabled` — when false no project's sign-in page shows a provider button). `withoutEnabledLink` counts accounts with no link to an enabled identity provider (who could not sign in were passwords turned off) and `passwordWithoutAuthenticator` accounts with no authenticator whose password is not known to be absent (who an authenticator requirement would ask to enrol); `applications` and `apis` count the applications and declared APIs it holds; on the default project a sign-in change's preview also counts the applications signing in there. `activeThisMonth` is present only to a caller with `can.readActivity`, and absent rather than zero before counting began. Counts only, never who. `plan`, while plans are enforced (to a super administrator always), is the project's plan: its `limits`, `features`, `usage`, `warnings` (`near` at 80% of a limit, `reached` at 100%) and `signUpsPaused` (new self-service accounts paused at the monthly-active-user cap; sign-ins never are); null for a System project, which has none. Readable by anyone who may read the project (project_get's `can.read`). `passkeyHolders` counts the people holding a passkey that signs in at the project's address (absent for the administrators' project)."
 	},
 	{
 		tool: 'project_activity_get',
@@ -499,7 +499,20 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id', 'uid'],
 		summary:
-			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists. `totpEnrolledVia` says how their authenticator app was set up (`self` on their own page, `sign-in` when the project required one), and `totpProofRequired` that an administrator removed it, so the next one needs a link emailed to them. `activity` summarises their activity: `lastSignIn` (when, to which application, how), `notLetInSince` (only when a sign-in or a check turned them away after it: when, how many times, why), `lastActive` (the last day, or month, they signed in, renewed a token or were let in at the proxy) and `recordingBegan`; no address, country or device, which project_user_activity_list gives."
+			"One end-user of a project, as a row of project_user_list, and — when they are locked — who locked them: `lockedLocally.byEmail` is that administrator's email, or null when their account no longer exists. `totpEnrolledVia` says how their authenticator app was set up (`self` on their own page, `sign-in` when the project required one), and `totpProofRequired` that an administrator removed it, so the next one needs a link emailed to them. `activity` summarises their activity: `lastSignIn` (when, to which application, how), `notLetInSince` (only when a sign-in or a check turned them away after it: when, how many times, why), `lastActive` (the last day, or month, they signed in, renewed a token or were let in at the proxy) and `recordingBegan`; no address, country or device, which project_user_activity_list gives. Their passkeys are listed by project_user_passkey_list; a person with no password may sign in with one."
+	},
+	{
+		tool: 'project_user_passkey_list',
+		method: 'GET',
+		path: '/admin/api/projects/:id/users/:uid/passkeys',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'The passkeys an end-user holds in a project, oldest first: `id`, `name` (absent if they never named it), `createdOn` (browser and system), `synced`, `createdAt`, `createdVia` (`passkey` after a passkey sign-in, `password_code` after a password and a code, `password_mail` after a password and an emailed link), `lastUsedAt` and `state`. A `state` of `works` signs in; `off` means the project does not accept passkeys now; `old_address` means it was made for an earlier address of the project and never works again; `copied` means it was refused for looking copied. `ways` says whether they also have a password the project accepts and which identity providers they are linked to, and `restore` how someone left with no way in gets back (`self`: Forgot your password?; `admin`: an administrator sets a password; `none`). `mailable` says whether they can be emailed. Nothing secret about a passkey is returned.'
 	},
 	{
 		tool: 'project_user_session_list',
@@ -1494,7 +1507,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Move a project to a different address: a path segment (`slug`), a subdomain of this instance (`slug` with `addressForm: 'subdomain'`) or a hostname of its own (`host`), never two. Moving between path and subdomain keeps the slug. Called without `confirm`, it changes nothing and answers with a preview naming what the change reaches — `applications`, `connections`, `providers` (each with the `newCallback` its upstream registration needs) and `resources` — the issuers `from` and `to`, and `expect`, their counts. Called with `confirm: true` and that `expect`, it performs the move: the project's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. If what it reaches changed since the preview, it is refused with 409 and the fresh preview. A super administrator may change any project's address; an owner of its team may change a path or subdomain address while no application, identity provider or provisioning connection depends on it, into a form listed in `can.addressForms`; only a super administrator may give it a hostname; a project served at the root cannot be moved at all — project_get states it as `can.changeAddress`, with `blockers.dependents` as the reason."
+			"Move a project to a different address: a path segment (`slug`), a subdomain of this instance (`slug` with `addressForm: 'subdomain'`) or a hostname of its own (`host`), never two. Moving between path and subdomain keeps the slug. Called without `confirm`, it changes nothing and answers with a preview naming what the change reaches — `applications`, `connections`, `providers` (each with the `newCallback` its upstream registration needs) and `resources` — the issuers `from` and `to`, and `expect`, their counts. Called with `confirm: true` and that `expect`, it performs the move: the project's issuer identifier becomes the new address, the previous address stops answering, and everyone signed in signs in again. If what it reaches changed since the preview, it is refused with 409 and the fresh preview. A super administrator may change any project's address; an owner of its team may change a path or subdomain address while no application, identity provider or provisioning connection depends on it, into a form listed in `can.addressForms`; only a super administrator may give it a hostname; a project served at the root cannot be moved at all — project_get states it as `can.changeAddress`, with `blockers.dependents` as the reason. When the new address changes where the project's passkeys work (between the instance's host, a subdomain and a hostname of its own), the preview's `passkeys` says how many passkeys of how many people stop working, how many of those people keep another way in, and names up to 20 of those who have none (`without`, `more`); `expect` then carries `passkeyPeople` and `passkeyOnly`. No passkey is deleted."
 	},
 	{
 		tool: 'project_owner_change',
@@ -1546,7 +1559,7 @@ const catalogue = [
 			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. A person who set up an authenticator app is asked for its code at every password sign-in whatever `totpRequired` says. `totpSelfService` (absent means true) lets people turn two-step verification on themselves, on their own account page after a link mailed to them; an agent cannot set up a code for anyone. It has no effect while password sign-in is off or mail is not configured (project_summary_get reports `twoStepSelfService`: on, off, no_password_login or no_mail), and it is refused on the administrators' project. `newSignInAlerts` emails an account, at a proven address, when it signs in from a network or a browser it has not used in 90 days, with where, how and which browser (never the address) and a link that signs it out everywhere; absent means false, and true on the administrators' project; it needs mail configured and people's activity recording on. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy. `passwordGuessing` sets what a password sign-in from an address on FoxTrust's list of addresses seen guessing passwords meets — `mode` nothing, count (the default) or refuse, and `exempt` networks never checked (each a single address or range, optionally `until` a date-time, at most 100). Choosing refuse previews like the tightenings above, with the last 7 days' numbers (`listedAttempts`, `listedRightPassword`) as `expect`, and is refused on the administrators' project. `passkeyLogin` (absent means false) lets people sign in with a passkey and add passkeys on their own account page; a passkey sign-in is two-step sign-in, so it meets every requirement of a code. It is refused when the instance is served at an IP address, warned about over plain http (project_get carries `passkeysNeedHttps`), and is refused on the administrators' project. Turning it off deletes no passkey; when someone could then no longer sign in, it previews like the other tightenings, with `passkeyOnly` as `expect`."
 	},
 
-	/* ----------------------------------------------- writes: end-users (10) */
+	/* ----------------------------------------------- writes: end-users (12) */
 	{
 		tool: 'project_user_create',
 		method: 'POST',
@@ -1666,6 +1679,38 @@ const catalogue = [
 		pathParams: ['id', 'uid'],
 		summary:
 			"Remove an end-user's authenticator app, for a lost device. It stops working at once and their sessions end; until they set up a new one their password alone signs them in, so anyone who knows it can too. They are emailed that it was removed, and a new one needs a link emailed to them: on their account page, or at their next sign-in where the project requires one. Their password, grants and tokens are untouched. Only the person can set up an authenticator; an agent cannot set one up for anyone."
+	},
+	{
+		tool: 'project_user_passkey_revoke',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/users/:uid/passkeys/:passkeyId',
+		action: 'enduser.passkey.revoke',
+		/*
+		 * High (specs/140 research R11), as removing an authenticator is: a passkey is a way in the person relies on, and
+		 * talking support into removing someone's credential is the classic way to take an account over. The gate makes
+		 * the agent describe that before it acts.
+		 */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid', 'passkeyId'],
+		summary:
+			'Revoke one passkey of an end-user, for a stolen or lost device; `passkeyId` is an `id` from project_user_passkey_list. It stops signing in at once, and they are signed out everywhere: every session, grant and token ends and relying parties registered for back-channel logout are told. Their password, authenticator app and other passkeys stay. They are emailed that the people who run the project removed it when their address is confirmed (`mailed`). Revoking their last way in is allowed: read project_user_passkey_list first, and say so when `ways` is empty and no other passkey `works`. Works on users a provisioning connection manages.'
+	},
+	{
+		tool: 'project_user_passkey_revoke_all',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/users/:uid/passkeys',
+		action: 'enduser.passkey.revoke.all',
+		/* High for the reason project_user_passkey_revoke is, and it takes every passkey at once. */
+		consequence: 'high',
+		superAdminOnly: false,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'uid'],
+		summary:
+			'Revoke every passkey of an end-user at once, for a password manager account that was taken over: they all stop signing in, and they are signed out everywhere as project_user_passkey_revoke signs them out. One email says how many were removed (`removed`, `mailed`). A person holding none is a 404 that changes nothing.'
 	},
 	{
 		tool: 'project_user_lock',

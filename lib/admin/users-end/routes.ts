@@ -3,6 +3,7 @@ import { uriPathParams } from 'lib/plugins/uri_path_params.js';
 import {
 	getActivityStore,
 	getBucketGroupStore,
+	getPasskeyStore,
 	getUserStore
 } from '../../adapters/index.js';
 import {
@@ -49,7 +50,9 @@ import {
 	markEndUserVerified,
 	removeEndUser,
 	resetEndUserPassword,
+	revokeAllPasskeys,
 	revokeEndUserAccess,
+	revokePasskey,
 	unlockEndUser,
 	updateEndUser,
 	type EndUserActor
@@ -61,6 +64,8 @@ import {
 	selfServiceState
 } from '../../totp/self_service.js';
 import { applicationSessions } from '../../end_users/sessions.js';
+import { notifyPasskey } from '../../passkeys/notify.js';
+import { passkeysOfPerson } from '../../passkeys/ways_in.js';
 import { activityPage, activitySummary } from '../../person_activity/read.js';
 import { recordActivityRead } from '../../person_activity/audit.js';
 import type { InviteOutcome } from '../../password_reset/challenge.js';
@@ -823,6 +828,94 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 				);
 			}
 			return { ok: true };
+		}
+	)
+	/*
+	 * A person's passkeys as the console's card and an agent see them (specs/140 contracts/admin-api.md): each with
+	 * whether it signs in here and why not, the person's other ways in, and how someone left with none gets back. An
+	 * explicit projection (lib/passkeys/ways_in.ts), so nothing secret about a passkey can leave. A read, unaudited.
+	 */
+	.get(
+		'/admin/api/projects/:id/users/:uid/passkeys',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await getUserStore(params.id).find(params.uid);
+			if (!user) throw new AdminError(404, 'user not found');
+			return passkeysOfPerson(
+				bucket,
+				user,
+				await getPasskeyStore().listOf(bucket._id, user._id)
+			);
+		}
+	)
+	/*
+	 * Revoke one passkey, for a stolen or lost device (lib/end_users/service.ts says what it removes and ends). The
+	 * person hears of it at a confirmed address, without the passkey's name; `mailed` says whether they did.
+	 */
+	.delete(
+		'/admin/api/projects/:id/users/:uid/passkeys/:passkeyId',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const { user, passkey, swept } = await asAdmin(
+				revokePasskey(bucket, params.uid, params.passkeyId, () =>
+					/*
+					 * What went, counted rather than named, as every deletion's entry records it: the passkey's id would
+					 * name a record that no longer exists.
+					 */
+					recordAdminAudit(ctx, 'enduser.passkey.revoke', params.uid, {
+						...scope(bucket),
+						cascade: { passkeys: 1 }
+					})
+				)
+			);
+			const mailed = await notifyPasskey(bucket, user, {
+				kind: 'revoked',
+				madeOn: passkey.createdOn,
+				createdAt: new Date(passkey.createdAt).getTime()
+			});
+			if (swept.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`the passkey was revoked, but their access survives in: ${swept.failedAreas.join(', ')}`,
+					{ failedAreas: swept.failedAreas }
+				);
+			}
+			return { removed: 1, mailed };
+		}
+	)
+	/* Every passkey of the person at once, for a password manager account that was taken over: one sign-out, one mail. */
+	.delete(
+		'/admin/api/projects/:id/users/:uid/passkeys',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const { user, removed, swept } = await asAdmin(
+				revokeAllPasskeys(bucket, params.uid, async (count) => {
+					await recordAdminAudit(
+						ctx,
+						'enduser.passkey.revoke.all',
+						params.uid,
+						{
+							...scope(bucket),
+							cascade: { passkeys: count }
+						}
+					);
+				})
+			);
+			const mailed = await notifyPasskey(bucket, user, {
+				kind: 'revoked_all',
+				count: removed
+			});
+			if (swept.failedAreas.length > 0) {
+				throw new AdminError(
+					500,
+					`the passkeys were revoked, but their access survives in: ${swept.failedAreas.join(', ')}`,
+					{ failedAreas: swept.failedAreas }
+				);
+			}
+			return { removed, mailed };
 		}
 	)
 	/*

@@ -81,7 +81,10 @@ export function passkeyLinkEmail(
 
 export type PasskeyNotice =
 	| { kind: 'added'; madeOn: MadeOn; at: number; disownUrl: string }
-	| { kind: 'removed'; madeOn: MadeOn; createdAt: number };
+	| { kind: 'removed'; madeOn: MadeOn; createdAt: number }
+	/* An administrator's revocation of one passkey, or of every one (specs/140): no link, and no name either. */
+	| { kind: 'revoked'; madeOn: MadeOn; createdAt: number }
+	| { kind: 'revoked_all'; count: number };
 
 export function passkeyNoticeEmail(
 	notice: PasskeyNotice,
@@ -89,14 +92,19 @@ export function passkeyNoticeEmail(
 	language: Language = 'en'
 ): RenderedEmail {
 	const t = EMAIL_TEXTS[language].passkeys;
-	const device = deviceWords(notice.madeOn, language);
+	const device =
+		notice.kind === 'revoked_all' ? null : deviceWords(notice.madeOn, language);
 	// Written in UTC whatever the reader's zone, as the account pages write times, and said so where a time is shown.
 	const values = {
 		...who,
-		date:
-			notice.kind === 'added'
-				? formatDateTime(language, notice.at)
-				: formatDate(language, notice.createdAt),
+		...(notice.kind === 'revoked_all'
+			? { count: String(notice.count) }
+			: {
+					date:
+						notice.kind === 'added'
+							? formatDateTime(language, notice.at)
+							: formatDate(language, notice.createdAt)
+				}),
 		...(device === null ? {} : { device })
 	};
 	const parts: string[] = [];
@@ -117,9 +125,19 @@ export function passkeyNoticeEmail(
 			bareLink(notice.disownUrl, language)
 		);
 		lines.push(notice.disownUrl);
-	} else {
+	} else if (notice.kind === 'removed') {
 		subject = t.removedSubject;
 		say(device === null ? t.removedIntroNoDevice : t.removedIntro);
+	} else {
+		if (notice.kind === 'revoked') {
+			subject = t.removedSubject;
+			say(device === null ? t.revokedIntroNoDevice : t.revokedIntro);
+		} else {
+			subject = t.revokedAllSubject;
+			say(t.revokedAllIntro);
+		}
+		say(t.signedOutEverywhere);
+		say(t.revokedTell);
 	}
 	return {
 		subject: text(subject, values),

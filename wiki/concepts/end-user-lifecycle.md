@@ -100,7 +100,10 @@ delete is refused with 409 naming the connection, before the audit write, so a r
 (`assertActorMayChange`, `service.ts`). A connection reaches only its own users; another connection's, or
 a local one, answers 404 to it. Clearing an authenticator stays allowed — it is account recovery, not a
 profile edit — and since 2026-11-10 it is a service operation too (`clearEndUserAuthenticator`), so an
-account that does not exist is refused before the audit write.
+account that does not exist is refused before the audit write. Revoking a person's passkeys (spec 140,
+`revokePasskey` / `revokeAllPasskeys`) is allowed on the same ground: a passkey is a credential of this server that no
+connection sends. Unlike clearing an authenticator, a revocation signs the person out everywhere through
+`revokeAccountAccess`, since whoever holds the passkey may be signed in with it ([[passkeys]]).
 
 **Why `provisionedBy` and not `managedBy`.** `managedBy` is the name of a retired ownership field (the
 manager list that team ownership replaced). A new field with the old name would have read as that field

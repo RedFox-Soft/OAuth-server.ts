@@ -215,11 +215,35 @@ check(
 	left.length === 1 && left[0]?._id === early._id && sinceRemoved > 0,
 	`${String(sinceRemoved)} removed, ${String(left.length)} left`
 );
-check(
-	'holders lists each person once',
-	JSON.stringify((await store.holdersIn(bucketId)).sort()) ===
-		JSON.stringify(['anna', 'bob'])
-);
+{
+	/*
+	 * Holders at one RP ID (specs/140 research R6): Anna's two count once with 2, a copied passkey and one made for
+	 * another RP ID count for nobody.
+	 */
+	const holding = `verify-passkeys-holding-${String(stamp)}`;
+	await store.create(passkey({ bucketId: holding }));
+	await store.create(passkey({ bucketId: holding }));
+	await store.create(passkey({ bucketId: holding, accountId: 'bob' }));
+	const copied = passkey({ bucketId: holding, accountId: 'carol' });
+	await store.create(copied);
+	await store.markCopied(holding, copied._id, at(10));
+	await store.create(
+		passkey({
+			bucketId: holding,
+			accountId: 'dave',
+			rpId: 'other.example.test'
+		})
+	);
+	const held = (await store.holdingIn(holding, 'auth.example.test'))
+		.map((row) => `${row.accountId}:${String(row.passkeys)}`)
+		.sort();
+	check(
+		'holders at one RP ID count each person once, without copied passkeys or another RP ID',
+		JSON.stringify(held) === JSON.stringify(['anna:2', 'bob:1']),
+		held.join(', ')
+	);
+	await store.removeAllIn(holding);
+}
 check(
 	'removing a person’s passkeys leaves everyone else’s',
 	(await store.removeAllOf(bucketId, 'anna')) === 1 &&

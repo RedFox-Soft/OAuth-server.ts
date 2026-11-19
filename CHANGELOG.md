@@ -17,8 +17,12 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   remove up to 20 passkeys on their account page, now named **Sign-in and security**; each new passkey is mailed with
   a "This wasn't me" link. A passkey works only at the host it was made for. **Changed:** a passkey sign-in reports
   the multi-factor `acr` and `amr` `pop user mfa`, so every requirement of a code (an app's, an API's, a proxy
-  condition's) now accepts it, and the console and the agent's tools call them "two-step sign-in". **Upgrade note:**
-  run `db:setup` (or `db:setup:pg`) for the three new storage areas, then `db:migrate` (one fence migration).
+  condition's) now accepts it, and the console and the agent's tools call them "two-step sign-in". Operators see a
+  person's passkeys on their page and revoke one or all of them, which signs the person out everywhere and mails them
+  (spec 140; agents get `project_user_passkey_list`, `_revoke` and `_revoke_all`). The Sign-in tab counts who has a
+  passkey, and an address change that breaks passkeys says beforehand how many people lose them and who has no other
+  way in. **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the three new storage areas, then `db:migrate` (one
+  fence migration).
 
 ### Fixed
 

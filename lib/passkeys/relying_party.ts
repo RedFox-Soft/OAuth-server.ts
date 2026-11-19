@@ -23,10 +23,18 @@ export function relyingPartyOf(
 ): RelyingParty {
 	const issuer = new URL(issuerFor(bucket));
 	return {
-		rpId: issuer.hostname,
+		rpId: rpIdFor(bucket),
 		origin: issuer.origin,
 		name: shownNameOf(bucket)
 	};
+}
+
+/*
+ * The RP ID a project's passkeys have at this address, or would have at another: an address change previews it for
+ * the address it is about to take (specs/140 research R7), so it takes any shape the issuer is derived from.
+ */
+export function rpIdFor(bucket: RequestBucket): string {
+	return new URL(issuerFor(bucket)).hostname;
 }
 
 function hostOf(issuer: string): string {

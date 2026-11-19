@@ -2,7 +2,51 @@ import { useMemo } from 'react';
 import { request } from '../../frame/request.js';
 import { useFeedback } from '../../frame/feedback.js';
 import { useConfirm } from '../../frame/confirm.js';
-import { usersApi, type EndUser } from './endUser.js';
+import {
+	usersApi,
+	type EndUser,
+	type PasskeysOfPerson,
+	type PasskeyView
+} from './endUser.js';
+
+/*
+ * What a revocation leaves the person (specs/140 contracts/console-and-mail.md), from the server's own rule
+ * (lib/passkeys/ways_in.ts): their password and providers, and the passkeys that still sign in and are not being
+ * revoked; or, when nothing is left, how they get back in.
+ */
+function remainingLines(
+	of: PasskeysOfPerson,
+	revoked: readonly PasskeyView[]
+): string[] {
+	const others = of.passkeys.filter(
+		(passkey) =>
+			passkey.state === 'works' &&
+			!revoked.some((gone) => gone.id === passkey.id)
+	).length;
+	const ways = [
+		...(of.ways.password ? ['a password'] : []),
+		...of.ways.providers,
+		...(others === 0
+			? []
+			: [others === 1 ? 'another passkey' : `${String(others)} other passkeys`])
+	];
+	if (ways.length > 0)
+		return [`They can still sign in with: ${ways.join(', ')}.`];
+	return [
+		'They will have no way to sign in.',
+		of.restore === 'self'
+			? 'They can choose a password with “Forgot your password?” on the sign-in page.'
+			: of.restore === 'admin'
+				? 'You can set a password for them on this page.'
+				: 'Nobody can restore their access until a way to sign in is added for them.'
+	];
+}
+
+function mailLine(of: PasskeysOfPerson, all: boolean): string {
+	return of.mailable
+		? `We email them that ${all ? 'they were' : 'it was'} removed.`
+		: "They have no confirmed address, so we can't email them.";
+}
 
 /*
  * The acts on one person that ask a question and send one request, shared by the users table's row menu
@@ -29,6 +73,28 @@ export function useUserActions(bucketId: string) {
 				feedback.failed(result);
 				return false;
 			}
+			return true;
+		}
+
+		/* A revocation's answer says whether the person was mailed; a mail that should have gone and did not is said. */
+		async function revoked(
+			user: EndUser,
+			path: string,
+			of: PasskeysOfPerson
+		): Promise<boolean> {
+			const result = await request<{ removed: number; mailed: boolean }>(
+				'DELETE',
+				`${usersApi(bucketId, user._id)}${path}`
+			);
+			if (!result.ok) {
+				feedback.failed(result);
+				return false;
+			}
+			feedback.done(
+				of.mailable && !result.data.mailed
+					? 'Revoked. The email to them could not be sent.'
+					: 'Revoked.'
+			);
 			return true;
 		}
 
@@ -76,6 +142,39 @@ export function useUserActions(bucketId: string) {
 				if (!agreed || !(await send('DELETE', user, '/totp'))) return false;
 				feedback.done(`Authenticator app of ${user.email} removed.`);
 				return true;
+			},
+
+			/* One passkey, for a stolen or lost device; answers whether it was revoked. */
+			async revokePasskey(
+				user: EndUser,
+				passkey: PasskeyView,
+				of: PasskeysOfPerson
+			) {
+				const agreed = await confirm('user.passkey.revoke', {
+					target: user.email,
+					consequences: [
+						'This passkey stops working immediately, and they are signed out everywhere.',
+						...remainingLines(of, [passkey]),
+						mailLine(of, false)
+					]
+				});
+				if (!agreed) return false;
+				return revoked(user, `/passkeys/${encodeURIComponent(passkey.id)}`, of);
+			},
+
+			/* Every passkey of the person, for a password manager account that was taken over. */
+			async revokeAllPasskeys(user: EndUser, of: PasskeysOfPerson) {
+				const count = of.passkeys.length;
+				const agreed = await confirm('user.passkey.revokeAll', {
+					target: `Revoke all ${String(count)} passkeys of ${user.email}?`,
+					consequences: [
+						'They all stop working immediately, and they are signed out everywhere.',
+						...remainingLines(of, of.passkeys),
+						mailLine(of, true)
+					]
+				});
+				if (!agreed) return false;
+				return revoked(user, '/passkeys', of);
 			},
 
 			async deactivate(user: EndUser) {

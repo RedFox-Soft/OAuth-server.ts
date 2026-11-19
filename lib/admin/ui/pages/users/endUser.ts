@@ -65,6 +65,28 @@ export interface ActivitySummaryView {
 	}[];
 }
 
+/*
+ * A person's passkeys as GET …/users/:uid/passkeys answers (specs/140, lib/passkeys/ways_in.ts): each with why it does
+ * or does not sign in, the person's other ways in, and how someone left with none gets back.
+ */
+export interface PasskeyView {
+	id: string;
+	name?: string;
+	createdOn: { browser: string; system: string };
+	synced: boolean;
+	createdAt: string;
+	createdVia: 'passkey' | 'password_code' | 'password_mail';
+	lastUsedAt?: string;
+	state: 'works' | 'off' | 'old_address' | 'copied';
+}
+
+export interface PasskeysOfPerson {
+	passkeys: PasskeyView[];
+	ways: { password: boolean; providers: string[] };
+	restore: 'self' | 'admin' | 'none';
+	mailable: boolean;
+}
+
 /* One page of the users list (GET /admin/api/projects/:id/users). */
 export interface EndUserPage {
 	users: EndUser[];

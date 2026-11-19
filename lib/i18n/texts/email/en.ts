@@ -165,6 +165,19 @@ export const en = {
 		removedIntro:
 			'A passkey created on {date} on {device} no longer signs you in to {service}.',
 		removedIntroNoDevice:
-			'A passkey created on {date} no longer signs you in to {service}.'
+			'A passkey created on {date} no longer signs you in to {service}.',
+		/*
+		 * An administrator's revocation (specs/140): who did it, as the two-step removal says it, and what it did. No link:
+		 * the person answers the people who run the project, not a page.
+		 */
+		revokedIntro:
+			'The people who run {service} removed a passkey from your account, {email}. It was created on {date} on {device}.',
+		revokedIntroNoDevice:
+			'The people who run {service} removed a passkey from your account, {email}. It was created on {date}.',
+		revokedAllSubject: 'Your passkeys were removed from your {service} account',
+		revokedAllIntro:
+			'The people who run {service} removed every passkey from your account, {email} ({count} in all).',
+		signedOutEverywhere: 'You were signed out everywhere.',
+		revokedTell: 'If you did not ask for this, tell them.'
 	}
 } as const;

@@ -10,14 +10,15 @@ import {
  * Tells the person about a passkey added to or removed from their account (specs/139 contracts/mails.md), at a
  * confirmed address only: the message names the account's security state, and an address nobody proved may be
  * someone else's. A notice that cannot be sent never fails what it reports — the passkey is added or removed either
- * way — and is logged without the address, which a mail server's error often repeats.
+ * way — and is logged without the address, which a mail server's error often repeats. Answers whether it was sent,
+ * which an administrator's revocation reports (specs/140).
  */
 export async function notifyPasskey(
 	bucket: UserBucket,
 	user: User,
 	notice: PasskeyNotice
-): Promise<void> {
-	if (!user.verified || !user.email) return;
+): Promise<boolean> {
+	if (!user.verified || !user.email) return false;
 	try {
 		await deliver({
 			to: user.email,
@@ -27,12 +28,14 @@ export async function notifyPasskey(
 				emailLanguage(user)
 			)
 		});
+		return true;
 	} catch (error) {
 		console.error('passkeys: a notice could not be sent', {
 			accountId: user._id,
 			kind: notice.kind,
 			...failureOf(error)
 		});
+		return false;
 	}
 }
 

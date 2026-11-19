@@ -423,6 +423,22 @@ const routes = [
 		targetType: 'EndUser'
 	},
 	/*
+	 * An administrator revokes one of a person's passkeys, or every one (specs/140); either signs the person out
+	 * everywhere. The entry counts the passkeys, never names them.
+	 */
+	{
+		action: 'enduser.passkey.revoke',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/users/:uid/passkeys/:passkeyId',
+		targetType: 'EndUser'
+	},
+	{
+		action: 'enduser.passkey.revoke.all',
+		method: 'DELETE',
+		path: '/admin/api/projects/:id/users/:uid/passkeys',
+		targetType: 'EndUser'
+	},
+	/*
 	 * A link for the person to choose their own password (specs/089). Its link never reaches the trail, and its
 	 * acceptance is the person's act, recorded nowhere, as a password reset's is.
 	 */
@@ -948,8 +964,9 @@ const nonRouteActions = [
 	{ action: 'enduser.totp.remove', targetType: 'EndUser' },
 	{ action: 'enduser.totp.disown', targetType: 'EndUser' },
 	/*
-	 * A person's own passkeys (specs/139), from the account page or the "This wasn't me" link; no admin route does these
-	 * in this release. Renaming one is not audited: it is the person's own label.
+	 * A person's own passkeys (specs/139), from the account page or the "This wasn't me" link; no admin route does these.
+	 * An administrator's revocation is `enduser.passkey.revoke` or `.revoke.all`. Renaming one is not audited: it is the
+	 * person's own label.
 	 */
 	{ action: 'enduser.passkey.add', targetType: 'EndUser' },
 	{ action: 'enduser.passkey.remove', targetType: 'EndUser' },

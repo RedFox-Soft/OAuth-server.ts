@@ -105,6 +105,11 @@ export interface BucketSummary {
 	codeRequiredApps?: { id: string; name: string }[];
 	/* The apps behind the proxy with paths that ask for a code (specs/128). Absent from a server that predates it. */
 	codeRequiredPaths?: { appId: string; name: string; paths: string[] }[];
+	/*
+	 * People holding a passkey that signs in at the project's address (specs/140). Absent for the administrators'
+	 * project and from a server that predates it.
+	 */
+	passkeyHolders?: number;
 	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
 	federationEnabled: boolean;
 	/*
@@ -123,12 +128,23 @@ export interface AddressPreview {
 	providers: { id: string; displayName: string; newCallback: string }[];
 	connectedServices: { id: string; displayName: string; newCallback: string }[];
 	resources: { identifier: string; name: string }[];
+	/* The passkeys the move stops, when it gives them another site (specs/140). */
+	passkeys?: {
+		passkeys: number;
+		people: number;
+		withOtherWay: number;
+		withoutOtherWay: number;
+		without: string[];
+		more: number;
+	};
 	namespaceMove: boolean;
 	expect: {
 		applications: number;
 		connections: number;
 		providers: number;
 		resources: number;
+		passkeyPeople?: number;
+		passkeyOnly?: number;
 	};
 	consequence: string;
 }

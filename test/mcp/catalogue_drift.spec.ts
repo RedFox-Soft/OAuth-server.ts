@@ -234,6 +234,9 @@ describe('MCP tool catalogue', () => {
 			'project_user_delete',
 			/* Hands the account's recovery to whoever holds the new mailbox. */
 			'project_user_email_change',
+			/* Takes away a way in the person relies on, and signs them out everywhere (specs/140). */
+			'project_user_passkey_revoke',
+			'project_user_passkey_revoke_all',
 			'project_user_password_reset',
 			/* Takes away a second factor the person relies on: the help-desk route around one (specs/126). */
 			'project_user_totp_clear',

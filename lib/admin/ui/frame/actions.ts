@@ -173,6 +173,17 @@ export const ACTIONS = {
 		title: (t) => `Remove the authenticator app of ${t}?`,
 		okText: 'Remove authenticator app'
 	},
+	// A passkey someone else may hold (specs/140): it signs the person out everywhere, so it is a danger question.
+	'user.passkey.revoke': {
+		class: 'C2',
+		title: () => 'Revoke this passkey?',
+		okText: 'Revoke'
+	},
+	'user.passkey.revokeAll': {
+		class: 'C2',
+		title: (t) => t,
+		okText: 'Revoke all'
+	},
 	'user.delete': {
 		class: 'C2',
 		title: (t) => `Delete user ${t}?`,

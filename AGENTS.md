@@ -212,12 +212,14 @@ Each rule is the part that is easy to break. Read the named page before changing
   → `admin-audit-trail.md`
 - **End users** — change an end user only through `lib/end_users/service.ts`, never the user store
   from a route; whether a user may sign in is `canSignIn`, and anything that makes them unable to runs
-  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock and clearing an
-  authenticator. An address is recorded verified only when it was proven, whatever the project requires, because that
+  `revokeAccountAccess`. A provisioned user is read-only to administrators except the local lock, clearing an
+  authenticator and revoking passkeys. An address is recorded verified only when it was proven, whatever the project requires, because that
   is what `email_verified` says. A person's own authenticator is set up only after a fresh password sign-in and a
   mailed link bound to that browser, changed only with a fresh code, and every change mails them; a held factor is
   asked for at every password sign-in, but the password throttle reads only the project's requirement. A passkey's RP ID
-  and origin come only from `relyingPartyOf(bucket)`, and its record is unowned, so deleting a person removes it by hand.
+  and origin come only from `relyingPartyOf(bucket)`, and its record is unowned, so deleting a person removes it by hand;
+  an administrator's revocation signs the person out everywhere, and whether someone has another way in is judged only
+  in `lib/passkeys/ways_in.ts`.
   → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion

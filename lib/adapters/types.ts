@@ -2847,8 +2847,15 @@ export interface PasskeyStoreInstance {
 		digest: string,
 		now: number
 	): Promise<boolean>;
-	/* The distinct people of the project holding at least one passkey: the turn-off preview's count (R21). */
-	holdersIn(bucketId: string): Promise<string[]>;
+	/*
+	 * The people of the project holding passkeys made for `rpId` and not marked copied, with how many each: the only
+	 * passkeys that can sign them in there. What the turn-off preview, the Sign-in tab's count and the address change
+	 * preview count (specs/140 research R6).
+	 */
+	holdingIn(
+		bucketId: string,
+		rpId: string
+	): Promise<{ accountId: string; passkeys: number }[]>;
 }
 
 export interface PasskeyStoreConstructor {

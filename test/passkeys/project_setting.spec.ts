@@ -261,6 +261,27 @@ describe('the project setting "Passkeys"', () => {
 		expect((await getBucketStore().find(id))?.passkeyLogin).toBe(true);
 	});
 
+	it('counts only passkeys that sign in here when showing who could no longer sign in', async () => {
+		const id = await plainProject();
+		await getBucketStore().update(id, { passkeyLogin: true });
+		await passkeyOnlyPerson(id);
+		for (const fields of [
+			{ rpId: 'old.example.test' },
+			{ copiedAt: new Date() }
+		]) {
+			const { accountId } = await person(id);
+			await getUserStore(id).update(accountId, { passwordSet: false });
+			await seedPasskey(id, accountId, fields);
+		}
+
+		const asked = await request('PATCH', `/admin/api/projects/${id}`, cookie, {
+			passkeyLogin: false
+		});
+
+		expect(asked.status).toBe(409);
+		expect(shaped(Preview, asked.body).expect).toEqual({ passkeyOnly: 1 });
+	});
+
 	it('turns off once confirmed with the counts it showed', async () => {
 		const id = await plainProject();
 		await getBucketStore().update(id, { passkeyLogin: true });

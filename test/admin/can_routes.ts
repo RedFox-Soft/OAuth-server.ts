@@ -199,6 +199,25 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		method: 'DELETE',
 		path: `${BUCKET}/users/:uid/totp`
 	},
+	/* A person's passkeys, read and revoked (specs/140): the people right, as the authenticator's removal is. */
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'GET',
+		path: `${BUCKET}/users/:uid/passkeys`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'DELETE',
+		path: `${BUCKET}/users/:uid/passkeys/:passkeyId`
+	},
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'DELETE',
+		path: `${BUCKET}/users/:uid/passkeys`
+	},
 	{
 		on: 'bucket',
 		flag: 'manageUsers',

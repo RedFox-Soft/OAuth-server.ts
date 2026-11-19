@@ -2047,6 +2047,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Turn on Passkeys in the Sign-in tab. People add their own on their Sign-in and security page, after a two-step sign-in or after their password and a link we email them, so a mail server is needed.',
 			'A passkey sign-in meets every app, API and path that asks for two-step sign-in, without a code.',
 			'A passkey works only at the host it was made at. If the project moves between a path, a subdomain and a hostname, or the server’s address changes, people add new ones.',
+			'On a person’s page you see their passkeys. After a lost or stolen device, revoke one or all of them: the person is signed out everywhere and gets an email.',
 			'Browsers offer passkeys only over HTTPS, or at localhost. Not on the administrators’ project.',
 			'Turning it off keeps people’s passkeys, and turning it on again makes them work. It is on every plan.'
 		],

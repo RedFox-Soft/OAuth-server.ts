@@ -33,8 +33,9 @@ graph:
 Since spec 139 (2026-11-19, uncommitted at the time of writing) a person signs in to a project with a passkey
 (WebAuthn), and adds, renames and removes their own on **Sign-in and security** (`/account/security`, the page that was
 "Two-step verification"). A project accepts passkeys only when an operator turns **Passkeys** on (`passkeyLogin`, off by
-default) and never on the administrators' project (`passkeysAccepted`, `lib/passkeys/accepted.ts:12`). Spec A2 (the
-operator's view and revocation, the agent's passkey tools) ships in the same release.
+default) and never on the administrators' project (`passkeysAccepted`, `lib/passkeys/accepted.ts:12`). Spec 140 (A2,
+same release) adds the operator's view and revocation, the agent's passkey tools, a holder count on the Sign-in tab and
+a passkey block in the address change preview: see "Operator and agent" below.
 
 ## One RP ID and one origin, both from the issuer
 
@@ -160,6 +161,50 @@ its own cannot be named by its address, so its link adds `&project=<id>`, accept
 confirmation; the POST (`fromThisOrigin`) spends the link (`spendNotMe`, conditional) and runs `disownPasskeys`
 (`lib/end_users/service.ts:583`): audit `enduser.passkey.disown`, remove that passkey **and every one added at or after
 it**, `revokeAccountAccess`, then a password-reset mail where the person has a password and the project offers reset.
+
+## Operator and agent (spec 140)
+
+- **One rule for "another way in"** lives in `lib/passkeys/ways_in.ts`: a password while the project's password door is
+  open, or a link to a provider the project has enabled (`otherWayIn`, `:62`). A passkey counts only in state `works`
+  (`passkeyState`, `:20`: `copied`, then `old_address`, then `off`, judged in that order). The person's own removal
+  (`isLastWayIn`), the turn-off preview (`passkeyOnlyPeople`, `lib/admin/buckets/sign_in_preview.ts:221`), the address
+  change preview and the console's revocation dialog all read it. Before spec 140 the turn-off preview counted a passkey
+  of an old address, or a copied one, as a way in.
+- **Counting holders** is one store read, `holdingIn(bucketId, rpId)` (`lib/adapters/types.ts:2855`): the people
+  holding passkeys of that RP ID and not marked copied, with how many each. It replaced `holdersIn`, which ignored both.
+  People are then read a hundred at a time (`usersOf`, `ways_in.ts:34`), never all at once.
+- **The console's view** is `GET /admin/api/projects/:id/users/:uid/passkeys` (`lib/admin/users-end/routes.ts:839`): an
+  explicit projection (`passkeyView`, `ways_in.ts:92`) that never carries the credential id, public key, counter,
+  transports, AAGUID, RP ID or `notMe`, plus `ways`, `restore` (`self`, `admin` or `none`: how someone left with no way
+  in gets back) and `mailable` (`passkeysOfPerson`, `:125`). Not audited, like every read of a person.
+- **Revocation**: `DELETE …/passkeys/:passkeyId` and `DELETE …/passkeys` (`:857`, `:890`), through `revokePasskey` and
+  `revokeAllPasskeys` (`lib/end_users/service.ts:613`, `:636`).
+  - The steps: check that the person exists and the passkey is theirs, write the audit entry, remove, then
+    `revokeAccountAccess`. That ends sessions, grants and tokens, which is wider than clearing an authenticator: the
+    operator revokes because someone else may be signed in with it.
+  - A passkey already gone is a 404 that signs nobody out. The losing side of a race may leave an audit entry, as every
+    audit-first act can.
+  - The entry (`enduser.passkey.revoke`, `enduser.passkey.revoke.all`) counts what went (`cascade: { passkeys: N }`)
+    and never names a passkey.
+  - The mail (`revoked`, `revoked_all` in `lib/mail/templates/passkeys.ts`) says the people who run the project
+    removed it. It carries no link and no name. `notifyPasskey` now answers whether it sent, which the route returns
+    as `mailed`.
+  - Revoking the last way in is allowed, with the console's dialog saying so first. It is allowed on a provisioned
+    person, as clearing an authenticator is.
+- **Agent tools**: `project_user_passkey_list` (read), `project_user_passkey_revoke` and
+  `project_user_passkey_revoke_all` (both `high`, gated) (`lib/mcp/catalogue.ts:505`, `:1684`, `:1702`).
+- **Address change**: `addressChangePreview` compares `rpIdFor(bucket)` with `rpIdFor(target)`
+  (`lib/passkeys/relying_party.ts:36`; `lib/admin/buckets/routes.ts:532`).
+  - When they differ and someone holds a passkey of the current RP ID, the preview gains `passkeys` (`passkeysLostByMove`,
+    `ways_in.ts:175`): counts, the people with and without another way in after the move, and the first 20 addresses of
+    those without.
+  - It counts whether or not the project accepts passkeys now: a move ends them for good.
+  - `expect` gains `passkeyPeople` and `passkeyOnly`, and `sameCounts` compares them with absent read as 0 (`:576`).
+  - The move deletes no passkey; the old ones list as `old_address`.
+  - Root to path and path to path keep the RP ID, so they say nothing about passkeys.
+- **Sign-in tab**: the summary's `passkeyHolders` (`routes.ts:1247`; absent for the administrators' project) drives "N
+  of M people have a passkey", "N people have passkeys, which don't work while passkeys are off", or, before anyone
+  holds one at the root or a path, the advice to give the project its own address first.
 
 ## Storage: an unowned area, removed by hand
 

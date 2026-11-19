@@ -144,6 +144,15 @@ export const ru: EmailTexts = {
 		removedIntro:
 			'Ключ доступа, созданный {date} (устройство: {device}), больше не открывает вход в {service}.',
 		removedIntroNoDevice:
-			'Ключ доступа, созданный {date}, больше не открывает вход в {service}.'
+			'Ключ доступа, созданный {date}, больше не открывает вход в {service}.',
+		revokedIntro:
+			'Те, кто обслуживает {service}, удалили ключ доступа из аккаунта {email}. Ключ был создан {date}. Устройство: {device}.',
+		revokedIntroNoDevice:
+			'Те, кто обслуживает {service}, удалили ключ доступа из аккаунта {email}. Ключ был создан {date}.',
+		revokedAllSubject: 'Из аккаунта {service} удалены ключи доступа',
+		revokedAllIntro:
+			'Те, кто обслуживает {service}, удалили все ключи доступа из аккаунта {email}. Всего ключей: {count}.',
+		signedOutEverywhere: 'Вы вышли из аккаунта на всех устройствах.',
+		revokedTell: 'Если вы об этом не просили, сообщите им.'
 	}
 };

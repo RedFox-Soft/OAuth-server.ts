@@ -7,6 +7,7 @@ import {
 	getGroupStore,
 	getProtectedResourceStore,
 	getBehindProxyAppStore,
+	getPasskeyStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from '../../adapters/index.js';
@@ -58,6 +59,11 @@ import {
 } from '../resources/move.js';
 import { loadBucketForSettings, loadBucketForEdit } from './access.js';
 import { visibleBuckets } from './visible.js';
+import { rpIdFor } from '../../passkeys/relying_party.js';
+import {
+	passkeysLostByMove,
+	type PasskeysLostByMove
+} from '../../passkeys/ways_in.js';
 import { assertAdminBucketChange } from './admin_bucket.js';
 import { sameExpect, signInCounts, signInPreview } from './sign_in_preview.js';
 import {
@@ -452,6 +458,9 @@ interface AddressChangeCounts {
 	connections: number;
 	providers: number;
 	resources: number;
+	/* Only when passkeys stop working (specs/140): their holders, and those of them left with no other way in. */
+	passkeyPeople?: number;
+	passkeyOnly?: number;
 }
 
 interface AddressChangePreview {
@@ -463,6 +472,8 @@ interface AddressChangePreview {
 	/* Named, not counted in `expect`: no account stops working at once, only the next connect does (specs/117). */
 	connectedServices: { id: string; displayName: string; newCallback: string }[];
 	resources: { identifier: string; name: string }[];
+	/* The passkeys the move stops, only when it gives them another RP ID and someone holds one (specs/140). */
+	passkeys?: PasskeysLostByMove;
 	namespaceMove: boolean;
 	expect: AddressChangeCounts;
 	consequence: string;
@@ -514,6 +525,11 @@ async function addressChangePreview(
 		identifier: resource.identifier,
 		name: resource.name
 	}));
+	/*
+	 * A passkey is bound to its RP ID for good, so a move between kinds of address stops every one; the browser then
+	 * simply stops offering it, and nobody is told. Counted, and those it leaves with no way in named (specs/140 R7).
+	 */
+	const passkeys = await passkeysLostByMove(bucket, rpIdFor(target));
 
 	return {
 		from: issuerFor(bucket),
@@ -523,15 +539,25 @@ async function addressChangePreview(
 		providers,
 		connectedServices,
 		resources,
+		...(passkeys === null ? {} : { passkeys }),
 		namespaceMove: namespaceOf(bucket) === ROOT_NAMESPACE,
 		expect: {
 			applications: applications.length,
 			connections: connections.length,
 			providers: providers.length,
-			resources: resources.length
+			resources: resources.length,
+			...(passkeys === null
+				? {}
+				: {
+						passkeyPeople: passkeys.people,
+						passkeyOnly: passkeys.withoutOtherWay
+					})
 		},
 		consequence:
-			'the issuer identifier changes, so every application listed stops validating tokens until it is reconfigured, every identity provider listed refuses sign-in until its upstream registration has the new callback address, and every provisioning connection listed stops until its directory is re-pointed, every connected service listed refuses new connections until its registration has the new callback address; the previous address stops answering and everyone signed in signs in again'
+			'the issuer identifier changes, so every application listed stops validating tokens until it is reconfigured, every identity provider listed refuses sign-in until its upstream registration has the new callback address, and every provisioning connection listed stops until its directory is re-pointed, every connected service listed refuses new connections until its registration has the new callback address; the previous address stops answering and everyone signed in signs in again' +
+			(passkeys === null
+				? ''
+				: '; every passkey listed stops working, because passkeys are tied to the address')
 	};
 }
 
@@ -544,7 +570,10 @@ function sameCounts(
 		expected.applications === actual.applications &&
 		expected.connections === actual.connections &&
 		expected.providers === actual.providers &&
-		expected.resources === actual.resources
+		expected.resources === actual.resources &&
+		// Absent reads as none: a client that previewed before anyone held a passkey is refused only if someone now does.
+		(expected.passkeyPeople ?? 0) === (actual.passkeyPeople ?? 0) &&
+		(expected.passkeyOnly ?? 0) === (actual.passkeyOnly ?? 0)
 	);
 }
 
@@ -1169,19 +1198,34 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 		const ctx = assertAuth(admin);
 		const bucket = await loadBucketForSettings(ctx, params.id, 'read');
 		const readsActivity = bucketCan(ctx, bucket).readActivity;
-		const [counts, groups, connections, mail, figure, applications, apis] =
-			await Promise.all([
-				signInCounts(bucket),
-				getBucketGroupStore().query(
-					{ bucketId: bucket._id },
-					{ startIndex: 1, count: 0 }
-				),
-				getProvisioningConnectionStore().listByBucket(bucket._id),
-				mailDeliveryConfigured(),
-				readsActivity ? readPeriod(bucket._id, monthOf(now())) : null,
-				bucketClients(bucket._id),
-				getProtectedResourceStore().listByBucket(bucket._id)
-			]);
+		const [
+			counts,
+			groups,
+			connections,
+			mail,
+			figure,
+			applications,
+			apis,
+			holders
+		] = await Promise.all([
+			signInCounts(bucket),
+			getBucketGroupStore().query(
+				{ bucketId: bucket._id },
+				{ startIndex: 1, count: 0 }
+			),
+			getProvisioningConnectionStore().listByBucket(bucket._id),
+			mailDeliveryConfigured(),
+			readsActivity ? readPeriod(bucket._id, monthOf(now())) : null,
+			bucketClients(bucket._id),
+			getProtectedResourceStore().listByBucket(bucket._id),
+			/*
+			 * People holding a passkey that signs in at the project's address (specs/140): what the Sign-in tab shows next
+			 * to the switch. Never for the administrators' project, which holds none.
+			 */
+			bucket._id === ADMIN_BUCKET_ID
+				? null
+				: getPasskeyStore().holdingIn(bucket._id, rpIdFor(bucket))
+		]);
 		const enabled = bucket.federation.filter((provider) => provider.enabled);
 		/* The project's plan, its use and its warnings (specs/102); null for a System project, which has none. */
 		const plan = plansShownTo(ctx)
@@ -1200,6 +1244,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			withoutEnabledLink: counts.withoutEnabledLink,
 			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
+			...(holders === null ? {} : { passkeyHolders: holders.length }),
 			applications: applications.length,
 			apis: apis.length,
 			groups: groups.totalResults,

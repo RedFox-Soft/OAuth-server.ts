@@ -26,6 +26,7 @@ import { NAME_MAX, NOT_ME_SECONDS, PASSKEYS_PER_PERSON } from './consts.js';
 import { notifyPasskey } from './notify.js';
 import { relyingPartyOf } from './relying_party.js';
 import type { PasskeyCeremonyPayload } from './types.js';
+import { otherWayIn } from './ways_in.js';
 
 /*
  * A person's own passkeys on their "Sign-in and security" page (specs/139 contracts/account-page.md): whether they may
@@ -302,13 +303,7 @@ export async function isLastWayIn(
 	passkey: Passkey
 ): Promise<boolean> {
 	if (!passkeyWorks(passkey, bucket)) return false;
-	if (bucket.passwordLogin && user.passwordSet !== false) return false;
-	const offered = new Set(
-		bucket.federation
-			.filter((provider) => provider.enabled)
-			.map((provider) => provider.id)
-	);
-	if ((user.federated ?? []).some((link) => offered.has(link.providerId)))
+	if (otherWayIn(bucket, user, { passwordsOpen: bucket.passwordLogin }))
 		return false;
 	const others = await getPasskeyStore().listOf(bucket._id, user._id);
 	return !others.some(

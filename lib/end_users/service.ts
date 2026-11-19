@@ -9,6 +9,7 @@ import {
 	DuplicateEndUserError,
 	type EndUserPatch,
 	type EndUserProfile,
+	type Passkey,
 	type User,
 	type UserBucket
 } from '../adapters/types.js';
@@ -597,6 +598,54 @@ export async function disownPasskeys(
 		since
 	);
 	return { removed, swept: await revokeAccountAccess(id) };
+}
+
+/*
+ * An administrator revokes one passkey of a person (specs/140 research R2–R4), because they believe someone else holds
+ * it: it stops signing in, and the person is signed out everywhere, since whoever holds it may be signed in with it and
+ * no session records which passkey opened it. The passkey must be the person's in this project; one already gone,
+ * however it went, is a 404 that signs nobody out. Recorded before the removal, so a racing removal can leave an entry
+ * of its own, as every audit-first act can.
+ *
+ * Allowed on a provisioned person, as clearing an authenticator is: a passkey is a credential of this server that no
+ * connection sends, and revoking it is account recovery, not a profile edit.
+ */
+export async function revokePasskey(
+	bucket: UserBucket,
+	id: string,
+	passkeyId: string,
+	record: RecordChange
+): Promise<{ user: User; passkey: Passkey; swept: CascadeResult }> {
+	const user = await existing(bucket._id, id);
+	const store = getPasskeyStore();
+	const passkey = await store.find(bucket._id, passkeyId);
+	if (passkey?.accountId !== id) {
+		throw new EndUserError(404, 'passkey not found');
+	}
+	await record();
+	if (!(await store.remove(bucket._id, id, passkeyId))) {
+		throw new EndUserError(404, 'passkey not found');
+	}
+	return { user, passkey, swept: await revokeAccountAccess(id) };
+}
+
+/*
+ * Every passkey of the person at once (specs/140 research R3), for a password manager account that was taken over:
+ * one removal, one sign-out. A person holding none is a 404 that changes nothing.
+ */
+export async function revokeAllPasskeys(
+	bucket: UserBucket,
+	id: string,
+	record: (count: number) => Promise<void>
+): Promise<{ user: User; removed: number; swept: CascadeResult }> {
+	const user = await existing(bucket._id, id);
+	const store = getPasskeyStore();
+	const held = await store.countOf(bucket._id, id);
+	if (held === 0) throw new EndUserError(404, 'no passkeys');
+	await record(held);
+	const removed = await store.removeAllOf(bucket._id, id);
+	if (removed === 0) throw new EndUserError(404, 'no passkeys');
+	return { user, removed, swept: await revokeAccountAccess(id) };
 }
 
 /* Lifts the lock and restores nothing: the user signs in afresh, and only if also active. */

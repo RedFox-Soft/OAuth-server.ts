@@ -125,14 +125,23 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		return true;
 	}
 
-	async holdersIn(bucketId: string): Promise<string[]> {
-		return [
-			...new Set(
-				this.matching((held) => held.bucketId === bucketId).map(
-					(held) => held.accountId
-				)
-			)
-		];
+	async holdingIn(
+		bucketId: string,
+		rpId: string
+	): Promise<{ accountId: string; passkeys: number }[]> {
+		const counts = new Map<string, number>();
+		for (const held of this.matching(
+			(held) =>
+				held.bucketId === bucketId &&
+				held.rpId === rpId &&
+				held.copiedAt === undefined
+		)) {
+			counts.set(held.accountId, (counts.get(held.accountId) ?? 0) + 1);
+		}
+		return [...counts].map(([accountId, passkeys]) => ({
+			accountId,
+			passkeys
+		}));
 	}
 
 	private owned(bucketId: string, id: string): Passkey | undefined {

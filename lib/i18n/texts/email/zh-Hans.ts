@@ -133,6 +133,15 @@ export const zhHans: EmailTexts = {
 		removedSubject: '您的{service}账户删除了一个通行密钥',
 		removedIntro:
 			'于 {date} 在 {device} 上创建的通行密钥已不能再用于登录{service}。',
-		removedIntroNoDevice: '于 {date} 创建的通行密钥已不能再用于登录{service}。'
+		removedIntroNoDevice: '于 {date} 创建的通行密钥已不能再用于登录{service}。',
+		revokedIntro:
+			'{service}的运营人员从您的账户 {email} 中删除了一个通行密钥。该密钥于 {date} 在 {device} 上创建。',
+		revokedIntroNoDevice:
+			'{service}的运营人员从您的账户 {email} 中删除了一个通行密钥。该密钥于 {date} 创建。',
+		revokedAllSubject: '您的{service}账户的通行密钥已被删除',
+		revokedAllIntro:
+			'{service}的运营人员删除了您的账户 {email} 的所有通行密钥，共 {count} 个。',
+		signedOutEverywhere: '您已在所有设备上退出登录。',
+		revokedTell: '如果您没有提出此请求，请告知他们。'
 	}
 };

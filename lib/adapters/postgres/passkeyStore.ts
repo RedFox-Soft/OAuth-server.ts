@@ -187,19 +187,27 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		return rows.length === 1;
 	}
 
-	async holdersIn(bucketId: string): Promise<string[]> {
+	async holdingIn(
+		bucketId: string,
+		rpId: string
+	): Promise<{ accountId: string; passkeys: number }[]> {
 		const handle = sql();
 		const rows: unknown[] = await handle`
-			SELECT DISTINCT doc->>'accountId' AS account FROM ${handle(this.area)}
-			WHERE doc->>'bucketId' = ${bucketId}
+			SELECT doc->>'accountId' AS account, count(*)::int AS passkeys FROM ${handle(this.area)}
+			WHERE doc->>'bucketId' = ${bucketId} AND doc->>'rpId' = ${rpId}
+				AND (doc->'copiedAt' IS NULL OR jsonb_typeof(doc->'copiedAt') = 'null')
+			GROUP BY doc->>'accountId'
 		`;
-		return rows
-			.map((row) =>
-				typeof row === 'object' && row !== null && 'account' in row
-					? row.account
-					: undefined
-			)
-			.filter((account): account is string => typeof account === 'string');
+		return rows.flatMap((row) =>
+			typeof row === 'object' &&
+			row !== null &&
+			'account' in row &&
+			typeof row.account === 'string' &&
+			'passkeys' in row &&
+			typeof row.passkeys === 'number'
+				? [{ accountId: row.account, passkeys: row.passkeys }]
+				: []
+		);
 	}
 
 	private recordOf(row: unknown): Passkey | null {
