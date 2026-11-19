@@ -72,7 +72,9 @@ export const passwordResetRoutes = new Elysia({ name: 'password-reset' })
 				return resetFailurePage(language);
 			}
 
-			return resetSuccessPage(result.purpose, language);
+			return resetSuccessPage(result.purpose, language, {
+				conditionalRemoved: result.conditionalRemoved > 0
+			});
 		},
 		{
 			body: t.Object({

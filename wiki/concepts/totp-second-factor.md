@@ -185,7 +185,8 @@ the administrators' project.
 
 Since spec 139 (2026-11-19) the page is named **Sign-in and security** and holds a **Passkeys** part above the
 **Two-step verification** part ([[passkeys]]). The two-step rules below are unchanged: a passkey sign-in
-(`freshPasskey`) opens the passkey acts only, never turning the factor on, replacing it or turning it off, and the
+(`freshPasskey`, which since spec 141 needs `mfa` beside `pop`, so a conditional passkey made after a password alone
+never counts) opens the passkey acts only, never turning the factor on, replacing it or turning it off, and the
 re-authentication those three start asks `acr_values` = the password value, so it offers no passkey. The mailed link
 store and its throttle are shared: `TotpLink` also carries purposes `passkey_add` and `passkey_remove` (with a
 `passkeyId`), under the same "ten minutes, once, newest only, one a minute, five a day".

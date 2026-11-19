@@ -116,6 +116,7 @@ export const presentUser = <
 		externalIdKey?: string;
 		connectionsDeclined?: unknown;
 		webauthnUserId?: string;
+		passkeyOffer?: unknown;
 	}
 >(
 	user: T
@@ -124,7 +125,7 @@ export const presentUser = <
 	 * The derived keys are index material, not facts about the person; they stay with the store. So does the list of
 	 * accounts the person disconnected themselves (specs/120): their choice, which no administrator acts on. And so does
 	 * the person's passkey identity (specs/139): the user handle their devices hand back, which nothing an
-	 * administrator does needs.
+	 * administrator does needs. Nor how the person answered the passkey offer (specs/141): theirs alone.
 	 */
 	const {
 		password: _password,
@@ -133,6 +134,7 @@ export const presentUser = <
 		externalIdKey: _externalIdKey,
 		connectionsDeclined: _connectionsDeclined,
 		webauthnUserId: _webauthnUserId,
+		passkeyOffer: _passkeyOffer,
 		...safe
 	} = user;
 	return {
@@ -520,12 +522,14 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 					ADMIN,
 					params.uid,
 					body.password,
-					() =>
+					(conditional) =>
 						// The reset is the recorded fact; the password is never named, and its value never near
-						// the trail. `signOut` is, because ending every sign-in is a second act the entry must show.
+						// the trail. `signOut` is, because ending every sign-in is a second act the entry must show,
+						// and so are the conditional passkeys it ends (specs/141), by count.
 						recordAdminAudit(ctx, 'enduser.password.reset', params.uid, {
 							...scope(bucket),
-							...(signOut ? { attributes: ['signOut'] } : {})
+							...(signOut ? { attributes: ['signOut'] } : {}),
+							...(conditional > 0 ? { cascade: { passkeys: conditional } } : {})
 						}),
 					{ signOut }
 				)

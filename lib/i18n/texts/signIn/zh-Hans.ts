@@ -6,7 +6,8 @@ export const zhHans: SignInTexts = {
 		registration: '注册',
 		totpEnroll: '设置身份验证器',
 		totpVerify: '两步验证',
-		codeRequired: '需要两步登录'
+		codeRequired: '需要两步登录',
+		passkeyOffer: '下次登录更快'
 	},
 
 	headings: {
@@ -128,6 +129,28 @@ export const zhHans: SignInTexts = {
 		passkey: '使用通行密钥登录',
 		passkeyHeldApp: '您有 {email} 的通行密钥。用它登录即可打开 {app}。',
 		passkeyHeldAny: '您有 {email} 的通行密钥。用它登录即可继续。'
+	},
+
+	passkeyOffer: {
+		heading: '下次登录更快',
+		explain:
+			'为 {email} 创建一个通行密钥。下次登录{service}时，您可以使用指纹、面容或屏幕锁，无需输入密码。',
+		where:
+			'您的通行密钥保存在此设备或您的密码管理器中。您的密码也仍然可以使用。',
+		create: '创建通行密钥',
+		notNow: '以后再说',
+		never: '不再询问',
+		cancelled: '通行密钥未创建。您可以重试，或选择“以后再说”。',
+		exists: '此设备上已有您账户的通行密钥。',
+		needsScript: '创建通行密钥需要 JavaScript。',
+		failed: '无法创建通行密钥。您可以重试，或选择“以后再说”。',
+		createdHeading: '通行密钥已创建',
+		created:
+			'下次登录{service}时，请选择您的通行密钥。我们已向 {email} 发送确认邮件。',
+		createdConditional:
+			'我们已向 {email} 发送一封邮件。请在此浏览器中打开它，并选择“是的，是我本人”以完成设置。',
+		continueApp: '继续前往 {app}',
+		continueAny: '继续'
 	},
 
 	errors: {

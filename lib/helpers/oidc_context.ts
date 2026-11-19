@@ -96,8 +96,15 @@ export interface InteractionResult {
 		acr?: string;
 		/* Set only by a federated sign-in: the provider, and its session identifier when it sent one (specs/073). */
 		upstream?: { providerId: string; sid?: string; sessionExpiry?: number };
+		/*
+		 * Set only by the password door and the code step of a password sign-in (specs/141 research R3): the sign-in may
+		 * lead to the passkey offer, and the passkey it makes would be full or conditional. Never copied into the session.
+		 */
+		passkeyOffer?: 'full' | 'conditional';
 		[key: string]: unknown;
 	};
+	/* How the passkey offer page ended (specs/141); a result with no login, so the offer is not asked again. */
+	passkeyOffer?: 'skipped' | 'declined' | 'created';
 	consent?: { grantId?: string; [key: string]: unknown };
 	error?: string;
 	error_description?: string;

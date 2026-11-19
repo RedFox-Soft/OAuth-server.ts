@@ -209,6 +209,11 @@ export const zhHans: AccountTexts = {
 	passkeyViaPasskey: '使用通行密钥登录后添加',
 	passkeyViaCode: '使用密码和验证码登录后添加',
 	passkeyViaMail: '使用密码登录并打开邮件链接后添加',
+	passkeyViaPassword: '使用密码登录后添加',
+	passkeyUnconfirmed: '未确认：作用与您的密码相同',
+	passkeyConfirm: '确认',
+	passkeyConfirmNeeds: '请使用密码和验证码，或使用另一个通行密钥登录后再确认。',
+	passkeyConfirmed: '您的通行密钥已确认。下次使用它登录时，将算作两步登录。',
 	passkeyOldAddress: '为 {service} 的旧地址创建，已无法使用',
 	passkeyCopied: '已拒绝：它可能已被复制',
 	passkeyAddedOn: '{date} 添加的通行密钥',
@@ -235,6 +240,15 @@ export const zhHans: AccountTexts = {
 	passkeyDisownDoneTitle: '通行密钥已删除',
 	passkeyDisownDone: '通行密钥已删除，您的账号已在所有设备上退出登录。',
 	passkeyDisownPassword: '现在请修改密码：有其他人知道它。',
+	passkeyConfirmTitle: '确认您的通行密钥',
+	passkeyConfirmEffect:
+		'仅当此通行密钥是您本人在此浏览器中创建时才确认。确认后，用它登录{service}将算作两步登录。',
+	passkeyConfirmButton: '是的，是我本人',
+	passkeyConfirmDoneTitle: '您的通行密钥已确认',
+	passkeyConfirmAlready: '此通行密钥已经确认。',
+	passkeyConfirmCantTitle: '此链接不能在这里使用',
+	passkeyConfirmCant:
+		'要确认通行密钥，请使用密码和验证码或另一个通行密钥登录，打开“登录与安全”，然后选择“确认”。',
 	disownTitle: '要从 {email} 移除两步验证吗？',
 	disownEffect:
 		'这将移除刚刚设置的身份验证器应用，并让您的账号在所有设备上退出登录。然后请修改密码。',

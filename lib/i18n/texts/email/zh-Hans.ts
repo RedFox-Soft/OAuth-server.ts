@@ -130,6 +130,12 @@ export const zhHans: EmailTexts = {
 		disownLine:
 			'如果这不是您本人操作，请在 72 小时内通过此链接将其删除，然后更改密码：',
 		disownButton: '不是我',
+		conditionalUse:
+			'在您确认之前，此通行密钥的作用与您的密码相同。如果是您创建的，请在创建它的浏览器中打开此链接：',
+		confirmButton: '是的，是我本人',
+		conditionalDisownLine:
+			'如果这不是您本人操作，请通过此链接将其删除，然后更改密码：',
+		linksLast: '两个链接均在 72 小时内有效。',
 		removedSubject: '您的{service}账户删除了一个通行密钥',
 		removedIntro:
 			'于 {date} 在 {device} 上创建的通行密钥已不能再用于登录{service}。',

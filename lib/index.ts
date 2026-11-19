@@ -64,6 +64,7 @@ import { accountSecurityRoutes } from './account_page/security_routes.js';
 import { accountNotMeRoutes } from './account_page/not_me_routes.js';
 import { accountSignInsRoutes } from './account_page/sign_ins_routes.js';
 import { accountLinkRoutes } from './account_page/link_routes.js';
+import { passkeyEndpointsRoutes } from './passkeys/endpoints_route.js';
 import { behindProxyRoutes } from './behind_proxy/routes.js';
 import { globalTokenRevocation } from './upstream_signals/global_token_revocation.js';
 import { verificationRoutes } from './routes/verification.js';
@@ -297,6 +298,11 @@ elysia.group('/:bucket', (bucketScoped) =>
 // Where an agent's connect link leads (specs/119), the same way.
 elysia.use(accountLinkRoutes);
 elysia.group('/:bucket', (bucketScoped) => bucketScoped.use(accountLinkRoutes));
+/*
+ * Where a password manager manages a site's passkeys (specs/141), as a statement of its own for the account routes'
+ * reason, and bare only: the file belongs to a host, and a path segment names no host.
+ */
+elysia.use(passkeyEndpointsRoutes);
 /*
  * The check a reverse proxy makes before passing a request to an app behind it (specs/122), the same way: the
  * project is named by the address, as at every other endpoint, and never by the forwarded host.

@@ -1,6 +1,7 @@
 import { Prompt } from './prompt.js';
 import login from './prompts/login.ts';
 import consent from './prompts/consent.ts';
+import passkeyOffer from './prompts/passkey_offer.ts';
 import type { Policy, PolicyPrompt } from '../../addon/interactions.js';
 
 // The ordered prompts, carrying the helpers a deployment edits them with.
@@ -38,6 +39,11 @@ const base = (): Policy => {
 
 	DEFAULT.add(login());
 	DEFAULT.add(consent());
+	/*
+	 * Last: the offer of a passkey after a password sign-in (specs/141) shows only when nothing before it asks for a
+	 * page, which is what keeps it from being a third interruption.
+	 */
+	DEFAULT.add(passkeyOffer());
 
 	return DEFAULT;
 };

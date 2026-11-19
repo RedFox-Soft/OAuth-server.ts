@@ -100,6 +100,7 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_security_link,
 	routeNames.account_security_disown,
 	routeNames.account_passkey_disown,
+	routeNames.account_passkey_confirm,
 	routeNames.account_sign_ins,
 	routeNames.account_not_me,
 	BEHIND_PROXY_CHECK_BASE
@@ -340,6 +341,14 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	/* "This wasn't me" about an added passkey (specs/139): the owner must reach it whatever is switched off. */
 	{ method: 'GET', path: routeNames.account_passkey_disown },
 	{ method: 'POST', path: routeNames.account_passkey_disown },
+	/* "Yes, this was me" about a passkey made after a password alone (specs/141), unconditional for the same reason. */
+	{ method: 'GET', path: routeNames.account_passkey_confirm },
+	{ method: 'POST', path: routeNames.account_passkey_confirm },
+	/*
+	 * Where a password manager manages a host's passkeys (specs/141). A file the browser and its password manager read
+	 * about this host, unconditional as discovery is; it names a page and changes nothing.
+	 */
+	{ method: 'GET', path: '/.well-known/passkey-endpoints' },
 	/*
 	 * The person's own recent sign-ins (specs/135), unconditional too: a person who fears someone else is in their
 	 * account must always be able to look and to sign out everywhere.

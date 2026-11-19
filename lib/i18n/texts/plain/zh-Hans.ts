@@ -73,6 +73,8 @@ export const zhHans: PlainTexts = {
 			heading: '密码已更新',
 			body: '您的密码已更改，并且您已在所有地方退出登录。请返回应用重新登录。'
 		},
+		conditionalRemoved:
+			'您尚未确认的通行密钥已被删除。您可以在账户页面添加新的通行密钥。',
 		inviteSuccess: {
 			title: '密码已设置',
 			heading: '您的密码已设置',

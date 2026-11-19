@@ -75,6 +75,7 @@ import {
 	type PageSession,
 	type RemoveRefused
 } from '../passkeys/account.js';
+import { confirmByLink, confirmOnPage } from '../passkeys/offer.js';
 import { passkeyName } from '../passkeys/names.js';
 import { relyingPartyOf } from '../passkeys/relying_party.js';
 import type { Session } from '../models/session.js';
@@ -83,6 +84,8 @@ import {
 	disownConfirmPage,
 	disownOutcomePage,
 	outcomePage,
+	passkeyConfirmOutcomePage,
+	passkeyConfirmPage,
 	passkeyDisownConfirmPage,
 	passkeyDisownDonePage,
 	passkeyDisownGonePage,
@@ -225,6 +228,8 @@ function noticeFor(
 			return { kind: 'success', text: T.passkeyRenamed };
 		case 'passkey_removed':
 			return { kind: 'success', text: text(T.passkeyRemoved, values) };
+		case 'passkey_confirmed':
+			return { kind: 'success', text: T.passkeyConfirmed };
 	}
 	switch (query.notice) {
 		case 'throttled':
@@ -353,28 +358,58 @@ async function passkeysView(
 		...(passkey.lastUsedAt ? { lastUsedAt: new Date(passkey.lastUsedAt) } : {}),
 		synced: passkey.backedUp,
 		via: passkey.createdVia,
+		...(passkey.conditional ? { unconfirmed: true as const } : {}),
 		...(passkey.copiedAt
 			? { mark: 'copied' as const }
 			: passkey.rpId !== rpId
 				? { mark: 'oldAddress' as const }
 				: {})
 	}));
+	/*
+	 * The browser is told which of the person's passkeys this project accepts at this site, and their current label
+	 * (specs/141 research R10). Only while the project accepts passkeys and the person has a passkey identity here: the
+	 * list is for that identity alone, so a passkey of another project at the same site is never touched.
+	 */
+	const party = relyingPartyOf(bucket);
+	const signalling =
+		passkeysAccepted(bucket) && user.webauthnUserId !== undefined
+			? {
+					signals: {
+						rpId,
+						userId: user.webauthnUserId,
+						accepted: held
+							.filter(
+								(passkey) =>
+									passkey.copiedAt === undefined && passkey.rpId === rpId
+							)
+							.map((passkey) => passkey.credentialId),
+						name: `${user.email} · ${party.name}`,
+						displayName: `${user.email} · ${party.name}`
+					},
+					script: versionedAsset('passkeyButton.js')
+				}
+			: {};
+	const manageAll = {
+		...manage,
+		...signalling,
+		...(strongRecentSignIn(session) ? { confirmable: true } : {})
+	};
 	switch (await addAvailability(bucket, user, held.length)) {
 		case 'not_accepted':
-			return { rows, ...manage, state: 'stopped' };
+			return { rows, ...manageAll, state: 'stopped' };
 		case 'provider_only':
 			return {
 				rows,
-				...manage,
+				...manageAll,
 				state: 'providerOnly',
 				providers: providersOf(person)
 			};
 		case 'no_mail':
-			return { rows, ...manage, state: 'noMail' };
+			return { rows, ...manageAll, state: 'noMail' };
 		case 'unconfirmed':
-			return { rows, ...manage, state: 'unconfirmed' };
+			return { rows, ...manageAll, state: 'unconfirmed' };
 		case 'full':
-			return { rows, ...manage, state: 'full' };
+			return { rows, ...manageAll, state: 'full' };
 		case 'ready':
 			break;
 	}
@@ -387,7 +422,7 @@ async function passkeysView(
 	if (options) {
 		return {
 			rows,
-			...manage,
+			...manageAll,
 			state: 'add',
 			options: JSON.stringify(options),
 			script: versionedAsset('passkeyButton.js')
@@ -395,7 +430,7 @@ async function passkeysView(
 	}
 	return {
 		rows,
-		...manage,
+		...manageAll,
 		state: query.sent === 'passkey' ? 'sent' : 'start'
 	};
 }
@@ -747,6 +782,23 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 						`${pagePath}?notice=${sent === 'throttled' ? 'throttled' : 'mail'}`
 					);
 				}
+				case 'passkey_confirm': {
+					/*
+					 * Confirming a passkey made after a password alone (specs/141 FR-017): only after a strong recent
+					 * sign-in, so nothing a password alone opens can raise a password-made passkey to two factors.
+					 */
+					const confirmed = await confirmOnPage(
+						bucket,
+						user,
+						session,
+						body.passkey
+					);
+					return seeOther(
+						confirmed === 'cannot'
+							? pagePath
+							: `${pagePath}?done=passkey_confirmed`
+					);
+				}
 				case 'passkey_remove': {
 					const removed = await completeRemove(
 						bucket,
@@ -909,6 +961,73 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 			return disownOutcomePage(shown, removed, service, forgot);
 		},
 		{ body: TokenBody, parse: 'urlencoded' }
+	)
+	/*
+	 * "Yes, this was me" about a conditional passkey (specs/141 contracts/account-page-and-mail.md). It acts only in the
+	 * browser session that made the passkey, signed in at this address: anywhere else, including the owner's own browser
+	 * for a passkey someone else made, it changes nothing. Opening the link only shows the form; the POST is the act.
+	 */
+	.get(
+		routeNames.account_passkey_confirm,
+		async ({ query, cookie, params, request }) => {
+			const addressed = await addressOfRequest(params, request);
+			const person = await usablePerson(addressed, cookie);
+			if (!person) {
+				return passkeyConfirmOutcomePage(
+					languageOfRequest(request).language,
+					'cannot'
+				);
+			}
+			return passkeyConfirmPage(
+				personLanguage(person, request),
+				new URL(
+					`${accountPageBase(addressed)}${routeNames.account_passkey_confirm}`
+				).pathname,
+				{
+					token: query.token ?? '',
+					xsrf: await ensureXsrf(person.session),
+					...(query.project ? { project: query.project } : {})
+				},
+				shownNameOf(person.bucket)
+			);
+		},
+		{ query: NotMeQuery }
+	)
+	.post(
+		routeNames.account_passkey_confirm,
+		async ({ body, cookie, params, request }) => {
+			const addressed = await addressOfRequest(params, request);
+			const person = await usablePerson(addressed, cookie);
+			if (
+				!person ||
+				!fromThisOrigin(request, new URL(accountPageBase(addressed)).origin) ||
+				!xsrfMatches(person.session, body.xsrf)
+			) {
+				return passkeyConfirmOutcomePage(
+					person
+						? personLanguage(person, request)
+						: languageOfRequest(request).language,
+					'cannot'
+				);
+			}
+			return passkeyConfirmOutcomePage(
+				personLanguage(person, request),
+				await confirmByLink(
+					person.bucket,
+					person.user,
+					person.session,
+					body.token ?? ''
+				)
+			);
+		},
+		{
+			body: t.Object({
+				token: t.Optional(t.String()),
+				xsrf: t.Optional(t.String()),
+				project: t.Optional(t.String())
+			}),
+			parse: 'urlencoded'
+		}
 	)
 	/*
 	 * "This wasn't me" about an added passkey (specs/139 research R16, contracts/account-page.md). The link's state lives

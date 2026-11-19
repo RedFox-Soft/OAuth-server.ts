@@ -8,6 +8,10 @@ import {
 	CodeRequiredPage,
 	type CodeRequiredVariant
 } from './codeRequiredPage.js';
+import {
+	PasskeyOfferPage,
+	type PasskeyOfferPageProps
+} from './passkeyOfferPage.js';
 import type { ConsentView } from './consentView.js';
 import type { SwitcherProps } from './languageSwitch.js';
 import type { OfferedProvider } from './signInOptions.js';
@@ -126,9 +130,12 @@ export async function loginServer(
 		passkey?: PasskeyOnPage;
 		/* The passkey door's own answer when it is not the error re-render's 400: its per-caller refusal is a 429. */
 		status?: number;
+		/* A refused passkey the browser may forget (specs/141 research R10). */
+		unknownPasskey?: { rpId: string; credentialId: string };
 	} = {}
 ) {
-	const { errorMessage, switcher, listRefusal, passkey } = options;
+	const { errorMessage, switcher, listRefusal, passkey, unknownPasskey } =
+		options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
@@ -166,7 +173,8 @@ export async function loginServer(
 			switcher,
 			face,
 			...(listRefusal ? { listRefusal } : {}),
-			...(passkey ? { passkey } : {})
+			...(passkey ? { passkey } : {}),
+			...(unknownPasskey ? { unknownPasskey } : {})
 		},
 		<LoginPage
 			uid={uid}
@@ -183,6 +191,7 @@ export async function loginServer(
 			face={face}
 			listRefusal={listRefusal}
 			passkey={passkey}
+			unknownPasskey={unknownPasskey}
 		/>,
 		language,
 		options.accent
@@ -353,6 +362,39 @@ export async function codeRequiredServer(
 	);
 	return htmlResponse(html, {
 		status: 200,
+		handOffTo: options.handOffTo,
+		language
+	});
+}
+
+/*
+ * The passkey offer after a password sign-in (specs/141). Every value the page reads is in the props too, the creation
+ * options included: the script hands them to the browser after hydration.
+ */
+export async function passkeyOfferServer(
+	props: Omit<PasskeyOfferPageProps, 'logoSrc' | 'face'>,
+	options: {
+		handOffTo?: string;
+		language?: Language;
+		accent?: PaintedAccent;
+		face?: SignInFace;
+		status?: number;
+	}
+) {
+	const language = options.language ?? 'en';
+	const face = faceOr(options.face);
+	const logoSrc = versionedAsset('logo.svg');
+	const all = { ...props, logoSrc, face };
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		SIGN_IN_TEXTS[language].titles.passkeyOffer,
+		all,
+		<PasskeyOfferPage {...all} />,
+		language,
+		options.accent
+	);
+	return htmlResponse(html, {
+		status: options.status ?? 200,
 		handOffTo: options.handOffTo,
 		language
 	});

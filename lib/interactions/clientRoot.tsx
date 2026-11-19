@@ -5,6 +5,7 @@ import { emptyConsentView } from './consentView.ts';
 import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
 import { CodeRequiredPage } from './codeRequiredPage.tsx';
+import { PasskeyOfferPage } from './passkeyOfferPage.tsx';
 import type { SignInFace } from './signInMasthead.tsx';
 import { EndUserTheme } from '../html/theme/provider.tsx';
 import type { PaintedAccent } from '../html/theme/accent.ts';
@@ -112,6 +113,17 @@ function pageElement(
 					uid={uid}
 					face={UNNAMED}
 					variant="askOperators"
+					{...props}
+				/>
+			);
+		case 'passkey-offer':
+			// Which state the offer is in is the server's; the spread comes last so its values win on hydration.
+			return (
+				<PasskeyOfferPage
+					uid={uid}
+					face={UNNAMED}
+					state="offer"
+					email=""
 					{...props}
 				/>
 			);

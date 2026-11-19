@@ -178,7 +178,21 @@ export const User = t.Object({
 	 * account, so two accounts of one person in two projects never share it. Barred from administrative reads by
 	 * `presentUser`; never in a token, an event, a log line or an audit entry.
 	 */
-	webauthnUserId: t.Optional(t.String({ minLength: 43, maxLength: 43 }))
+	webauthnUserId: t.Optional(t.String({ minLength: 43, maxLength: 43 })),
+	/*
+	 * The offer to create a passkey after a password sign-in (specs/141 research R4): how often it was shown, when last,
+	 * whether the person said "Don't ask again" (`never`), and whether "This wasn't me" holds it back until the password
+	 * is reset (`held`). On the person, so the pause holds in every app and browser of the project. Written only by
+	 * `lib/end_users/passkey_offer.ts`; left out of administrative reads by `presentUser`.
+	 */
+	passkeyOffer: t.Optional(
+		t.Object({
+			shown: t.Integer({ minimum: 0 }),
+			lastShownAt: t.Optional(t.Date()),
+			never: t.Optional(t.Literal(true)),
+			held: t.Optional(t.Literal(true))
+		})
+	)
 });
 export type User = Static<typeof User>;
 
@@ -304,6 +318,8 @@ export type EndUserPatch = Partial<
 		| 'connectionsDeclined'
 		/* Only `lib/end_users/service.ts` writes it, once, when a person's first passkey add is prepared (specs/139). */
 		| 'webauthnUserId'
+		/* Only `lib/end_users/passkey_offer.ts` writes it: the passkey offer's showings and the person's answers (specs/141). */
+		| 'passkeyOffer'
 	>
 >;
 
@@ -2772,11 +2788,15 @@ export const Passkey = t.Object({
 	/* As declared by the device, in UUID form; stored, never trusted or shown in this release. */
 	aaguid: t.String(),
 	createdAt: t.Date(),
-	/* The proof the add was made under (FR-026). */
+	/*
+	 * The proof the add was made under (FR-026). `password` is the offer after a sign-in with a password alone
+	 * (specs/141), and only such a passkey is ever `conditional`.
+	 */
 	createdVia: t.Union([
 		t.Literal('passkey'),
 		t.Literal('password_code'),
-		t.Literal('password_mail')
+		t.Literal('password_mail'),
+		t.Literal('password')
 	]),
 	/* The browser and system it was made on, from closed sets: the default name, and what a mail says. */
 	createdOn: t.Object({ browser: ActivityBrowser, system: ActivitySystem }),
@@ -2791,7 +2811,22 @@ export const Passkey = t.Object({
 	 * cleared once spent. On the passkey rather than in an account-owned area, so a sign-out everywhere by whoever
 	 * added it cannot kill the owner's link.
 	 */
-	notMe: t.Optional(t.Object({ digest: t.String(), exp: t.Number() }))
+	notMe: t.Optional(t.Object({ digest: t.String(), exp: t.Number() })),
+	/*
+	 * A passkey made after a password alone (specs/141 research R2, R6): it signs in as that password does, never as two
+	 * factors, until it is confirmed. Not the browser's `mediation: 'conditional'` (autofill and silent creation), which
+	 * the sign-in and offer pages also use; the two share only a word. Absent means full, so every earlier record reads
+	 * as it did.
+	 */
+	conditional: t.Optional(t.Literal(true)),
+	/*
+	 * The mailed "Yes, this was me" while the passkey is conditional: the sha256 hex of the secret, its end (epoch
+	 * seconds), and the sha256 hex of the holder of the browser session that made it, which is the only session the link
+	 * acts in. On the passkey for `notMe`'s reason; removed together with `conditional`.
+	 */
+	confirm: t.Optional(
+		t.Object({ digest: t.String(), exp: t.Number(), holder: t.String() })
+	)
 });
 export type Passkey = Static<typeof Passkey>;
 
@@ -2856,6 +2891,16 @@ export interface PasskeyStoreInstance {
 		bucketId: string,
 		rpId: string
 	): Promise<{ accountId: string; passkeys: number }[]>;
+	/*
+	 * Makes a conditional passkey full: removes `conditional` and `confirm` only where `conditional` is set. Answers
+	 * whether it did, so of two racing confirmations exactly one is told it did (specs/141).
+	 */
+	confirm(bucketId: string, id: string): Promise<boolean>;
+	/*
+	 * Whether any project holds a passkey with this credential id made for this RP ID. The one read of this area across
+	 * projects, and asked only to decide whether a browser may be told a passkey is unknown (specs/141 research R10).
+	 */
+	knownAnywhere(rpId: string, credentialId: string): Promise<boolean>;
 }
 
 export interface PasskeyStoreConstructor {
@@ -3268,6 +3313,11 @@ export const UserBucket = t.Object({
 	 * for the administrators' project. Turning it off deletes no passkey; on again, every one works again.
 	 */
 	passkeyLogin: t.Optional(t.Boolean()),
+	/*
+	 * Whether people are offered a passkey after a sign-in with a password (specs/141). Absent means on; it has no effect
+	 * while the project does not accept passkeys.
+	 */
+	passkeyOffer: t.Optional(t.Boolean()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -3360,6 +3410,7 @@ export interface UserBucketStoreInstance {
 				| 'totpSelfService'
 				| 'newSignInAlerts'
 				| 'passkeyLogin'
+				| 'passkeyOffer'
 			>
 		>
 	): Promise<UserBucket | null>;

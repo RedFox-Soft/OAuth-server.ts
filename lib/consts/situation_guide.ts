@@ -2034,7 +2034,8 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			lines: [
 				'“Sign in with a passkey” on the sign-in page, and their passkeys offered in the email field',
 				'Their device asking for a fingerprint, face or screen lock',
-				'A Passkeys part on their Sign-in and security page, where they add one'
+				'A Passkeys part on their Sign-in and security page, where they add one',
+				'After signing in with their password, an offer to create a passkey, with Not now'
 			]
 		},
 		needs: { role: 'edit' },
@@ -2045,6 +2046,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		},
 		goodToKnow: [
 			'Turn on Passkeys in the Sign-in tab. People add their own on their Sign-in and security page, after a two-step sign-in or after their password and a link we email them, so a mail server is needed.',
+			'After a password sign-in people are offered a passkey; turn this off with "Offer a passkey after a password sign-in". After a password and a code the new passkey counts as two-step sign-in at once. After a password alone it works like the password until they confirm it from our email, in the same browser, and a password reset removes it.',
 			'A passkey sign-in meets every app, API and path that asks for two-step sign-in, without a code.',
 			'A passkey works only at the host it was made at. If the project moves between a path, a subdomain and a hostname, or the server’s address changes, people add new ones.',
 			'On a person’s page you see their passkeys. After a lost or stolen device, revoke one or all of them: the person is signed out everywhere and gets an email.',

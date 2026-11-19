@@ -970,7 +970,9 @@ const nonRouteActions = [
 	 */
 	{ action: 'enduser.passkey.add', targetType: 'EndUser' },
 	{ action: 'enduser.passkey.remove', targetType: 'EndUser' },
-	{ action: 'enduser.passkey.disown', targetType: 'EndUser' }
+	{ action: 'enduser.passkey.disown', targetType: 'EndUser' },
+	/* Confirming a passkey made after a password alone (specs/141), by its mailed link or after a strong sign-in. */
+	{ action: 'enduser.passkey.confirm', targetType: 'EndUser' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {

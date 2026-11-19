@@ -21,6 +21,12 @@ import { emailScopedId } from '../helpers/email_scoped_id.js';
 import epochTime from '../helpers/epoch_time.js';
 import { clearFailures } from '../login_throttle/throttle.js';
 import { clearAttempts } from '../totp/verify.js';
+import { recordEndUserAudit } from '../admin/audit/record.js';
+import {
+	conditionalPasskeysOf,
+	releaseOffers,
+	removeConditionalPasskeys
+} from '../end_users/passkey_offer.js';
 import {
 	nextRateFields,
 	rateRefusal,
@@ -321,6 +327,8 @@ export type ConsumeOutcome =
 			ok: true;
 			failedAreas: readonly string[];
 			purpose: SetPasswordPurpose;
+			/* Conditional passkeys the reset removed (specs/141), which the page says. */
+			conditionalRemoved: number;
 	  }
 	| { ok: false; reason: 'invalid' };
 
@@ -388,6 +396,31 @@ export async function consume(
 		);
 	}
 	/*
+	 * Every conditional passkey goes with the old password, whoever proved the address (specs/141 FR-013): each was made
+	 * after that password alone, so whoever knew it may have made it. A reset by mail has no audit entry of its own, so
+	 * the removal writes one, before it, naming how many and never which. And whoever "This wasn't me" held back from
+	 * the offer is the owner again.
+	 */
+	const conditional = await conditionalPasskeysOf(
+		challenge.bucketId,
+		challenge.accountId
+	);
+	if (conditional > 0) {
+		const bucket = await getBucketStore().find(challenge.bucketId);
+		await recordEndUserAudit(
+			challenge.bucketId,
+			challenge.accountId,
+			'enduser.passkey.remove',
+			{
+				targetScope: challenge.bucketId,
+				...(bucket ? { ownerGroupId: bucket.ownerGroupId } : {}),
+				cascade: { passkeys: conditional }
+			}
+		);
+		await removeConditionalPasskeys(challenge.bucketId, challenge.accountId);
+	}
+	await releaseOffers(challenge.bucketId, challenge.accountId);
+	/*
 	 * Both code-failure windows go with a completed reset (specs/126 FR-024), for the reason the sign-in counter below
 	 * does: the reset proves the owner is back, and a stranger who knew the old password must not keep them locked out
 	 * of their own code step for a day.
@@ -423,7 +456,8 @@ export async function consume(
 	return {
 		ok: true,
 		failedAreas: swept.failedAreas,
-		purpose: loaded.purpose
+		purpose: loaded.purpose,
+		conditionalRemoved: conditional
 	};
 }
 

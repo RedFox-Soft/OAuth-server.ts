@@ -251,6 +251,14 @@ export const en = {
 	passkeyViaCode: 'Added after signing in with your password and a code',
 	passkeyViaMail:
 		'Added after signing in with your password and an emailed link',
+	/* A conditional passkey (specs/141): made at the offer after a password alone, and not yet confirmed. */
+	passkeyViaPassword: 'Added after signing in with your password',
+	passkeyUnconfirmed: 'Not confirmed: works like your password',
+	passkeyConfirm: 'Confirm',
+	passkeyConfirmNeeds:
+		'Sign in with your password and a code, or with another passkey, to confirm it.',
+	passkeyConfirmed:
+		'Your passkey is confirmed. Next time you sign in with it, it counts as two-step sign-in.',
 	passkeyOldAddress: 'Made for an old address of {service}; it no longer works',
 	passkeyCopied: 'Refused: it may have been copied',
 	passkeyAddedOn: 'Passkey added {date}',
@@ -279,6 +287,16 @@ export const en = {
 	passkeyDisownDone:
 		'The passkey was removed and your account was signed out everywhere.',
 	passkeyDisownPassword: 'Now change your password: someone else knows it.',
+	/* "Yes, this was me" from the email about a conditional passkey (specs/141). */
+	passkeyConfirmTitle: 'Confirm your passkey',
+	passkeyConfirmEffect:
+		'Confirm only if you created this passkey yourself, in this browser. It will then count as two-step sign-in for {service}.',
+	passkeyConfirmButton: 'Yes, this was me',
+	passkeyConfirmDoneTitle: 'Your passkey is confirmed',
+	passkeyConfirmAlready: 'This passkey is already confirmed.',
+	passkeyConfirmCantTitle: 'This link can’t be used here',
+	passkeyConfirmCant:
+		'To confirm a passkey, open Sign-in and security after signing in with your password and a code, or with another passkey, and choose Confirm.',
 	disownTitle: 'Remove two-step verification from {email}?',
 	disownEffect:
 		'This removes the authenticator app that was just set up and signs your account out everywhere. Then change your password.',

@@ -39,6 +39,11 @@ export interface Expected {
 	origin: string;
 	/* base64url, as the options carried it. */
 	challenge: string;
+	/*
+	 * The browser's silent creation (specs/141 research R8), which reports neither presence nor verification; the offer
+	 * asks for it only where the passkey is full at once. Every later use requires both.
+	 */
+	silent?: boolean;
 }
 
 /* A browser's transports beyond the ones a record may hold are dropped: a stored value goes back to browsers. */
@@ -233,8 +238,8 @@ export async function verifyAdd(
 			expectedChallenge: expected.challenge,
 			expectedOrigin: expected.origin,
 			expectedRPID: expected.rpId,
-			requireUserPresence: true,
-			requireUserVerification: true
+			requireUserPresence: expected.silent !== true,
+			requireUserVerification: expected.silent !== true
 		});
 	} catch {
 		return {

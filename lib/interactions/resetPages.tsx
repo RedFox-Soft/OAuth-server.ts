@@ -94,13 +94,18 @@ export function resetFormPage(
 
 export function resetSuccessPage(
 	purpose: SetPasswordPurpose,
-	language: Language = 'en'
+	language: Language = 'en',
+	/* The reset removed passkeys made after the old password alone (specs/141): the person is told. */
+	options: { conditionalRemoved?: boolean } = {}
 ): Response {
 	const texts = PLAIN_TEXTS[language].reset;
 	const t = purpose === 'invite' ? texts.inviteSuccess : texts.success;
+	const removed = options.conditionalRemoved
+		? `<p style="color:${foxVar('text-secondary')};">${html(texts.conditionalRemoved)}</p>`
+		: '';
 	return page(
 		t.title,
-		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p>`,
+		`<h2 style="color:${foxVar('text')};">${html(t.heading)}</h2><p style="color:${foxVar('text-secondary')};">${html(t.body)}</p>${removed}`,
 		200,
 		{ language }
 	);

@@ -161,6 +161,16 @@ export const en = {
 		disownLine:
 			'If this was not you, remove it with this link within 72 hours, then change your password:',
 		disownButton: 'This wasn’t me',
+		/*
+		 * A conditional passkey (specs/141): made after a password alone, it works as the password does until the person
+		 * confirms it here, in the browser that made it.
+		 */
+		conditionalUse:
+			'This passkey works like your password until you confirm it. If you created it, open this link in the browser where you created it:',
+		confirmButton: 'Yes, this was me',
+		conditionalDisownLine:
+			'If this was not you, remove it with this link, then change your password:',
+		linksLast: 'Both links work for 72 hours.',
 		removedSubject: 'A passkey was removed from your {service} account',
 		removedIntro:
 			'A passkey created on {date} on {device} no longer signs you in to {service}.',

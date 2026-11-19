@@ -35,7 +35,8 @@ Since spec 139 (2026-11-19, uncommitted at the time of writing) a person signs i
 "Two-step verification"). A project accepts passkeys only when an operator turns **Passkeys** on (`passkeyLogin`, off by
 default) and never on the administrators' project (`passkeysAccepted`, `lib/passkeys/accepted.ts:12`). Spec 140 (A2,
 same release) adds the operator's view and revocation, the agent's passkey tools, a holder count on the Sign-in tab and
-a passkey block in the address change preview: see "Operator and agent" below.
+a passkey block in the address change preview: see "Operator and agent" below. Spec 141 (B) adds the offer after a
+password sign-in, the conditional passkey, the browser's signals and the passkey endpoints: see the section below.
 
 ## One RP ID and one origin, both from the issuer
 
@@ -100,8 +101,8 @@ challenge and `requireUserVerification: true`. What the library leaves to its ca
 
 Every failure from step 4 on is one sentence, "This passkey isn't for {service}. Choose another one, or sign in
 another way.", whoever's passkey it was, so nothing says whether it is known elsewhere. Where the account is known,
-the person's activity gets `passkey_refused`; never for an unknown passkey. There is no `noteAttack` and no
-`signalUnknownCredential`.
+the person's activity gets `passkey_refused`; never for an unknown passkey. There is no `noteAttack`; since spec 141 the
+browser may be told the passkey is unknown, only at a project's own site (below).
 
 The offer (`offerFor`, `sign_in.ts:59`) is on every sign-in page form (password, providers only, the attacker list's
 refusal), with `allowCredentials` empty, the email field `autocomplete="username webauthn"` for autofill, and a button.
@@ -205,6 +206,61 @@ it**, `revokeAccountAccess`, then a password-reset mail where the person has a p
 - **Sign-in tab**: the summary's `passkeyHolders` (`routes.ts:1247`; absent for the administrators' project) drives "N
   of M people have a passkey", "N people have passkeys, which don't work while passkeys are off", or, before anyone
   holds one at the root or a path, the advice to give the project its own address first.
+
+## The offer, the conditional passkey and the browser (spec 141)
+
+- **The offer is the policy's third prompt**, `passkey-offer`, after `login` and `consent`
+  (`lib/helpers/interaction_policy/prompts/passkey_offer.ts:21`, added at `index.ts:46`). Its position does most of the
+  rule: a sign-in that still needs a code stops at the login prompt (the code-required page), consent comes first and
+  its own result carries no login, and a request that needed no page has no result. By the time it shows, `resume` has
+  signed the person in and saved the session. **Gotcha**: the prompt's name becomes the page's path segment
+  (`/ui/:uid/<prompt name>`), so it is `passkey-offer` with a hyphen; `passkey_offer` 404'd on the first run.
+- **Whether a sign-in may lead to it** is decided at the door and carried as `result.login.passkeyOffer`
+  (`'full' | 'conditional'`; `offersPasskey`, `lib/interactions/index.ts:1287`): the page's script reported a device
+  that can make a passkey (`passkeyDevice=1`, from `isUserVerifyingPlatformAuthenticatorAvailable`), "Remember me" was
+  ticked, and the account page's own client did not start the sign-in. Only the password door and the code step set
+  it; setting up an authenticator during the sign-in never does. **Whether it does now** is `offerable`
+  (`lib/passkeys/offerable.ts:22`, a leaf module so the policy does not import the ceremonies): passkeys accepted, the
+  project's `passkeyOffer` not `false`, mail, a verified address, fewer than 20, and the person's own state.
+- **The person's state** is `User.passkeyOffer` (`shown`, `lastShownAt`, `never`, `held`), written only by
+  `lib/end_users/passkey_offer.ts` (a leaf the service re-exports, because the password reset needs it and the service
+  imports the reset). Opening the page counts a showing (`noteOfferShown`), so the 30-day pause runs whatever the person
+  then does; a cancelled device dialog posts nothing. "Don't ask again" appears from the second showing.
+- **Full or conditional**: after a password and a code the passkey is full (`createdVia: 'password_code'`); after a
+  password alone it is conditional (`createdVia: 'password'`, `conditional: true`, `confirm: { digest, exp, holder }`),
+  stored by the same `storeAdd` the account page uses (`lib/passkeys/account.ts:219`). Creating one never touches
+  `result.login`, so the app still gets the sign-in the person made.
+- **A conditional passkey is the password and no more** (`lib/consts/amr.ts:38`): alone it reports `password` with
+  `["pop","user"]`; the passkey door then takes the password's own continuation (`afterKnowledge`,
+  `lib/interactions/index.ts:1206`), so the code step follows wherever it would after a password, and completes with
+  `passkey_conditional_code` (`["pop","user","otp","mfa"]`). `freshPasskey` now needs `mfa` beside `pop`
+  (`lib/totp/self_service.ts:133`): without that, a conditional sign-in opened adding and removing passkeys with no
+  mailed link, which is exactly the escalation the conditional passkey exists to prevent.
+- **Confirming**: the mailed "Yes, this was me" (`/account/security/passkey-confirm`,
+  `lib/account_page/security_routes.ts:971`) acts only in the browser session that made the passkey: the offer's
+  ceremony is held by `account:<session uid>` and the passkey keeps its sha256 (`confirmByLink`,
+  `lib/passkeys/offer.ts:96`). So an owner who clicks it for a stranger's passkey in their own browser changes nothing.
+  On the person's page, "Confirm" exists only after a strong recent sign-in (`confirmOnPage`, `:123`). Both write
+  `enduser.passkey.confirm`; no mail.
+- **What removes conditional passkeys**: a reset by mail (`lib/password_reset/challenge.ts:404`, which writes an
+  `enduser.passkey.remove` entry with the count, since a mailed reset had no entry of its own), an administrator setting
+  a password (`resetEndUserPassword`, `lib/end_users/service.ts:310`, count in the route's entry), and "This wasn't me"
+  for any passkey (`disownPasskeys`, `:613`), which also sets `held` until the next reset.
+- **Silent creation** (the browser's `mediation: 'conditional'`, not to be confused with a conditional passkey) is tried
+  by the offer page only for a full offer; the server accepts its answer without UP/UV only then (`completeOffer`,
+  `offer.ts:60`; `verifyAdd`'s `silent`). Every use still requires UV.
+- **Signals**: the person's page carries `data-passkey-signals` (`signalsOf`, `lib/account_page/html.ts:947`) and
+  `public/passkeyButton.js` calls `signalAllAcceptedCredentials` (not copied, current RP ID, conditional included) and
+  `signalCurrentUserDetails` ("{email} · {project}", the creation label). They touch only the person's own
+  `webauthnUserId` here, so they are safe at the shared host. `signalUnknownCredential` is sent only after a refusal at
+  a project's own site and only when `knownAnywhere(rpId, credentialId)` finds no project holding it (`unknownHere`,
+  `lib/passkeys/sign_in.ts:112`), backed by the `{credentialId: 1}` index.
+- **`/.well-known/passkey-endpoints`** (`lib/passkeys/endpoints_route.ts`), bare only: the instance's host answers `{}`
+  whenever passkeys are possible there; a subdomain or host project with passkeys names its Sign-in and security page as
+  `enroll` and `manage`; anything else 404.
+- **Not done, by decision**: Chrome's immediate mode (`uiMode: 'immediate'`) needs a click on an origin of the passkey's
+  site, and an app's own "Sign in" button is never on one; the sign-in page already offers passkeys in its suggestions
+  and with a button.
 
 ## Storage: an unowned area, removed by hand
 

@@ -771,9 +771,23 @@ export interface PasskeyRowView {
 	createdAt: Date;
 	lastUsedAt?: Date;
 	synced: boolean;
-	via: 'passkey' | 'password_code' | 'password_mail';
+	via: 'passkey' | 'password_code' | 'password_mail' | 'password';
 	/* Made for an address the project no longer has, or refused because it may have been copied: it no longer works. */
 	mark?: 'oldAddress' | 'copied';
+	/* Made after a password alone and not yet confirmed (specs/141): it signs in as the password does. */
+	unconfirmed?: true;
+}
+
+/*
+ * What the page's script tells the browser about the person's passkeys here (specs/141 research R10): every passkey this
+ * project accepts at this site, and the person's current details, for their passkey identity in this project only.
+ */
+export interface PasskeySignals {
+	rpId: string;
+	userId: string;
+	accepted: readonly string[];
+	name: string;
+	displayName: string;
 }
 
 /* The Passkeys part of "Sign-in and security" (contracts/account-page.md), one state at a time. */
@@ -784,6 +798,11 @@ export type PasskeysView = {
 	removing?: string;
 	/* A link to confirm a removal was mailed to this browser. */
 	removeSent?: boolean;
+	/* A strong recent sign-in: an unconfirmed passkey's row offers Confirm (specs/141 FR-017). */
+	confirmable?: boolean;
+	/* What the script tells the browser, and the script itself when the add form does not already load it. */
+	signals?: PasskeySignals;
+	script?: string;
 } & (
 	| { state: 'stopped' }
 	| { state: 'providerOnly'; providers: readonly string[] }
@@ -871,7 +890,8 @@ function passkeyRow(
 	const via = {
 		passkey: T.passkeyViaPasskey,
 		password_code: T.passkeyViaCode,
-		password_mail: T.passkeyViaMail
+		password_mail: T.passkeyViaMail,
+		password: T.passkeyViaPassword
 	}[row.via];
 	const facts = [
 		text(T.passkeyCreated, { date: day(row.createdAt) }),
@@ -894,12 +914,58 @@ function passkeyRow(
 		mark
 			? `<br/><span style="color:${foxVar('danger-text')};">${esc(mark)}</span>`
 			: '',
+		row.unconfirmed && !mark ? unconfirmedLine(row, frame, view, xsrf) : '',
 		`<div>${passkeyActions(row, frame, view, xsrf)}</div>`,
 		`</li>`
 	].join('');
 }
 
+/*
+ * A passkey made after a password alone (specs/141): what it is, and Confirm only after a strong recent sign-in, never
+ * through a mailed link, so a link opened in the owner's browser never confirms someone else's passkey.
+ */
+function unconfirmedLine(
+	row: PasskeyRowView,
+	frame: PageFrame,
+	view: PasskeysView,
+	xsrf: string
+): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	return [
+		`<br/><span style="color:${foxVar('notice-text')};">${esc(T.passkeyUnconfirmed)}</span>`,
+		view.confirmable
+			? `<div>${passkeyForm(frame, { action: 'passkey_confirm', xsrf, passkey: row.id }, T.passkeyConfirm, BUTTON)}</div>`
+			: `<br/><span style="${MUTED}">${esc(T.passkeyConfirmNeeds)}</span>`
+	].join('');
+}
+
+/*
+ * The signals' data (specs/141 contracts/browser.md), as attributes the page's one script reads: no inline script, and
+ * nothing here that the person's own page does not already show them, but their passkeys' credential ids, which the
+ * browser already holds.
+ */
+function signalsOf(view: PasskeysView): string {
+	const { signals } = view;
+	if (!signals) return '';
+	const script =
+		view.state === 'add' || view.script === undefined
+			? ''
+			: `<script src="${esc(view.script)}"></script>`;
+	return (
+		`<div hidden data-passkey-signals data-rp-id="${esc(signals.rpId)}" data-user-id="${esc(signals.userId)}" data-accepted="${esc(JSON.stringify(signals.accepted))}" data-name="${esc(signals.name)}" data-display-name="${esc(signals.displayName)}"></div>` +
+		script
+	);
+}
+
 function passkeysBody(
+	frame: PageFrame,
+	view: PasskeysView,
+	xsrf: string
+): string {
+	return passkeysState(frame, view, xsrf) + signalsOf(view);
+}
+
+function passkeysState(
 	frame: PageFrame,
 	view: PasskeysView,
 	xsrf: string
@@ -1044,6 +1110,53 @@ export function passkeyDisownConfirmPage(
 			`<form method="post" action="${esc(path)}">${hidden(fields)}<button type="submit" style="${BUTTON}">${esc(T.disownButton)}</button></form>`
 		].join(''),
 		200,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+/*
+ * "Yes, this was me" about a conditional passkey (specs/141 contracts/account-page-and-mail.md). Opening the link shows
+ * only this; the form's POST, with the page's anti-forgery value, is the act.
+ */
+export function passkeyConfirmPage(
+	language: Language,
+	path: string,
+	fields: { token: string; xsrf: string; project?: string },
+	service: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const response = page(
+		T.passkeyConfirmTitle,
+		[
+			`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.passkeyConfirmTitle)}</h1>`,
+			`<p>${html(T.passkeyConfirmEffect, { service })}</p>`,
+			`<form method="post" action="${esc(path)}">${hidden(fields)}<button type="submit" style="${PRIMARY}">${esc(T.passkeyConfirmButton)}</button></form>`
+		].join(''),
+		200,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+/* The outcomes of "Yes, this was me": confirmed, already confirmed, or a link that cannot act here. */
+export function passkeyConfirmOutcomePage(
+	language: Language,
+	outcome: 'confirmed' | 'already' | 'cannot'
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const [title, body, status] =
+		outcome === 'confirmed'
+			? [T.passkeyConfirmDoneTitle, T.passkeyConfirmed, 200]
+			: outcome === 'already'
+				? [T.passkeyConfirmDoneTitle, T.passkeyConfirmAlready, 200]
+				: [T.passkeyConfirmCantTitle, T.passkeyConfirmCant, 400];
+	const response = page(
+		title,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1><p>${esc(body)}</p>`,
+		status,
 		{ language }
 	);
 	response.headers.set('cache-control', 'no-store');

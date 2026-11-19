@@ -14,6 +14,11 @@ import type { AcrDistinction } from './acr.ts';
  * individual methods, as RFC 8176 §2 allows and nearly every provider does, so a relying party can test for it
  * without knowing which factors this server has.
  *
+ * A conditional passkey (specs/141 research R2), made after a password alone and not yet confirmed, is no more than
+ * that password: it reports the password context, so every requirement of a code still asks for one, and its own
+ * methods (`pop`, `user`) without `mfa`, since `pwd` would be untrue and would make it count as a fresh password.
+ * Followed by a code, it is two factors like a password and a code, with the methods it actually used.
+ *
  * A federated sign-in carries none. This server accepted another provider's assertion and observed no method of its
  * own; the provider's own `amr` is not forwarded, because vouching for it is an operator's decision per provider that
  * no setting expresses yet.
@@ -30,6 +35,8 @@ export const SIGN_IN_METHODS = [
 	'password',
 	'password_code',
 	'passkey',
+	'passkey_conditional',
+	'passkey_conditional_code',
 	'federated'
 ] as const;
 
@@ -39,6 +46,8 @@ export const AMR_FOR_METHOD: Record<SignInMethod, readonly AmrValue[]> = {
 	password: ['pwd'],
 	password_code: ['pwd', 'otp', 'mfa'],
 	passkey: ['pop', 'user', 'mfa'],
+	passkey_conditional: ['pop', 'user'],
+	passkey_conditional_code: ['pop', 'user', 'otp', 'mfa'],
 	federated: []
 };
 
@@ -47,5 +56,7 @@ export const DISTINCTION_FOR_METHOD: Record<SignInMethod, AcrDistinction> = {
 	password: 'password',
 	password_code: 'multi_factor',
 	passkey: 'multi_factor',
+	passkey_conditional: 'password',
+	passkey_conditional_code: 'multi_factor',
 	federated: 'federated'
 };

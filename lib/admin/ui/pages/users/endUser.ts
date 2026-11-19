@@ -75,9 +75,11 @@ export interface PasskeyView {
 	createdOn: { browser: string; system: string };
 	synced: boolean;
 	createdAt: string;
-	createdVia: 'passkey' | 'password_code' | 'password_mail';
+	createdVia: 'passkey' | 'password_code' | 'password_mail' | 'password';
 	lastUsedAt?: string;
 	state: 'works' | 'off' | 'old_address' | 'copied';
+	/* False while a passkey made after a password alone is unconfirmed (specs/141). */
+	confirmed: boolean;
 }
 
 export interface PasskeysOfPerson {

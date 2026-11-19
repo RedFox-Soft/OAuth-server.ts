@@ -81,6 +81,17 @@ export function passkeyLinkEmail(
 
 export type PasskeyNotice =
 	| { kind: 'added'; madeOn: MadeOn; at: number; disownUrl: string }
+	/*
+	 * A conditional passkey (specs/141): made at the offer after a password alone. It carries "Yes, this was me" first,
+	 * and "This wasn't me" as `added` does.
+	 */
+	| {
+			kind: 'added_conditional';
+			madeOn: MadeOn;
+			at: number;
+			confirmUrl: string;
+			disownUrl: string;
+	  }
 	| { kind: 'removed'; madeOn: MadeOn; createdAt: number }
 	/* An administrator's revocation of one passkey, or of every one (specs/140): no link, and no name either. */
 	| { kind: 'revoked'; madeOn: MadeOn; createdAt: number }
@@ -101,7 +112,7 @@ export function passkeyNoticeEmail(
 			? { count: String(notice.count) }
 			: {
 					date:
-						notice.kind === 'added'
+						notice.kind === 'added' || notice.kind === 'added_conditional'
 							? formatDateTime(language, notice.at)
 							: formatDate(language, notice.createdAt)
 				}),
@@ -125,6 +136,22 @@ export function passkeyNoticeEmail(
 			bareLink(notice.disownUrl, language)
 		);
 		lines.push(notice.disownUrl);
+	} else if (notice.kind === 'added_conditional') {
+		subject = t.addedSubject;
+		say(device === null ? t.addedIntroNoDevice : t.addedIntro);
+		say(t.conditionalUse);
+		parts.push(
+			button(notice.confirmUrl, t.confirmButton),
+			bareLink(notice.confirmUrl, language)
+		);
+		lines.push(notice.confirmUrl);
+		say(t.conditionalDisownLine);
+		parts.push(
+			button(notice.disownUrl, t.disownButton),
+			bareLink(notice.disownUrl, language)
+		);
+		lines.push(notice.disownUrl);
+		say(t.linksLast);
 	} else if (notice.kind === 'removed') {
 		subject = t.removedSubject;
 		say(device === null ? t.removedIntroNoDevice : t.removedIntro);

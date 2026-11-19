@@ -39,6 +39,8 @@ interface Policy {
 	newSignInAlerts: boolean;
 	/* Whether people may sign in with a passkey and add their own (specs/139); absent means off. */
 	passkeyLogin: boolean;
+	/* Whether people are offered a passkey after a password sign-in (specs/141); absent means on. */
+	passkeyOffer: boolean;
 	registrationOpen: boolean;
 	emailVerificationRequired: boolean;
 	verificationMethod: 'link' | 'code';
@@ -50,6 +52,7 @@ const LABELS: Record<keyof Policy, string> = {
 	totpSelfService: 'Let people turn on two-step verification themselves',
 	newSignInAlerts: 'Email about sign-ins from a new network or browser',
 	passkeyLogin: 'Passkeys',
+	passkeyOffer: 'Offer a passkey after a password sign-in',
 	registrationOpen: 'Self-service sign-up',
 	emailVerificationRequired: 'Require a verified email address',
 	verificationMethod: 'Verification method'
@@ -62,6 +65,7 @@ export function policyOf(bucket: BucketView): Policy {
 		totpSelfService: bucket.totpSelfService !== false,
 		newSignInAlerts: bucket.newSignInAlerts ?? bucket._id === ADMIN_BUCKET_ID,
 		passkeyLogin: bucket.passkeyLogin === true,
+		passkeyOffer: bucket.passkeyOffer !== false,
 		registrationOpen: bucket.registrationOpen,
 		emailVerificationRequired: bucket.emailVerificationRequired,
 		verificationMethod: bucket.verificationMethod
@@ -559,6 +563,28 @@ export function SignInTab({
 									</Typography.Text>
 								) : null)}
 						</Setting>
+					)}
+					{/*
+					 * The offer after a password sign-in (specs/141), beneath the switch it depends on: it does nothing while
+					 * passkeys are off, so it is shown but cannot be changed then.
+					 */}
+					{!consoleBucket && (
+						<Setting
+							title={LABELS.passkeyOffer}
+							control={
+								<Switch
+									aria-label={LABELS.passkeyOffer}
+									checked={draft.passkeyOffer}
+									disabled={!draft.passkeyLogin}
+									onChange={(on) => set('passkeyOffer', on)}
+								/>
+							}
+							effect={
+								draft.passkeyOffer
+									? 'After someone signs in with their password, they’re asked whether to create a passkey. If they also entered a code, the passkey counts as two-step sign-in right away. If they used only a password, it works like their password until they confirm it from the email we send.'
+									: 'People are not asked to create a passkey after signing in. They can still add one on their own Sign-in and security page.'
+							}
+						/>
 					)}
 				</Flex>
 			</Card>

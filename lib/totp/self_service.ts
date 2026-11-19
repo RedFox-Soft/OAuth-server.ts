@@ -78,7 +78,12 @@ export const digestOf = (token: string) =>
 
 /* The holder of an enrolment started on the person's page: their browser's sign-in session. */
 export function pageHolder(session: Session): string {
-	return `account:${session.payload.uid}`;
+	return holderOfSession(session.payload.uid);
+}
+
+/* The same holder from a browser session's uid alone: the passkey offer knows the session only by it (specs/141). */
+export function holderOfSession(uid: string): string {
+	return `account:${uid}`;
 }
 
 /*
@@ -121,12 +126,16 @@ export function freshCode(session: Session): boolean {
  * The person signed in with a passkey in this browser no more than fifteen minutes ago (specs/139 research R13): `pop`
  * is the method only a passkey sign-in reports (lib/consts/amr.ts). It opens the person's passkey acts only, never a
  * two-step change, which keeps asking for a fresh password or a fresh code.
+ *
+ * `mfa` as well (specs/141 research R5): a conditional passkey reports `pop` without it, because it proves no more than
+ * the password it was made after, and a password alone never opens these acts without a mailed link.
  */
 export function freshPasskey(session: Session): boolean {
 	const { amr, loginTs } = session.payload;
 	return (
 		Array.isArray(amr) &&
 		amr.includes('pop') &&
+		amr.includes('mfa') &&
 		typeof loginTs === 'number' &&
 		epochTime() - loginTs <= FRESH_SECONDS
 	);

@@ -28,7 +28,8 @@ const Answer = Type.Object({
 			createdAt: Type.String(),
 			createdVia: Type.String(),
 			lastUsedAt: Type.Optional(Type.String()),
-			state: Type.String()
+			state: Type.String(),
+			confirmed: Type.Boolean()
 		})
 	),
 	ways: Type.Object({
@@ -154,7 +155,9 @@ describe('a person’s passkeys in the console', () => {
 			'aaguid',
 			'rpId',
 			'notMe',
-			'digest'
+			'digest',
+			'confirm',
+			'holder'
 		];
 		expect(
 			keysIn(answer.body).filter((key) => forbidden.includes(key))

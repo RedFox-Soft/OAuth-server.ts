@@ -301,16 +301,24 @@ export async function resetEndUserPassword(
 	actor: EndUserActor,
 	id: string,
 	password: string,
-	record: RecordChange,
+	/* Told how many conditional passkeys the new password removes (specs/141), so the entry written first names it. */
+	record: (conditionalPasskeys: number) => Promise<unknown>,
 	options: { signOut?: boolean } = {}
 ): Promise<{ revoked?: CascadeResult }> {
 	assertActorMayChange(actor, await existing(bucket._id, id));
 	const hash = await Bun.password.hash(password);
-	await record();
+	const conditional = await conditionalPasskeysOf(bucket._id, id);
+	await record(conditional);
 	await getUserStore(bucket._id).update(id, {
 		password: hash,
 		passwordSet: true
 	});
+	/*
+	 * A passkey made after the old password alone rested on nothing but that password (specs/141 FR-013): a new one set
+	 * by an administrator ends it, as a reset by mail does, and lets the offer be made again.
+	 */
+	if (conditional > 0) await removeConditionalPasskeys(bucket._id, id);
+	await releaseOffers(bucket._id, id);
 	return options.signOut === true
 		? { revoked: await revokeAccountAccess(id) }
 		: {};
@@ -597,7 +605,17 @@ export async function disownPasskeys(
 		id,
 		since
 	);
-	return { removed, swept: await revokeAccountAccess(id) };
+	/*
+	 * Every conditional passkey too, whenever it was made (specs/141 FR-013): each rested on the password alone, which
+	 * whoever added this one knew. And no offer to this account until its password is reset (FR-014), or whoever knows
+	 * the password would be offered a new one at the next sign-in.
+	 */
+	const conditional = await removeConditionalPasskeys(bucket._id, id);
+	await holdOffers(bucket._id, id);
+	return {
+		removed: removed + conditional,
+		swept: await revokeAccountAccess(id)
+	};
 }
 
 /*
@@ -823,6 +841,21 @@ export async function ensurePasskeyIdentity(
 	if (!written) throw new EndUserError(404, 'user not found');
 	return webauthnUserId;
 }
+
+export {
+	conditionalPasskeysOf,
+	declineOffers,
+	holdOffers,
+	noteOfferShown,
+	releaseOffers,
+	removeConditionalPasskeys
+} from './passkey_offer.js';
+import {
+	conditionalPasskeysOf,
+	holdOffers,
+	releaseOffers,
+	removeConditionalPasskeys
+} from './passkey_offer.js';
 
 const DECLINED_KEPT = 50;
 

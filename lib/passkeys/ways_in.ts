@@ -83,6 +83,8 @@ export interface PasskeyView {
 	createdVia: Passkey['createdVia'];
 	lastUsedAt?: string;
 	state: PasskeyState;
+	/* False for a passkey made after a password alone and not yet confirmed: it signs in as that password (specs/141). */
+	confirmed: boolean;
 }
 
 function isoOf(value: Date | string): string {
@@ -103,7 +105,8 @@ export function passkeyView(passkey: Passkey, bucket: UserBucket): PasskeyView {
 		...(passkey.lastUsedAt === undefined
 			? {}
 			: { lastUsedAt: isoOf(passkey.lastUsedAt) }),
-		state: passkeyState(passkey, bucket)
+		state: passkeyState(passkey, bucket),
+		confirmed: passkey.conditional !== true
 	};
 }
 

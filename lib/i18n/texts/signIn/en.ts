@@ -10,7 +10,8 @@ export const en = {
 		registration: 'Create account',
 		totpEnroll: 'Set Up Authenticator',
 		totpVerify: 'Two-Step Verification',
-		codeRequired: 'Two-Step Sign-In Needed'
+		codeRequired: 'Two-Step Sign-In Needed',
+		passkeyOffer: 'Sign in faster next time'
 	},
 
 	/*
@@ -179,6 +180,35 @@ export const en = {
 			'You have a passkey for {email}. Sign in with it to open {app}.',
 		passkeyHeldAny:
 			'You have a passkey for {email}. Sign in with it to continue.'
+	},
+
+	/*
+	 * The offer of a passkey after a sign-in with a password (specs/141). What a passkey is, in one sentence, and that the
+	 * password stays: the first showing is the one that decides, and people read "instead of your password" as "your
+	 * password is going away".
+	 */
+	passkeyOffer: {
+		heading: 'Sign in faster next time',
+		explain:
+			'Create a passkey for {email}. Next time you sign in to {service}, you use your fingerprint, face or screen lock instead of typing your password.',
+		where:
+			'Your passkey is saved on this device or in your password manager. Your password keeps working too.',
+		create: 'Create a passkey',
+		notNow: 'Not now',
+		never: 'Don’t ask again',
+		cancelled:
+			'The passkey wasn’t created. You can try again, or choose Not now.',
+		exists: 'This device already has a passkey for your account.',
+		needsScript: 'Creating a passkey needs JavaScript.',
+		failed:
+			'We couldn’t create the passkey. You can try again, or choose Not now.',
+		createdHeading: 'Passkey created',
+		created:
+			'Next time, choose your passkey when you sign in to {service}. We sent a confirmation to {email}.',
+		createdConditional:
+			'We sent an email to {email}. Open it in this browser and choose “Yes, this was me” to finish setting it up.',
+		continueApp: 'Continue to {app}',
+		continueAny: 'Continue'
 	},
 
 	errors: {

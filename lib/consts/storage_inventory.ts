@@ -844,7 +844,8 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 *
 	 * `{bucketId, credentialId}` unique is the sign-in lookup, and what keeps one passkey from being stored twice in a
 	 * project under a concurrent add. `{bucketId, accountId}` serves a person's list and count, and its prefix the
-	 * project's removal.
+	 * project's removal. `{credentialId}` alone is the one lookup across projects, asked before a browser may be told a
+	 * passkey is unknown (specs/141 research R10).
 	 */
 	storeArea(
 		STORE_AREAS.passkeys,
@@ -854,7 +855,8 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 		),
 		[
 			{ key: { bucketId: 1, credentialId: 1 }, unique: true },
-			{ key: { bucketId: 1, accountId: 1 } }
+			{ key: { bucketId: 1, accountId: 1 } },
+			{ key: { credentialId: 1 } }
 		]
 	),
 	/*

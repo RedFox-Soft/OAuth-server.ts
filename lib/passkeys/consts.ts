@@ -23,6 +23,18 @@ export { FRESH_SECONDS } from '../totp/consts.js';
 export const NOT_ME_SECONDS = 72 * 60 * 60;
 
 /*
+ * How long the "Yes, this was me" link in the mail about a conditional passkey works (specs/141): the same three days as
+ * "This wasn't me" beside it, so one sentence covers both links.
+ */
+export const CONFIRM_SECONDS = 72 * 60 * 60;
+
+/*
+ * How long a showing of the passkey offer keeps it away from the person, in every app and browser of the project
+ * (specs/141 research R4). The thirty days comparable products use.
+ */
+export const OFFER_PAUSE_SECONDS = 30 * 24 * 60 * 60;
+
+/*
  * Passkeys one person may hold in one project. Twenty covers a phone, a laptop, a tablet and a few security keys with
  * room to spare, and bounds the list a page renders and the `excludeCredentials` an add sends to the browser.
  */

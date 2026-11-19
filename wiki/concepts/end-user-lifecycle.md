@@ -49,7 +49,8 @@ person themselves from Recent sign-ins (`signOutOwnAccount`, recorded as `enduse
    or the project removes them ([[connected-services]]). Nor are a person's **passkeys** (spec 139): unowned for
    the same reason, kept through a lock, a deactivation, a sign-out everywhere and a confirmed reset, and removed by
    hand only by deleting the person, destroying the project, an unconfirmed account's completed reset and an
-   invitation reclaim ([[passkeys]]).
+   invitation reclaim ([[passkeys]]). A **conditional** passkey (spec 141, made at the offer after a password alone)
+   also goes with any completed reset, a password an administrator sets, and "This wasn't me".
 
 Introspection needed no change: it already answers `active: false` once the grant behind a token is gone
 (`lib/actions/introspection.ts:134`).

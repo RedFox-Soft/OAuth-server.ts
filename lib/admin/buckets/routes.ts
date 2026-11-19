@@ -877,6 +877,8 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		 * true is the warning that browsers will not offer them until the instance is served over HTTPS.
 		 */
 		passkeyLogin: bucket.passkeyLogin === true,
+		/* The offer of a passkey after a password sign-in (specs/141): true when absent. */
+		passkeyOffer: bucket.passkeyOffer !== false,
 		passkeysPossible: passkeysPossible(ISSUER),
 		passkeysNeedHttps: passkeysNeedHttps(ISSUER),
 		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
@@ -1334,6 +1336,13 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 						422,
 						"Administrators can't use passkeys yet; they have no account page to add one on.",
 						{ field: 'passkeyLogin' }
+					);
+				}
+				if (changes.passkeyOffer !== undefined) {
+					throw new AdminError(
+						422,
+						"Administrators can't use passkeys yet, so they are never offered one.",
+						{ field: 'passkeyOffer' }
 					);
 				}
 			}

@@ -392,3 +392,73 @@ describe('the project setting "Passkeys"', () => {
 		expect(refused.body.field).toBe('passkeyLogin');
 	});
 });
+
+/**
+ * @proves A project's administrators, and their agent, decide whether people are offered a passkey after a password
+ * sign-in: on until they turn it off, recorded in the audit trail, and never set on the administrators' project.
+ */
+describe('the project setting "Offer a passkey after a password sign-in"', () => {
+	let cookie: string;
+
+	beforeAll(async () => {
+		await bootstrap(import.meta.url);
+		await ensureAdminSeed();
+		cookie = await cookieFor(await createAdministrator('super'));
+	});
+
+	beforeEach(() => {
+		ApplicationConfig['mcp.enabled'] = true;
+	});
+
+	it('is on for a project that never set it', async () => {
+		const id = await plainProject();
+
+		const read = await request('GET', `/admin/api/projects/${id}`, cookie);
+
+		expect(read.body.passkeyOffer).toBe(true);
+	});
+
+	it('turns off, recorded in the audit trail naming the field', async () => {
+		const id = await plainProject();
+
+		const saved = await request('PATCH', `/admin/api/projects/${id}`, cookie, {
+			passkeyOffer: false
+		});
+
+		expect(saved.status).toBe(200);
+		expect((await getBucketStore().find(id))?.passkeyOffer).toBe(false);
+		const { entries } = await adminAuditStore.list({ targetId: id });
+		expect(
+			entries.some(
+				(entry) =>
+					entry.action === 'bucket.update' &&
+					entry.attributes?.includes('passkeyOffer')
+			)
+		).toBe(true);
+	});
+
+	it('is set by an agent through project_update', async () => {
+		const id = await plainProject();
+		const { token } = await agentToken();
+
+		const response = await rpc(
+			tool('project_update', { id, passkeyOffer: false }),
+			token
+		);
+
+		expect(response.result?.isError).not.toBe(true);
+		expect((await getBucketStore().find(id))?.passkeyOffer).toBe(false);
+	});
+
+	it('is refused on the administrators’ project, naming the field', async () => {
+		const refused = await request(
+			'PATCH',
+			`/admin/api/projects/${ADMIN_BUCKET_ID}`,
+			cookie,
+			{ passkeyOffer: false }
+		);
+
+		expect(refused.status).toBe(422);
+		expect(refused.body.field).toBe('passkeyOffer');
+	});
+});

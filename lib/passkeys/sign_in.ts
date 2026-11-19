@@ -3,7 +3,7 @@ import { randomBytes } from 'node:crypto';
 import type { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 
 import { getPasskeyStore, getUserStore } from '../adapters/index.js';
-import type { User, UserBucket } from '../adapters/types.js';
+import type { Passkey, User, UserBucket } from '../adapters/types.js';
 import { isAccountPageClient } from '../account_page/client.js';
 import { configuration } from '../configs/application.js';
 import epochTime from '../helpers/epoch_time.js';
@@ -14,6 +14,7 @@ import { readAssertion, signInOptions, verifySignIn } from './ceremony.js';
 import { CEREMONY_SECONDS } from './consts.js';
 import { admitPasskeyAttempt, countPasskeyFailure } from './limits.js';
 import { relyingPartyOf } from './relying_party.js';
+import { hasOwnOrigin } from '../configs/issuer.js';
 
 /*
  * Signing in with a passkey on the project's sign-in page (specs/139 contracts/sign-in.md): the offer every render of
@@ -87,8 +88,37 @@ export type PasskeyAttempt =
 	| { kind: 'off' }
 	| { kind: 'limited'; retryAfter: number }
 	| { kind: 'retry' }
-	| { kind: 'refused' }
-	| { kind: 'verified'; user: User };
+	/*
+	 * `unknown`: the browser may be told to forget this passkey (specs/141 research R10). Set only at a project's own
+	 * site, and only for a credential no project on the instance holds for it.
+	 */
+	| { kind: 'refused'; unknown?: UnknownPasskey }
+	/* The passkey too: a conditional one signs in as its password does (specs/141). */
+	| { kind: 'verified'; user: User; passkey: Passkey };
+
+/* A passkey a browser may be told to forget: its site and its credential id, both the browser's own already. */
+export interface UnknownPasskey {
+	rpId: string;
+	credentialId: string;
+}
+
+/*
+ * Whether a credential this project does not hold may be reported unknown (specs/141 research R10): only at a site the
+ * project has to itself (a subdomain or a host of its own), where no other project's passkey can live, and only when
+ * no project on the instance holds it for that site, so a project that left the address and comes back to it finds
+ * its people's passkeys still in their managers. At the instance's own host, shared by the root, the path projects
+ * and the administrators, never: "not this project's" says nothing about theirs.
+ */
+async function unknownHere(
+	bucket: UserBucket,
+	credentialId: string
+): Promise<UnknownPasskey | undefined> {
+	if (!hasOwnOrigin(bucket)) return undefined;
+	const { rpId } = relyingPartyOf(bucket);
+	if (await getPasskeyStore().knownAnywhere(rpId, credentialId))
+		return undefined;
+	return { rpId, credentialId };
+}
 
 /*
  * Judges one posted passkey for the project the sign-in belongs to (`bucket`, the interaction's `signsInto`):
@@ -147,7 +177,11 @@ export async function judgePasskey(input: {
 	if (!response) return refuse();
 	const store = getPasskeyStore();
 	const passkey = await store.findByCredential(bucket._id, response.id);
-	if (!passkey) return refuse();
+	if (!passkey) {
+		const refused = await refuse();
+		const unknown = await unknownHere(bucket, response.id);
+		return unknown ? { kind: 'refused', unknown } : refused;
+	}
 	const user = await getUserStore(bucket._id).find(passkey.accountId);
 	if (!user) return refuse();
 	const party = relyingPartyOf(bucket);
@@ -192,5 +226,5 @@ export async function judgePasskey(input: {
 		at: new Date()
 	});
 	if (!recorded) return refuse(user._id);
-	return { kind: 'verified', user };
+	return { kind: 'verified', user, passkey };
 }

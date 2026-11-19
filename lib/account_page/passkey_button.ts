@@ -1,9 +1,9 @@
 /*
- * The account pages' one script (specs/139 research R12): the "Add a passkey" button of "Sign-in and security". It
- * carries no page data: the options it hands the browser and the sentences it may show are attributes of the form it
- * finds, written by the server (lib/account_page/html.ts). It runs as an external file, so the page needs no inline
- * script. Without it the button stays disabled and the sentence beside it says what is missing; the rest of the page is
- * plain forms.
+ * The account pages' one script (specs/139 research R12): the "Add a passkey" button of "Sign-in and security", and the
+ * browser signals of specs/141. It carries no page data: the options it hands the browser, the sentences it may show
+ * and what it signals are attributes written by the server (lib/account_page/html.ts). It runs as an external file, so
+ * the page needs no inline script. Without it the button stays disabled and the sentence beside it says what is
+ * missing; the rest of the page is plain forms.
  */
 import {
 	browserSupportsWebAuthn,
@@ -68,4 +68,52 @@ for (const form of document.querySelectorAll<HTMLFormElement>(
 	'form[data-passkey-add]'
 )) {
 	wire(form);
+}
+
+/*
+ * The Signal API (specs/141 research R10): the passkeys this project accepts at this site for the person's passkey
+ * identity here, and their current label, so a password manager hides a passkey the server no longer takes and shows
+ * the current address. Feature-detected and fire-and-forget: a browser without it, or one that refuses, changes
+ * nothing on the page.
+ */
+interface SignallingCredential {
+	signalAllAcceptedCredentials?: (options: {
+		rpId: string;
+		userId: string;
+		allAcceptedCredentialIds: string[];
+	}) => Promise<void>;
+	signalCurrentUserDetails?: (options: {
+		rpId: string;
+		userId: string;
+		name: string;
+		displayName: string;
+	}) => Promise<void>;
+}
+
+function signal(holder: HTMLElement): void {
+	if (typeof PublicKeyCredential === 'undefined') return;
+	const { rpId, userId, accepted, name, displayName } = holder.dataset;
+	if (!rpId || !userId || accepted === undefined) return;
+	/* Typed by hand: the Signal API is newer than the DOM library this bundle is checked against. */
+	const api = PublicKeyCredential as unknown as SignallingCredential;
+	// The server's own attribute: a JSON array of the credential ids it accepts.
+	const ids = JSON.parse(accepted) as string[];
+	api
+		.signalAllAcceptedCredentials?.({
+			rpId,
+			userId,
+			allAcceptedCredentialIds: ids
+		})
+		.catch(() => undefined);
+	if (name && displayName) {
+		api
+			.signalCurrentUserDetails?.({ rpId, userId, name, displayName })
+			.catch(() => undefined);
+	}
+}
+
+for (const holder of document.querySelectorAll<HTMLElement>(
+	'[data-passkey-signals]'
+)) {
+	signal(holder);
 }

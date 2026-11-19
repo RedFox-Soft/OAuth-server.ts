@@ -223,6 +223,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'totpSelfService'
 				| 'newSignInAlerts'
 				| 'passkeyLogin'
+				| 'passkeyOffer'
 			>
 		>
 	): Promise<UserBucket | null> {

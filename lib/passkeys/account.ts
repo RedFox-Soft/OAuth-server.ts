@@ -22,7 +22,12 @@ import {
 	takeCeremony
 } from './ceremonies.js';
 import { addOptions, readAttestation, verifyAdd } from './ceremony.js';
-import { NAME_MAX, NOT_ME_SECONDS, PASSKEYS_PER_PERSON } from './consts.js';
+import {
+	CONFIRM_SECONDS,
+	NAME_MAX,
+	NOT_ME_SECONDS,
+	PASSKEYS_PER_PERSON
+} from './consts.js';
 import { notifyPasskey } from './notify.js';
 import { relyingPartyOf } from './relying_party.js';
 import type { PasskeyCeremonyPayload } from './types.js';
@@ -106,14 +111,37 @@ export async function prepareAdd(
 	session: PageSession,
 	proof: AddProof
 ): Promise<PasskeyCeremonyPayload> {
-	const userId = await ensurePasskeyIdentity(bucket._id, user._id);
-	const party = relyingPartyOf(bucket);
-	return prepareCeremony(ceremonyId('add', session.uid), {
-		accountId: user._id,
-		bucketId: bucket._id,
+	return prepareCreation(bucket, user, {
+		id: ceremonyId('add', session.uid),
 		holder: session.holder,
 		purpose: 'add',
-		proof,
+		proof
+	});
+}
+
+/*
+ * A creation ceremony, for the account page's add and the offer after a sign-in (specs/141): the person's passkey
+ * identity (created on the first one), a challenge, and the one RP ID and origin of the project, kept for five minutes
+ * under `id`, replacing the earlier one there.
+ */
+export async function prepareCreation(
+	bucket: UserBucket,
+	user: User,
+	ceremony: {
+		id: string;
+		holder: string;
+		purpose: 'add' | 'offer';
+		proof: AddProof;
+	}
+): Promise<PasskeyCeremonyPayload> {
+	const userId = await ensurePasskeyIdentity(bucket._id, user._id);
+	const party = relyingPartyOf(bucket);
+	return prepareCeremony(ceremony.id, {
+		accountId: user._id,
+		bucketId: bucket._id,
+		holder: ceremony.holder,
+		purpose: ceremony.purpose,
+		proof: ceremony.proof,
 		challenge: randomBytes(32).toString('base64url'),
 		userId,
 		rpId: party.rpId,
@@ -158,10 +186,8 @@ export type AddRefused =
 	| 'failed';
 
 /*
- * Completes an add: spends the session's ceremony, checks again everything that may have changed since it was prepared
- * (the project, the person, their passkey identity, the project's address), verifies the device's answer against the
- * ceremony's one origin, RP ID and challenge with the person verified, then records, stores, and mails "added" with
- * its "This wasn't me" link. The session that added it is left exactly as it was.
+ * Completes an add: spends the session's ceremony, then stores what the device made (`storeAdd`). The session that
+ * added it is left exactly as it was.
  */
 export async function completeAdd(
 	bucket: UserBucket,
@@ -174,8 +200,31 @@ export async function completeAdd(
 		ceremonyId('add', session.uid),
 		session.holder
 	);
+	if (ceremony?.purpose !== 'add') return { ok: false, reason: 'expired' };
+	const stored = await storeAdd(bucket, user, ceremony, credential, request);
+	return stored.ok ? { ok: true } : stored;
+}
+
+/*
+ * Stores the passkey a spent ceremony's device made, for the account page's add and for the offer after a sign-in
+ * (specs/141): checks again everything that may have changed since the ceremony was prepared (the project, the person,
+ * their passkey identity, the project's address), verifies the device's answer against the ceremony's one origin, RP
+ * ID and challenge, then records, stores, and mails "added" with its "This wasn't me" link.
+ *
+ * The person verified, except `silent`: the browser's silent creation reports neither presence nor verification, and
+ * the offer passes it only for a passkey that is full at once (specs/141 research R8); every use checks again. A
+ * ceremony of proof `password` makes a conditional passkey, mailed with "Yes, this was me" bound to the ceremony's
+ * browser session (research R6, R7).
+ */
+export async function storeAdd(
+	bucket: UserBucket,
+	user: User,
+	ceremony: PasskeyCeremonyPayload,
+	credential: string,
+	request: Request,
+	options: { silent?: boolean } = {}
+): Promise<{ ok: true; passkey: Passkey } | { ok: false; reason: AddRefused }> {
 	if (
-		ceremony?.purpose !== 'add' ||
 		ceremony.accountId !== user._id ||
 		ceremony.bucketId !== bucket._id ||
 		ceremony.challenge === undefined ||
@@ -214,7 +263,8 @@ export async function completeAdd(
 	const verified = await verifyAdd(response, {
 		rpId: ceremony.rpId,
 		origin: ceremony.origin,
-		challenge: ceremony.challenge
+		challenge: ceremony.challenge,
+		silent: options.silent === true
 	});
 	if (!verified.ok) {
 		return {
@@ -231,6 +281,10 @@ export async function completeAdd(
 	}
 
 	const secret = randomBytes(32).toString('base64url');
+	const confirmSecret =
+		ceremony.proof === 'password'
+			? randomBytes(32).toString('base64url')
+			: undefined;
 	const createdOn = deviceOf(request.headers.get('user-agent')) ?? {
 		browser: 'other' as const,
 		system: 'other' as const
@@ -250,7 +304,17 @@ export async function completeAdd(
 		createdAt: new Date(),
 		createdVia: ceremony.proof,
 		createdOn,
-		notMe: { digest: digestOf(secret), exp: epochTime() + NOT_ME_SECONDS }
+		notMe: { digest: digestOf(secret), exp: epochTime() + NOT_ME_SECONDS },
+		...(confirmSecret === undefined
+			? {}
+			: {
+					conditional: true as const,
+					confirm: {
+						digest: digestOf(confirmSecret),
+						exp: epochTime() + CONFIRM_SECONDS,
+						holder: digestOf(ceremony.holder)
+					}
+				})
 	};
 	/* Recorded before the write, as the person's other acts on this page are; the entry names no credential. */
 	await recordEndUserAudit(bucket._id, user._id, 'enduser.passkey.add', {
@@ -260,13 +324,26 @@ export async function completeAdd(
 	if ((await store.create(record)) === 'exists') {
 		return { ok: false, reason: 'exists' };
 	}
-	await notifyPasskey(bucket, user, {
-		kind: 'added',
-		madeOn: createdOn,
-		at: record.createdAt.getTime(),
-		disownUrl: `${accountPageBase(bucket)}${routeNames.account_passkey_disown}?token=${record._id}.${secret}${notMeProject(bucket)}`
-	});
-	return { ok: true };
+	const disownUrl = `${accountPageBase(bucket)}${routeNames.account_passkey_disown}?token=${record._id}.${secret}${notMeProject(bucket)}`;
+	await notifyPasskey(
+		bucket,
+		user,
+		confirmSecret === undefined
+			? {
+					kind: 'added',
+					madeOn: createdOn,
+					at: record.createdAt.getTime(),
+					disownUrl
+				}
+			: {
+					kind: 'added_conditional',
+					madeOn: createdOn,
+					at: record.createdAt.getTime(),
+					confirmUrl: `${accountPageBase(bucket)}${routeNames.account_passkey_confirm}?token=${record._id}.${confirmSecret}${notMeProject(bucket)}`,
+					disownUrl
+				}
+	);
+	return { ok: true, passkey: record };
 }
 
 /* One of this person's passkeys in this project, by its record id, or none: never another person's. */
@@ -428,7 +505,7 @@ export async function completeRemove(
  * A project with no address of its own serves its page at the root, which the default project's address names, so its
  * "This wasn't me" link names the project as well; every other project's link is named by its address alone.
  */
-function notMeProject(bucket: RequestBucket): string {
+export function notMeProject(bucket: RequestBucket): string {
 	return addressOf(bucket).kind === 'unaddressed'
 		? `&project=${encodeURIComponent(bucket._id)}`
 		: '';

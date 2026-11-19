@@ -1,4 +1,4 @@
-import { Button, Card, Flex, Tag, Typography } from 'antd';
+import { Button, Card, Flex, Tag, Tooltip, Typography } from 'antd';
 import {
 	BROWSER_NAMES,
 	SYSTEM_NAMES
@@ -13,7 +13,8 @@ import type { UserActions } from './useUserActions.js';
 const VIA: Record<PasskeyView['createdVia'], string> = {
 	passkey: 'after a passkey sign-in',
 	password_code: 'after a password and a code',
-	password_mail: 'after a password and an emailed link'
+	password_mail: 'after a password and an emailed link',
+	password: 'after a password alone'
 };
 
 const NOT_WORKING: Record<Exclude<PasskeyView['state'], 'works'>, string> = {
@@ -94,6 +95,11 @@ export function PasskeysCard({
 										<Tag color={passkey.state === 'off' ? 'default' : 'red'}>
 											{NOT_WORKING[passkey.state]}
 										</Tag>
+									)}
+									{passkey.state === 'works' && !passkey.confirmed && (
+										<Tooltip title="Works like their password until they confirm it">
+											<Tag color="gold">Not confirmed</Tag>
+										</Tooltip>
 									)}
 								</Typography.Text>
 								<Typography.Text type="secondary">

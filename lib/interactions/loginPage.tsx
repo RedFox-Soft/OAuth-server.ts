@@ -75,6 +75,30 @@ function sendPasskey(
 	form.submit();
 }
 
+/*
+ * Whether this device can make a passkey itself (specs/141 research R3): the password form carries the answer, so the
+ * server offers a passkey after the sign-in only where one can be made. Asked once the page runs; without a script the
+ * field stays empty and no offer follows.
+ */
+function useDeviceReport(enabled: boolean): string {
+	const [report, setReport] = useState('');
+	useEffect(() => {
+		if (!enabled || typeof PublicKeyCredential === 'undefined') return;
+		let current = true;
+		void PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()
+			.then((able) => {
+				if (current && able) setReport('1');
+			})
+			.catch(() => {
+				/* No answer is a "no": nothing is offered. */
+			});
+		return () => {
+			current = false;
+		};
+	}, [enabled]);
+	return report;
+}
+
 /* Whether the browser can use passkeys does not change while the page is open. */
 function neverChanges(): () => void {
 	return () => {};
@@ -99,9 +123,15 @@ export function LoginPage({
 	switcher,
 	face,
 	listRefusal,
-	passkey
+	passkey,
+	unknownPasskey
 }: {
 	uid: string;
+	/*
+	 * A passkey just refused here that no project holds for this site (specs/141 research R10): the browser is told, so
+	 * the password manager can stop offering it. The server sets it only at a project's own site.
+	 */
+	unknownPasskey?: { rpId: string; credentialId: string };
 	/* Signing in with a passkey, offered in every form of this page where the project accepts passkeys (specs/139). */
 	passkey?: PasskeyOnPage;
 	errorMessage?: string;
@@ -152,6 +182,23 @@ export function LoginPage({
 		notOnTheServer
 	);
 	const passkeyReady = !embedded && offer !== undefined && webAuthn;
+	const deviceReport = useDeviceReport(!embedded && passkey !== undefined);
+	useEffect(() => {
+		if (
+			embedded ||
+			!unknownPasskey ||
+			typeof PublicKeyCredential === 'undefined'
+		)
+			return;
+		/* Typed by hand: the Signal API is newer than the DOM library this bundle is checked against. */
+		const api = PublicKeyCredential as unknown as {
+			signalUnknownCredential?: (options: {
+				rpId: string;
+				credentialId: string;
+			}) => Promise<void>;
+		};
+		api.signalUnknownCredential?.(unknownPasskey).catch(() => undefined);
+	}, [embedded, unknownPasskey]);
 	const [passkeyCancelled, setPasskeyCancelled] = useState(false);
 	useEffect(() => {
 		if (!passkeyReady) return;
@@ -469,6 +516,13 @@ export function LoginPage({
 					 */}
 					{passwordLogin && (
 						<>
+							{passkey && (
+								<input
+									type="hidden"
+									name="passkeyDevice"
+									value={deviceReport}
+								/>
+							)}
 							<Form.Item
 								name="username"
 								rules={[{ required: true, message: T.login.emailRequired }]}

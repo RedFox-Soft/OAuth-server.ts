@@ -44,6 +44,7 @@ import {
 	codeRequiredServer,
 	consentServer,
 	loginServer,
+	passkeyOfferServer,
 	registrationServer,
 	totpServer
 } from './serverRender.js';
@@ -163,7 +164,10 @@ import { ttl } from 'lib/configs/liveTime.js';
 import epochTime from 'lib/helpers/epoch_time.js';
 import { denormalize } from 'lib/helpers/user_codes.js';
 import { versionedAsset } from 'lib/html/versionedAsset.js';
-import { accountPageUrl } from 'lib/account_page/client.js';
+import {
+	accountPageClientId,
+	accountPageUrl
+} from 'lib/account_page/client.js';
 import { findDeclaredResource } from 'lib/resources/registry.js';
 import { namespaceOf } from 'lib/resources/namespace.js';
 import { isMcpResource } from 'lib/mcp/resource_server.js';
@@ -254,9 +258,15 @@ import { noteListed } from '../attacker_list/counters.js';
 import {
 	judgePasskey,
 	offerFor,
-	type PasskeyOffer
+	type PasskeyOffer,
+	type UnknownPasskey
 } from '../passkeys/sign_in.js';
 import { passkeysAccepted } from '../passkeys/accepted.js';
+import { CREDENTIAL_FIELD_MAX } from '../passkeys/consts.js';
+import { completeOffer, prepareOffer } from '../passkeys/offer.js';
+import { offerable, type OfferKind } from '../passkeys/offerable.js';
+import { declineOffers, noteOfferShown } from '../end_users/service.js';
+import { holderOfSession } from '../totp/self_service.js';
 import { relyingPartyOf } from '../passkeys/relying_party.js';
 import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
 
@@ -1070,6 +1080,7 @@ async function signInPage(
 		errorMessage?: string;
 		status?: number;
 		passkeys?: boolean;
+		unknownPasskey?: UnknownPasskey;
 	} = {}
 ): Promise<Response> {
 	const options = await loginOptionsForBucket(signsInto);
@@ -1092,7 +1103,8 @@ async function signInPage(
 		...page,
 		...(shown.passkeys === false
 			? {}
-			: await passkeyOfferOf(interaction, signsInto, page.passwordLogin))
+			: await passkeyOfferOf(interaction, signsInto, page.passwordLogin)),
+		...(shown.unknownPasskey ? { unknownPasskey: shown.unknownPasskey } : {})
 	});
 }
 
@@ -1185,6 +1197,105 @@ async function unverifiedAtSignIn(
  * Each door brings its own words for the first refusal (`refuse`): the password door's is the one sentence an unknown
  * address and a wrong password share, which must not change; the passkey door's never mentions a password.
  */
+/*
+ * What follows a proved credential of the "something you know" kind (specs/141 research R2): a password, or a
+ * conditional passkey, which is no more than the password it was made after. A person who holds a code, or a project
+ * that requires one, is asked for it, and nothing is established before it arrives; otherwise the sign-in completes
+ * with the method's own context. The password door may carry the offer of a passkey on (research R3).
+ */
+async function afterKnowledge(
+	interaction: Interaction,
+	input: {
+		user: User;
+		bucketId: string;
+		totpRequired: boolean;
+		remember: boolean;
+		method: 'password' | 'passkey_conditional';
+		offer: boolean;
+		cookie: OIDCCookies;
+		route: string;
+		request: Request;
+	}
+): Promise<Response> {
+	const { user, bucketId, method } = input;
+	/*
+	 * A person who set up an authenticator is asked for it at every password sign-in, whatever the project
+	 * requires (specs/126 research R1): a factor that is not asked for protects nothing, and makes them believe
+	 * it does. It is also what lets a request for a multi-factor sign-in be met for them, through this ordinary
+	 * sign-in. Without one, only a project that requires a factor leads on, to setting one up.
+	 *
+	 * Last, after every refusal the door made. The order is the point: an inactive or unverified account is turned
+	 * away exactly as it was, so the second factor never becomes the step at which an account reveals that it exists.
+	 */
+	if (input.totpRequired || user.totp !== undefined) {
+		/*
+		 * `result` is deliberately NOT written here. That is the whole of "a correct password
+		 * alone establishes nothing": no session is created, no token is issued, and the
+		 * authorization request stays where it is until a code arrives.
+		 */
+		interaction.payload.secondFactor = {
+			accountId: user._id,
+			/*
+			 * An unchecked checkbox submits nothing, so an absent field is the decline. `transient`
+			 * is the negative of what the control says, which is the trap this expression fell into:
+			 * it read `=== 'on'`, marking a sign-in the end user asked to keep as one to discard.
+			 */
+			transient: !input.remember,
+			attempts: 0,
+			...(method === 'passkey_conditional' ? { passkey: true as const } : {}),
+			...(input.offer ? { offer: true as const } : {})
+		};
+		await interaction.persist();
+		/*
+		 * A redirect rather than a render, and that is forced rather than stylistic:
+		 * loginClient.tsx reads the page name out of window.location.pathname, so a code page
+		 * served at the login path hydrates into an empty root. The federated decline path
+		 * redirects for the same reason.
+		 */
+		return Response.redirect(
+			buildUIPath(interaction.uid, user.totp ? 'totp' : 'totp/enroll'),
+			303
+		);
+	}
+
+	interaction.payload.result = {
+		login: {
+			accountId: user._id,
+			transient: !input.remember,
+			/*
+			 * The context this sign-in satisfied: the method alone, because a bucket that demands a second factor,
+			 * and a person who holds one, never reach here; they stage `secondFactor` above, and the context is
+			 * decided once the code is verified.
+			 */
+			amr: [...AMR_FOR_METHOD[method]],
+			acr: configuration.acrMap[DISTINCTION_FOR_METHOD[method]],
+			...(input.offer ? { passkeyOffer: 'conditional' as const } : {})
+		}
+	};
+	await settlePendingLink(interaction.payload, bucketId);
+	return resume(interaction, input.cookie, {
+		route: input.route,
+		request: input.request
+	});
+}
+
+/*
+ * Whether a password sign-in may lead to the passkey offer (specs/141 research R3): the page found a device that can
+ * make a passkey, the person asked to be remembered on it, and the sign-in is not the account page's own, which has its
+ * own "Add a passkey". Whether it does is the policy's last prompt.
+ */
+function offersPasskey(
+	interaction: Interaction,
+	bucketId: string,
+	body: { remember?: string; passkeyDevice?: string }
+): boolean {
+	return (
+		body.passkeyDevice === '1' &&
+		body.remember === 'on' &&
+		clientIdOf(interaction) !== accountPageClientId(bucketId)
+	);
+}
+
 async function accountGates(input: {
 	uid: string;
 	interaction: Interaction;
@@ -1275,6 +1386,89 @@ function proxyHostOf(interaction: Interaction): string | undefined {
  * The look of a page that names the app a sign-in is for (the refusal page, the set-up that continues it): an app behind
  * the proxy is named by its host, as the proxy's own pages name it (specs/128 research R7).
  */
+/*
+ * The offer this interaction stands at (specs/141): its prompt, the project and the person the session signed in, and
+ * the holder of that browser session, which a ceremony and a conditional passkey's confirmation are bound to.
+ */
+async function offerAt(interaction: Interaction): Promise<
+	| {
+			kind: OfferKind;
+			bucket: UserBucket;
+			user: User;
+			holder: string;
+	  }
+	| undefined
+> {
+	const prompt = interaction.payload.prompt;
+	const kind = prompt?.details.kind;
+	const session = interaction.payload.session;
+	if (
+		prompt?.name !== 'passkey-offer' ||
+		(kind !== 'full' && kind !== 'conditional') ||
+		!session?.uid
+	) {
+		return undefined;
+	}
+	const bucketId = await resolveBucketForRequest(
+		clientIdOf(interaction),
+		resourceOf(interaction),
+		await addressedBucketOf(interaction)
+	);
+	const bucket = await getBucketStore().find(bucketId);
+	const user = bucket
+		? await getUserStore(bucketId).find(session.accountId)
+		: null;
+	if (!bucket || !user) return undefined;
+	return { kind, bucket, user, holder: holderOfSession(session.uid) };
+}
+
+async function offerPage(
+	interaction: Interaction,
+	offer: NonNullable<Awaited<ReturnType<typeof offerAt>>>,
+	shown: {
+		askNever?: boolean;
+		refused?: 'failed' | 'exists';
+		created?: { conditional: boolean };
+	}
+): Promise<Response> {
+	const look = await lookNamingApp(interaction, offer.bucket._id);
+	const common = {
+		handOffTo: redirectUriOf(interaction),
+		language: languageOf(interaction),
+		...look
+	};
+	if (shown.created) {
+		return passkeyOfferServer(
+			{
+				uid: interaction.uid,
+				state: 'created',
+				email: offer.user.email,
+				conditional: shown.created.conditional
+			},
+			common
+		);
+	}
+	const options = await prepareOffer(
+		offer.bucket,
+		offer.user,
+		offer.holder,
+		offer.kind,
+		interaction.uid
+	);
+	return passkeyOfferServer(
+		{
+			uid: interaction.uid,
+			state: 'offer',
+			email: offer.user.email,
+			...(options ? { options } : {}),
+			silent: offer.kind === 'full',
+			askNever: shown.askNever === true,
+			...(shown.refused ? { refused: shown.refused } : {})
+		},
+		{ ...common, ...(shown.refused ? { status: 400 } : {}) }
+	);
+}
+
 async function lookNamingApp(
 	interaction: Interaction,
 	bucketId: string
@@ -1891,68 +2085,25 @@ export const ui = new Elysia()
 				refuse
 			});
 			if (gated) return gated;
-			/*
-			 * Last, after every refusal above. The order is the point: an inactive or unverified account
-			 * is turned away exactly as it was, so the second factor never becomes the step at which an
-			 * account reveals that it exists.
-			 */
-			const { totpRequired } = loginOptions;
-			/*
-			 * A person who set up an authenticator is asked for it at every password sign-in, whatever the project
-			 * requires (specs/126 research R1): a factor that is not asked for protects nothing, and makes them believe
-			 * it does. It is also what lets a request for a multi-factor sign-in be met for them, through this ordinary
-			 * sign-in. Without one, only a project that requires a factor leads on, to setting one up.
-			 */
-			if (totpRequired || user.totp !== undefined) {
-				/*
-				 * `result` is deliberately NOT written here. That is the whole of "a correct password
-				 * alone establishes nothing": no session is created, no token is issued, and the
-				 * authorization request stays where it is until a code arrives.
-				 */
-				interaction.payload.secondFactor = {
-					accountId: user._id,
-					/*
-					 * An unchecked checkbox submits nothing, so an absent field is the decline. `transient`
-					 * is the negative of what the control says, which is the trap this expression fell into:
-					 * it read `=== 'on'`, marking a sign-in the end user asked to keep as one to discard.
-					 */
-					transient: body.remember !== 'on',
-					attempts: 0
-				};
-				await interaction.persist();
-				/*
-				 * A redirect rather than a render, and that is forced rather than stylistic:
-				 * loginClient.tsx reads the page name out of window.location.pathname, so a code page
-				 * served at the login path hydrates into an empty root. The federated decline path
-				 * redirects for the same reason.
-				 */
-				return Response.redirect(
-					buildUIPath(uid, user.totp ? 'totp' : 'totp/enroll'),
-					303
-				);
-			}
-
-			interaction.payload.result = {
-				login: {
-					accountId: user._id,
-					transient: body.remember !== 'on',
-					/*
-					 * The context this sign-in satisfied. A password alone, because a bucket that demands
-					 * a second factor, and a person who holds one, never reach here — they stage
-					 * `secondFactor` above, and the context is decided once the code is verified.
-					 */
-					amr: [...AMR_FOR_METHOD.password],
-					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.password]
-				}
-			};
-			await settlePendingLink(interaction.payload, bucketId);
-			return resume(interaction, cookie, { route, request });
+			return afterKnowledge(interaction, {
+				user,
+				bucketId,
+				totpRequired: loginOptions.totpRequired,
+				remember: body.remember === 'on',
+				method: 'password',
+				offer: offersPasskey(interaction, bucketId, body),
+				cookie,
+				route,
+				request
+			});
 		},
 		{
 			body: t.Object({
 				username: t.String(),
 				password: t.String(),
-				remember: t.Optional(t.Literal('on'))
+				remember: t.Optional(t.Literal('on')),
+				/* Set by the page's script where this device can make a passkey (specs/141 research R3). */
+				passkeyDevice: t.Optional(t.String({ maxLength: 8 }))
 			})
 		}
 	)
@@ -2006,10 +2157,12 @@ export const ui = new Elysia()
 				case 'retry':
 					return page({ notice: T.notices.passkeyRetry });
 				case 'refused':
+					/* The same sentence whether or not the browser is also told the passkey is unknown here. */
 					return page({
 						errorMessage: text(T.errors.passkeyRefused, {
 							service: look.face.service
-						})
+						}),
+						...(attempt.unknown ? { unknownPasskey: attempt.unknown } : {})
 					});
 			}
 			const { user } = attempt;
@@ -2031,6 +2184,23 @@ export const ui = new Elysia()
 			if (gated) return gated;
 			/* A password proved earlier in this interaction and waiting for its code is overtaken by the passkey. */
 			delete interaction.payload.secondFactor;
+			/*
+			 * A conditional passkey (specs/141 research R2) is no more than the password it was made after: the code step
+			 * that would follow that password follows it, and alone it reports the password context.
+			 */
+			if (attempt.passkey.conditional === true) {
+				return afterKnowledge(interaction, {
+					user,
+					bucketId: signsInto,
+					totpRequired: (await loginOptionsForBucket(signsInto)).totpRequired,
+					remember: body.remember === 'on',
+					method: 'passkey_conditional',
+					offer: false,
+					cookie,
+					route,
+					request
+				});
+			}
 			interaction.payload.result = {
 				login: {
 					accountId: user._id,
@@ -2149,12 +2319,20 @@ export const ui = new Elysia()
 				return refuse();
 			}
 
+			/*
+			 * After a conditional passkey the methods are that passkey's and a code (specs/141 research R2). After a password
+			 * whose door saw a device able to make one, the sign-in may lead to the offer of a full passkey (research R3).
+			 */
+			const method = pending.passkey
+				? 'passkey_conditional_code'
+				: 'password_code';
 			interaction.payload.result = {
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					amr: [...AMR_FOR_METHOD.password_code],
-					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.password_code]
+					amr: [...AMR_FOR_METHOD[method]],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD[method]],
+					...(pending.offer ? { passkeyOffer: 'full' as const } : {})
 				}
 			};
 			delete interaction.payload.secondFactor;
@@ -2368,12 +2546,19 @@ export const ui = new Elysia()
 				});
 			}
 
+			/*
+			 * Never an offer after setting up an authenticator: this sign-in already showed a page of its own (specs/141
+			 * FR-001). After a conditional passkey, its methods and the code.
+			 */
+			const method = pending.passkey
+				? 'passkey_conditional_code'
+				: 'password_code';
 			interaction.payload.result = {
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					amr: [...AMR_FOR_METHOD.password_code],
-					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.password_code]
+					amr: [...AMR_FOR_METHOD[method]],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD[method]]
 				}
 			};
 			delete interaction.payload.secondFactor;
@@ -2484,6 +2669,90 @@ export const ui = new Elysia()
 			return resume(interaction, cookie, { route, request });
 		},
 		{ body: t.Object({ action: t.Literal('return') }) }
+	)
+	/*
+	 * The passkey offer after a sign-in with a password (specs/141 contracts/sign-in-and-offer.md), reached only through
+	 * the policy's last prompt: the person is signed in already, in the session this interaction carries. Opening it
+	 * counts a showing, which starts the 30-day pause however the page is left (research R4); the ceremony is held by
+	 * that browser session, so a conditional passkey made here can be confirmed only in it (research R7).
+	 */
+	.get(
+		'ui/:uid/passkey-offer',
+		async ({ params: { uid }, interaction, cookie, route, request }) => {
+			const offer = await offerAt(interaction);
+			if (!offer) return Response.redirect(buildUILoginPath(uid), 303);
+			/* A condition changed since the prompt: on to the app, as if the offer had never been due. */
+			const counted = interaction.payload.passkeyOfferCounted === true;
+			if (
+				!(await offerable(offer.bucket, offer.user, { thisShowing: counted }))
+			) {
+				interaction.payload.result = { passkeyOffer: 'skipped' };
+				return resume(interaction, cookie, { route, request });
+			}
+			/* Counted once per sign-in: a reload, or a second request for the page, is the same showing. */
+			const before = offer.user.passkeyOffer?.shown ?? 0;
+			let shown = before;
+			if (!counted) {
+				await noteOfferShown(offer.bucket._id, offer.user._id);
+				interaction.payload.passkeyOfferCounted = true;
+				await interaction.persist();
+				shown = before + 1;
+			}
+			return offerPage(interaction, offer, { askNever: shown >= 2 });
+		}
+	)
+	.post(
+		'ui/:uid/passkey-offer',
+		async ({ params: { uid }, body, interaction, cookie, route, request }) => {
+			const finish = async (outcome: 'declined' | 'created') => {
+				interaction.payload.result = { passkeyOffer: outcome };
+				return resume(interaction, cookie, { route, request });
+			};
+			const offer = await offerAt(interaction);
+			if (!offer) return Response.redirect(buildUILoginPath(uid), 303);
+			switch (body.action) {
+				case 'continue':
+					return finish('created');
+				case 'not_now':
+					return finish('declined');
+				case 'never':
+					await declineOffers(offer.bucket._id, offer.user._id);
+					return finish('declined');
+				case 'create': {
+					const made = await completeOffer(
+						offer.bucket,
+						offer.user,
+						offer.holder,
+						uid,
+						body.credential ?? '',
+						body.silent === '1',
+						request
+					);
+					if (made.ok) {
+						return offerPage(interaction, offer, {
+							created: { conditional: made.kind === 'conditional' }
+						});
+					}
+					/* A new ceremony on the same showing: a refused create is not a second showing. */
+					return offerPage(interaction, offer, {
+						askNever: (offer.user.passkeyOffer?.shown ?? 0) >= 2,
+						refused: made.reason === 'exists' ? 'exists' : 'failed'
+					});
+				}
+			}
+		},
+		{
+			body: t.Object({
+				action: t.Union([
+					t.Literal('create'),
+					t.Literal('not_now'),
+					t.Literal('never'),
+					t.Literal('continue')
+				]),
+				credential: t.Optional(t.String({ maxLength: CREDENTIAL_FIELD_MAX })),
+				silent: t.Optional(t.String({ maxLength: 8 }))
+			})
+		}
 	)
 	/*
 	 * Leg one of a federated sign-in. Declares its own `params` schema, and that is load-bearing rather than

@@ -37,7 +37,10 @@ const SIGN_IN_ROUTES: Record<
 	'GET /ui/:uid/totp/enroll/link': 'records none',
 	'GET /ui/:uid/registration': 'records none',
 	'GET /ui/:uid/consent': 'records none',
-	'GET /ui/:uid/federation/:providerId/start': 'records none'
+	'GET /ui/:uid/federation/:providerId/start': 'records none',
+	// The passkey offer after a password sign-in (specs/141): it follows a finished sign-in and writes no login of its own.
+	'GET /ui/:uid/passkey-offer': 'records none',
+	'POST /ui/:uid/passkey-offer': 'records none'
 };
 
 /**

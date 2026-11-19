@@ -167,6 +167,11 @@ export const UpdateBucketBody = t.Object({
 	 */
 	passkeyLogin: t.Optional(t.Boolean()),
 	/*
+	 * Whether people are offered a passkey after a sign-in with a password (specs/141). Absent means on; it has no
+	 * effect while `passkeyLogin` is off, and is refused on the administrators' project as `passkeyLogin` is.
+	 */
+	passkeyOffer: t.Optional(t.Boolean()),
+	/*
 	 * Whether the project's people are emailed about a sign-in from a new network or browser, with a link that signs
 	 * them out everywhere (specs/138). Absent means off, and on for the administrators' project.
 	 */

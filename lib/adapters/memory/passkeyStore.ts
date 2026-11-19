@@ -144,6 +144,20 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		}));
 	}
 
+	async confirm(bucketId: string, id: string): Promise<boolean> {
+		const held = this.owned(bucketId, id);
+		if (held?.conditional !== true) return false;
+		delete held.conditional;
+		delete held.confirm;
+		return true;
+	}
+
+	async knownAnywhere(rpId: string, credentialId: string): Promise<boolean> {
+		return [...this.records.values()].some(
+			(held) => held.rpId === rpId && held.credentialId === credentialId
+		);
+	}
+
 	private owned(bucketId: string, id: string): Passkey | undefined {
 		const held = this.records.get(id);
 		return held && held.bucketId === bucketId ? held : undefined;

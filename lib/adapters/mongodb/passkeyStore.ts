@@ -165,6 +165,22 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		);
 	}
 
+	async confirm(bucketId: string, id: string): Promise<boolean> {
+		const result = await this.collection.updateOne(
+			{ _id: id, bucketId, conditional: true },
+			{ $unset: { conditional: '', confirm: '' } }
+		);
+		return result.modifiedCount === 1;
+	}
+
+	async knownAnywhere(rpId: string, credentialId: string): Promise<boolean> {
+		const found = await this.collection.findOne(
+			{ credentialId, rpId },
+			{ projection: { _id: 1 } }
+		);
+		return found !== null;
+	}
+
 	private recordOf(found: unknown): Passkey | null {
 		return found ? documentOf(STORE_AREAS.passkeys, Passkey, found) : null;
 	}

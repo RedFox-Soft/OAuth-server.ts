@@ -21,7 +21,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   person's passkeys on their page and revoke one or all of them, which signs the person out everywhere and mails them
   (spec 140; agents get `project_user_passkey_list`, `_revoke` and `_revoke_all`). The Sign-in tab counts who has a
   passkey, and an address change that breaks passkeys says beforehand how many people lose them and who has no other
-  way in. **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the three new storage areas, then `db:migrate` (one
+  way in. After a password sign-in people are offered a passkey (spec 141; `passkeyOffer`, on by default): after a
+  password and a code it is two-step at once, after a password alone it works like the password until confirmed from
+  its mail in the same browser, and any reset or "This wasn't me" removes it. The account page keeps the browser's
+  passkey list current, and each project host serves `/.well-known/passkey-endpoints`. **Upgrade note:** run
+  `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then `db:migrate` (one
   fence migration).
 
 ### Fixed

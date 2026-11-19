@@ -11,7 +11,8 @@
  * A script rather than a spec (Constitution Principle III): the in-memory store checks with no `await` inside a
  * write, so `bun test` cannot prove that the unique `{bucketId, credentialId}` index exists and refuses a second add,
  * that the conditional counter write lets exactly one of two racing sign-ins through, that the removals by person,
- * by project and "added since" remove exactly theirs, or that one "This wasn't me" link is spent once.
+ * by project and "added since" remove exactly theirs, that one "This wasn't me" link is spent once, or that two racing
+ * confirmations of a conditional passkey confirm it once (specs/141).
  */
 
 const THROWAWAY =
@@ -243,6 +244,44 @@ check(
 		held.join(', ')
 	);
 	await store.removeAllIn(holding);
+}
+/* ---------------------------------------------------------- confirming, once (specs/141) */
+{
+	const confirming = `${bucketId}-confirming`;
+	const conditional = passkey({
+		bucketId: confirming,
+		createdVia: 'password',
+		conditional: true,
+		confirm: { digest: 'd'.repeat(64), exp: 4102444800, holder: 'h'.repeat(64) }
+	});
+	const full = passkey({ bucketId: confirming });
+	await store.create(conditional);
+	await store.create(full);
+	const raced = await Promise.all([
+		store.confirm(confirming, conditional._id),
+		store.confirm(confirming, conditional._id)
+	]);
+	const after = await store.find(confirming, conditional._id);
+	check(
+		'of two racing confirmations exactly one confirms, and the passkey is left full with no link',
+		raced.filter(Boolean).length === 1 &&
+			after !== null &&
+			after.conditional === undefined &&
+			after.confirm === undefined,
+		raced.join(', ')
+	);
+	check(
+		'confirming a full passkey, or one in another project, changes nothing',
+		!(await store.confirm(confirming, full._id)) &&
+			!(await store.confirm(other, conditional._id))
+	);
+	check(
+		'a credential id is known across projects for its RP ID, and not for another',
+		(await store.knownAnywhere('auth.example.test', full.credentialId)) &&
+			!(await store.knownAnywhere('other.example.test', full.credentialId)) &&
+			!(await store.knownAnywhere('auth.example.test', id()))
+	);
+	await store.removeAllIn(confirming);
 }
 check(
 	'removing a person’s passkeys leaves everyone else’s',

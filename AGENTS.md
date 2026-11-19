@@ -219,7 +219,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   asked for at every password sign-in, but the password throttle reads only the project's requirement. A passkey's RP ID
   and origin come only from `relyingPartyOf(bucket)`, and its record is unowned, so deleting a person removes it by hand;
   an administrator's revocation signs the person out everywhere, and whether someone has another way in is judged only
-  in `lib/passkeys/ways_in.ts`.
+  in `lib/passkeys/ways_in.ts`. A passkey made after a password alone is conditional: it signs in as that password does,
+  any reset or "This wasn't me" removes it, and only its mailed confirmation in the session that made it, or a strong
+  sign-in, makes it full.
   → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion

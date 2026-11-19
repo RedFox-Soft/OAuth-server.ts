@@ -210,6 +210,27 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		);
 	}
 
+	async confirm(bucketId: string, id: string): Promise<boolean> {
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)} SET doc = doc - 'conditional' - 'confirm'
+			WHERE id = ${id} AND doc->>'bucketId' = ${bucketId}
+				AND doc->>'conditional' = 'true'
+			RETURNING id
+		`;
+		return rows.length === 1;
+	}
+
+	async knownAnywhere(rpId: string, credentialId: string): Promise<boolean> {
+		const handle = sql();
+		const rows = await handle`
+			SELECT 1 FROM ${handle(this.area)}
+			WHERE doc->>'credentialId' = ${credentialId} AND doc->>'rpId' = ${rpId}
+			LIMIT 1
+		`;
+		return rows.length > 0;
+	}
+
 	private recordOf(row: unknown): Passkey | null {
 		const doc = docOf(row);
 		return doc === undefined ? null : documentOf(this.area, Passkey, doc);

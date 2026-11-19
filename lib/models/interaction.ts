@@ -28,7 +28,9 @@ const PendingPrompt = t.Object({
 			rar: t.Optional(t.Array(t.Unknown())),
 			/* The API that asks for a code or a recent sign-in, and the age it allows in seconds (specs/130). */
 			api: t.Optional(t.String()),
-			apiMaxAge: t.Optional(t.Number())
+			apiMaxAge: t.Optional(t.Number()),
+			/* The passkey offer (specs/141): whether the passkey it makes is full at once or conditional. */
+			kind: t.Optional(t.Union([t.Literal('full'), t.Literal('conditional')]))
 		},
 		{ additionalProperties: true }
 	)
@@ -92,6 +94,11 @@ export const InteractionPayload = t.Object({
 	 * Living on the interaction gives it the interaction's own TTL, so a half-finished sign-in
 	 * expires with the attempt it belongs to and needs no expiry logic of its own.
 	 */
+	/*
+	 * The passkey offer of this interaction was counted as a showing (specs/141 research R4). A reload, or a browser that
+	 * asks for the page twice, is the same showing: counted once, so "Don't ask again" still waits for the second sign-in.
+	 */
+	passkeyOfferCounted: t.Optional(t.Literal(true)),
 	secondFactor: t.Optional(
 		t.Object({
 			accountId: t.String(),
@@ -103,7 +110,17 @@ export const InteractionPayload = t.Object({
 			 * Set up from an application that requires a code (specs/127), in a project that does not require one: the
 			 * person's own choice, proved as on their own page — a fresh password and a link mailed to them first.
 			 */
-			selfService: t.Optional(t.Boolean())
+			selfService: t.Optional(t.Boolean()),
+			/*
+			 * The credential before the code was a conditional passkey (specs/141 research R2): the code completes the
+			 * sign-in with that passkey's methods, never a password's.
+			 */
+			passkey: t.Optional(t.Literal(true)),
+			/*
+			 * The password door saw a device that can make passkeys and a ticked "Remember me" (specs/141 research R3), so
+			 * the completed sign-in may lead to the passkey offer.
+			 */
+			offer: t.Optional(t.Literal(true))
 		})
 	),
 	/*

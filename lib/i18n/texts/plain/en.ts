@@ -78,6 +78,9 @@ export const en = {
 			heading: 'Password updated',
 			body: 'Your password has been changed and you have been signed out everywhere. Return to the application to sign in.'
 		},
+		/* After a reset that removed passkeys made after the old password alone (specs/141). */
+		conditionalRemoved:
+			'Passkeys you had not confirmed were removed. You can add a new one on your account page.',
 		inviteSuccess: {
 			title: 'Password set',
 			heading: 'Your password is set',

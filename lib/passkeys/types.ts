@@ -17,12 +17,20 @@ export const PasskeyCeremonyPayload = t.Object({
 	bucketId: t.String(),
 	/* `account:<session uid>`: the browser session the ceremony belongs to, compared at the act. */
 	holder: t.String(),
-	purpose: t.Union([t.Literal('add'), t.Literal('remove')]),
-	/* The proof the ceremony was prepared under; an add stores it as the passkey's `createdVia`. */
+	/*
+	 * `offer` is the passkey offer after a password sign-in (specs/141), keyed `offer:<interaction uid>`; its holder is
+	 * the browser session the sign-in made, as an add's is.
+	 */
+	purpose: t.Union([t.Literal('add'), t.Literal('remove'), t.Literal('offer')]),
+	/*
+	 * The proof the ceremony was prepared under; an add stores it as the passkey's `createdVia`. `password` is an offer
+	 * after a password alone, whose passkey is conditional.
+	 */
 	proof: t.Union([
 		t.Literal('passkey'),
 		t.Literal('password_code'),
-		t.Literal('password_mail')
+		t.Literal('password_mail'),
+		t.Literal('password')
 	]),
 	/* An add: 32 random bytes, base64url, the challenge its options carried. */
 	challenge: t.Optional(t.String()),
