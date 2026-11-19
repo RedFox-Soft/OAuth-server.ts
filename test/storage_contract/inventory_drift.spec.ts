@@ -13,6 +13,7 @@ import {
 } from 'lib/consts/storage_inventory.js';
 import { grantable } from 'lib/adapters/memory/helpers.js';
 import {
+	KEPT_THROUGH_REVOCATION,
 	OWNER_FIELDS,
 	PAYLOAD_SCHEMAS,
 	SCHEMA_EXEMPT_AREAS
@@ -262,7 +263,12 @@ describe('storage ownership drift', () => {
 				(field) =>
 					field in schema.properties &&
 					area.owners.account !== field &&
-					area.owners.client !== field
+					area.owners.client !== field &&
+					!(
+						field === 'accountId' &&
+						area.owners.account === null &&
+						KEPT_THROUGH_REVOCATION.has(area.name)
+					)
 			).map((field) => `${area.name}.${field}`);
 		});
 

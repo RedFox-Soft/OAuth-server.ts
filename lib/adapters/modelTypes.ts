@@ -38,6 +38,7 @@ import type { SessionPayloadType } from '../models/session.js';
 import type { PasswordGuessingTallyPayload } from '../attacker_list/types.js';
 import type { TeamInvitationThrottlePayload } from '../admin/groups/invite_bounds.js';
 import type {
+	NotMeLinkPayload,
 	TotpAttemptPayload,
 	TotpEnrollmentPayload,
 	TotpLinkPayload,
@@ -87,6 +88,7 @@ export interface ModelPayloadByName {
 	Interaction: InteractionPayloadType;
 	LoginThrottle: LoginThrottlePayload;
 	MailRequestTally: MailRequestTallyPayload;
+	NotMeLink: NotMeLinkPayload;
 	PasskeyAttemptTally: PasskeyAttemptTallyPayload;
 	PasskeyCeremony: PasskeyCeremonyPayload;
 	PasswordGuessingTally: PasswordGuessingTallyPayload;

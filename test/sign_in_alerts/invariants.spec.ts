@@ -33,7 +33,7 @@ import type { UserBucket } from 'lib/adapters/types.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { sentEmails } from 'lib/mail/mailer.ts';
 import { issueNotMeLink } from 'lib/sign_in_alerts/link.ts';
-import { TotpLinkPayload } from 'lib/totp/types.ts';
+import { NotMeLinkPayload } from 'lib/totp/types.ts';
 
 const APP = 'activity-app';
 
@@ -145,7 +145,7 @@ describe("the This wasn't me link and what triggers it", () => {
 
 	it('accepts no link of another purpose, and is accepted by no other page', async () => {
 		const token = crypto.randomBytes(32).toString('base64url');
-		await checkedAdapter('TotpLink', TotpLinkPayload).upsert(
+		await checkedAdapter('NotMeLink', NotMeLinkPayload).upsert(
 			crypto.createHash('sha256').update(token).digest('hex'),
 			{
 				accountId: anna.accountId,

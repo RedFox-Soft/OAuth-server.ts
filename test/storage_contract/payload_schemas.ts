@@ -57,6 +57,7 @@ import {
 	VerificationResendPayload
 } from 'lib/verification/types.js';
 import {
+	NotMeLinkPayload,
 	TotpAttemptPayload,
 	TotpEnrollmentPayload,
 	TotpLinkPayload,
@@ -92,6 +93,7 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	Interaction: InteractionPayload,
 	LoginThrottle: LoginThrottlePayload,
 	MailRequestTally: MailRequestTallyPayload,
+	NotMeLink: NotMeLinkPayload,
 	PasskeyAttemptTally: PasskeyAttemptTallyPayload,
 	PasskeyCeremony: PasskeyCeremonyPayload,
 	PasswordGuessingTally: PasswordGuessingTallyPayload,
@@ -125,3 +127,14 @@ export const SCHEMA_EXEMPT_AREAS: ReadonlySet<string> = new Set(['Client']);
 
 /* The two fields the guard treats as ownership pointers wherever they appear. */
 export const OWNER_FIELDS = ['accountId', 'clientId'] as const;
+
+/*
+ * Areas whose records name an account on purpose without the account owning them, each with where they are removed
+ * instead. Named one by one, so any other area that gains an `accountId` still fails the guard.
+ */
+export const KEPT_THROUGH_REVOCATION: ReadonlyMap<string, string> = new Map([
+	[
+		'NotMeLink',
+		'a "This wasn’t me" link must outlive a sign-out everywhere; removeEndUser and destroyBucket remove it'
+	]
+]);

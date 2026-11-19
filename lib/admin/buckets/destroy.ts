@@ -33,6 +33,7 @@ import { forgetBucketAddresses } from '../auth/bucketAddress.js';
 import { groupLabel } from '../groups/label.js';
 import { destroyBucketAccounts } from '../../connected_services/accounts.js';
 import { forgetProjectActivity } from '../../person_activity/forget.js';
+import { forgetNotMeLinksIn } from '../../totp/not_me_links.js';
 import { endSessionsOfApps } from '../behind-proxy/service.js';
 
 /* Who is destroying the bucket: an administrator's Delete now, or the server when the thirty days ran out. */
@@ -237,6 +238,8 @@ async function destroyClaimed(
 	await forgetProjectActivity(claimed._id);
 	/* Nor their passkeys (specs/139): unowned so a lock and a sign-out everywhere keep them. */
 	await getPasskeyStore().removeAllIn(claimed._id);
+	/* Nor the "This wasn't me" links mailed to them: unowned so a sign-out everywhere keeps them. */
+	await forgetNotMeLinksIn(claimed._id);
 	/* Its groups and every membership in them; nothing outside the bucket refers to either. */
 	await getBucketGroupStore().destroyByBucket(id);
 	/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind for

@@ -18,6 +18,8 @@ export async function verifyTwoStep(
 		buckets: UserBucketStoreInstance;
 		users: (bucketId: string) => UserStoreInstance;
 		links: ModelAdapter<Record<string, unknown>>;
+		/* The "This wasn't me" links: unowned, so removed with a person or a project by the two indexes they declare. */
+		notMeLinks: ModelAdapter<Record<string, unknown>>;
 		spent: ModelAdapter<Record<string, unknown>>;
 		attempts: ModelAdapter<Record<string, unknown>>;
 		/* An application's requirement of a code (specs/127): a base key on the stored client document. */
@@ -110,6 +112,45 @@ export async function verifyTwoStep(
 		spends.filter(Boolean).length === 1,
 		JSON.stringify(spends)
 	);
+
+	{
+		const mine = `verify-notme-${stamp}-mine`;
+		const theirs = `verify-notme-${stamp}-theirs`;
+		const other = `verify-notme-${stamp}-other-project`;
+		const link = (accountId: string, bucketId: string) => ({
+			accountId,
+			bucketId,
+			purpose: 'notme',
+			signInId: 'verify',
+			exp
+		});
+		await stores.notMeLinks.upsert(mine, link(person._id, bucket._id), 600);
+		await stores.notMeLinks.upsert(
+			theirs,
+			link('someone-else', bucket._id),
+			600
+		);
+		await stores.notMeLinks.upsert(
+			other,
+			link('someone-else', `${bucket._id}-x`),
+			600
+		);
+		const withPerson = await stores.notMeLinks.destroyByOwner(
+			'accountId',
+			person._id
+		);
+		const withProject = await stores.notMeLinks.destroyByOwner(
+			'bucketId',
+			bucket._id
+		);
+		const left = await stores.notMeLinks.find(other);
+		check(
+			'"This wasn’t me" links go with their person and with their project, and no further',
+			withPerson === 1 && withProject === 1 && left !== undefined,
+			JSON.stringify({ withPerson, withProject, left: left !== undefined })
+		);
+		await stores.notMeLinks.destroy(other);
+	}
 
 	const stepId = `verify-step-${stamp}`;
 	const steps = await Promise.all(

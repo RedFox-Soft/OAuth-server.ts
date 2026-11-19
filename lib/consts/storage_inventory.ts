@@ -119,6 +119,7 @@ export const MODEL_AREAS = [
 	'Interaction',
 	'LoginThrottle',
 	'MailRequestTally',
+	'NotMeLink',
 	'PasskeyAttemptTally',
 	'PasskeyCeremony',
 	'PasswordGuessingTally',
@@ -536,6 +537,20 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * Failed passkey sign-ins from one caller address in one UTC hour (specs/139 research R10), in MailRequestTally's
 	 * shape and for its reason: keyed by a network address, kept no longer than two hours, owning nothing.
 	 */
+	/*
+	 * The "This wasn't me" links (specs/126 about a factor, specs/138 about a new sign-in), keyed by the digest of the
+	 * token and expiring after three days. Unowned on purpose: whoever turned a factor on or signed in from somewhere
+	 * new can press Sign out everywhere, and that sweep must not take away the owner's way back. So only deleting the
+	 * person or destroying the project removes them, by hand, through the two indexes below.
+	 */
+	modelArea(
+		'NotMeLink',
+		EXPIRES_AT,
+		unowned(
+			'kept through every revocation of the account, so its owner can still answer the mail; removed by hand with the person and the project'
+		),
+		[{ key: { 'payload.accountId': 1 } }, { key: { 'payload.bucketId': 1 } }]
+	),
 	modelArea(
 		'PasskeyAttemptTally',
 		EXPIRES_AT,
@@ -652,9 +667,10 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	modelArea('TotpSpentStep', EXPIRES_AT, byAccount),
 	/*
 	 * A person's own two-step verification (specs/126): the links mailed to them, keyed by the digest of the token,
-	 * and how often one account was mailed an enrolment link. Account-owned, so a deleted person's pending links and
-	 * counts die with them; point-read by id, and expiring — ten minutes for an enrolment link, three days for the
-	 * "This wasn't me" link, a day for the count.
+	 * and how often one account was mailed an enrolment link. Account-owned, so a sign-out everywhere kills a link
+	 * bound to a browser session along with the session, and a deleted person's pending links and counts die with
+	 * them; point-read by id, and expiring — ten minutes for a link, a day for the count. The "This wasn't me" links
+	 * are not here: see NotMeLink.
 	 */
 	modelArea('TotpLink', EXPIRES_AT, byAccount),
 	modelArea('TotpLinkThrottle', EXPIRES_AT, byAccount),

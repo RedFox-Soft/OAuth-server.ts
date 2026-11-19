@@ -42,7 +42,11 @@ import {
 	LINK_WINDOW_SECONDS
 } from './consts.js';
 import type { Proved } from './enrollment.js';
-import { TotpLinkPayload, TotpLinkThrottlePayload } from './types.js';
+import {
+	NotMeLinkPayload,
+	TotpLinkPayload,
+	TotpLinkThrottlePayload
+} from './types.js';
 
 /*
  * A person's own two-step verification (specs/126): who may start or change it, the links mailed to prove the
@@ -52,6 +56,10 @@ import { TotpLinkPayload, TotpLinkThrottlePayload } from './types.js';
 
 function links() {
 	return checkedAdapter('TotpLink', TotpLinkPayload);
+}
+
+function notMeLinks() {
+	return checkedAdapter('NotMeLink', NotMeLinkPayload);
 }
 
 function linkCounts() {
@@ -263,8 +271,6 @@ export async function followLink(
 	if (
 		!record ||
 		record.exp <= epochTime() ||
-		record.purpose === 'disown' ||
-		record.purpose === 'notme' ||
 		record.holder !== holder ||
 		record.accountId !== accountId ||
 		record.bucketId !== bucketId
@@ -284,7 +290,7 @@ async function issueDisownLink(
 	enrolledAt: number
 ): Promise<string> {
 	const token = crypto.randomBytes(32).toString('base64url');
-	await links().upsert(
+	await notMeLinks().upsert(
 		digestOf(token),
 		{
 			accountId,
@@ -301,9 +307,9 @@ async function issueDisownLink(
 /* A live "This wasn't me" link, read without spending it, for the confirmation page. */
 export async function readDisownLink(
 	token: string
-): Promise<TotpLinkPayload | undefined> {
+): Promise<NotMeLinkPayload | undefined> {
 	if (!token) return undefined;
-	const record = await links().find(digestOf(token));
+	const record = await notMeLinks().find(digestOf(token));
 	return record?.purpose === 'disown' &&
 		record.exp > epochTime() &&
 		record.enrolledAt !== undefined
@@ -313,7 +319,7 @@ export async function readDisownLink(
 
 /* Spends a "This wasn't me" link; of two racing confirmations exactly one is told yes. */
 export async function spendDisownLink(token: string): Promise<boolean> {
-	return token ? links().consume(digestOf(token)) : false;
+	return token ? notMeLinks().consume(digestOf(token)) : false;
 }
 
 /*

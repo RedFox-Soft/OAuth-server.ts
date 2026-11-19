@@ -1147,6 +1147,7 @@ await verifyTwoStep(
 		buckets: new UserBucketStore(),
 		users: (bucketId) => new UserStore(bucketId),
 		links: adapter('TotpLink'),
+		notMeLinks: adapter('NotMeLink'),
 		spent: adapter('TotpSpentStep'),
 		attempts: adapter('TotpAttempt'),
 		clients: adapter('Client')

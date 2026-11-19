@@ -42,6 +42,7 @@ import { grantsIn, sessionsIn } from './sessions.js';
 import { lookup, type Language } from '../i18n/languages.js';
 import { storedLocaleRanges } from '../i18n/resolve.js';
 import { destroyConnectedAccountsOf } from '../connected_services/accounts.js';
+import { forgetNotMeLinksOf } from '../totp/not_me_links.js';
 import { forgetPersonActivity } from '../person_activity/forget.js';
 
 /*
@@ -348,6 +349,8 @@ export async function removeEndUser(
 	 * the sweep below never reaches it either.
 	 */
 	await getPasskeyStore().removeAllOf(bucket._id, id);
+	/* And the "This wasn't me" links mailed to them: unowned so a sign-out everywhere keeps them. */
+	await forgetNotMeLinksOf(id);
 	return cascadeForAccount(id, scopedId);
 }
 

@@ -75,8 +75,8 @@ export type TotpSpentStepPayload = Static<typeof TotpSpentStepPayload>;
  * A link mailed to the person (specs/126 research R4, R7), keyed by the sha256 of its token: the token exists only in
  * the mail. `holder` binds an enrolment link to the place it was asked for — `account:<session uid>` on the account
  * page, the interaction uid at sign-in — so it does nothing in any other browser, and cannot be read aloud to someone
- * who claims to be support. `enrolledAt` (epoch ms) is the factor a `replace` or `disown` link was sent about; either
- * acts only while that same factor is still in place.
+ * who claims to be support. `enrolledAt` (epoch ms) is the factor a `replace` link was sent about; it acts only
+ * while that same factor is still in place.
  */
 export const TotpLinkPayload = t.Object({
 	accountId: t.String(),
@@ -85,9 +85,6 @@ export const TotpLinkPayload = t.Object({
 		t.Literal('enrol'),
 		t.Literal('replace'),
 		t.Literal('reenrol'),
-		t.Literal('disown'),
-		/* "This wasn't me" about a sign-in from a new network or browser (specs/138), not about a factor. */
-		t.Literal('notme'),
 		/*
 		 * Proof of the mailbox before adding or removing a passkey on the person's own page (specs/139 research R14),
 		 * for someone whose recent sign-in was a password alone: the same holder, ten minutes, once, newest only.
@@ -97,14 +94,30 @@ export const TotpLinkPayload = t.Object({
 	]),
 	holder: t.Optional(t.String()),
 	enrolledAt: t.Optional(t.Number()),
-	/* For a `notme` link: the sign-in it was mailed about. */
-	signInId: t.Optional(t.String()),
 	/* For a `passkey_remove` link: the passkey record it is for. */
 	passkeyId: t.Optional(t.String()),
 	exp: t.Number()
 });
 
 export type TotpLinkPayload = Static<typeof TotpLinkPayload>;
+
+/*
+ * A "This wasn't me" link, keyed by the sha256 of its token like a TotpLink, and kept apart from them so that ending
+ * the account's access leaves it alone: `disown` about a factor just set up or replaced (specs/126, `enrolledAt` is
+ * that factor), `notme` about a sign-in from a new network or browser (specs/138, `signInId` is that sign-in). Whoever
+ * set the factor up or signed in can sign the account out everywhere, and that must not take away the owner's way
+ * back.
+ */
+export const NotMeLinkPayload = t.Object({
+	accountId: t.String(),
+	bucketId: t.String(),
+	purpose: t.Union([t.Literal('disown'), t.Literal('notme')]),
+	enrolledAt: t.Optional(t.Number()),
+	signInId: t.Optional(t.String()),
+	exp: t.Number()
+});
+
+export type NotMeLinkPayload = Static<typeof NotMeLinkPayload>;
 
 /*
  * How often one account was mailed an enrolment link, keyed `${bucketId}:${accountId}`: the rate-window record

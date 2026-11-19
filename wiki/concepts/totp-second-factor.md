@@ -199,11 +199,18 @@ store and its throttle are shared: `TotpLink` also carries purposes `passkey_add
 - **Replacing and turning off** need a fresh *code*: a session whose `acr` is the multi-factor value, `amr` has
   `otp`, at most 15 minutes old. A replacement writes only while the factor it replaces is still in place.
 - **Every change is mailed**, to a confirmed address only, and logged as `enduser.totp.enrol|replace|remove|disown`
-  with the person as actor. The mail about a new factor carries a "This was not me" link (`TotpLink` purpose
-  `disown`, 72 hours) that removes *that* factor and ends all access (since spec 138 the same store also holds purpose
-  `notme`, the "This wasn't me" of an email about a new sign-in, which `followLink` and the disown page refuse;
-  [[new-sign-in-alerts]]): self-service binds the account to whoever proves
-  the password and the mailbox first, and this is the owner's way back when a thief read the mailbox once.
+  with the person as actor. The mail about a new factor carries a "This was not me" link (`NotMeLink` purpose
+  `disown`, 72 hours) that removes *that* factor and ends all access (the same store holds purpose `notme`, the "This
+  wasn't me" of an email about a new sign-in, which the disown page refuses; [[new-sign-in-alerts]]): self-service
+  binds the account to whoever proves the password and the mailbox first, and this is the owner's way back when a
+  thief read the mailbox once.
+- **The "This wasn't me" links outlive every revocation.** Until the fix after commit `60e7d8cd` they were `TotpLink`
+  records, account-owned, so the thief who had just turned the factor on could press Sign out everywhere (or a lock,
+  or an administrator's sign-out could run) and the owner's link said "Nothing was changed". They now live in their
+  own area, `NotMeLink`, declared unowned (`lib/consts/storage_inventory.ts:547`) and removed by hand only with the
+  person (`lib/end_users/service.ts:353`) and the project (`lib/admin/buckets/destroy.ts:242`), through
+  `lib/totp/not_me_links.ts`. The other `TotpLink` purposes still die with a revocation: each is bound to a browser
+  session that is gone. Links in flight at the upgrade were dropped, not moved (72 hours at most).
 - **After an administrator's removal** the account carries `totpProofRequired`, and the next factor anywhere —
   including at sign-in in a requiring project — needs a mailed link first, bound to the interaction
   (`ui/:uid/totp/enroll/link`). A removal someone talked support into must not hand the next factor to whoever knows

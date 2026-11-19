@@ -6,18 +6,18 @@ import { routeNames } from '../consts/param_list.js';
 import { DISOWN_TTL_SECONDS } from '../totp/consts.js';
 import { checkedAdapter } from '../adapters/index.js';
 import { digestOf } from '../totp/self_service.js';
-import { TotpLinkPayload } from '../totp/types.js';
+import { NotMeLinkPayload } from '../totp/types.js';
 import epochTime from '../helpers/epoch_time.js';
 
 /*
- * The "This wasn't me" link of an email about a new sign-in (specs/138 research R4): spec 126's link store and rules,
+ * The "This wasn't me" link of an email about a new sign-in (specs/138 research R4): spec 126's rules for such a link,
  * with a purpose of its own. The token exists only in the email; the store keeps its digest. It lives as long as a
- * "This was not me" about a factor, works once, and goes with the account's access, so after any sign-out everywhere
- * it has nothing left to end and says so.
+ * "This wasn't me" about a factor, works once, and outlives every sign-out everywhere: whoever signed in from
+ * somewhere new can press that button too, and the owner still needs the password reset this link sends.
  */
 
-function links() {
-	return checkedAdapter('TotpLink', TotpLinkPayload);
+function notMeLinks() {
+	return checkedAdapter('NotMeLink', NotMeLinkPayload);
 }
 
 export async function issueNotMeLink(
@@ -26,7 +26,7 @@ export async function issueNotMeLink(
 	signInId: string
 ): Promise<string> {
 	const token = crypto.randomBytes(32).toString('base64url');
-	await links().upsert(
+	await notMeLinks().upsert(
 		digestOf(token),
 		{
 			accountId,
@@ -46,9 +46,9 @@ export async function issueNotMeLink(
  */
 export async function readNotMeLink(
 	token: string
-): Promise<TotpLinkPayload | undefined> {
+): Promise<NotMeLinkPayload | undefined> {
 	if (!token) return undefined;
-	const record = await links().find(digestOf(token));
+	const record = await notMeLinks().find(digestOf(token));
 	return record?.purpose === 'notme' && record.exp > epochTime()
 		? record
 		: undefined;
@@ -56,5 +56,5 @@ export async function readNotMeLink(
 
 /* Spends the link; of two racing confirmations exactly one is told yes. */
 export async function spendNotMeLink(token: string): Promise<boolean> {
-	return token ? links().consume(digestOf(token)) : false;
+	return token ? notMeLinks().consume(digestOf(token)) : false;
 }

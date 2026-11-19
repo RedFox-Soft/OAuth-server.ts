@@ -20,6 +20,14 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   condition's) now accepts it, and the console and the agent's tools call them "two-step sign-in". **Upgrade note:**
   run `db:setup` (or `db:setup:pg`) for the three new storage areas, then `db:migrate` (one fence migration).
 
+### Fixed
+
+- **"This wasn't me" links survive a sign-out everywhere.** The link in the mail about a new two-step factor
+  (spec 126) or a sign-in from somewhere new (spec 138) stopped working once anyone signed the account out
+  everywhere, so whoever had just turned the factor on or signed in could take away the owner's way back. The links
+  now have their own storage area (`NotMeLink`; run `db:setup`) and go only with the person or the project; links
+  mailed before the upgrade no longer work.
+
 ## [2.1.0] - 2026-11-18
 
 Super administrators can see where administrators sign in from, and an account is emailed about a sign-in from a

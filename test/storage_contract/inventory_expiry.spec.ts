@@ -69,6 +69,11 @@ const REAPED_ON_EXPIRES_AT = [
 	'LoginThrottle',
 	'MailRequestTally',
 	/*
+	 * A "This wasn't me" link that never expired would let whoever holds an old mail sign the account out and remove
+	 * its factor for good; no revocation reaches this area, so expiry is the only end it has short of deletion.
+	 */
+	'NotMeLink',
+	/*
 	 * Failed passkey sign-ins per caller and hour (specs/139), and an add or removal prepared on the account page: a
 	 * tally that never expired would hold an address refused for good, and a ceremony that never expired would be a
 	 * challenge to replay.

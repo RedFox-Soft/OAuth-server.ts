@@ -18,7 +18,7 @@ import { request as requestPasswordReset } from '../password_reset/challenge.js'
 import { selfServiceResetAllowed } from '../password_reset/eligibility.js';
 import { readNotMeLink, spendNotMeLink } from '../sign_in_alerts/link.js';
 import { reportToSuperAdministrators } from '../sign_in_alerts/report.js';
-import type { TotpLinkPayload } from '../totp/types.js';
+import type { NotMeLinkPayload } from '../totp/types.js';
 import { accountPageBase, accountPageUrl } from './client.js';
 import {
 	notMeAdministratorDonePage,
@@ -55,7 +55,7 @@ function acceptsAt(bucket: UserBucket, at: RequestBucket): boolean {
 }
 
 interface Found {
-	link: TotpLinkPayload;
+	link: NotMeLinkPayload;
 	user: User;
 	bucket: UserBucket;
 }

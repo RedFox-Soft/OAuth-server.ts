@@ -59,9 +59,11 @@ the address, as the person's own Recent sign-ins page ([[connected-apps-page]]).
 
 ## This wasn't me
 
-- The link is spec 126's link store with purpose `notme` and `signInId` (`lib/sign_in_alerts/link.ts:23`): a digest
-  stored, 72 hours, spent once by `consume`; `followLink` and `readDisownLink` refuse it, and the not-me page refuses
-  every other purpose ([[totp-second-factor]]).
+- The link is a `NotMeLink` with purpose `notme` and `signInId` (`lib/sign_in_alerts/link.ts:23`), the store spec
+  126's `disown` link shares: a digest stored, 72 hours, spent once by `consume`; `readDisownLink` refuses it, and the
+  not-me page refuses the other purpose. The store is unowned, so the link still works after anyone signs the account
+  out everywhere, as whoever signed in from somewhere new can; it goes only with the person or the project
+  ([[totp-second-factor]]). Before that fix it lived in `TotpLink` and a sign-out everywhere silently killed it.
 - `GET/POST /account/not-me` (`lib/account_page/not_me_routes.ts`), plain page family. Opening shows what will happen;
   only the POST acts (a mail scanner changes nothing). `acceptsAt` (`:51`): a link acts only where its own project's
   pages are served (`accountPageBase` equal), so the administrators' links and those of a project without an address
