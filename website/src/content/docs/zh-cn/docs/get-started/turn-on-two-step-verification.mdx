@@ -1,7 +1,7 @@
 ---
 title: 让用户自己开启两步验证
 description: '每个人都可以为自己的账号添加身份验证器应用中的验证码，此后每次用密码登录都会要求输入验证码。'
-source: 799eb91d6950
+source: 5d8ccb31fce9
 sidebar:
   order: 11
 ---
@@ -12,7 +12,7 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## 用户需要做什么 {#steps}
 
-1. 用户用密码登录，打开自己账号的 **两步验证** 页面。它位于已连接的应用旁边，地址是项目地址下的 `/account/security`。
+1. 用户用密码登录，打开自己账号的 **登录与安全** 页面中的 **两步验证** 部分。该页面位于已连接的应用旁边，地址是项目地址下的 `/account/security`。
 2. 用户选择 **开启两步验证**。FoxAuth 会向其发送一封带链接的邮件。
 3. 用户在 10 分钟内用同一个浏览器打开链接。在其他浏览器中打开的链接不起作用，因此冒充客服的人无法骗取它。
 4. 用户用身份验证器应用（例如 Google Authenticator、Microsoft Authenticator 或 1Password）扫描二维码，并输入应用显示的验证码。在手机上可以通过链接直接打开应用。
@@ -49,10 +49,10 @@ import { Aside } from '@astrojs/starlight/components';
 
 - **Require an authenticator app for everyone who signs in with a password**，与之前相同；
 - **Let people turn on two-step verification themselves**，默认开启。需要密码登录和邮件服务器；
-- **Where a code is asked**：有多少人设置了身份验证器应用。
+- **Where two-step sign-in is asked**：有多少人设置了身份验证器应用。
 
 代理可以通过 `project_update`（`totpSelfService`）更改此设置。它不能替任何人设置验证码：只有本人可以。
 
 ## 对于您的应用 {#app}
 
-在应用的账号设置中添加一个名为“两步验证”的链接，打开项目颁发者（issuer）下的 `/account/security`。要求多因素登录的应用（通过必需的 `acr` 声明或 IPSIE SL1 配置文件）现在可以为每个开启了此功能的人获得多因素登录。如需在某个应用中不借助任何参数要求验证码，请参阅[在一个应用中要求验证码](/zh-cn/docs/get-started/require-a-code-for-an-app/)。
+在应用的账号设置中添加一个名为“登录与安全”的链接，打开项目颁发者（issuer）下的 `/account/security`。要求多因素登录的应用（通过必需的 `acr` 声明或 IPSIE SL1 配置文件）现在可以为每个开启了此功能的人获得多因素登录。如需在某个应用中不借助任何参数要求两步登录，请参阅[在一个应用中要求两步登录](/zh-cn/docs/get-started/require-a-code-for-an-app/)。如果项目接受通行密钥，用户可以在同一页面上添加通行密钥：请参阅[使用通行密钥登录](/zh-cn/docs/get-started/let-people-sign-in-with-a-passkey/)。

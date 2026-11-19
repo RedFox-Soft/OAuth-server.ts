@@ -116,7 +116,7 @@ export function ApplicationPage({
 					client?.registeredDynamically || client?.requireCode ? (
 						<>
 							{client.registeredDynamically ? <Tag>Self-registered</Tag> : null}
-							{client.requireCode ? <Tag>Code required</Tag> : null}
+							{client.requireCode ? <Tag>Two-step required</Tag> : null}
 						</>
 					) : undefined
 				}

@@ -124,7 +124,7 @@ export function factsText(facts: NetworkFactsPart): string {
 	const what =
 		outcome.kind === 'refuse'
 			? ''
-			: ` (otherwise sign in again${outcome.withCode ? ' with a code' : ''} within ${freshText(outcome.maxAgeMinutes)})`;
+			: ` (otherwise sign in again${outcome.withCode ? ' with two-step sign-in' : ''} within ${freshText(outcome.maxAgeMinutes)})`;
 	return `${parts.join(', ')}${what}`;
 }
 
@@ -153,7 +153,7 @@ export function conditionText(
 			return `${attributeText(condition.attribute)} is ${or(condition.values)}`;
 		case 'fresh':
 			return condition.withCode
-				? `signed in with a code within ${freshText(condition.maxAgeMinutes)}`
+				? `signed in with two steps within ${freshText(condition.maxAgeMinutes)}`
 				: `signed in within ${freshText(condition.maxAgeMinutes)}`;
 		case 'group':
 			return `members of ${or(condition.groupIds.map((id) => nameOf(id) ?? 'a deleted group'))}`;

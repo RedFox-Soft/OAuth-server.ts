@@ -11,6 +11,7 @@ export { PersonActivityStore } from './personActivityStore.js';
 export { OutsideAuthorizationServerStore } from './outsideAuthorizationServerStore.js';
 export { BehindProxyAppStore } from './behindProxyAppStore.js';
 export { ConnectedAccountStore } from './connectedAccountStore.js';
+export { PasskeyStore } from './passkeyStore.js';
 export { BucketGroupStore } from './bucketGroupStore.js';
 export { BucketKeysStore } from './bucketKeysStore.js';
 export { McpClientPermissionStore } from './mcpClientPermissionStore.js';

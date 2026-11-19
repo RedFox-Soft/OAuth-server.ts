@@ -1,7 +1,9 @@
 import { Alert, Form, InputNumber, Select, Space, Switch } from 'antd';
 
+import { secondStepWords } from '../signin/passkeysAccepted.js';
+
 /*
- * An API's sign-in requirement (specs/130): a code from an authenticator app, and a sign-in every so often. The words
+ * An API's sign-in requirement (specs/130): two-step sign-in, and a sign-in every so often. The words
  * are the application's own (specs/127), and the text about apps is always there: FoxAuth makes the requirement hold
  * by refusing renewals and asking at the next sign-in, and what a person then sees depends on the app they use.
  */
@@ -65,18 +67,21 @@ export function signInEveryText(minutes: number): string {
 
 export function ResourceSignInFields({
 	checkedBy,
-	every
+	every,
+	passkeys = false
 }: {
 	checkedBy: 'server' | 'proxy';
 	every: EveryChoice | undefined;
+	/* Whether the project accepts passkeys, which meet the requirement too (specs/139). */
+	passkeys?: boolean;
 }) {
 	return (
 		<>
 			<Form.Item
 				name="requireCode"
-				label="Require a code from an authenticator app"
+				label="Require two-step sign-in"
 				valuePropName="checked"
-				extra="A token for this API is issued only after a sign-in with a code. People without an authenticator app are asked to set one up, if this project lets them; people who sign in through a provider can't connect."
+				extra={`A token for this API is issued only after a sign-in with ${secondStepWords(passkeys)}. People without an authenticator app are asked to set one up, if this project lets them; people who sign in through a provider can't connect.`}
 			>
 				<Switch />
 			</Form.Item>

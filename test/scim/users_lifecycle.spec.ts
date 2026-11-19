@@ -8,7 +8,7 @@ import {
 	spyOn
 } from 'bun:test';
 
-import { adapter, getUserStore } from 'lib/adapters/index.js';
+import { adapter, getPasskeyStore, getUserStore } from 'lib/adapters/index.js';
 import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { canSignIn } from 'lib/end_users/can_sign_in.js';
 import {
@@ -17,6 +17,7 @@ import {
 } from 'lib/end_users/service.js';
 import bootstrap, { type Setup } from '../test_helper.js';
 import { introspect, refresh, signIn } from '../end_user_lifecycle/fixtures.ts';
+import { seedPasskey } from '../passkeys/helpers.ts';
 import {
 	connect,
 	defaultScimBucket,
@@ -151,6 +152,16 @@ describe('maintaining a provisioned user over SCIM', () => {
 		expect(deleted.status).toBe(204);
 		expect(read.status).toBe(404);
 		expect(again.status).toBe(201);
+	});
+
+	// specs/139 FR-033: the passkeys area is unowned, so a deletion removes them by hand, here as in the console.
+	it('removes a deleted user’s passkeys with them', async () => {
+		const id = await create(root, scimUser('ivy@contoso.com'));
+		await seedPasskey(root.bucket._id, id);
+
+		await scim('DELETE', `${root.base}/Users/${id}`, { token: root.token });
+
+		expect(await getPasskeyStore().countOf(root.bucket._id, id)).toBe(0);
 	});
 
 	it('answers 500 in the SCIM format when a deactivation cannot clear an area, and the user still cannot sign in', async () => {

@@ -40,6 +40,7 @@ import {
 } from '../../../../behind_proxy/conditions.js';
 import { ConditionsEditor, DbIpAttribution } from './ConditionsEditor.js';
 import { useCodeConsent, withConsent } from '../applications/codeConsent.js';
+import { usePasskeysAccepted } from '../signin/passkeysAccepted.js';
 import {
 	conditionText,
 	KIND_LABELS,
@@ -211,6 +212,7 @@ export function AccessTab({
 	const feedback = useFeedback();
 	const confirm = useConfirm();
 	const codeConsent = useCodeConsent('path');
+	const passkeys = usePasskeysAccepted(bucketId);
 	const host = hostOfAddress(app.address);
 	const baseline = useMemo(() => draftOf(app), [app]);
 	const [draft, setDraft] = useState<DraftRule[]>(baseline);
@@ -678,6 +680,7 @@ export function AccessTab({
 						}}
 						countUrl={`/admin/api/projects/${encodeURIComponent(bucketId)}/attribute-matches`}
 						disabled={!writable}
+						passkeys={passkeys}
 						networkFactsOn={app.addresses.networkFacts?.state !== 'off'}
 						unavailable={
 							addressesProven(app.addresses)
@@ -1009,7 +1012,7 @@ function AccessCheck({
 			case 'sign_in_again':
 				/* A code condition failed for want of a code, not of time (specs/128): say which. */
 				return decision.requireCode && person?.signedInWithCode !== true
-					? `${who} did not sign in with a code from an authenticator app, so they are asked to sign in again with one.`
+					? `${who} did not use two-step sign-in, so they are asked to sign in again with it.`
 					: `${who} signed in longer ago than the path allows, so they are asked to sign in again.`;
 			default:
 				return decision.reason;
@@ -1141,7 +1144,7 @@ function AccessCheck({
 						checked={withCode}
 						onChange={(e) => setWithCode(e.target.checked)}
 					>
-						Signed in with a code from an authenticator app
+						Signed in with two steps (a code or a passkey)
 					</Checkbox>
 				</Flex>
 				{wantsFacts && facts && (

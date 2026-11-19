@@ -23,6 +23,10 @@ import type { InteractionPayloadType } from '../models/interaction.js';
 import type { LoginThrottlePayload } from '../login_throttle/types.js';
 import type { MailRequestTallyPayload } from '../mail_limit/types.js';
 import type {
+	PasskeyAttemptTallyPayload,
+	PasskeyCeremonyPayload
+} from '../passkeys/types.js';
+import type {
 	PasswordResetChallengePayload,
 	PasswordResetThrottlePayload
 } from '../password_reset/types.js';
@@ -83,6 +87,8 @@ export interface ModelPayloadByName {
 	Interaction: InteractionPayloadType;
 	LoginThrottle: LoginThrottlePayload;
 	MailRequestTally: MailRequestTallyPayload;
+	PasskeyAttemptTally: PasskeyAttemptTallyPayload;
+	PasskeyCeremony: PasskeyCeremonyPayload;
 	PasswordGuessingTally: PasswordGuessingTallyPayload;
 	PasswordResetChallenge: PasswordResetChallengePayload;
 	PasswordResetThrottle: PasswordResetThrottlePayload;

@@ -6,7 +6,7 @@ export const zhHans: SignInTexts = {
 		registration: '注册',
 		totpEnroll: '设置身份验证器',
 		totpVerify: '两步验证',
-		codeRequired: '需要验证码'
+		codeRequired: '需要两步登录'
 	},
 
 	headings: {
@@ -30,6 +30,9 @@ export const zhHans: SignInTexts = {
 		providersDivider: '或',
 		moreProviders: '更多登录方式',
 		signInWith: '使用{provider}登录',
+		passkey: '使用通行密钥登录',
+		passkeyNoScript: '使用通行密钥登录需要启用 JavaScript。',
+		passkeyCancelled: '此设备上没有通行密钥？请使用下方的其他方式登录。',
 		listRefusal: {
 			title: '此网络暂时无法使用密码登录',
 			happened:
@@ -90,7 +93,9 @@ export const zhHans: SignInTexts = {
 		freshSignInCode:
 			'{host} 要求您使用身份验证器应用中的验证码重新登录以打开此页面。',
 		codeAskedByApp: '{app} 需要身份验证器应用中的验证码。',
-		codeAsked: '您要登录的应用需要身份验证器应用中的验证码。'
+		codeAsked: '您要登录的应用需要身份验证器应用中的验证码。',
+		passkey: '请使用您的通行密钥登录以继续。',
+		passkeyRetry: '请重试。'
 	},
 
 	apiNotices: {
@@ -106,8 +111,8 @@ export const zhHans: SignInTexts = {
 	},
 
 	codeRequired: {
-		headingApp: '{app} 需要身份验证器应用中的验证码',
-		headingAny: '您要登录的应用需要身份验证器应用中的验证码',
+		headingApp: '{app} 需要两步登录',
+		headingAny: '您要登录的应用需要两步登录',
 		noFactor:
 			'您的账号 {email} 尚未设置身份验证器应用，因此无法以这种方式进入。',
 		setUpHint:
@@ -119,7 +124,10 @@ export const zhHans: SignInTexts = {
 		passwordInstead: '改用密码登录',
 		providerAsk: '请联系 {service} 的管理员。',
 		returnApp: '不登录，返回 {app}',
-		returnAny: '不登录，返回应用'
+		returnAny: '不登录，返回应用',
+		passkey: '使用通行密钥登录',
+		passkeyHeldApp: '您有 {email} 的通行密钥。用它登录即可打开 {app}。',
+		passkeyHeldAny: '您有 {email} 的通行密钥。用它登录即可继续。'
 	},
 
 	errors: {
@@ -135,6 +143,11 @@ export const zhHans: SignInTexts = {
 		verificationOutstanding:
 			'登录前，请先验证您的电子邮件地址。请打开我们发送到{email}的链接。',
 		verificationRecent: '最近已发送过验证邮件。请查看收件箱。',
-		verificationUnsent: '我们无法发送验证邮件。请稍后重试。'
+		verificationUnsent: '我们无法发送验证邮件。请稍后重试。',
+		passkeyRefused:
+			'此通行密钥不适用于 {service}。请选择其他通行密钥，或使用其他方式登录。',
+		passkeyAccount: '此账号目前无法登录。请联系 {service} 的管理员。',
+		passkeyLimited:
+			'您的网络尝试使用通行密钥登录的次数过多。请稍后再试，或使用其他方式登录。'
 	}
 };

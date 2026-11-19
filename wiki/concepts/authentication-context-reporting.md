@@ -4,7 +4,7 @@ title: "Reporting the authentication context a sign-in satisfied"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-09-13
-updated: 2026-11-12
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
@@ -17,7 +17,7 @@ graph:
     - predicate: complements
       object: concept:totp-second-factor
       source: oauth-server-codebase
-      evidence: "amr: [...AMR_FOR_DISTINCTION.multi_factor], acr: configuration.acrMap.multi_factor"
+      evidence: "password_code: 'multi_factor'"
       confidence: high
       status: current
 ---
@@ -27,7 +27,9 @@ graph:
 The `acr` claim says which Authentication Context Class the authentication *performed* satisfied —
 a statement of fact about the sign-in, never an echo of what was asked for. This server distinguishes
 three: a password alone, a password with a second factor, and a sign-in delegated to an upstream
-provider (`lib/consts/acr.ts`). Until commit `4101b93` it distinguished none of them, and an
+provider (`lib/consts/acr.ts`). Since spec 139 a passkey sign-in reports the second of them, `multi_factor`
+(`DISTINCTION_FOR_METHOD`, `lib/consts/amr.ts:46`), so it meets every requirement of two-step sign-in
+([[passkeys]]). Until commit `4101b93` it distinguished none of them, and an
 **essential** `acr` request could therefore never be satisfied by anything.
 
 ## The server owns the distinctions, an operator owns the names
@@ -44,7 +46,7 @@ server cannot make and then advertise it.
 the advertised set and the producible set cannot disagree. (Corrected 2026-10-01: this page used to say
 the `acr` entry in `claims_supported` is derived the same way. It is not — it comes from `acr: null` in
 the `claims` setting, so an operator who saves that setting without it stops advertising the claim.
-`amr`, which is keyed on the same distinctions, is advertised unconditionally — see [[amr-reporting]].) The
+`amr`, which is read from the same per-method row as the distinction, is advertised unconditionally — see [[amr-reporting]].) The
 conditional that used to drop `acr` when no values were configured is gone, because a complete map
 is now a validation requirement: every distinction present, values unique, none of them `"0"` —
 OIDC Core §2 reserves that for an authentication carrying no confidence that the same person is

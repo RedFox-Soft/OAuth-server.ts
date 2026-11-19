@@ -3,6 +3,7 @@ import {
 	getBucketStore,
 	getGroupInvitationStore,
 	getGroupStore,
+	getPasskeyStore,
 	getUserStore
 } from '../../adapters/index.js';
 import { AdminError, adminErrorBody } from '../auth/rbac.js';
@@ -158,6 +159,11 @@ export const invitationAcceptRoutes = new Elysia({ name: 'admin-invitations' })
 					totp: undefined,
 					federated: []
 				});
+				/*
+				 * Their passkeys too (specs/139 FR-033). The administrators' project holds none yet (spec D2); the
+				 * `passkeys` area is unowned, so the sign-out below would never reach one.
+				 */
+				await getPasskeyStore().removeAllOf(ADMIN_BUCKET_ID, existing._id);
 				// So the invitee's own enrolment does not begin inside a lockout the earlier registrant earned.
 				await clearAttempts(ADMIN_BUCKET_ID, existing._id);
 				await signOutAdministrator(existing._id);

@@ -4,7 +4,7 @@ title: 'The TOTP second factor'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-27
-updated: 2026-11-18
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
@@ -182,6 +182,13 @@ People turn two-step verification on themselves on `/account/security`, beside t
 (`lib/account_page/security_routes.ts`; flow logic in `lib/totp/self_service.ts`). The project setting
 `totpSelfService` (absent means on) allows it; it is in effect only with password sign-in and mail, and refused on
 the administrators' project.
+
+Since spec 139 (2026-11-19) the page is named **Sign-in and security** and holds a **Passkeys** part above the
+**Two-step verification** part ([[passkeys]]). The two-step rules below are unchanged: a passkey sign-in
+(`freshPasskey`) opens the passkey acts only, never turning the factor on, replacing it or turning it off, and the
+re-authentication those three start asks `acr_values` = the password value, so it offers no passkey. The mailed link
+store and its throttle are shared: `TotpLink` also carries purposes `passkey_add` and `passkey_remove` (with a
+`passkeyId`), under the same "ten minutes, once, newest only, one a minute, five a day".
 
 - **Proof a password thief lacks.** Starting needs a fresh *password* sign-in (`amr` has `pwd`, at most 15 minutes):
   a provider sign-in does not count, because whoever holds the provider account may hold the mailbox too. Then a

@@ -93,7 +93,12 @@ function rowOf(noted: Noted): PersonActivityRow {
 					noted.outcome,
 					noted.reason,
 					noted.freshness?.requireCode ? 'code' : '',
-					...placeKey(noted.place)
+					...placeKey(noted.place),
+					/*
+					 * A refusal at the passkey door is a row of its own (specs/139), so it never merges with the password
+					 * door's and takes its words. Appended only then: every other row keeps the id it always had.
+					 */
+					...(noted.method === 'passkey' ? ['passkey'] : [])
 				]);
 	const facts = noted.address
 		? factsOf(noted.address.value, noted.at.getTime())
@@ -174,12 +179,18 @@ export function noteSignedIn(input: {
 	if (!recording(input.bucketId, 'signIn')) return;
 	safely(() => {
 		const providerId = input.login.upstream?.providerId;
+		/*
+		 * A passkey sign-in reports the multi-factor context a password and a code do, so it is told apart by its methods
+		 * first: `pop` is reported by a passkey sign-in only (lib/consts/amr.ts, specs/139 FR-034).
+		 */
 		const method: PersonActivityRow['method'] =
 			providerId !== undefined
 				? 'provider'
-				: input.login.acr === configuration.acrMap.multi_factor
-					? 'password_code'
-					: 'password';
+				: input.login.amr?.includes('pop')
+					? 'passkey'
+					: input.login.acr === configuration.acrMap.multi_factor
+						? 'password_code'
+						: 'password';
 		const device = deviceOf(input.request.headers.get('user-agent'));
 		note(
 			rowOf({
@@ -210,7 +221,9 @@ export type SignInRefusal =
 	| 'email_unverified'
 	| 'wrong_code'
 	| 'code_required'
-	| 'provider_closed';
+	| 'provider_closed'
+	/* A passkey of a known account refused at the passkey door (specs/139): never for a passkey nobody here holds. */
+	| 'passkey_refused';
 
 export function noteSignInRefused(input: {
 	bucketId: string;
@@ -220,6 +233,8 @@ export function noteSignInRefused(input: {
 	providerId?: string;
 	/* The API whose own requirement turned the sign-in away, when the application did not (specs/130). */
 	resource?: string;
+	/* The door that refused, where it was not the password's: what the person saw there differs (specs/139 FR-014). */
+	method?: 'passkey';
 	request: Request;
 }): void {
 	if (!recording(input.bucketId, 'signIn')) return;
@@ -241,7 +256,8 @@ export function noteSignInRefused(input: {
 					...(input.resource === undefined ? {} : { resource: input.resource })
 				},
 				at: new Date(),
-				address: signInAddress(input.request)
+				address: signInAddress(input.request),
+				...(input.method === undefined ? {} : { method: input.method })
 			})
 		);
 	});

@@ -1,5 +1,6 @@
 import { Button, Card, Flex, Space, Typography } from 'antd';
-import { buildUIPath } from './buildUIPath.js';
+import { buildUILoginPath, buildUIPath } from './buildUIPath.js';
+import { NOTICE_PASSKEY } from './notices.js';
 import { DEFAULT_LOGO } from './logo.js';
 import { SignInMasthead, type SignInFace } from './signInMasthead.js';
 import { foxVar } from '../html/theme/palette.js';
@@ -36,6 +37,12 @@ export interface CodeRequiredPageProps {
 	 * back names no app, since the app the person came from is not the one asking.
 	 */
 	api?: string;
+	/*
+	 * In a project that accepts passkeys a passkey sign-in meets the requirement (specs/139): offered first when the
+	 * account holds a passkey that still works here, after the page's own action otherwise. A link to this sign-in's
+	 * page, where the passkey prompt lives; this page starts none.
+	 */
+	passkey?: 'primary' | 'secondary';
 	logoSrc?: string;
 	switcher?: SwitcherProps;
 	face: SignInFace;
@@ -47,6 +54,7 @@ export function CodeRequiredPage({
 	email = '',
 	provider = '',
 	api,
+	passkey,
 	logoSrc = DEFAULT_LOGO,
 	switcher,
 	face
@@ -64,6 +72,16 @@ export function CodeRequiredPage({
 		T.headingAny
 	);
 	const providerVariant = variant === 'provider' || variant === 'providerAsk';
+	const passkeyFirst = passkey === 'primary';
+	const passkeyLink = passkey && (
+		<Button
+			type={passkeyFirst ? 'primary' : 'default'}
+			block
+			href={buildUILoginPath(uid, NOTICE_PASSKEY)}
+		>
+			{T.passkey}
+		</Button>
+	);
 
 	return (
 		<Flex
@@ -102,6 +120,21 @@ export function CodeRequiredPage({
 						/>
 					)}
 				</Typography.Paragraph>
+				{passkeyFirst && (
+					<Typography.Paragraph>
+						{app ? (
+							<Message
+								t={T.passkeyHeldApp}
+								values={{ email, app }}
+							/>
+						) : (
+							<Message
+								t={T.passkeyHeldAny}
+								values={{ email }}
+							/>
+						)}
+					</Typography.Paragraph>
+				)}
 				{variant === 'setUp' && (
 					<Typography.Paragraph type="secondary">
 						{T.setUpHint}
@@ -129,9 +162,10 @@ export function CodeRequiredPage({
 						style={{ width: '100%' }}
 						size={12}
 					>
+						{passkeyFirst && passkeyLink}
 						{variant === 'setUp' && (
 							<Button
-								type="primary"
+								type={passkeyFirst ? 'default' : 'primary'}
 								block
 								href={buildUIPath(uid, 'totp/enroll')}
 							>
@@ -140,13 +174,14 @@ export function CodeRequiredPage({
 						)}
 						{variant === 'provider' && (
 							<Button
-								type="primary"
+								type={passkeyFirst ? 'default' : 'primary'}
 								block
 								href={buildUIPath(uid, 'login')}
 							>
 								{T.passwordInstead}
 							</Button>
 						)}
+						{!passkeyFirst && passkeyLink}
 						<Button
 							htmlType="submit"
 							block

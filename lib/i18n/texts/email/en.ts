@@ -136,5 +136,35 @@ export const en = {
 			'If it was not you, sign out everywhere now. The link works once, within 72 hours:',
 		button: 'This wasn’t me',
 		console: 'the FoxAuth console'
+	},
+	/*
+	 * A person's own passkeys (specs/139): the link that proves the mailbox before an add or a removal, and the notices
+	 * about both. Never the name the person gave a passkey: whoever added it chose that name.
+	 */
+	passkeys: {
+		linkAddSubject: 'Confirm it’s you to add a passkey',
+		linkRemoveSubject: 'Confirm it’s you to remove a passkey',
+		linkHeading: 'Confirm it is you',
+		linkAddIntro:
+			'Open this link in the browser where you asked, within 10 minutes, to add a passkey on your {service} account.',
+		linkRemoveIntro:
+			'Open this link in the browser where you asked, within 10 minutes, to remove a passkey from your {service} account.',
+		linkIgnore: 'If you didn’t ask, ignore this email.',
+		linkButton: 'Continue',
+		addedSubject: 'A passkey was added to your {service} account',
+		addedIntro:
+			'A passkey was added to your {service} account, {email}, on {date} UTC, on {device}.',
+		addedIntroNoDevice:
+			'A passkey was added to your {service} account, {email}, on {date} UTC.',
+		addedUse:
+			'You can now sign in to {service} with it instead of your password.',
+		disownLine:
+			'If this was not you, remove it with this link within 72 hours, then change your password:',
+		disownButton: 'This wasn’t me',
+		removedSubject: 'A passkey was removed from your {service} account',
+		removedIntro:
+			'A passkey created on {date} on {device} no longer signs you in to {service}.',
+		removedIntroNoDevice:
+			'A passkey created on {date} no longer signs you in to {service}.'
 	}
 } as const;

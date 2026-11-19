@@ -20,6 +20,8 @@ const SIGN_IN_ROUTES: Record<
 	'POST /ui/:uid/login': 'records a context and methods',
 	'POST /ui/:uid/totp': 'records a context and methods',
 	'POST /ui/:uid/totp/enroll': 'records a context and methods',
+	// The passkey door (specs/139): the multi-factor context with the passkey's own methods.
+	'POST /ui/:uid/passkey': 'records a context and methods',
 	// This server observed no method of its own; it does not repeat the upstream provider's.
 	'GET /ui/:uid/federation/complete': 'records a context only',
 	// Stages a pending sign-in and hands off; it writes no login result of its own.
@@ -97,5 +99,5 @@ describe('what the server says it can report', () => {
  * classified.
  */
 function isCandidate(key: string) {
-	return /(login|totp|federation|registration|consent|abort)/.test(key);
+	return /(login|totp|passkey|federation|registration|consent|abort)/.test(key);
 }

@@ -1,6 +1,6 @@
 ---
-title: Require a code in one app
-description: 'One app, such as billing, lets nobody in without a code from an authenticator app, while the other apps of the project stay as they are.'
+title: Require two-step sign-in in one app
+description: 'One app, such as billing, lets nobody in without two-step sign-in, a code or a passkey, while the other apps of the project stay as they are.'
 sidebar:
   order: 12
 ---
@@ -8,29 +8,33 @@ sidebar:
 import { Aside } from '@astrojs/starlight/components';
 
 Some apps hold more than others. A billing app or an admin tool should not open for someone who only learned a
-password. This page shows how to make one app require a code from an authenticator app, without changing the
-project's other apps.
+password. This page shows how to make one app require two-step sign-in, without changing the project's other apps.
+Two-step sign-in is a code from an authenticator app after the password, or a sign-in with a passkey where the project
+accepts passkeys.
 
 ## Turn it on {#on}
 
 1. Open the app in the console, on its **Settings** tab.
-2. Switch on **Require a code from an authenticator app** and save.
+2. Switch on **Require two-step sign-in** and save.
 3. Before anything changes, the console shows how many people this reaches:
    - people who sign in with a password and have no authenticator app. They will be asked to set one up, or turned
      away if your project does not let people do that themselves;
    - people who can sign in only through a provider. They will be turned away;
    - people who hold a sign-in to the app now.
-4. Confirm. The app's line in the list now says **Code required**.
+4. Confirm. The app's line in the list now says **Two-step required**.
 
 An agent does the same with `client_update` (`requireCode`). It is a high-consequence change, and the agent gets the
 same numbers to confirm.
 
 ## What a person sees {#person}
 
-A code is asked once per sign-in, not every time the app opens.
+Two-step sign-in is asked once per sign-in, not every time the app opens.
 
 - **They have a code.** They type their password, then the code. Someone already signed in with a code is asked
   nothing.
+- **They have a passkey.** Where the project accepts passkeys, a passkey sign-in opens the app with no code. Every
+  version of the page below also offers **Sign in with a passkey**, as its first choice when the person holds one. See
+  [Let people sign in with a passkey](/docs/get-started/let-people-sign-in-with-a-passkey/).
 - **They have none.** After the password, a page says the app asks for a code from an authenticator app. They can
   choose **Set up an authenticator app**: FoxAuth emails them a link, they open it in the same browser, scan a QR code
   and type the code. **Continue** takes them into the app in the same sign-in.
@@ -48,18 +52,18 @@ Every version of the page has **Return to the app without signing in**. The app 
 
 ## Tokens {#tokens}
 
-- Sign-ins that already happened keep working until the app renews its tokens. A refresh token from a sign-in without
-  a code then stops working, and the person signs in again, this time with a code.
+- Sign-ins that already happened keep working until the app renews its tokens. A refresh token from a one-step sign-in
+  then stops working, and the person signs in again, this time with two steps.
 - The same rule holds for device sign-ins and CIBA.
-- Assertion grants (JWT bearer and identity assertions) are refused, because no code was typed here. A token exchange
-  works only when the sign-in behind it included a code.
+- Assertion grants (JWT bearer and identity assertions) are refused, because no second step happened here. A token
+  exchange works only when the sign-in behind it was two-step.
 - A client credentials token, which acts for no person, is not affected.
-- There is no "code within the last N hours" rule. A sign-in with a code is enough, however long ago it was.
+- There is no "two steps within the last N hours" rule. A two-step sign-in is enough, however long ago it was.
 
 ## Ask for a code only on some pages {#some-pages}
 
 Leave the switch off and ask for a code where you need it. Send `acr_values` with your server's multi-factor value,
-which the app's **Connect** tab shows, and check `acr` in the ID token. Under the IPSIE SL1 profile, or with an
+which the app's **Connect** tab shows, and check `acr` in the ID token. A passkey sign-in carries the same value. Under the IPSIE SL1 profile, or with an
 essential `acr` claim, the request is binding. Otherwise it is only a request, so the app must check the ID token.
 
 An app behind your proxy asks for a code on a path instead: see

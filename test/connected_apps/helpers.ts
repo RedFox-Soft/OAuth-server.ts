@@ -143,7 +143,9 @@ export class Browser {
 				present(response.headers.get('location'), 'a location'),
 				url
 			);
-			if (!isServer(next)) return { response, url: next.toString() };
+			// A browser opened at a project's own origin (a subdomain or host project) stays on it too.
+			if (!isServer(next) && next.origin !== new URL(this.origin).origin)
+				return { response, url: next.toString() };
 			url = next.toString();
 			response = await this.request(url);
 		}

@@ -212,6 +212,7 @@ export function SettingsTab({
 				<ClientFormFields
 					form={form}
 					siblings={siblings}
+					passkeys={bucket.passkeyLogin === true}
 				/>
 			</Form>
 			{writable && (

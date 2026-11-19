@@ -200,6 +200,8 @@ describe('route classification', () => {
 			'POST /ui/:uid/forgot-password',
 			'POST /ui/:uid/totp',
 			'POST /ui/:uid/totp/enroll',
+			// The passkey door (specs/139): verifies a signature.
+			'POST /ui/:uid/passkey',
 			'POST /verify-email/code',
 			'POST /verify-email/resend',
 			'POST /reset-password',
@@ -207,6 +209,8 @@ describe('route classification', () => {
 			// "This wasn't me" link removes a factor without a session.
 			'POST /account/security',
 			'POST /account/security/disown',
+			// "This wasn't me" about an added passkey (specs/139): removes passkeys and sweeps the account without a session.
+			'POST /account/security/passkey-disown',
 			// Signing out everywhere from Recent sign-ins (specs/135): it sweeps the account and may mail a reset.
 			'POST /account/sign-ins',
 			// "This wasn't me" from an email about a new sign-in (specs/138): it sweeps the account without a session.

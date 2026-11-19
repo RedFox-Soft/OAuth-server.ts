@@ -42,6 +42,12 @@ export interface BucketView extends Omit<
 	discoveryUrl?: string | null;
 	/* What its sign-in pages call it: the display name, else the host people sign in at. */
 	shownName?: string;
+	/*
+	 * What the instance's address allows passkeys (specs/139): false when it is an IP address, which refuses turning
+	 * them on; `passkeysNeedHttps` when browsers will not offer them until it is served over HTTPS.
+	 */
+	passkeysPossible?: boolean;
+	passkeysNeedHttps?: boolean;
 	/* What it holds besides its people (specs/099). */
 	applications?: number;
 	apis?: number;

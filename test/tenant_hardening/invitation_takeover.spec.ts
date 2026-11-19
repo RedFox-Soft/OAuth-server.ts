@@ -12,10 +12,12 @@ import {
 	adminAuditStore,
 	adminSessionStore,
 	getBucketStore,
+	getPasskeyStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID } from 'lib/admin/consts.ts';
 import { sessionFor } from '../admin_session.ts';
+import { seedPasskey } from '../passkeys/helpers.ts';
 import { resetSentEmails } from '../mail_capture.ts';
 import {
 	accept,
@@ -110,6 +112,20 @@ describe('accepting a team invitation', () => {
 			expect(after.totp).toBeUndefined();
 			expect(after.federated ?? []).toEqual([]);
 			expect(await adminSessionStore.find(sessionId)).toBeNull();
+		});
+
+		// specs/139 FR-033: a passkey is one more way back in, and the passkeys area is unowned, so removed by hand.
+		it('removes every passkey the earlier registrant held', async () => {
+			const email = freshEmail('bob');
+			const { account } = await registeredUnder(email, { verified: false });
+			await seedPasskey(ADMIN_BUCKET_ID, account._id);
+			await invite(owner, email);
+
+			await accept(invitationTokenFor(email), 'bobs-own-password');
+
+			expect(
+				await getPasskeyStore().countOf(ADMIN_BUCKET_ID, account._id)
+			).toBe(0);
 		});
 
 		it('records that the address was reclaimed, in the team’s trail', async () => {

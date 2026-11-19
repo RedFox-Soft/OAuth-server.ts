@@ -129,8 +129,8 @@ export const zhHans: AccountTexts = {
 	linkChangedAccess:
 		'{app}已无权访问您在此处的账号。请重新登录该应用以授予访问权限。',
 	linkChangedAccount: '该{service}账号已不再连接。',
-	securityLink: '两步验证',
-	securityTitle: '两步验证',
+	securityLink: '登录与安全',
+	securityTitle: '登录与安全',
 	securityOff: '未开启。用密码登录{service}只需要密码。',
 	securityExplain:
 		'开启后，输入密码之后还需要输入手机上身份验证器应用中的 6 位验证码。即使有人知道了您的密码，也无法登录。',
@@ -176,6 +176,65 @@ export const zhHans: AccountTexts = {
 	securityLinkInvalid:
 		'此链接在这里无效。请在您开始操作的浏览器中、10 分钟内打开最新的那个链接。',
 	securityChanged: '在您操作期间情况发生了变化。请重新开始。',
+	twoStepTitle: '两步验证',
+	passkeysTitle: '通行密钥',
+	passkeysExplain:
+		'通行密钥让您用指纹、面容或屏幕锁登录，无需输入密码。它保存在您的设备或密码管理器中。',
+	passkeysStopped: '{service} 目前不接受通行密钥。恢复接受后，它们会重新可用。',
+	passkeysNoMail: '目前无法添加通行密钥：{service} 无法发送电子邮件。',
+	passkeysUnconfirmed:
+		'请先确认您的电子邮件地址；每个通行密钥的变动我们都会发邮件告诉您。',
+	passkeysProviderOnly:
+		'您通过 {provider} 登录。像您这样的账户暂不支持通行密钥。',
+	passkeysNoPassword:
+		'您在这里登录不使用密码。像您这样的账户暂不支持通行密钥。',
+	passkeysFull: '您已有 20 个通行密钥，已达上限。请先删除一个再添加。',
+	passkeysSent:
+		'请查收邮件：我们已向 {email} 发送了一个链接。请在 10 分钟内用这个浏览器打开它。',
+	passkeyAdd: '添加通行密钥',
+	passkeyNeedsScript:
+		'添加通行密钥需要浏览器启用 JavaScript。本页的其他功能无需它也能使用。',
+	passkeyExists: '此设备上已有您账户的通行密钥。',
+	passkeyAddFailed: '无法添加此通行密钥。请重新开始。',
+	passkeyNoUserVerification:
+		'此安全密钥无法确认是您本人。请为它设置 PIN，或改用其他设备。',
+	passkeyTooLong: '用时过长。请重新开始。',
+	passkeyReady: '您的电子邮件已确认。请选择“添加通行密钥”继续。',
+	passkeyAdded: '通行密钥已添加。我们已向 {email} 发送了确认邮件。',
+	passkeyCreated: '创建于 {date}',
+	passkeyLastUsed: '上次使用：{date}',
+	passkeyNeverUsed: '从未使用',
+	passkeySynced: '已同步到您的设备',
+	passkeyThisDevice: '仅在此设备上',
+	passkeyViaPasskey: '使用通行密钥登录后添加',
+	passkeyViaCode: '使用密码和验证码登录后添加',
+	passkeyViaMail: '使用密码登录并打开邮件链接后添加',
+	passkeyOldAddress: '为 {service} 的旧地址创建，已无法使用',
+	passkeyCopied: '已拒绝：它可能已被复制',
+	passkeyAddedOn: '{date} 添加的通行密钥',
+	passkeyRename: '重命名',
+	passkeyRemove: '删除',
+	passkeyNameLabel: '新名称',
+	passkeySave: '保存',
+	passkeyNameInvalid: '请使用 1 到 64 个字符的单行名称。',
+	passkeyRenamed: '通行密钥已重命名。',
+	passkeyRemoveTitle: '要删除“{name}”吗？',
+	passkeyRemoveEffect:
+		'它将立即无法再用于登录{service}。我们会发邮件告诉您它已被删除。',
+	passkeyRemoveButton: '删除',
+	passkeyRemoved: '通行密钥已删除。我们已向 {email} 发送了确认邮件。',
+	passkeyRemoveSent:
+		'请查收邮件：我们已向 {email} 发送了一个链接。请在 10 分钟内用这个浏览器打开它，以删除该通行密钥。',
+	passkeyLast:
+		'这是您登录{service}的唯一方式。请先添加另一种方式：密码或另一个通行密钥。',
+	passkeyDisownTitle: '要从 {email} 删除这个通行密钥吗？',
+	passkeyDisownEffect:
+		'在它之后添加的通行密钥也会一并删除，您的账号将在所有设备上退出登录。',
+	passkeyDisownNothing:
+		'此链接已失效。如果是其他人向您的账号添加了通行密钥，请联系{service}的运营人员。',
+	passkeyDisownDoneTitle: '通行密钥已删除',
+	passkeyDisownDone: '通行密钥已删除，您的账号已在所有设备上退出登录。',
+	passkeyDisownPassword: '现在请修改密码：有其他人知道它。',
 	disownTitle: '要从 {email} 移除两步验证吗？',
 	disownEffect:
 		'这将移除刚刚设置的身份验证器应用，并让您的账号在所有设备上退出登录。然后请修改密码。',
@@ -197,6 +256,7 @@ export const zhHans: AccountTexts = {
 	accountPageName: '您的账号页面',
 	methodPassword: '密码',
 	methodPasswordCode: '密码和身份验证器应用中的验证码',
+	methodPasskey: '通行密钥',
 	methodProvider: '通过 {provider}',
 	methodProviderGone: '通过一个已不存在的身份提供方',
 	otherBrowser: '其他浏览器',

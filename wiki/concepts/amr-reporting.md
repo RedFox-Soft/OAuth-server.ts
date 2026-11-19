@@ -4,14 +4,14 @@ title: "Reporting the authentication methods a sign-in used"
 tags: [oidc, contract, gotcha, config]
 sources: [oauth-server-codebase]
 created: 2026-10-01
-updated: 2026-11-10
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
     - predicate: derived_from
       object: concept:authentication-context-reporting
       source: oauth-server-codebase
-      evidence: "AMR_FOR_DISTINCTION: Record<AcrDistinction, readonly AmrValue[]>"
+      evidence: "export const DISTINCTION_FOR_METHOD: Record<SignInMethod, AcrDistinction> = {"
       confidence: high
       status: current
     - predicate: complements
@@ -32,11 +32,16 @@ satisfied. Every ID token issued from a sign-in carries `amr`, whether or not th
 | --- | --- |
 | Password | `["pwd"]` |
 | Password and a one-time code (verified, or enrolled during sign-in) | `["pwd", "otp", "mfa"]` |
+| Passkey (since spec 139) | `["pop", "user", "mfa"]` |
 | Upstream identity provider | none |
 | Backchannel | what the deployment's integration passes to `backchannelResult`; none if nothing |
 
-The values are declared once, keyed by the same distinction that yields `acr`
-(`lib/consts/amr.ts`), so the two claims cannot disagree. They are not operator-renamable, unlike the
+The values are declared once per sign-in **method** (`AMR_FOR_METHOD`, `lib/consts/amr.ts:38`), beside the
+distinction each method reports as `acr` (`DISTINCTION_FOR_METHOD`, `:46`), and every writer reads both from the
+same row, so the two claims cannot disagree. Until spec 139 the table was keyed by the distinction itself
+(`AMR_FOR_DISTINCTION`); a passkey reports the same `multi_factor` distinction as a password and a code but other
+methods, so the key became the method. `mfa` appears exactly for the methods whose distinction is
+`multi_factor`, which `test/amr/advertised.spec.ts` proves for every method. They are not operator-renamable, unlike the
 `acr` names: they are registered identifiers every relying party library knows. `mfa` sits beside the
 individual methods as RFC 8176 §2 allows; order is fixed for reproducible tokens and means nothing.
 
@@ -76,7 +81,8 @@ compared.
   so its tokens stayed byte-identical and "contains `otp`" was the test. That made absence ambiguous —
   "password" and "this server says nothing" read the same. Okta, Duende, Zitadel and Entra all report
   `pwd`. The test for a second factor is still "contains `otp`", or now "contains `mfa`" — never
-  "has `amr`".
+  "has `amr`". Since spec 139 "contains `pop`" is the test for a passkey sign-in ([[passkeys]]): it is how the
+  person's activity names the method and how `freshPasskey` reads a session.
 - **A federated sign-in reports nothing.** Core defines `amr` as the methods used in the
   authentication, and this server used none of its own: it accepted a signed assertion. The upstream
   provider's `amr` is verified and discarded with the rest of its claims (`lib/federation/`). Rejected:
@@ -125,4 +131,5 @@ decision.
 
 - [[authentication-context-reporting]] — the distinctions `amr` is keyed on
 - [[totp-second-factor]] — where `otp` comes from
+- [[passkeys]] — where `pop` and `user` come from
 - [[token-payload-access-contract]] — how `amr` is read off a stored artefact

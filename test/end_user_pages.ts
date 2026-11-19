@@ -60,6 +60,17 @@ import { paintedAccent } from 'lib/html/theme/accent.ts';
 
 export type PageFamily = 'hydrated' | 'terminal' | 'plain';
 
+/* A passkey offer as the sign-in page carries one (specs/139): request options with a challenge, in the props. */
+const PASSKEY_OFFER = {
+	options: {
+		challenge: 'Y2hhbGxlbmdl',
+		rpId: 'e.ly',
+		userVerification: 'required' as const,
+		timeout: 300000,
+		allowCredentials: []
+	}
+};
+
 const nothing = () => ({ items: [], resources: [], rar: [] });
 
 export const APPLICATION_ROW: ApplicationRow = {
@@ -109,6 +120,45 @@ export const END_USER_PAGES: Array<
 					{ id: 'gh', displayName: 'GitHub', brand: 'github' },
 					{ id: 'gg', displayName: 'Google', brand: 'google' }
 				],
+				language
+			})
+	],
+	/*
+	 * The three forms the page takes with a passkey offer (specs/139 contracts/sign-in.md): beside the password form,
+	 * where there is none, and beside the attacker list's refusal. The offer adds a button, a hidden form and props,
+	 * never a script or a source the page's policy has to allow.
+	 */
+	[
+		'sign-in with a passkey offer',
+		'hydrated',
+		(language) =>
+			loginServer('uid-1', {
+				passkey: { ...PASSKEY_OFFER, remember: true },
+				language
+			})
+	],
+	[
+		'sign-in with a passkey offer and no password form',
+		'hydrated',
+		(language) =>
+			loginServer('uid-1', {
+				passwordLogin: false,
+				providers: [{ id: 'gh', displayName: 'GitHub', brand: 'github' }],
+				passkey: { ...PASSKEY_OFFER, remember: false },
+				language
+			})
+	],
+	[
+		'sign-in with a passkey offer beside the attacker list’s refusal',
+		'hydrated',
+		(language) =>
+			loginServer('uid-1', {
+				passwordLogin: false,
+				listRefusal: {
+					line: 'listed-address · 203.0.113.0/24 · 2026-11-19',
+					disputeUrl: 'https://foxtrust.dev/dispute'
+				},
+				passkey: { ...PASSKEY_OFFER, remember: false },
 				language
 			})
 	],

@@ -80,9 +80,7 @@ describe('a provider sign-in for an API that requires a code or a recent sign-in
 
 		expect(location).toMatch(/\/ui\/[^/]+\/code-required$/);
 		expect(propsOf(page.text).variant).toBe('providerAsk');
-		expect(textOf(page.text)).toContain(
-			'Files asks for a code from an authenticator app'
-		);
+		expect(textOf(page.text)).toContain('Files asks for two-step sign-in');
 		expect(page.text).not.toContain('/totp/enroll');
 	});
 });

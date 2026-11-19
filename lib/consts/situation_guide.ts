@@ -358,6 +358,7 @@ const LANES = {
 	you: { label: 'You', kind: 'person', part: 'person' },
 	mail: { label: 'Inbox', kind: 'outside', part: 'mail' },
 	totp: { label: 'Authenticator app', kind: 'outside', part: 'authenticator' },
+	passkey: { label: 'Phone or laptop', kind: 'outside', part: 'phone' },
 	domain: { label: 'Your address', kind: 'browser', part: 'globe' },
 	idp: { label: 'Okta or Entra ID', kind: 'company', part: 'company' },
 	dir: { label: 'Company directory', kind: 'company', part: 'directory' },
@@ -1577,7 +1578,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'People’s addresses are looked up only inside your server. FoxTrust learns only that the file was downloaded.',
 			'Commercial VPN covers only the VPN services FoxTrust lists, not a company VPN. Hosting or a cloud also covers content networks and some companies’ own exits. iCloud Private Relay is not kept out.',
 			'Countries come from DB-IP (IP Geolocation by DB-IP, CC BY 4.0). An address with no known country is refused by “Only from” and passes “Not from”.',
-			'A matching address is refused, or asked to sign in again within the minutes you choose, with a code from an authenticator app if you tick it. An API checked at the proxy can only refuse.',
+			'A matching address is refused, or asked to sign in again within the minutes you choose, with two-step sign-in if you tick it. An API checked at the proxy can only refuse.',
 			'If the download is off or the snapshot is more than 26 hours old, the path is closed until a fresh one loads, and the console marks it. Check access shows what the snapshot says about an address.',
 			'Your proxy must pass the address it saw with the project’s proxy key, as for a list of networks. It is on every plan.'
 		],
@@ -1777,12 +1778,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		goodToKnow: [
 			'Choose 15 minutes, an hour, 8 hours or a day. Pages that load data in the background, such as dashboards, stop working until the person reloads, so use it on admin paths.',
 			'Anyone who set up an authenticator app types a code when signing in again, whether or not the project requires one.',
-			'Tick "with a code from an authenticator app" and only a recent sign-in with a code opens the path. Before it saves, you see how many people it turns away; people without one are asked to set one up when the project lets them.',
-			'Without the code, a person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides. With it, they cannot open the path.',
+			'Tick "with two-step sign-in" and only a recent sign-in with a code from an authenticator app, or with a passkey, opens the path. Before it saves, you see how many people it turns away; people without an authenticator app are asked to set one up when the project lets them.',
+			'Without two-step sign-in, a person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides. With it, they cannot open the path.',
 			'It is on every plan.'
 		],
 		prompt: prompt(
-			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old, and to type a code from an authenticator app.\nAdd a fresh sign-in condition with withCode to the rule for /admin, and tell me first how many people that affects.',
+			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old, and to use two-step sign-in.\nAdd a fresh sign-in condition with withCode to the rule for /admin, and tell me first how many people that affects.',
 			'behind_proxy_app_update with rules[].conditions',
 			'Use it on admin paths: a dashboard that loads data in the background stops until it is reloaded.'
 		)
@@ -1957,7 +1958,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		sees: {
 			kind: 'signIn',
 			lines: [
-				'A Two-step verification page beside their connected apps',
+				'A Sign-in and security page beside their connected apps',
 				'An email with a link, then a QR code',
 				'Afterwards, a page asking for the code at every password sign-in'
 			]
@@ -1974,17 +1975,93 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Signing in through Google or another provider does not ask for this code, so an application that requires one turns them away.'
 		],
 		prompt: prompt(
-			'Add a "Two-step verification" link to my app’s account settings that opens {issuer}/account/security.',
+			'Add a "Sign-in and security" link to my app’s account settings that opens {issuer}/account/security.',
 			'project_update (totpSelfService)',
 			'Tell me how many people have set one up.'
 		)
 	},
 	{
+		id: 'passkeys',
+		tab: 'product',
+		title: 'Let people sign in with a passkey',
+		sentence:
+			'People sign in with their fingerprint, face or screen lock instead of typing a password. A passkey counts as two-step sign-in.',
+		protocol: 'WebAuthn · passkeys',
+		lanes: lanes('person', 'app', 'fox', 'passkey'),
+		steps: [
+			step(
+				'person',
+				'app',
+				'Opens it',
+				'The person opens your app and is sent to sign in.'
+			),
+			step(
+				'fox',
+				'passkey',
+				'Asks for a passkey',
+				'The sign-in page asks the person’s device for a passkey of this project.',
+				'request'
+			),
+			step(
+				'person',
+				'passkey',
+				'Fingerprint or face',
+				'The person unlocks the passkey with a fingerprint, face or screen lock.'
+			),
+			step(
+				'passkey',
+				'fox',
+				'Signed answer',
+				'The device answers with a signature only this passkey can make, and only for this project’s address.'
+			),
+			step(
+				'fox',
+				'app',
+				'Signed in with two steps',
+				'FoxAuth tells your app the sign-in was two-step, as after a password and a code.',
+				'token'
+			)
+		],
+		problem: {
+			at: 'person',
+			mark: 'password',
+			caption: 'A password typed into a fake page lets someone in.',
+			lanes: ['person']
+		},
+		fixCaption: 'A passkey works only at your project’s own address.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'“Sign in with a passkey” on the sign-in page, and their passkeys offered in the email field',
+				'Their device asking for a fingerprint, face or screen lock',
+				'A Passkeys part on their Sign-in and security page, where they add one'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open Sign-in',
+			target: { area: 'sign-in' }
+		},
+		goodToKnow: [
+			'Turn on Passkeys in the Sign-in tab. People add their own on their Sign-in and security page, after a two-step sign-in or after their password and a link we email them, so a mail server is needed.',
+			'A passkey sign-in meets every app, API and path that asks for two-step sign-in, without a code.',
+			'A passkey works only at the host it was made at. If the project moves between a path, a subdomain and a hostname, or the server’s address changes, people add new ones.',
+			'Browsers offer passkeys only over HTTPS, or at localhost. Not on the administrators’ project.',
+			'Turning it off keeps people’s passkeys, and turning it on again makes them work. It is on every plan.'
+		],
+		prompt: prompt(
+			'Turn on passkeys in my FoxAuth project and check that SMTP is set up.',
+			'project_update (passkeyLogin) and smtp_settings_get',
+			'Then add a "Sign-in and security" link to my app’s account settings that opens {issuer}/account/security, where people add a passkey.'
+		)
+	},
+	{
 		id: 'appcode',
 		tab: 'product',
-		title: 'Ask for a code only in the apps that need it',
+		title: 'Ask for two-step sign-in only in the apps that need it',
 		sentence:
-			'One application, such as billing, lets nobody in without a code from an authenticator app. The other applications of the project stay as they are.',
+			'One application, such as billing, lets nobody in without two-step sign-in: a code from an authenticator app, or a passkey. The other applications of the project stay as they are.',
 		protocol: 'OpenID Connect acr',
 		lanes: lanes('person', 'app', 'fox', 'totp'),
 		steps: [
@@ -2004,14 +2081,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'person',
 				'fox',
 				'Password and code',
-				'FoxAuth asks for the password, then a code from the app. Someone without one can set it up right there.'
+				'FoxAuth asks for the password, then a code from the app. Someone without one can set it up right there. A passkey sign-in needs no code.'
 			),
 			step('totp', 'person', '6 digits', 'The app shows a code.'),
 			step(
 				'fox',
 				'app',
-				'Signed in with a code',
-				'FoxAuth tells the application the sign-in included a code.'
+				'Signed in with two steps',
+				'FoxAuth tells the application the sign-in was two-step.'
 			)
 		],
 		problem: {
@@ -2020,7 +2097,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			caption: 'A stolen password opens the billing app too.',
 			lanes: ['person', 'app']
 		},
-		fixCaption: 'The billing app takes only sign-ins with a code.',
+		fixCaption: 'The billing app takes only two-step sign-ins.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -2036,14 +2113,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			target: { area: 'applications' }
 		},
 		goodToKnow: [
-			'Turn it on in the application’s Settings, under "Require a code from an authenticator app". Before it saves, you see how many people it affects.',
-			'A code is asked once per sign-in, not every time the app opens.',
-			'Refresh tokens from sign-ins without a code stop working, so people sign in again with one.',
+			'Turn it on in the application’s Settings, under "Require two-step sign-in". Before it saves, you see how many people it affects.',
+			'It is asked once per sign-in, not every time the app opens. Where the project accepts passkeys, a passkey sign-in is two-step already.',
+			'Refresh tokens from one-step sign-ins stop working, so people sign in again with two steps.',
 			'People who sign in through a provider cannot open the app this way.',
-			'For an app behind your proxy, tick "with a code from an authenticator app" on the "Ask to sign in again" condition of a path instead.'
+			'For an app behind your proxy, tick "with two-step sign-in" on the "Ask to sign in again" condition of a path instead.'
 		],
 		prompt: prompt(
-			'Make my billing application in FoxAuth require a code from an authenticator app, and tell me first how many people that affects.',
+			'Make my billing application in FoxAuth require two-step sign-in, and tell me first how many people that affects.',
 			'client_update (requireCode)',
 			'Make my app show a helpful page when it receives unmet_authentication_requirements.'
 		)
@@ -2051,9 +2128,9 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 	{
 		id: 'apicode',
 		tab: 'product',
-		title: 'Ask for a code to connect an MCP server or API',
+		title: 'Ask for two-step sign-in to connect an MCP server or API',
 		sentence:
-			'An agent connects to your MCP server only after its person signs in with a code from an authenticator app, and signs in again as often as you choose.',
+			'An agent connects to your MCP server only after its person signs in with two steps (a code from an authenticator app, or a passkey), and signs in again as often as you choose.',
 		protocol: 'OAuth 2.0 Step Up Authentication Challenge (RFC 9470)',
 		lanes: lanes('person', 'agent', 'fox', 'mcp'),
 		steps: [
@@ -2067,20 +2144,20 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 				'person',
 				'fox',
 				'Password and code',
-				'FoxAuth asks the person for the password, then a code from the app, whatever the agent asked for.'
+				'FoxAuth asks the person for the password, then a code from the app, whatever the agent asked for. A passkey sign-in needs no code.'
 			),
 			step(
 				'fox',
 				'agent',
 				'Token for your server',
-				'The token says the sign-in included a code.',
+				'The token says the sign-in was two-step.',
 				'token'
 			),
 			step(
 				'agent',
 				'mcp',
 				'Calls a tool',
-				'Your server, or your proxy, accepts only a token whose sign-in had a code.'
+				'Your server, or your proxy, accepts only a token whose sign-in was two-step.'
 			)
 		],
 		problem: {
@@ -2089,7 +2166,7 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			caption: 'A stolen password connects an agent to your MCP server.',
 			lanes: ['person', 'mcp']
 		},
-		fixCaption: 'Only a sign-in with a code connects an agent.',
+		fixCaption: 'Only a two-step sign-in connects an agent.',
 		sees: {
 			kind: 'signIn',
 			lines: [
@@ -2105,14 +2182,14 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			target: { area: 'apis' }
 		},
 		goodToKnow: [
-			'Turn it on in the Access tab of the API’s page, under "Require a code from an authenticator app". "Ask to sign in again every" asks people to reconnect at least that often. Before it saves, you see whom it affects.',
+			'Turn it on in the Access tab of the API’s page, under "Require two-step sign-in". "Ask to sign in again every" asks people to reconnect at least that often. Before it saves, you see whom it affects.',
 			'Not every app asks people to sign in again on its own. In Claude Code they reconnect the server in /mcp. In claude.ai they get a Connect card. ChatGPT and Codex may only show an error. Try it with the apps your people use.',
 			'If an app does not carry on after the new sign-in, the person asks it to try again.',
-			'A connection made without a code stops at its next renewal, and its person signs in again with one.',
-			'Apps that act for no one, and sign-ins by assertion, cannot connect. People who sign in through a provider cannot give a code here.'
+			'A connection made with a one-step sign-in stops at its next renewal, and its person signs in again with two steps.',
+			'Apps that act for no one, and sign-ins by assertion, cannot connect. People who sign in through a provider cannot give a second step here.'
 		],
 		prompt: prompt(
-			'Make my MCP server in FoxAuth require a sign-in with a code from an authenticator app, and tell me first whom that affects.',
+			'Make my MCP server in FoxAuth require two-step sign-in, and tell me first whom that affects.',
 			'resource_update (requireCode, signInEveryMinutes)',
 			'If my MCP server checks its own tokens, make it refuse a token whose acr is not the multi-factor value FoxAuth names.'
 		)

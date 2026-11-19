@@ -4,13 +4,15 @@ title: "An API's sign-in requirement: a code, or a recent sign-in"
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-12
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 # An API's sign-in requirement: a code, or a recent sign-in
 
 Spec 130. Any declared API (whoever checks its tokens: its own server or the operator's proxy) can carry two fields
-an administrator sets: `requireCode` (a token is issued only after a sign-in with a code from an authenticator app)
+an administrator sets: `requireCode` (a token is issued only after a sign-in with a code from an authenticator app,
+or since spec 139 with a passkey, which reports the same multi-factor `acr`; the console calls it "Require two-step
+sign-in", [[passkeys]])
 and `signInEveryMinutes` (60 to 20160, whole hours: the sign-in behind a token may be no older). They live at the top
 level of `ProtectedResource` (`lib/adapters/types.ts`), written only by the admin routes.
 

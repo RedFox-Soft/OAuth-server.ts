@@ -137,6 +137,18 @@ export const InteractionPayload = t.Object({
 			sessionExpiry: t.Optional(t.Integer())
 		})
 	),
+	/*
+	 * The challenge the sign-in page's passkey offer carries (specs/139 research R7): 32 random bytes, base64url, and
+	 * when it stops working (epoch seconds, five minutes on). On the interaction because Safari opens the passkey
+	 * prompt only from a click with no request in between, so the page must hold it before the click; one per
+	 * interaction, rewritten at every render, and taken off by the passkey door before it verifies anything.
+	 */
+	passkeyChallenge: t.Optional(
+		t.Object({
+			value: t.String(),
+			exp: t.Number()
+		})
+	),
 	result: t.Optional(Outcome)
 });
 export type InteractionPayloadType = Static<typeof InteractionPayload>;

@@ -10,7 +10,7 @@ import { accountPageBase } from '../account_page/client.js';
 import { recordEndUserAudit } from '../admin/audit/record.js';
 import { configuration } from '../configs/application.js';
 import type { RequestBucket } from '../configs/issuer.js';
-import { AMR_FOR_DISTINCTION } from '../consts/amr.js';
+import { AMR_FOR_METHOD, DISTINCTION_FOR_METHOD } from '../consts/amr.js';
 import { routeNames } from '../consts/param_list.js';
 import {
 	EndUserError,
@@ -28,6 +28,10 @@ import {
 	type TwoStepLink,
 	type TwoStepNotice
 } from '../mail/templates/two_step.js';
+import {
+	passkeyLinkEmail,
+	type PasskeyLink
+} from '../mail/templates/passkeys.js';
 import type { Session } from '../models/session.js';
 import {
 	DISOWN_TTL_SECONDS,
@@ -105,6 +109,29 @@ export function freshCode(session: Session): boolean {
 	);
 }
 
+/*
+ * The person signed in with a passkey in this browser no more than fifteen minutes ago (specs/139 research R13): `pop`
+ * is the method only a passkey sign-in reports (lib/consts/amr.ts). It opens the person's passkey acts only, never a
+ * two-step change, which keeps asking for a fresh password or a fresh code.
+ */
+export function freshPasskey(session: Session): boolean {
+	const { amr, loginTs } = session.payload;
+	return (
+		Array.isArray(amr) &&
+		amr.includes('pop') &&
+		typeof loginTs === 'number' &&
+		epochTime() - loginTs <= FRESH_SECONDS
+	);
+}
+
+/*
+ * A strong recent sign-in (specs/139): two factors in this browser within fifteen minutes, a passkey or a password
+ * with a code. It adds or removes a passkey without a mailed link; a password alone needs the link as well.
+ */
+export function strongRecentSignIn(session: Session): boolean {
+	return freshPasskey(session) || freshCode(session);
+}
+
 export type SelfService = 'on' | 'off' | 'no_password_login' | 'no_mail';
 
 /*
@@ -133,17 +160,20 @@ export type LinkSent = 'sent' | 'throttled' | 'mail_failed';
 /*
  * Mails a link that proves the mailbox, bound to `holder`. One a minute and five a day per account, and under the
  * instance's per-caller mail limit too (spec 115). The newest link of the account is the only one that works, so a
- * resend or a new start kills every earlier one.
+ * resend or a new start kills every earlier one. The two-step purposes and the passkey ones (specs/139) share these
+ * bounds and the one newest link, so a person cannot be mailed more often by asking for both.
  */
 export async function sendLink(
 	bucket: UserBucket,
 	user: User,
-	purpose: TwoStepLink,
+	purpose: TwoStepLink | PasskeyLink,
 	holder: string,
 	options: {
 		request: Request;
 		urlFor: (token: string) => string;
 		enrolledAt?: number;
+		/* A `passkey_remove` link: the passkey it is for. */
+		passkeyId?: string;
 	}
 ): Promise<LinkSent> {
 	const now = epochTime();
@@ -165,6 +195,9 @@ export async function sendLink(
 			holder,
 			...(options.enrolledAt !== undefined
 				? { enrolledAt: options.enrolledAt }
+				: {}),
+			...(options.passkeyId !== undefined
+				? { passkeyId: options.passkeyId }
 				: {}),
 			exp: now + LINK_TTL_SECONDS
 		},
@@ -188,12 +221,19 @@ export async function sendLink(
 	try {
 		await deliver({
 			to: user.email,
-			...twoStepLinkEmail(
-				purpose,
-				who(bucket, user),
-				options.urlFor(token),
-				emailLanguage(user)
-			)
+			...(purpose === 'passkey_add' || purpose === 'passkey_remove'
+				? passkeyLinkEmail(
+						purpose,
+						who(bucket, user),
+						options.urlFor(token),
+						emailLanguage(user)
+					)
+				: twoStepLinkEmail(
+						purpose,
+						who(bucket, user),
+						options.urlFor(token),
+						emailLanguage(user)
+					))
 		});
 	} catch (error) {
 		console.error('two-step verification: a link could not be mailed', {
@@ -206,9 +246,10 @@ export async function sendLink(
 }
 
 /*
- * Follows an enrolment link: only in the place it was sent for, only within its ten minutes, only once, and only the
- * newest of the account's links. Answers the link, or nothing — never why, so a link shows nothing to whoever holds it
- * in the wrong browser.
+ * Follows a link that proves the mailbox — for a two-step enrolment or replacement, or before adding or removing a
+ * passkey (specs/139): only in the place it was sent for, only within its ten minutes, only once, and only the newest
+ * of the account's links, which all four purposes share with their throttle. Answers the link, or nothing — never why,
+ * so a link shows nothing to whoever holds it in the wrong browser. The caller acts on its purpose.
  */
 export async function followLink(
 	token: string,
@@ -354,8 +395,9 @@ export async function enrolAtSignIn(
  * a multi-factor sign-in need not send them round again. Saved with what is left of its life.
  */
 export async function raiseSession(session: Session): Promise<void> {
-	session.payload.acr = configuration.acrMap.multi_factor;
-	session.payload.amr = [...AMR_FOR_DISTINCTION.multi_factor];
+	session.payload.acr =
+		configuration.acrMap[DISTINCTION_FOR_METHOD.password_code];
+	session.payload.amr = [...AMR_FOR_METHOD.password_code];
 	session.payload.loginTs = epochTime();
 	const remaining = (session.payload.exp ?? 0) - epochTime();
 	if (remaining > 0) await session.save(remaining);

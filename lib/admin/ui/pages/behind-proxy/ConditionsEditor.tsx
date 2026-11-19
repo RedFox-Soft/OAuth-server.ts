@@ -110,9 +110,12 @@ export function ConditionsEditor({
 	disabled,
 	unavailable = {},
 	networkFactsOn = false,
+	passkeys = false,
 	onChange
 }: {
 	conditions: Condition[];
+	/* Whether the project accepts passkeys, which meet a condition asking for two-step sign-in (specs/139). */
+	passkeys?: boolean;
 	/* Whether a super administrator has the download of FoxTrust's network facts on (specs/129 FR-015). */
 	networkFactsOn?: boolean;
 	/*
@@ -210,6 +213,7 @@ export function ConditionsEditor({
 						<FreshFields
 							condition={condition}
 							disabled={disabled}
+							passkeys={passkeys}
 							onChange={replace}
 						/>
 					)}
@@ -566,7 +570,7 @@ function NetworkFactsFields({
 									});
 								}}
 							>
-								with a code from an authenticator app
+								with two-step sign-in
 							</Checkbox>
 						</Space>
 					)}
@@ -856,10 +860,12 @@ function AttributeFields({
 function FreshFields({
 	condition,
 	disabled,
+	passkeys,
 	onChange
 }: {
 	condition: Extract<Condition, { kind: 'fresh' }>;
 	disabled: boolean;
+	passkeys: boolean;
 	onChange: (next: Condition) => void;
 }) {
 	const preset = FRESH_PRESETS.includes(condition.maxAgeMinutes);
@@ -917,13 +923,13 @@ function FreshFields({
 					);
 				}}
 			>
-				with a code from an authenticator app
+				with two-step sign-in
 			</Checkbox>
 			{condition.withCode && (
 				<Typography.Text type="secondary">
-					People without one, and people who sign in through a provider, can’t
-					open this path. People without one are asked to set one up when the
-					project lets them.
+					{passkeys
+						? 'A code from an authenticator app, or a passkey. People with neither, and people who sign in through a provider, can’t open this path. People without an authenticator app are asked to set one up when the project lets them.'
+						: 'A code from an authenticator app. People without one, and people who sign in through a provider, can’t open this path. People without one are asked to set one up when the project lets them.'}
 				</Typography.Text>
 			)}
 			<Typography.Text type="secondary">

@@ -158,8 +158,8 @@ export const en = {
 	 * The person's own two-step verification (specs/126). People read "a code from an authenticator app"; "TOTP" never
 	 * appears here. A value — an address, a date, a provider's name — is always a value, never part of a sentence.
 	 */
-	securityLink: 'Two-step verification',
-	securityTitle: 'Two-step verification',
+	securityLink: 'Sign-in and security',
+	securityTitle: 'Sign-in and security',
 	securityOff:
 		'Off. Signing in to {service} with your password needs only the password.',
 	securityExplain:
@@ -210,6 +210,75 @@ export const en = {
 	securityLinkInvalid:
 		'This link does not work here. Open the newest link in the browser where you started, within 10 minutes.',
 	securityChanged: 'Something changed while you were doing this. Start again.',
+	/*
+	 * The Passkeys part of "Sign-in and security" (specs/139). A value (an address, a date, a name) is always a value,
+	 * never part of a sentence; the page never shows a credential id, a key or an AAGUID.
+	 */
+	twoStepTitle: 'Two-step verification',
+	passkeysTitle: 'Passkeys',
+	passkeysExplain:
+		'A passkey signs you in with your fingerprint, face or screen lock instead of your password. It stays on your device or in your password manager.',
+	passkeysStopped:
+		'{service} doesn’t accept passkeys right now. They will work again if it does.',
+	passkeysNoMail:
+		'Adding a passkey isn’t possible right now: {service} can’t send email.',
+	passkeysUnconfirmed:
+		'Confirm your email address first; we email you about every passkey.',
+	passkeysProviderOnly:
+		'You sign in through {provider}. Passkeys for accounts like yours aren’t available yet.',
+	passkeysNoPassword:
+		'You sign in here without a password. Passkeys for accounts like yours aren’t available yet.',
+	passkeysFull:
+		'You have 20 passkeys, the most allowed. Remove one to add another.',
+	passkeysSent:
+		'Check your email: we sent a link to {email}. Open it in this browser within 10 minutes.',
+	passkeyAdd: 'Add a passkey',
+	passkeyNeedsScript:
+		'Adding a passkey needs JavaScript in your browser. Everything else on this page works without it.',
+	passkeyExists: 'This device already has a passkey for your account.',
+	passkeyAddFailed: 'We couldn’t add this passkey. Start again.',
+	passkeyNoUserVerification:
+		'This security key can’t confirm it’s you. Set up a PIN for it, or use another device.',
+	passkeyTooLong: 'That took too long. Start again.',
+	passkeyReady: 'Your email is confirmed. Choose Add a passkey to continue.',
+	passkeyAdded: 'Your passkey was added. We sent a confirmation to {email}.',
+	passkeyCreated: 'Created {date}',
+	passkeyLastUsed: 'Last used {date}',
+	passkeyNeverUsed: 'Never used',
+	passkeySynced: 'Synced to your devices',
+	passkeyThisDevice: 'Only on this device',
+	passkeyViaPasskey: 'Added after signing in with a passkey',
+	passkeyViaCode: 'Added after signing in with your password and a code',
+	passkeyViaMail:
+		'Added after signing in with your password and an emailed link',
+	passkeyOldAddress: 'Made for an old address of {service}; it no longer works',
+	passkeyCopied: 'Refused: it may have been copied',
+	passkeyAddedOn: 'Passkey added {date}',
+	passkeyRename: 'Rename',
+	passkeyRemove: 'Remove',
+	passkeyNameLabel: 'New name',
+	passkeySave: 'Save',
+	passkeyNameInvalid: 'Give it a name of 1 to 64 characters, on one line.',
+	passkeyRenamed: 'The passkey was renamed.',
+	passkeyRemoveTitle: 'Remove {name}?',
+	passkeyRemoveEffect:
+		'It stops signing you in to {service} at once. We’ll email you that it was removed.',
+	passkeyRemoveButton: 'Remove it',
+	passkeyRemoved: 'The passkey was removed. We sent a confirmation to {email}.',
+	passkeyRemoveSent:
+		'Check your email: we sent a link to {email}. Open it in this browser within 10 minutes to remove the passkey.',
+	passkeyLast:
+		'This is your only way to sign in to {service}. Add another way first: a password or another passkey.',
+	/* "This wasn't me" from the email about an added passkey (specs/139 research R16). */
+	passkeyDisownTitle: 'Remove this passkey from {email}?',
+	passkeyDisownEffect:
+		'This also removes passkeys added after it and signs your account out everywhere.',
+	passkeyDisownNothing:
+		'This link no longer works. If someone else added a passkey to your account, ask the people who run {service}.',
+	passkeyDisownDoneTitle: 'The passkey was removed',
+	passkeyDisownDone:
+		'The passkey was removed and your account was signed out everywhere.',
+	passkeyDisownPassword: 'Now change your password: someone else knows it.',
 	disownTitle: 'Remove two-step verification from {email}?',
 	disownEffect:
 		'This removes the authenticator app that was just set up and signs your account out everywhere. Then change your password.',
@@ -235,6 +304,7 @@ export const en = {
 	accountPageName: 'Your account page',
 	methodPassword: 'Password',
 	methodPasswordCode: 'Password and a code from an authenticator app',
+	methodPasskey: 'Passkey',
 	methodProvider: 'Through {provider}',
 	methodProviderGone: 'Through a provider that no longer exists',
 	otherBrowser: 'Other browser',

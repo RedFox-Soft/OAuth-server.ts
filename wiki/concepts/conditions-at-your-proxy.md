@@ -4,7 +4,7 @@ title: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-06
-updated: 2026-11-10
+updated: 2026-11-19
 ---
 
 # Conditions at your proxy
@@ -115,7 +115,8 @@ console-bundled), so the fact `signedInWithCode` is computed server-side; the co
 ## Network facts in "From where" (spec 129)
 
 The network condition may carry `facts`: FoxTrust categories to keep out (tor, vpn, hosting with cloud), countries
-"only from" or "not from", and an outcome, Refuse or (apps only) Sign in again within N, optionally with a code. A
+"only from" or "not from", and an outcome, Refuse or (apps only) Sign in again within N, optionally with a code (the
+console's "with two-step sign-in" since spec 139: a passkey sign-in meets `withCode` too, [[passkeys]]). A
 Refuse match is decided with the ranges, before any session; a sign-in-again match joins the fresh conditions
 (`freshOf`, `decide.ts`), so the sign-in, the callback's code check and the code pages above serve it unchanged.
 Facts that are off, not loaded, older than 26 hours or unreadable fail every such condition: the opposite of the

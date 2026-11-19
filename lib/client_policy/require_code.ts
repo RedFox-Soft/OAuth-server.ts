@@ -35,6 +35,9 @@ export function proxyAsksForCode(
 	return acrValues.split(' ').includes(multiFactor) && acr !== multiFactor;
 }
 
-/* What a refusal says, at the token endpoint and to an application its sign-in hands back. */
+/*
+ * What a refusal says, at the token endpoint and to an application its sign-in hands back. "Two-step": a code from an
+ * authenticator app, or a passkey where the project accepts them (specs/139 research R22), both of which meet it.
+ */
 export const REQUIRE_CODE_DESCRIPTION =
-	'the application requires a sign-in with a code from an authenticator app';
+	'the application requires two-step sign-in';

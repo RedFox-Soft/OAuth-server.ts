@@ -211,6 +211,8 @@ export const routeNames = {
 	account_security: '/account/security',
 	account_security_link: '/account/security/link',
 	account_security_disown: '/account/security/disown',
+	/* "This wasn't me" about an added passkey (specs/139): removes it and every later one, and ends every session. */
+	account_passkey_disown: '/account/security/passkey-disown',
 	/* The person's own recent sign-ins, and the one act beside them: signing out everywhere (specs/135). */
 	account_sign_ins: '/account/sign-ins',
 	/* "This wasn't me" about a sign-in from a new network or browser (specs/138), for people and administrators. */

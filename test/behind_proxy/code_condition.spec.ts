@@ -10,7 +10,11 @@ import {
 import { Type } from '@sinclair/typebox';
 
 import bootstrap from '../test_helper.js';
-import { getBucketStore, getUserStore } from 'lib/adapters/index.ts';
+import {
+	getBucketGroupStore,
+	getBucketStore,
+	getUserStore
+} from 'lib/adapters/index.ts';
 import { forgetBucketAddresses } from 'lib/admin/auth/bucketAddress.ts';
 import { configuration } from 'lib/configs/application.ts';
 import { resetSentEmails } from 'lib/mail/mailer.ts';
@@ -25,6 +29,7 @@ import {
 	uidIn
 } from '../require_code/helpers.ts';
 import { Browser, PASSWORD } from '../connected_apps/helpers.ts';
+import { holdingPasskey, postPasskey } from '../passkeys/helpers.ts';
 import {
 	AppJar,
 	behindProxyPath,
@@ -296,7 +301,7 @@ describe('a path behind the proxy that asks for a code', () => {
 			expect(returned.headers.getSetCookie().join(';')).not.toContain(
 				`__Host-foxauth-${app.id}=`
 			);
-			expect(page).toContain('needs a code from an authenticator app');
+			expect(page).toContain('needs two-step sign-in');
 			expect(page).not.toContain('Sign in again');
 		});
 
@@ -352,7 +357,7 @@ describe('a path behind the proxy that asks for a code', () => {
 			expect(refused.url).toMatch(/\/ui\/[^/]+\/code-required$/);
 			const shown = textOf(await refused.response.text());
 			expect(shown).toContain(
-				`${new URL(app.address).host} asks for a code from an authenticator app`
+				`${new URL(app.address).host} asks for two-step sign-in`
 			);
 			const uid = uidIn(refused.url);
 			await v.browser.open(`/ui/${uid}/totp/enroll`);
@@ -401,9 +406,7 @@ describe('a path behind the proxy that asks for a code', () => {
 				expect(shown).not.toContain('Set up an authenticator app');
 				expect(returned.status).toBe(403);
 				expect(returned.headers.get('x-auth-reason')).toBe('code_required');
-				expect(textOf(page)).toContain(
-					'needs a code from an authenticator app'
-				);
+				expect(textOf(page)).toContain('needs two-step sign-in');
 				expect(page).not.toContain('/_foxauth/start');
 				expect(page).toContain(`href="${app.address}/"`);
 			} finally {
@@ -458,9 +461,53 @@ describe('a path behind the proxy that asks for a code', () => {
 				headers: { 'Accept-Language': 'ru' }
 			});
 
-			expect(textOf(await returned.text())).toContain(
-				'нужен код из приложения-аутентификатора'
-			);
+			expect(textOf(await returned.text())).toContain('нужен двухэтапный вход');
+		});
+	});
+
+	/**
+	 * @proves A person who holds a passkey opens a path that asks for a recent sign-in with a code by signing in with the
+	 * passkey alone, in a project that accepts passkeys: no code is asked, and the path opens (specs/139 FR-016).
+	 */
+	describe('a person with a passkey', () => {
+		it('opens the path after a passkey sign-in, asked for no code', async () => {
+			await getBucketStore().update(w.acme.id, { passkeyLogin: true });
+			forgetBucketAddresses();
+			const at = {
+				bucketId: w.acme.id,
+				clientId: '',
+				prefix: `/${w.acme.slug}`,
+				origin: 'http://e.ly'
+			};
+			setSystemTime(T0 + 120 * MINUTE);
+			try {
+				const { accountId, device } = await holdingPasskey(at);
+				await getBucketGroupStore().change(w.acme.staff, {
+					add: [accountId],
+					remove: []
+				});
+				const v = visit();
+				const opened = await open(v, '/admin');
+				const login = present(opened.url, 'the login page');
+
+				const posted = await postPasskey(v.browser, device, at, {
+					url: login,
+					html: await present(opened.response, 'a page').text()
+				});
+				const landed = await v.browser.open(
+					new URL(
+						present(posted.headers.get('location'), 'a redirect'),
+						login
+					).toString()
+				);
+				const completed = await relay(v, landed.url);
+
+				expect(completed.headers.get('location')).toBe(`${app.address}/admin`);
+				expect((await allowed(v, '/admin')).status).toBe(200);
+			} finally {
+				await getBucketStore().update(w.acme.id, { passkeyLogin: undefined });
+				forgetBucketAddresses();
+			}
 		});
 	});
 });

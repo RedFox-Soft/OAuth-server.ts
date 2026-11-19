@@ -168,7 +168,7 @@ describe("an API's sign-in requirement at the proxy", () => {
 		expect(res.status).toBe(401);
 		expect(res.headers.get('x-auth-reason')).toBe('code_required');
 		expect(res.headers.get('www-authenticate')).toStartWith(
-			`Bearer error="insufficient_user_authentication", error_description="a sign-in with a code from an authenticator app is required", acr_values="${configuration.acrMap.multi_factor}", resource_metadata="`
+			`Bearer error="insufficient_user_authentication", error_description="two-step sign-in is required", acr_values="${configuration.acrMap.multi_factor}", resource_metadata="`
 		);
 	});
 

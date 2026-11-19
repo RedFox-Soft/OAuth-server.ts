@@ -157,6 +157,13 @@ export const UpdateBucketBody = t.Object({
 	 */
 	totpSelfService: t.Optional(t.Boolean()),
 	/*
+	 * Whether people may sign in with a passkey and add passkeys on their own account page (specs/139). Absent means
+	 * off. Refused on the administrators' project, and turning it on is refused while the instance is served at an IP
+	 * address, which can never be a passkey's site. Turning it off deletes no passkey, and goes through the preview
+	 * below when someone could then sign in only with one.
+	 */
+	passkeyLogin: t.Optional(t.Boolean()),
+	/*
 	 * Whether the project's people are emailed about a sign-in from a new network or browser, with a link that signs
 	 * them out everywhere (specs/138). Absent means off, and on for the administrators' project.
 	 */

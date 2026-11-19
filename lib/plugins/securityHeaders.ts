@@ -90,9 +90,13 @@ export const securityHeaders = (app: Elysia) => {
 		 * deprecated path and fail on the browser release that finally removes it, long after this
 		 * change and nowhere near it. Not worth one directive.
 		 *
-		 * `publickey-credentials-get` IS denied, with eyes open: there is no WebAuthn anywhere in the
-		 * server today. A future passkey feature must remove it. That one is safe to deny now precisely
-		 * because its failure mode is loud — a rejected promise, not a silent downgrade.
+		 * `publickey-credentials-get` and `publickey-credentials-create` are granted to this origin only
+		 * (specs/139): the sign-in page asks for a passkey and the person's own page adds one. They were denied
+		 * while nothing here used WebAuthn. Granted on every response rather than per page (an owner's decision):
+		 * a script already running in this origin could navigate to the sign-in page anyway, and a frame of this
+		 * server inside another origin's page stays refused, as `frame-ancestors 'none'` keeps every page out of
+		 * one. `create` defaults to `self` already; naming it writes the decision down. Each served origin is its
+		 * own `self`, so a host or subdomain project's pages grant only to that project's origin.
 		 *
 		 * WHY not the maximal list. Every extra name people reach for — ambient-light-sensor, battery,
 		 * document-domain, execution-while-*, keyboard-map, navigation-override, sync-xhr, web-share —
@@ -103,7 +107,7 @@ export const securityHeaders = (app: Elysia) => {
 		 * trade. specs/029-hsts-permissions-framing/research.md M5.
 		 */
 		set.headers['Permissions-Policy'] =
-			'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
+			'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-create=(self), publickey-credentials-get=(self), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
 		/*
 		 * Nothing an authorization server serves belongs in search results, and an indexed sign-in URL
 		 * carries a client_id, a redirect_uri and the hostnames of the projects behind it.

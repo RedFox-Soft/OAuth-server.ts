@@ -1,7 +1,7 @@
 ---
 title: 在代理处保护 MCP 服务器
 description: 让 Caddy、Traefik 或 nginx 代理请 FoxAuth 检查每个令牌以及每个工具需要的权限，MCP 服务器无需任何授权代码。
-source: 300eb7b73d6c
+source: 69757460530a
 sidebar:
   order: 8
 ---
@@ -183,7 +183,7 @@ API 自己的条件对所有工具都有效。有时某一个工具需要更多�
 - **From where**：地址在你的地址范围之内，或不在其中。它还可以挡住 FoxTrust 网络信息所指的网络，例如 Tor。你的代理必须传递用户的地址，做法见 [From where](/zh-cn/docs/get-started/add-conditions-at-your-proxy/#from-where)。
 - **When**：日期和时段，按 API 的时区计算。一个 API 只有一个时区。
 
-一个工具最多有四个条件。工具的条件中没有属性，也没有重新登录。验证码或近期登录针对整个 API 设置：请参阅[连接时要求验证码或近期登录](#require-a-code-or-a-recent-sign-in)。
+一个工具最多有四个条件。工具的条件中没有属性，也没有重新登录。两步登录或近期登录针对整个 API 设置：请参阅[连接时要求两步登录或近期登录](#require-a-code-or-a-recent-sign-in)。
 
 ### 工具的条件如何叠加 {#tool-conditions-add-up}
 
@@ -227,17 +227,17 @@ MCP 服务器上新增或改名的工具还不在工具表中。在你把它加�
 
 ### 检查访问 {#tool-conditions-check-access}
 
-该 API 的 **Access** 选项卡最下方有一张 **Check access** 卡片。选择一个人，或者选择 **No person: an app acting for itself**（没有对应的人：应用以自己的身份行事）。然后选择应用令牌持有的权限、调用的工具或其他请求、地址和时间。如果 API 要求验证码或近期登录，还要说明登录时是否输入了验证码，以及何时登录。
+该 API 的 **Access** 选项卡最下方有一张 **Check access** 卡片。选择一个人，或者选择 **No person: an app acting for itself**（没有对应的人：应用以自己的身份行事）。然后选择应用令牌持有的权限、调用的工具或其他请求、地址和时间。如果 API 要求两步登录或近期登录，还要说明登录是否为两步登录，以及何时登录。
 
 卡片会回答 **Allowed**（允许）、**Refused**（拒绝）或 **Asked to sign in again**（要求重新登录），并用平实的话说明原因。它会分别针对已保存的工具表和你正在编辑的工具表作答。如果缺少需要的信息，它会回答 **Not known**（未知），并说明缺少什么。卡片在你的浏览器中运行与代理处检查相同的判断。不由任何服务器替它判断，也不会写入审计记录。如果某个条件需要网络信息，卡片会在你的服务器自己的副本中查找这个地址。
 
 智能体可以用 `resource_update` 设置工具的条件，即 `tools` 中某一行的 `conditions`。单个工具的条件在所有方案中免费提供。
 
-## 连接时要求验证码或近期登录 {#require-a-code-or-a-recent-sign-in}
+## 连接时要求两步登录或近期登录 {#require-a-code-or-a-recent-sign-in}
 
 令牌只说明有人登录了这个项目，并不说明是怎样登录的。所以，一个被盗的密码就足以让智能体连接到你的 MCP 服务器。API 的 **Access** 选项卡中的两项设置可以改变这一点。打开项目的 **APIs** 标签页，再打开该 API，然后打开 **Access**：
 
-- **Require a code from an authenticator app**。只有在用户登录时输入了身份验证器应用（例如 Google Authenticator）中的验证码之后，才会为这个 API 签发令牌。
+- **Require two-step sign-in**。只有在用户登录时输入了身份验证器应用（例如 Google Authenticator）中的验证码，或者在项目接受通行密钥时使用了通行密钥之后，才会为这个 API 签发令牌。
 - **Ask to sign in again every**。选择每天、每 7 天、每 14 天，或 **Custom**：一个整数的小时数或天数，从 1 小时到 14 天。令牌所代表的用户，其登录时间不能早于这个时长。
 
 可以只设置其中一项，也可以两项都设置。无论谁检查这个 API 的令牌（你的代理或 API 自己的服务器），这两项设置都有效。智能体也可以通过管理 MCP 服务器设置它们：在 `resource_declare` 和 `resource_update` 中使用 `requireCode` 和 `signInEveryMinutes`。所有方案均免费提供。
@@ -246,7 +246,7 @@ MCP 服务器上新增或改名的工具还不在工具表中。在你把它加�
 
 API 要求更强或更近期的登录时，有一个标准的回答：带有 `error="insufficient_user_authentication"` 的 `401`（RFC 9470）。截至 2026-11-12，我们查看过的 MCP 客户端都不理解它。但每个客户端在收到 `401` 时都会去申请新令牌。这个令牌由 FoxAuth 签发，所以 FoxAuth 自己保证这一要求得到满足：
 
-- 当用户为获取这个 API 的令牌而登录时，无论客户端请求了什么，FoxAuth 都会要求输入验证码。如果用户的登录早于允许的时长，FoxAuth 会要求重新登录。
+- 当用户为获取这个 API 的令牌而登录时，无论客户端请求了什么，FoxAuth 都会要求输入验证码。使用通行密钥登录则不需要验证码。如果用户的登录早于允许的时长，FoxAuth 会要求重新登录。
 - 登录页面上有一行文字写出 API 的名称，例如“Files 需要身份验证器应用中的验证码才能连接。”或“Files 要求您每天重新登录一次，以保持连接。”
 - 没有身份验证器应用的用户可以在同一次登录中设置一个，前提是项目允许用户自行设置。
 - 为用户获取令牌的每一种方式都会检查这一要求：授权码、设备流程（device flow）、CIBA 和刷新令牌。
@@ -263,7 +263,7 @@ API 要求更强或更近期的登录时，有一个标准的回答：带有 `er
 - **不代表任何人的应用**。通过 client credentials 授权类型为自己获取令牌的应用，拿不到这个 API 的令牌。在你的代理处，这样的令牌会收到 `403`。
 - **通过断言（assertion）登录**。来自 JWT bearer 授权类型、identity assertions 或 ID-JAG 的令牌也会被拒绝。用户是在别处登录的，FoxAuth 无法知道是怎样登录的。
 
-通过身份提供方（例如 Google 或你公司的身份提供方）登录的人是第三种情况。他们无法在 FoxAuth 输入验证码。所以当 API 要求验证码时，登录页面会告诉他们无法以这种方式连接。当 API 只要求重新登录时，FoxAuth 会把他们送到身份提供方重新登录。怎样重新登录由身份提供方决定，FoxAuth 无法确认他们确实重新登录了。
+通过身份提供方（例如 Google 或你公司的身份提供方）登录的人是第三种情况。他们无法在 FoxAuth 输入验证码。所以当 API 要求两步登录时，登录页面会告诉他们无法以这种方式连接。当 API 只要求重新登录时，FoxAuth 会把他们送到身份提供方重新登录。怎样重新登录由身份提供方决定，FoxAuth 无法确认他们确实重新登录了。
 
 ### 保存之前：会影响哪些人 {#before-you-save}
 
@@ -297,7 +297,7 @@ Goose 从 1.48.0 版起会说明自己调用的工具。
 ## 试一试 {#try-it}
 
 1. 按照[第 1 步](#declare-the-api)声明一个 MCP 服务器并配置你的代理，或者使用已有的服务器。
-2. 打开它的 **Access** 选项卡，打开 **Require a code from an authenticator app**。查看会影响哪些人，然后保存。
+2. 打开它的 **Access** 选项卡，打开 **Require two-step sign-in**。查看会影响哪些人，然后保存。
 3. 用你的 MCP 客户端连接这个服务器。登录页面会写出 API 的名称，并在输入密码后要求输入验证码。如果你没有身份验证器应用，可以在那里设置一个。
 4. 调用一个工具。它可以正常工作。
 5. 在同一个选项卡中，把 **Ask to sign in again every** 设为 **Custom**、1 小时，然后保存。

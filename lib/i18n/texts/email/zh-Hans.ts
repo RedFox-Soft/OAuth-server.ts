@@ -110,5 +110,29 @@ export const zhHans: EmailTexts = {
 			'如果不是您，请立即退出所有登录。此链接只能使用一次，72 小时内有效：',
 		button: '不是我',
 		console: 'FoxAuth 控制台'
+	},
+	passkeys: {
+		linkAddSubject: '确认是您本人，以添加通行密钥',
+		linkRemoveSubject: '确认是您本人，以删除通行密钥',
+		linkHeading: '确认是您本人',
+		linkAddIntro:
+			'请在 10 分钟内，在您发出请求的同一浏览器中打开此链接，为您的{service}账户添加通行密钥。',
+		linkRemoveIntro:
+			'请在 10 分钟内，在您发出请求的同一浏览器中打开此链接，从您的{service}账户中删除通行密钥。',
+		linkIgnore: '如果这不是您的请求，请忽略此邮件。',
+		linkButton: '继续',
+		addedSubject: '您的{service}账户添加了一个通行密钥',
+		addedIntro:
+			'{date} UTC，您的{service}账户 {email} 在 {device} 上添加了一个通行密钥。',
+		addedIntroNoDevice:
+			'{date} UTC，您的{service}账户 {email} 添加了一个通行密钥。',
+		addedUse: '现在您可以用它代替密码登录{service}。',
+		disownLine:
+			'如果这不是您本人操作，请在 72 小时内通过此链接将其删除，然后更改密码：',
+		disownButton: '不是我',
+		removedSubject: '您的{service}账户删除了一个通行密钥',
+		removedIntro:
+			'于 {date} 在 {device} 上创建的通行密钥已不能再用于登录{service}。',
+		removedIntroNoDevice: '于 {date} 创建的通行密钥已不能再用于登录{service}。'
 	}
 };

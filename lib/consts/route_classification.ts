@@ -99,6 +99,7 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_security,
 	routeNames.account_security_link,
 	routeNames.account_security_disown,
+	routeNames.account_passkey_disown,
 	routeNames.account_sign_ins,
 	routeNames.account_not_me,
 	BEHIND_PROXY_CHECK_BASE
@@ -336,6 +337,9 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	{ method: 'GET', path: routeNames.account_security_link },
 	{ method: 'GET', path: routeNames.account_security_disown },
 	{ method: 'POST', path: routeNames.account_security_disown },
+	/* "This wasn't me" about an added passkey (specs/139): the owner must reach it whatever is switched off. */
+	{ method: 'GET', path: routeNames.account_passkey_disown },
+	{ method: 'POST', path: routeNames.account_passkey_disown },
 	/*
 	 * The person's own recent sign-ins (specs/135), unconditional too: a person who fears someone else is in their
 	 * account must always be able to look and to sign out everywhere.
@@ -571,9 +575,13 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'POST', path: '/ui/:uid/forgot-password', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp/enroll', rate: 'strict' },
+	// The passkey door (specs/139): it verifies a signature, and has its own per-caller bound of failures behind this.
+	{ method: 'POST', path: '/ui/:uid/passkey', rate: 'strict' },
 	// The person's own page checks a code and sends mail (specs/126), and the disown link removes a factor.
 	{ method: 'POST', path: routeNames.account_security, rate: 'strict' },
 	{ method: 'POST', path: routeNames.account_security_disown, rate: 'strict' },
+	// The passkey "This wasn't me" removes passkeys, signs the account out everywhere and may send a reset mail.
+	{ method: 'POST', path: routeNames.account_passkey_disown, rate: 'strict' },
 	// Signing out everywhere sweeps every record of the account and may send a reset mail (specs/135).
 	{ method: 'POST', path: routeNames.account_sign_ins, rate: 'strict' },
 	// "This wasn't me" sweeps every record of the account like it (specs/138).

@@ -50,6 +50,8 @@
 		"@modelcontextprotocol/server": "^2.4.0",
 		"@rc-component/qrcode": "2.0.0",
 		"@sentry/bun": "11.11.0",
+		"@simplewebauthn/browser": "14.0.0",
+		"@simplewebauthn/server": "14.1.0",
 		"antd": "^6.7.0",
 		"debug": "^4.4.3",
 		"elysia": "^1.4.31",

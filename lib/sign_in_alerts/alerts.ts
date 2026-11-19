@@ -137,6 +137,8 @@ function methodWords(
 	switch (row.method) {
 		case 'password_code':
 			return T.methodPasswordCode;
+		case 'passkey':
+			return T.methodPasskey;
 		case 'provider': {
 			const provider = row.place.providerId
 				? names.provider(row.place.providerId)

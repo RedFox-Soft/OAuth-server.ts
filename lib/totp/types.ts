@@ -87,12 +87,20 @@ export const TotpLinkPayload = t.Object({
 		t.Literal('reenrol'),
 		t.Literal('disown'),
 		/* "This wasn't me" about a sign-in from a new network or browser (specs/138), not about a factor. */
-		t.Literal('notme')
+		t.Literal('notme'),
+		/*
+		 * Proof of the mailbox before adding or removing a passkey on the person's own page (specs/139 research R14),
+		 * for someone whose recent sign-in was a password alone: the same holder, ten minutes, once, newest only.
+		 */
+		t.Literal('passkey_add'),
+		t.Literal('passkey_remove')
 	]),
 	holder: t.Optional(t.String()),
 	enrolledAt: t.Optional(t.Number()),
 	/* For a `notme` link: the sign-in it was mailed about. */
 	signInId: t.Optional(t.String()),
+	/* For a `passkey_remove` link: the passkey record it is for. */
+	passkeyId: t.Optional(t.String()),
 	exp: t.Number()
 });
 

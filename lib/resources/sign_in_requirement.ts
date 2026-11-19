@@ -40,9 +40,11 @@ export function signInRequirementUnmet(
 	);
 }
 
-/* What a refusal says at the token endpoint and to the client a sign-in hands back. Fixed ASCII, no names. */
-export const API_CODE_DESCRIPTION =
-	'the API requires a sign-in with a code from an authenticator app';
+/*
+ * What a refusal says at the token endpoint and to the client a sign-in hands back. Fixed ASCII, no names. "Two-step":
+ * a code from an authenticator app, or a passkey where the project accepts them (specs/139 research R22).
+ */
+export const API_CODE_DESCRIPTION = 'the API requires two-step sign-in';
 export const API_RECENT_DESCRIPTION = 'the API requires a more recent sign-in';
 
 /* Assertion grants and client credentials, which carry no sign-in this server saw, for an API with a requirement. */
@@ -51,8 +53,7 @@ export const API_MACHINE_DESCRIPTION =
 	"this API accepts only tokens from a person's sign-in";
 
 /* The proxy's `error_description` (RFC 6750 §3: printable ASCII without `"` or `\`). */
-export const CHALLENGE_CODE_DESCRIPTION =
-	'a sign-in with a code from an authenticator app is required';
+export const CHALLENGE_CODE_DESCRIPTION = 'two-step sign-in is required';
 export const CHALLENGE_RECENT_DESCRIPTION = 'a more recent sign-in is required';
 
 /* One description for a refusal, the code first. */

@@ -55,7 +55,12 @@ function pageElement(
 	props: object
 ): ReactElement | null {
 	switch (page) {
+		/*
+		 * The passkey door (`POST ui/:uid/passkey`, specs/139) answers a refusal with the sign-in page itself, as the
+		 * password door does at its own path, so the page hydrates under that path's name too.
+		 */
 		case 'login':
+		case 'passkey':
 			return (
 				<LoginPage
 					uid={uid}

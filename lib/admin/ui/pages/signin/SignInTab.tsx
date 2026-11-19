@@ -37,6 +37,8 @@ interface Policy {
 	totpSelfService: boolean;
 	/* Whether people are emailed about a sign-in from a new network or browser (specs/138); absent: on only here for administrators. */
 	newSignInAlerts: boolean;
+	/* Whether people may sign in with a passkey and add their own (specs/139); absent means off. */
+	passkeyLogin: boolean;
 	registrationOpen: boolean;
 	emailVerificationRequired: boolean;
 	verificationMethod: 'link' | 'code';
@@ -47,6 +49,7 @@ const LABELS: Record<keyof Policy, string> = {
 	totpRequired: 'Require an authenticator app',
 	totpSelfService: 'Let people turn on two-step verification themselves',
 	newSignInAlerts: 'Email about sign-ins from a new network or browser',
+	passkeyLogin: 'Passkeys',
 	registrationOpen: 'Self-service sign-up',
 	emailVerificationRequired: 'Require a verified email address',
 	verificationMethod: 'Verification method'
@@ -58,6 +61,7 @@ export function policyOf(bucket: BucketView): Policy {
 		totpRequired: bucket.totpRequired,
 		totpSelfService: bucket.totpSelfService !== false,
 		newSignInAlerts: bucket.newSignInAlerts ?? bucket._id === ADMIN_BUCKET_ID,
+		passkeyLogin: bucket.passkeyLogin === true,
 		registrationOpen: bucket.registrationOpen,
 		emailVerificationRequired: bucket.emailVerificationRequired,
 		verificationMethod: bucket.verificationMethod
@@ -360,6 +364,15 @@ export function SignInTab({
 								label: 'Identity providers',
 								children: `${String(enabled.length)} enabled`
 							},
+							...(consoleBucket
+								? []
+								: [
+										{
+											key: 'passkeys',
+											label: LABELS.passkeyLogin,
+											children: yes(baseline.passkeyLogin)
+										}
+									]),
 							{
 								key: 'totp',
 								label: LABELS.totpRequired,
@@ -473,7 +486,49 @@ export function SignInTab({
 						</div>
 						<Link href={providersHref}>Manage →</Link>
 					</Flex>
-					{/* Passkeys (plan 055) are a way to sign in and will be offered here once they exist. */}
+					{/*
+					 * Passkeys (specs/139): not on the administrators' project, whose people have no account page to add
+					 * one on. Turning them on is refused at an IP address and only warned about over plain http, as the
+					 * server decides; the project read says which.
+					 */}
+					{!consoleBucket && (
+						<Setting
+							title={LABELS.passkeyLogin}
+							control={
+								<Switch
+									aria-label={LABELS.passkeyLogin}
+									checked={draft.passkeyLogin}
+									disabled={
+										!draft.passkeyLogin && bucket.passkeysPossible === false
+									}
+									onChange={(on) => set('passkeyLogin', on)}
+								/>
+							}
+							effect={
+								draft.passkeyLogin
+									? 'People can sign in with a passkey, and add passkeys on their own Sign-in and security page. A passkey checks a fingerprint, face or screen lock, so it counts as two-step sign-in.'
+									: 'Passkeys are not offered or accepted. Passkeys people already have are kept.'
+							}
+						>
+							{!draft.passkeyLogin && bucket.passkeysPossible === false && (
+								<Typography.Text type="warning">
+									Passkeys need this instance at a domain name over HTTPS (its
+									address is {bucket.issuer ?? 'not a domain name'}).
+								</Typography.Text>
+							)}
+							{draft.passkeyLogin && bucket.passkeysNeedHttps === true && (
+								<Typography.Text type="warning">
+									Browsers won&apos;t offer passkeys until this instance is
+									served over HTTPS.
+								</Typography.Text>
+							)}
+							{draft.passkeyLogin && !mailReady && (
+								<Typography.Text type="warning">
+									People can&apos;t add passkeys until email is set up.
+								</Typography.Text>
+							)}
+						</Setting>
+					)}
 				</Flex>
 			</Card>
 
@@ -567,7 +622,9 @@ export function SignInTab({
 					vertical
 					gap={4}
 				>
-					<Typography.Text strong>Where a code is asked</Typography.Text>
+					<Typography.Text strong>
+						Where two-step sign-in is asked
+					</Typography.Text>
 					{counts && (
 						<Typography.Text>
 							{counts.users - counts.withoutAuthenticator === 0
@@ -577,7 +634,7 @@ export function SignInTab({
 					)}
 					{(summary?.codeRequiredApps?.length ?? 0) > 0 && (
 						<Typography.Text>
-							Every sign-in to these applications includes a code:{' '}
+							Every sign-in to these applications is two-step:{' '}
 							{summary?.codeRequiredApps?.map((app, index) => (
 								<span key={app.id}>
 									{index > 0 ? ', ' : ''}
@@ -591,7 +648,7 @@ export function SignInTab({
 					)}
 					{(summary?.codeRequiredPaths?.length ?? 0) > 0 && (
 						<Typography.Text>
-							Apps behind your proxy ask for a code on these paths:{' '}
+							Apps behind your proxy ask for two-step sign-in on these paths:{' '}
 							{summary?.codeRequiredPaths?.map((app, index) => (
 								<span key={app.appId}>
 									{index > 0 ? '; ' : ''}
@@ -606,7 +663,9 @@ export function SignInTab({
 					)}
 					<Typography.Text type="secondary">
 						People who sign in through a provider are never asked for a code
-						here. Apps that require a code turn them away.
+						here. Apps that require two-step sign-in turn them away.
+						{draft.passkeyLogin &&
+							' A passkey sign-in is two-step: it meets every requirement here without a code.'}
 					</Typography.Text>
 				</Flex>
 			</Card>

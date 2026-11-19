@@ -77,7 +77,7 @@ function reasonOf(decision: ApiDecision, who: string): string {
 			return `The app's token lacks ${decision.needed.join(', ')}, which ${decision.tool} needs.`;
 		case 'sign_in':
 			return decision.unmet.code
-				? 'The sign-in had no code from an authenticator app, which this API requires, so the app is asked to sign in again.'
+				? 'The sign-in was not two-step, which this API requires, so the app is asked to sign in again.'
 				: 'The sign-in is older than this API allows, so the app is asked to sign in again.';
 		case 'unknown':
 			return `Not enough to judge: ${decision.kinds
@@ -401,7 +401,7 @@ export function ApiCheckAccess({
 								checked={withCode}
 								onChange={(e) => setWithCode(e.target.checked)}
 							>
-								Signed in with a code from an authenticator app
+								Signed in with two steps (a code or a passkey)
 							</Checkbox>
 						</>
 					)}

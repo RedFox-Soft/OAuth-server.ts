@@ -9,6 +9,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+### Added
+
+- **Sign in with a passkey** (spec 139). A project can turn on **Passkeys** in its Sign-in tab (or `project_update`
+  with `passkeyLogin`; off by default, never on the administrators' project, refused at an IP-address `ISSUER`). People
+  then sign in with a fingerprint, face or screen lock from the sign-in page's button or autofill, and add, rename and
+  remove up to 20 passkeys on their account page, now named **Sign-in and security**; each new passkey is mailed with
+  a "This wasn't me" link. A passkey works only at the host it was made for. **Changed:** a passkey sign-in reports
+  the multi-factor `acr` and `amr` `pop user mfa`, so every requirement of a code (an app's, an API's, a proxy
+  condition's) now accepts it, and the console and the agent's tools call them "two-step sign-in". **Upgrade note:**
+  run `db:setup` (or `db:setup:pg`) for the three new storage areas, then `db:migrate` (one fence migration).
+
 ## [2.1.0] - 2026-11-18
 
 Super administrators can see where administrators sign in from, and an account is emailed about a sign-in from a

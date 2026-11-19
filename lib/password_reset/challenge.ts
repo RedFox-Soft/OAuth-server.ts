@@ -2,6 +2,7 @@ import crypto from 'crypto';
 
 import {
 	checkedAdapter,
+	getPasskeyStore,
 	getUserStore,
 	getBucketStore
 } from '../adapters/index.js';
@@ -367,8 +368,8 @@ export async function consume(
 	 */
 	const store = getUserStore(challenge.bucketId);
 	const before = await store.find(challenge.accountId);
-	const unprovenFactor =
-		before?.verified !== true && before?.totp !== undefined;
+	const unprovenAddress = before !== null && !before.verified;
+	const unprovenFactor = unprovenAddress && before.totp !== undefined;
 
 	await store.update(challenge.accountId, {
 		password: await Bun.password.hash(password),
@@ -376,6 +377,16 @@ export async function consume(
 		verified: true,
 		...(unprovenFactor ? { totp: undefined } : {})
 	});
+	/*
+	 * Passkeys held before the address was ever proven go too, for the authenticator's reason (specs/139 FR-033): whoever
+	 * registered the address first may have added them. The `passkeys` area is unowned, so nothing else removes them.
+	 */
+	if (unprovenAddress) {
+		await getPasskeyStore().removeAllOf(
+			challenge.bucketId,
+			challenge.accountId
+		);
+	}
 	/*
 	 * Both code-failure windows go with a completed reset (specs/126 FR-024), for the reason the sign-in counter below
 	 * does: the reset proves the owner is back, and a stranger who knew the old password must not keep them locked out

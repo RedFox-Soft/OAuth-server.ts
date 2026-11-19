@@ -1,10 +1,19 @@
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { Form, Input, Button, Checkbox, Flex, Card, Divider } from 'antd';
 import {
 	MailOutlined,
 	LockOutlined,
 	ExclamationCircleOutlined,
-	InfoCircleOutlined
+	InfoCircleOutlined,
+	KeyOutlined
 } from '@ant-design/icons';
+import {
+	browserSupportsWebAuthn,
+	browserSupportsWebAuthnAutofill,
+	startAuthentication,
+	type AuthenticationResponseJSON,
+	type PublicKeyCredentialRequestOptionsJSON
+} from '@simplewebauthn/browser';
 import {
 	buildUILoginPath,
 	buildUIRegistrationPath,
@@ -23,6 +32,58 @@ import { Message, text } from '../i18n/message.js';
 import { SIGN_IN_TEXTS } from '../i18n/texts/signIn/index.js';
 import type { OfferedProvider } from './signInOptions.js';
 
+/*
+ * The passkey offer a render of the page carries (specs/139 contracts/sign-in.md): the request options with the
+ * challenge the server wrote onto this interaction, and whether the page's "Remember me" decides how long the session
+ * lasts. The console's preview passes no options: it draws the button and can never start a prompt (FR-012).
+ */
+export interface PasskeyOnPage {
+	options?: PublicKeyCredentialRequestOptionsJSON;
+	remember: boolean;
+}
+
+/*
+ * The password form's "Remember me" checkbox, which the passkey's post copies. antd's `<Form name="login">` renders
+ * `id="login"`, not a `name` attribute: a `form[name="login"]` selector matched nothing in a browser, so an unticked box
+ * was never copied and every passkey sign-in was remembered (found in the browser walk, specs/139 T058).
+ */
+export const REMEMBER_TICK = 'form#login input[name="remember"]';
+
+/*
+ * Hands the browser's answer to the passkey door the way the password form is sent: a native post of the hidden form,
+ * so the server answers with a redirect or a page exactly as it does to a password. With a "Remember me" on the page
+ * its tick is sent along; without one the sign-in is remembered, as a provider sign-in is.
+ */
+function sendPasskey(
+	answer: AuthenticationResponseJSON,
+	rememberAsked: boolean
+): void {
+	const form = document.forms.namedItem('passkey');
+	const credential = form?.elements.namedItem('credential');
+	const remember = form?.elements.namedItem('remember');
+	if (
+		!form ||
+		!(credential instanceof HTMLInputElement) ||
+		!(remember instanceof HTMLInputElement)
+	)
+		return;
+	credential.value = JSON.stringify(answer);
+	const ticked =
+		document.querySelector<HTMLInputElement>(REMEMBER_TICK)?.checked;
+	// A disabled field is not sent: an absent `remember` is the server's "don't remember".
+	remember.disabled = rememberAsked && ticked === false;
+	form.submit();
+}
+
+/* Whether the browser can use passkeys does not change while the page is open. */
+function neverChanges(): () => void {
+	return () => {};
+}
+
+function notOnTheServer(): boolean {
+	return false;
+}
+
 export function LoginPage({
 	uid,
 	errorMessage,
@@ -37,9 +98,12 @@ export function LoginPage({
 	embedded = false,
 	switcher,
 	face,
-	listRefusal
+	listRefusal,
+	passkey
 }: {
 	uid: string;
+	/* Signing in with a passkey, offered in every form of this page where the project accepts passkeys (specs/139). */
+	passkey?: PasskeyOnPage;
 	errorMessage?: string;
 	notice?: string;
 	/*
@@ -76,6 +140,120 @@ export function LoginPage({
 	face: SignInFace;
 }) {
 	const T = SIGN_IN_TEXTS[useLanguage()];
+	const offer = passkey?.options;
+	const rememberAsked = passkey?.remember === true;
+	/*
+	 * Disabled on the server and in the render that hydrates its markup, so the two match (the server's answer is
+	 * "no"); enabled once the browser has said it can use passkeys at all (research R8).
+	 */
+	const webAuthn = useSyncExternalStore(
+		neverChanges,
+		browserSupportsWebAuthn,
+		notOnTheServer
+	);
+	const passkeyReady = !embedded && offer !== undefined && webAuthn;
+	const [passkeyCancelled, setPasskeyCancelled] = useState(false);
+	useEffect(() => {
+		if (!passkeyReady) return;
+		let current = true;
+		/*
+		 * The browser's own suggestions on the email field (FR-011), where it can show them: the request waits for the
+		 * person to pick a passkey there. The button starts a request of its own, which ends this one first.
+		 */
+		void browserSupportsWebAuthnAutofill().then((autofill) => {
+			if (!autofill || !current) return;
+			startAuthentication({ optionsJSON: offer, useBrowserAutofill: true })
+				.then((answer) => {
+					sendPasskey(answer, rememberAsked);
+				})
+				.catch(() => {
+					/* Ended by the button, or never chosen: there is nothing to tell the person. */
+				});
+		});
+		return () => {
+			current = false;
+		};
+	}, [passkeyReady, offer, rememberAsked]);
+	const startPasskey = () => {
+		if (!passkeyReady) return;
+		setPasskeyCancelled(false);
+		startAuthentication({ optionsJSON: offer })
+			.then((answer) => {
+				sendPasskey(answer, rememberAsked);
+			})
+			.catch(() => {
+				setPasskeyCancelled(true);
+			});
+	};
+	/*
+	 * The button leads the "or" block in the providers' own frame (research R8), with the line scripts-off readers see
+	 * and the line after a closed prompt. In the console's preview it is drawn as it looks and does nothing.
+	 */
+	const passkeyButton = passkey && (
+		<Flex
+			vertical
+			gap={4}
+		>
+			<button
+				type="button"
+				disabled={!embedded && !passkeyReady}
+				onClick={startPasskey}
+				style={{
+					display: 'flex',
+					alignItems: 'center',
+					justifyContent: 'center',
+					gap: '10px',
+					width: '100%',
+					minHeight: '44px',
+					padding: '10px 12px',
+					backgroundColor: foxVar('provider-bg'),
+					border: `1px solid ${foxVar('provider-border')}`,
+					borderRadius: '6px',
+					color: foxVar('provider-text'),
+					font: 'inherit',
+					cursor: 'pointer'
+				}}
+			>
+				<span style={{ display: 'inline-flex', flexShrink: 0 }}>
+					<KeyOutlined aria-hidden="true" />
+				</span>
+				<span>{T.login.passkey}</span>
+			</button>
+			<noscript>
+				<span style={{ color: foxVar('text-muted'), fontSize: '14px' }}>
+					{T.login.passkeyNoScript}
+				</span>
+			</noscript>
+			{passkeyCancelled && (
+				<span
+					role="status"
+					style={{ color: foxVar('text-muted'), fontSize: '14px' }}
+				>
+					{T.login.passkeyCancelled}
+				</span>
+			)}
+		</Flex>
+	);
+	/*
+	 * Where the page has no password form (password sign-in off, or the attacker list's refusal): an email field of
+	 * its own, which the browser hangs its passkey suggestions on and which is never sent, then the button.
+	 */
+	const passkeyBlock = passkey && (
+		<Flex
+			vertical
+			gap={8}
+			style={{ marginBottom: 24 }}
+		>
+			<Input
+				prefix={<MailOutlined aria-hidden="true" />}
+				placeholder={T.login.emailPlaceholder}
+				aria-label={T.login.emailPlaceholder}
+				autoComplete="username webauthn"
+				inputMode="email"
+			/>
+			{passkeyButton}
+		</Flex>
+	);
 	const link = (provider: OfferedProvider) => (
 		<ProviderLink
 			key={provider.id}
@@ -271,6 +449,7 @@ export function LoginPage({
 						)}
 					</div>
 				)}
+				{!passwordLogin && passkeyBlock}
 				{!passwordLogin && providerBlock}
 				<Form
 					name="login"
@@ -298,7 +477,7 @@ export function LoginPage({
 									name="username"
 									prefix={<MailOutlined aria-hidden="true" />}
 									placeholder={T.login.emailPlaceholder}
-									autoComplete="username"
+									autoComplete={passkey ? 'username webauthn' : 'username'}
 									inputMode="email"
 								/>
 							</Form.Item>
@@ -378,15 +557,43 @@ export function LoginPage({
 						</Button>
 					</form>
 				)}
-				{passwordLogin && providers.length > 0 && (
+				{passwordLogin && (providers.length > 0 || passkey) && (
 					<>
 						<Divider plain>
 							<span style={{ color: foxVar('text-muted') }}>
 								{T.login.providersDivider}
 							</span>
 						</Divider>
-						{providerBlock}
+						<Flex
+							vertical
+							gap={8}
+						>
+							{passkeyButton}
+							{providerBlock}
+						</Flex>
 					</>
+				)}
+				{/*
+				 * The passkey door's own form, posted by the script with the browser's answer: never typed into, and with
+				 * no script nothing can fill it, so it renders nothing a person sees.
+				 */}
+				{passkey && (
+					<form
+						name="passkey"
+						method="post"
+						action={buildUIPath(uid, 'passkey')}
+						hidden
+					>
+						<input
+							type="hidden"
+							name="credential"
+						/>
+						<input
+							type="hidden"
+							name="remember"
+							value="on"
+						/>
+					</form>
 				)}
 				{switcher && <LanguageSwitch {...switcher} />}
 			</Card>

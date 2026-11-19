@@ -18,7 +18,8 @@ const GOOGLE = 'https://accounts.google.com';
 const BucketRead = Type.Object({
 	passwordLogin: Type.Boolean(),
 	registrationOpen: Type.Boolean(),
-	totpRequired: Type.Boolean()
+	totpRequired: Type.Boolean(),
+	passkeyLogin: Type.Boolean()
 });
 const SummaryRead = Type.Object({ federationEnabled: Type.Boolean() });
 const PageProps = Type.Object({
@@ -57,7 +58,8 @@ async function previewFor(bucketId: string, cookie: string) {
 		draft: {
 			passwordLogin: settings.passwordLogin,
 			registrationOpen: settings.registrationOpen,
-			totpRequired: settings.totpRequired
+			totpRequired: settings.totpRequired,
+			passkeyLogin: settings.passkeyLogin
 		},
 		providers: providers.body as FederationProvider[],
 		federationOn: federationEnabled

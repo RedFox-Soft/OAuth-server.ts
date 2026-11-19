@@ -4,7 +4,7 @@ title: 'The connected-applications page: an end user sees and removes the access
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-10-13
-updated: 2026-11-16
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
@@ -144,7 +144,8 @@ console would have listed the other's access. Older grants still read as before 
 ## Three account pages (spec 126)
 
 Since 2026-11-10 the project has a third account page beside this one and connected services: **Two-step
-verification**, at `/account/security` (`lib/account_page/security_routes.ts`). The three link to each other from
+verification**, at `/account/security` (`lib/account_page/security_routes.ts`), named **Sign-in and security** since
+spec 139, which added a Passkeys part above the two-step part ([[passkeys]]). The three link to each other from
 the line under the heading; connected services only where the project offers them. It resolves the person the same
 way, from the project's own session, and checks every POST the same way (`fromThisOrigin`, then the person, then the
 anti-forgery value). Its re-authentication returns through this page's callback with a `security` pending flag, back
@@ -178,5 +179,8 @@ successful sign-ins from their activity ([[person-activity]]), and offers one ac
 
 - [[consent-screen-decisions]]: the "remove this access later" line on the consent page links here
   (`lib/interactions/index.ts:855`).
-- [[interaction-page-families]]: the page is plain and script-free, so every step works without JavaScript.
+- [[interaction-page-families]]: the page is plain and script-free, so every step works without JavaScript. One
+  exception since spec 139: Sign-in and security loads `public/passkeyButton.js` while it shows the form that adds a
+  passkey, the one act a browser cannot do without a script; the list, rename and remove still work without it
+  ([[passkeys]]).
 - [[end-user-support]]: the administrator's per-application view and sign-out it reuses.

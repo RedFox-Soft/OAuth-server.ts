@@ -28,7 +28,7 @@ A condition says "and only if". It never lets anyone in who was not let in befor
 
 An app's groups are already in its rule for each path, so groups are a condition only for an API. Network facts are
 a part of **From where**, not a condition of their own. An API has no **Ask to sign in again** condition. Instead, its
-own Access tab can require a code from an authenticator app or a recent sign-in: see [Ask for a code or a recent
+own Access tab can require two-step sign-in or a recent sign-in: see [Ask for two-step sign-in or a recent
 sign-in](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
 
 Values inside one condition combine with "or": "from the office or from the VPN". Different conditions combine with
@@ -173,13 +173,13 @@ Choose what happens when an address matches:
 - **Refused.** Before any sign-in, the person sees a page titled "You can't open app.example.com from where you are".
   The page names no source, category or country. Your proxy gets `403` with `X-Auth-Reason: not_from_network`.
 - **Asked to sign in again within N minutes**, for an app only. A person whose sign-in is older than N is sent to sign
-  in again. N is from 5 minutes to a day. Tick **with a code from an authenticator app** to ask for a code too. The
-  console then shows the same count of people as for [a code on Ask to sign in again](#with-code).
+  in again. N is from 5 minutes to a day. Tick **with two-step sign-in** to ask for a code or a passkey too. The
+  console then shows the same count of people as for [two-step sign-in on Ask to sign in again](#with-code).
 
 An address that does not match is never asked. What FoxTrust knows about a network can be wrong, and asking for a new
 sign-in is gentler than refusing. On an API checked at the proxy, network facts can only refuse: a token check has no
-browser to send to a sign-in. An API can still ask for a code or a recent sign-in, through its own settings: see [Ask
-for a code or a recent sign-in](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
+browser to send to a sign-in. An API can still ask for two-step sign-in or a recent sign-in, through its own settings:
+see [Ask for two-step sign-in or a recent sign-in](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
 
 The rule's line says it in words, for example "not from Tor, a VPN or hosting" or "only from Germany or Austria".
 
@@ -235,22 +235,23 @@ browser is sent to sign in again, and the sign-in page says why. A request that 
 - A person who signs in through an outside provider is asked to sign in there again. How fresh that sign-in is, the
   provider decides.
 
-### With a code from an authenticator app {#with-code}
+### With two-step sign-in {#with-code}
 
-Tick **with a code from an authenticator app** under the condition. The path then opens only for a sign-in that
-included a code and is not older than the time you chose, at most a day. The rule reads "signed in with a code within
-15 min".
+Tick **with two-step sign-in** under the condition. The path then opens only for a sign-in that included a code from an
+authenticator app, or was made with a passkey where the project accepts passkeys, and is not older than the time you
+chose, at most a day. The rule reads "signed in with two steps within 15 min".
 
 - Before it saves, the console shows how many of the people who may open the path have no authenticator app, and how
   many can sign in only through a provider. You confirm with those numbers. Only someone who may manage the project's
   people can turn it on.
-- A person with a code signs in again with the password and the code, even when they typed a code earlier that day.
+- A person with a code signs in again with the password and the code, even when they typed a code earlier that day. A
+  person with a passkey can sign in again with it instead, and is asked no code.
 - A person without one sees a page that names your app's address. If the project lets people set one up, they set it
   up there and reach the page they opened, in the same sign-in. Otherwise the page asks them to contact you.
 - A person who signs in through a provider is told this way of signing in cannot open the page.
-- Going back without signing in ends on a page that says the page needs a code. It never starts the same sign-in
-  again.
-- The console's **Check access** has a box for whether the person signed in with a code.
+- Going back without signing in ends on a page that says the page needs two-step sign-in. It never starts the same
+  sign-in again.
+- The console's **Check access** has a box for whether the person signed in with two steps (a code or a passkey).
 
 ## Groups and attributes for an API {#api}
 

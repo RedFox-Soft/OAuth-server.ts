@@ -112,7 +112,7 @@ describe('a sign-in for an API that requires a code or a recent sign-in', () => 
 		const tokens = await tokensFrom(reached.auth, continued.url);
 
 		expect(reached.url).toMatch(/\/ui\/[^/]+\/code-required$/);
-		expect(page).toContain('Files asks for a code from an authenticator app');
+		expect(page).toContain('Files asks for two-step sign-in');
 		expect(page).toContain('Return to the app without signing in');
 		expect(payloadOf(tokens.access_token)).toMatchObject({
 			acr: configuration.acrMap.multi_factor
@@ -134,9 +134,7 @@ describe('a sign-in for an API that requires a code or a recent sign-in', () => 
 		expect(stopped?.words.reason).toEndWith(
 			'without a code; Files asks for one'
 		);
-		expect(stopped?.words.sawText).toBe(
-			'Files asks for a code from an authenticator app'
-		);
+		expect(stopped?.words.sawText).toBe('Files asks for two-step sign-in');
 	});
 
 	it('sends a person who goes back without a code back to the app with the standard error', async () => {
@@ -158,7 +156,7 @@ describe('a sign-in for an API that requires a code or a recent sign-in', () => 
 			'unmet_authentication_requirements'
 		);
 		expect(url.searchParams.get('error_description')).toBe(
-			'the API requires a sign-in with a code from an authenticator app'
+			'the API requires two-step sign-in'
 		);
 	});
 

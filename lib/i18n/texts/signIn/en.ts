@@ -10,7 +10,7 @@ export const en = {
 		registration: 'Create account',
 		totpEnroll: 'Set Up Authenticator',
 		totpVerify: 'Two-Step Verification',
-		codeRequired: 'A Code Is Needed'
+		codeRequired: 'Two-Step Sign-In Needed'
 	},
 
 	/*
@@ -41,6 +41,13 @@ export const en = {
 		moreProviders: 'More sign-in options',
 		// The provider's own name from the built-in catalogue, never the name an administrator gave it.
 		signInWith: 'Sign in with {provider}',
+		/*
+		 * Signing in with a passkey (specs/139): the button, in every form of the page; the line shown when scripts are
+		 * off; the line after the person closed the browser's prompt without choosing one.
+		 */
+		passkey: 'Sign in with a passkey',
+		passkeyNoScript: 'Signing in with a passkey needs JavaScript.',
+		passkeyCancelled: 'No passkey on this device? Sign in another way below.',
 		/*
 		 * In place of the password form when this network's address is on FoxTrust's list and has just failed
 		 * passwords here (specs/125). Says what to do now; the support line and the dispute link follow as their
@@ -119,7 +126,11 @@ export const en = {
 		/* An application that requires a code, before this sign-in has one (specs/127). */
 		codeAskedByApp: '{app} asks for a code from an authenticator app.',
 		codeAsked:
-			'The app you’re signing in to asks for a code from an authenticator app.'
+			'The app you’re signing in to asks for a code from an authenticator app.',
+		/* From the two-step sign-in page's "Sign in with a passkey" (specs/139). */
+		passkey: 'Sign in with your passkey to continue.',
+		/* The page was older than its passkey challenge, or another tab replaced it: nothing was judged. */
+		passkeyRetry: 'Try again.'
 	},
 
 	/*
@@ -147,9 +158,8 @@ export const en = {
 	 * The app is named only where the page may name it (the masthead rule); a value is always a value.
 	 */
 	codeRequired: {
-		headingApp: '{app} asks for a code from an authenticator app',
-		headingAny:
-			'The app you’re signing in to asks for a code from an authenticator app',
+		headingApp: '{app} asks for two-step sign-in',
+		headingAny: 'The app you’re signing in to asks for two-step sign-in',
 		noFactor:
 			'Your account, {email}, doesn’t have an authenticator app set up yet, so you can’t open it this way.',
 		setUpHint:
@@ -162,7 +172,13 @@ export const en = {
 		passwordInstead: 'Sign in with a password instead',
 		providerAsk: 'Ask the people who run {service}.',
 		returnApp: 'Return to {app} without signing in',
-		returnAny: 'Return to the app without signing in'
+		returnAny: 'Return to the app without signing in',
+		/* In a project that accepts passkeys (specs/139): a passkey sign-in meets the requirement. */
+		passkey: 'Sign in with a passkey',
+		passkeyHeldApp:
+			'You have a passkey for {email}. Sign in with it to open {app}.',
+		passkeyHeldAny:
+			'You have a passkey for {email}. Sign in with it to continue.'
 	},
 
 	errors: {
@@ -184,6 +200,16 @@ export const en = {
 		verificationRecent:
 			'A verification message was sent recently. Check your inbox.',
 		verificationUnsent:
-			'We could not send the verification message. Try again later.'
+			'We could not send the verification message. Try again later.',
+		/*
+		 * The passkey door (specs/139). One sentence for every passkey it cannot use, whoever's it is, so it says nothing
+		 * about whether the passkey is known anywhere (FR-008); the account's refusal never mentions a password (FR-014).
+		 */
+		passkeyRefused:
+			'This passkey isn’t for {service}. Choose another one, or sign in another way.',
+		passkeyAccount:
+			'This account can’t sign in right now. Ask the people who run {service}.',
+		passkeyLimited:
+			'Too many passkey attempts from your network. Try again later, or sign in another way.'
 	}
 } as const;

@@ -106,6 +106,10 @@ import {
 } from '../../configs/issuer.js';
 import { callbackUri } from '../../federation/flow.js';
 import { selfServiceState } from '../../totp/self_service.js';
+import {
+	passkeysNeedHttps,
+	passkeysPossible
+} from '../../passkeys/relying_party.js';
 import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { listClientView } from '../clients/service.js';
 import {
@@ -838,6 +842,14 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		...addressing(bucket),
 		/* The name its sign-in pages open with — the display name, else the host — for the Sign-in tab's preview. */
 		shownName: shownNameOf(bucket),
+		/*
+		 * Passkeys (specs/139): the setting, false when absent, and what the instance's address allows, which the
+		 * console cannot know for the reason above. `passkeysPossible` false refuses turning them on; `passkeysNeedHttps`
+		 * true is the warning that browsers will not offer them until the instance is served over HTTPS.
+		 */
+		passkeyLogin: bucket.passkeyLogin === true,
+		passkeysPossible: passkeysPossible(ISSUER),
+		passkeysNeedHttps: passkeysNeedHttps(ISSUER),
 		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
 		applications: applications.length,
 		apis: apis.length,
@@ -1272,6 +1284,25 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 						{ field: 'totpSelfService' }
 					);
 				}
+				if (changes.passkeyLogin !== undefined) {
+					throw new AdminError(
+						422,
+						"Administrators can't use passkeys yet; they have no account page to add one on.",
+						{ field: 'passkeyLogin' }
+					);
+				}
+			}
+			/*
+			 * A passkey belongs to a site named by a host name (specs/139 research R4); an address is never one, so
+			 * at an IP address no browser could make or use a passkey here. Plain http is warned about on the read,
+			 * not refused: the server side works there, and a certificate may be on its way.
+			 */
+			if (changes.passkeyLogin === true && !passkeysPossible(ISSUER)) {
+				throw new AdminError(
+					422,
+					`Passkeys need this instance to be served at a domain name; its address is ${ISSUER}.`,
+					{ field: 'passkeyLogin' }
+				);
 			}
 			if (changes.passwordGuessing) {
 				changes.passwordGuessing = acceptedPasswordGuessing(

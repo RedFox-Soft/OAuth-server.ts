@@ -24,6 +24,7 @@ import {
 } from './situations.js';
 import { buildBody, DEFAULT_VALUES, type FormValues } from './clientForm.js';
 import { ClientFormFields } from './ClientFormFields.js';
+import { usePasskeysAccepted } from '../signin/passkeysAccepted.js';
 import { useCodeConsent, withConsent } from './codeConsent.js';
 import { handOff } from './handOff.js';
 import { GUIDE_SITUATIONS } from '../../../../consts/situation_guide.js';
@@ -130,6 +131,7 @@ export function SituationChooser({
 	const [fullInitial, setFullInitial] = useState<FormValues>(DEFAULT_VALUES);
 	const [details] = Form.useForm<Details>();
 	const [form] = Form.useForm<FormValues>();
+	const passkeys = usePasskeysAccepted(bucketId);
 	const [proxied] = Form.useForm<CreateValues>();
 	const devAddress = Form.useWatch('devAddress', details);
 
@@ -487,6 +489,7 @@ export function SituationChooser({
 			<ClientFormFields
 				form={form}
 				siblings={siblings}
+				passkeys={passkeys}
 			/>
 		</Form>
 	);

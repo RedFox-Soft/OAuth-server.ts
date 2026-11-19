@@ -1,4 +1,10 @@
-import { getBucketGroupStore, getUserStore } from '../adapters/index.js';
+import { randomBytes } from 'node:crypto';
+
+import {
+	getBucketGroupStore,
+	getPasskeyStore,
+	getUserStore
+} from '../adapters/index.js';
 import {
 	DuplicateEndUserError,
 	type EndUserPatch,
@@ -337,6 +343,11 @@ export async function removeEndUser(
 	await destroyConnectedAccountsOf(bucket, id);
 	/* The same for their activity (specs/133): unowned so a lock keeps it, so only this deletion removes it. */
 	await forgetPersonActivity(bucket._id, id);
+	/*
+	 * And their passkeys (specs/139): the `passkeys` area is unowned so a lock and a sign-out everywhere keep them, so
+	 * the sweep below never reaches it either.
+	 */
+	await getPasskeyStore().removeAllOf(bucket._id, id);
 	return cascadeForAccount(id, scopedId);
 }
 
@@ -564,6 +575,27 @@ export async function disownAuthenticator(
 	return true;
 }
 
+/*
+ * "This wasn't me" about an added passkey (specs/139 research R16): removes that passkey and every one the person added
+ * at or after it, since whoever added it may have added more, and ends every session and token, since they may be
+ * signed in with one. The link was spent before this is called; answers how many passkeys went.
+ */
+export async function disownPasskeys(
+	bucket: UserBucket,
+	id: string,
+	since: Date,
+	record: RecordChange
+): Promise<{ removed: number; swept: CascadeResult }> {
+	await existing(bucket._id, id);
+	await record();
+	const removed = await getPasskeyStore().removeAddedSince(
+		bucket._id,
+		id,
+		since
+	);
+	return { removed, swept: await revokeAccountAccess(id) };
+}
+
 /* Lifts the lock and restores nothing: the user signs in afresh, and only if also active. */
 export async function unlockEndUser(
 	bucket: UserBucket,
@@ -717,6 +749,27 @@ export async function recordOwnLanguage(
 	await store.update(accountId, {
 		profile: { ...user.profile, locale: language }
 	});
+}
+
+/*
+ * The person's passkey identity (specs/139 research R6): the user handle every passkey of this account carries, 32
+ * random bytes in base64url, written once when their first add is prepared and never changed, so a passkey made
+ * yesterday still names the account it was made for. Random per account, hence per project: two accounts of one
+ * person never share it, and it is never the account id or the address (FR-009). The person's own act, so no audit
+ * record. Two first adds racing may each write one; the last stands, and an add whose options carried the other is
+ * refused at its end ("start again") rather than stored under a handle the account does not hold.
+ */
+export async function ensurePasskeyIdentity(
+	bucketId: string,
+	accountId: string
+): Promise<string> {
+	const store = getUserStore(bucketId);
+	const user = await existing(bucketId, accountId);
+	if (user.webauthnUserId !== undefined) return user.webauthnUserId;
+	const webauthnUserId = randomBytes(32).toString('base64url');
+	const written = await store.update(accountId, { webauthnUserId });
+	if (!written) throw new EndUserError(404, 'user not found');
+	return webauthnUserId;
 }
 
 const DECLINED_KEPT = 50;

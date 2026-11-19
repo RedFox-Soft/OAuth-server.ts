@@ -1,5 +1,5 @@
 import { hostOfRequest } from 'lib/consts/request_host.js';
-import { AMR_FOR_DISTINCTION } from 'lib/consts/amr.js';
+import { AMR_FOR_METHOD, DISTINCTION_FOR_METHOD } from 'lib/consts/amr.js';
 import { END_USER_PASSWORD_MIN_LENGTH } from 'lib/consts/password_policy.js';
 import {
 	bucketAtHost,
@@ -118,7 +118,11 @@ import { OIDCContext, type OIDCCookies } from 'lib/helpers/oidc_context.js';
 import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
-import { getUserStore, getBucketStore } from 'lib/adapters/index.js';
+import {
+	getUserStore,
+	getBucketStore,
+	getPasskeyStore
+} from 'lib/adapters/index.js';
 import {
 	DuplicateEndUserError,
 	type User,
@@ -172,6 +176,7 @@ import {
 	NOTICE_VERIFY_RESENT,
 	NOTICE_VERIFY_UNSENT,
 	NOTICE_MAIL_LIMITED,
+	NOTICE_PASSKEY,
 	resolveNotice
 } from './notices.js';
 import {
@@ -246,6 +251,13 @@ import {
 	type GuessingAtDoor
 } from '../attacker_list/at_sign_in.js';
 import { noteListed } from '../attacker_list/counters.js';
+import {
+	judgePasskey,
+	offerFor,
+	type PasskeyOffer
+} from '../passkeys/sign_in.js';
+import { passkeysAccepted } from '../passkeys/accepted.js';
+import { relyingPartyOf } from '../passkeys/relying_party.js';
 import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
 
 /*
@@ -1019,6 +1031,71 @@ function listRefusalOf(guessing: GuessingAtDoor):
 	};
 }
 
+/*
+ * The passkey offer of one render of the sign-in page (specs/139 research R7), for every render: the GET, each
+ * refusal of either door, the attacker list's refusal and the unconfirmed-address page. Each render writes a fresh
+ * challenge, so a page re-rendered after a refusal can be answered with a passkey at once. `passwordForm` is whether
+ * this render has a password form, whose "Remember me" the passkey sign-in then follows.
+ */
+async function passkeyOfferOf(
+	interaction: Interaction,
+	bucketId: string,
+	passwordForm: boolean
+): Promise<{ passkey: PasskeyOffer } | Record<string, never>> {
+	const bucket = await getBucketStore().find(bucketId);
+	const offer = bucket
+		? await offerFor(interaction, bucket, { remember: passwordForm })
+		: undefined;
+	return offer ? { passkey: offer } : {};
+}
+
+/*
+ * The sign-in page as the GET renders it, and as the passkey door re-renders it after a refusal: the project's ways to
+ * sign in, the attacker list's refusal for an address it refuses here (specs/125; nothing is counted on a page view,
+ * only an attempt is an attempt), and the passkey offer unless `passkeys` is false.
+ *
+ * The bucket is resolved on the GET as well as the POST, exactly as the registration route already does: what this
+ * page offers — a password form, provider buttons, or only the latter — is a property of the bucket, and a page that
+ * offered what the POST would refuse is a dead end dressed as an invitation.
+ */
+async function signInPage(
+	uid: string,
+	interaction: Interaction,
+	signsInto: string,
+	request: Request,
+	shown: {
+		look?: Awaited<ReturnType<typeof signInLook>>;
+		notice?: string;
+		providersOpen?: boolean;
+		errorMessage?: string;
+		status?: number;
+		passkeys?: boolean;
+	} = {}
+): Promise<Response> {
+	const options = await loginOptionsForBucket(signsInto);
+	const guessing = guessingAtDoor(
+		request,
+		await getBucketStore().find(signsInto)
+	);
+	const page = { ...options, ...listRefusalOf(guessing) };
+	return loginServer(uid, {
+		notice: shown.notice,
+		errorMessage: shown.errorMessage,
+		status: shown.status,
+		providersOpen: shown.providersOpen,
+		// Only once this sign-in has proved the password of an unverified account (see the resend route).
+		verificationResend: interaction.payload.pendingVerification !== undefined,
+		handOffTo: redirectUriOf(interaction),
+		language: languageOf(interaction),
+		switcher: switcherOf(interaction, 'login'),
+		...(shown.look ?? (await signInLook(interaction, signsInto))),
+		...page,
+		...(shown.passkeys === false
+			? {}
+			: await passkeyOfferOf(interaction, signsInto, page.passwordLogin))
+	});
+}
+
 async function passwordDoorClosed(
 	interaction: Interaction,
 	uid: string
@@ -1089,8 +1166,73 @@ async function unverifiedAtSignIn(
 		language: languageOf(interaction),
 		switcher: switcherOf(interaction, 'login'),
 		...(await signInLook(interaction, bucket._id)),
-		...loginOptions
+		...loginOptions,
+		...(await passkeyOfferOf(
+			interaction,
+			bucket._id,
+			loginOptions.passwordLogin
+		))
 	});
+}
+
+/*
+ * The gates an account passes at every door that proves who someone is, after the proof (specs/139 research R9):
+ * the password door and the passkey door call this one function, so neither can drift from the other in what it lets
+ * through or in what the person's activity records. First whether the account may sign in at all (a lock, a
+ * deactivation), then the confirmed address where the project requires one, which re-mails the link and answers the
+ * page that says so. Answers the refusal, or undefined when the account may go on.
+ *
+ * Each door brings its own words for the first refusal (`refuse`): the password door's is the one sentence an unknown
+ * address and a wrong password share, which must not change; the passkey door's never mentions a password.
+ */
+async function accountGates(input: {
+	uid: string;
+	interaction: Interaction;
+	user: User;
+	bucketId: string;
+	loginOptions: LoginOptions;
+	request: Request;
+	refuse: () => Response | Promise<Response>;
+	/* The passkey door's refusals are recorded as its own, so the record says what the person was shown there. */
+	method?: 'passkey';
+}): Promise<Response | undefined> {
+	const { uid, interaction, user, bucketId, loginOptions, request } = input;
+	const door = input.method === undefined ? {} : { method: input.method };
+	if (!canSignIn(user)) {
+		noteSignInRefused({
+			bucketId,
+			accountId: user._id,
+			reason: user.lockedLocally ? 'locked' : 'deactivated',
+			clientId: clientIdOf(interaction),
+			request,
+			...door
+		});
+		return input.refuse();
+	}
+	const loginBucket = await getBucketStore().find(bucketId);
+	/*
+	 * The administrators' bucket is gated like any other. Its lockout guard sits at the setting — the requirement
+	 * cannot be turned on without mail delivery, or by an administrator whose own address is unproven — so the door
+	 * has no exception to make.
+	 */
+	if (loginBucket?.emailVerificationRequired === true && !user.verified) {
+		noteSignInRefused({
+			bucketId,
+			accountId: user._id,
+			reason: 'email_unverified',
+			clientId: clientIdOf(interaction),
+			request,
+			...door
+		});
+		return unverifiedAtSignIn(
+			uid,
+			interaction,
+			user,
+			loginBucket,
+			loginOptions
+		);
+	}
+	return undefined;
 }
 
 /* The client that began an interaction — the only trustworthy route to a bucket. */
@@ -1287,6 +1429,27 @@ async function refusalVariant({
 	return hasPassword && bucket && (await selfServiceState(bucket)) === 'on'
 		? 'setUp'
 		: 'askOperators';
+}
+
+/*
+ * Where the two-step sign-in page offers a passkey sign-in (specs/139 research R22): in a project that accepts
+ * passkeys, first when the account holds one that still works here (made for the project's current site, not marked
+ * as possibly copied), after the page's own action otherwise; nowhere else.
+ */
+async function passkeyPlacement({
+	bucket,
+	user
+}: RefusedSignIn): Promise<{ passkey?: 'primary' | 'secondary' }> {
+	if (!bucket || !passkeysAccepted(bucket)) return {};
+	const { rpId } = relyingPartyOf(bucket);
+	const held = await getPasskeyStore().listOf(bucket._id, user._id);
+	return {
+		passkey: held.some(
+			(passkey) => passkey.rpId === rpId && passkey.copiedAt === undefined
+		)
+			? 'primary'
+			: 'secondary'
+	};
 }
 
 /* The provider as its sign-in button names it: the catalogue's name for a recognised one, the administrator's otherwise. */
@@ -1543,24 +1706,17 @@ export const ui = new Elysia()
 			 * property of the bucket, and a page that offered what the POST would refuse is a dead end dressed
 			 * as an invitation.
 			 */
-			const clientId = clientIdOf(interaction);
-			const options = await loginOptionsForClient(
-				clientId,
-				resourceOf(interaction),
-				await addressedBucketOf(interaction)
-			);
-			/*
-			 * An address the attacker list refuses here sees the refusal instead of a form it could not use (specs/125).
-			 * Nothing is counted on a page view: only an attempt is an attempt.
-			 */
-			const guessing = guessingAtDoor(
-				request,
-				await getBucketStore().find(signsInto)
-			);
 			const look = await signInLook(interaction, signsInto);
-			return loginServer(uid, {
+			/* "Sign in with your passkey" only where the page still offers one (the project may have turned them off). */
+			const asked =
+				query.notice === NOTICE_PASSKEY &&
+				!(await loginOptionsForBucket(signsInto)).passkeyLogin
+					? undefined
+					: query.notice;
+			return signInPage(uid, interaction, signsInto, request, {
+				look,
 				notice:
-					resolveNotice(query.notice, languageOf(interaction)) ??
+					resolveNotice(asked, languageOf(interaction)) ??
 					freshSignInNotice(interaction) ??
 					codeAskedNotice(interaction, look.face) ??
 					apiNotice(interaction, await apiAsking(interaction)),
@@ -1569,16 +1725,7 @@ export const ui = new Elysia()
 				 * of those folded away (specs/105), so the fold opens. The notice does not name the provider, so it
 				 * opens whichever was chosen — harmless when that one was in sight.
 				 */
-				providersOpen: query.notice === NOTICE_FEDERATION_ABORTED,
-				// Only once this sign-in has proved the password of an unverified account (see the resend route).
-				verificationResend:
-					interaction.payload.pendingVerification !== undefined,
-				handOffTo: redirectUriOf(interaction),
-				language: languageOf(interaction),
-				switcher: switcherOf(interaction, 'login'),
-				...look,
-				...options,
-				...listRefusalOf(guessing)
+				providersOpen: query.notice === NOTICE_FEDERATION_ABORTED
 			});
 		},
 		{ query: t.Object({ notice: t.Optional(t.String()) }) }
@@ -1618,7 +1765,7 @@ export const ui = new Elysia()
 			 * precisely so the four renderings of this page cannot disagree; it was resolved here and then
 			 * not passed.
 			 */
-			const refuse = () =>
+			const refuse = async () =>
 				loginServer(uid, {
 					errorMessage:
 						SIGN_IN_TEXTS[languageOf(interaction)].errors.invalidCredentials,
@@ -1626,7 +1773,12 @@ export const ui = new Elysia()
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'login'),
 					...branded,
-					...loginOptions
+					...loginOptions,
+					...(await passkeyOfferOf(
+						interaction,
+						bucketId,
+						loginOptions.passwordLogin
+					))
 				});
 
 			/*
@@ -1643,13 +1795,15 @@ export const ui = new Elysia()
 				noteGuessingRefusal(guessing);
 				noteListed(bucketId, 'refused');
 				eventBus.emit('password_guessing_refused', { bucketId });
+				const page = { ...loginOptions, ...listRefusalOf(guessing) };
 				return loginServer(uid, {
 					handOffTo: redirectUriOf(interaction),
 					language: languageOf(interaction),
 					switcher: switcherOf(interaction, 'login'),
 					...branded,
-					...loginOptions,
-					...listRefusalOf(guessing)
+					...page,
+					// The refusal is about passwords from this address: a passkey is still offered beside it (FR-011).
+					...(await passkeyOfferOf(interaction, bucketId, page.passwordLogin))
 				});
 			}
 			if (guessing.decision === 'count') noteListed(bucketId, 'attempt');
@@ -1727,38 +1881,16 @@ export const ui = new Elysia()
 			 */
 			await clearFailures(bucketId, body.username);
 			if (guessing.decision === 'count') noteListed(bucketId, 'rightPassword');
-			if (!canSignIn(user)) {
-				noteSignInRefused({
-					bucketId,
-					accountId: user._id,
-					reason: user.lockedLocally ? 'locked' : 'deactivated',
-					clientId: clientIdOf(interaction),
-					request
-				});
-				return refuse();
-			}
-			const loginBucket = await getBucketStore().find(bucketId);
-			/*
-			 * The administrators' bucket is gated like any other. Its lockout guard sits at the setting —
-			 * the requirement cannot be turned on without mail delivery, or by an administrator whose own
-			 * address is unproven — so the door has no exception to make.
-			 */
-			if (loginBucket?.emailVerificationRequired === true && !user.verified) {
-				noteSignInRefused({
-					bucketId,
-					accountId: user._id,
-					reason: 'email_unverified',
-					clientId: clientIdOf(interaction),
-					request
-				});
-				return unverifiedAtSignIn(
-					uid,
-					interaction,
-					user,
-					loginBucket,
-					loginOptions
-				);
-			}
+			const gated = await accountGates({
+				uid,
+				interaction,
+				user,
+				bucketId,
+				loginOptions,
+				request,
+				refuse
+			});
+			if (gated) return gated;
 			/*
 			 * Last, after every refusal above. The order is the point: an inactive or unverified account
 			 * is turned away exactly as it was, so the second factor never becomes the step at which an
@@ -1809,8 +1941,8 @@ export const ui = new Elysia()
 					 * a second factor, and a person who holds one, never reach here — they stage
 					 * `secondFactor` above, and the context is decided once the code is verified.
 					 */
-					amr: [...AMR_FOR_DISTINCTION.password],
-					acr: configuration.acrMap.password
+					amr: [...AMR_FOR_METHOD.password],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.password]
 				}
 			};
 			await settlePendingLink(interaction.payload, bucketId);
@@ -1820,6 +1952,99 @@ export const ui = new Elysia()
 			body: t.Object({
 				username: t.String(),
 				password: t.String(),
+				remember: t.Optional(t.Literal('on'))
+			})
+		}
+	)
+	/*
+	 * The passkey door (specs/139 contracts/sign-in.md): the sign-in page's script posts the browser's answer here, as
+	 * a native form post, and the answer is a redirect or the page itself exactly as at the password door. Everything
+	 * about the passkey is judged in lib/passkeys/sign_in.ts; from the account on, this door and the password door are
+	 * one: the same gates (`accountGates`), then the same completion through `resume`.
+	 *
+	 * No code is asked after a passkey, whatever the project requires and whether the person holds an authenticator
+	 * app: a passkey is two factors already, and the sign-in reports the multi-factor context with its own methods.
+	 * Nothing here reports an attack (a passkey has nothing to guess, research R9), and nothing tells the browser to
+	 * forget a passkey (FR-010).
+	 */
+	.post(
+		'ui/:uid/passkey',
+		async ({
+			body,
+			params: { uid },
+			interaction,
+			signsInto,
+			cookie,
+			route,
+			request
+		}) => {
+			const language = languageOf(interaction);
+			const T = SIGN_IN_TEXTS[language];
+			const look = await signInLook(interaction, signsInto);
+			const page = (shown: Parameters<typeof signInPage>[4] = {}) =>
+				signInPage(uid, interaction, signsInto, request, { look, ...shown });
+			const attempt = await judgePasskey({
+				interaction,
+				bucket: await getBucketStore().find(signsInto),
+				credential: body.credential,
+				request,
+				clientId: clientIdOf(interaction)
+			});
+			switch (attempt.kind) {
+				case 'off':
+					return page();
+				case 'limited': {
+					/* No offer on this page: its autofill would only send the next refused attempt. */
+					const limited = await page({
+						errorMessage: T.errors.passkeyLimited,
+						status: 429,
+						passkeys: false
+					});
+					limited.headers.set('retry-after', String(attempt.retryAfter));
+					return limited;
+				}
+				case 'retry':
+					return page({ notice: T.notices.passkeyRetry });
+				case 'refused':
+					return page({
+						errorMessage: text(T.errors.passkeyRefused, {
+							service: look.face.service
+						})
+					});
+			}
+			const { user } = attempt;
+			const gated = await accountGates({
+				uid,
+				interaction,
+				user,
+				bucketId: signsInto,
+				loginOptions: await loginOptionsForBucket(signsInto),
+				request,
+				method: 'passkey',
+				refuse: () =>
+					page({
+						errorMessage: text(T.errors.passkeyAccount, {
+							service: look.face.service
+						})
+					})
+			});
+			if (gated) return gated;
+			/* A password proved earlier in this interaction and waiting for its code is overtaken by the passkey. */
+			delete interaction.payload.secondFactor;
+			interaction.payload.result = {
+				login: {
+					accountId: user._id,
+					transient: body.remember !== 'on',
+					amr: [...AMR_FOR_METHOD.passkey],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.passkey]
+				}
+			};
+			await settlePendingLink(interaction.payload, signsInto);
+			return resume(interaction, cookie, { route, request });
+		},
+		{
+			body: t.Object({
+				credential: t.String(),
 				remember: t.Optional(t.Literal('on'))
 			})
 		}
@@ -1928,8 +2153,8 @@ export const ui = new Elysia()
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					amr: [...AMR_FOR_DISTINCTION.multi_factor],
-					acr: configuration.acrMap.multi_factor
+					amr: [...AMR_FOR_METHOD.password_code],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.password_code]
 				}
 			};
 			delete interaction.payload.secondFactor;
@@ -2147,8 +2372,8 @@ export const ui = new Elysia()
 				login: {
 					accountId: pending.accountId,
 					transient: pending.transient,
-					amr: [...AMR_FOR_DISTINCTION.multi_factor],
-					acr: configuration.acrMap.multi_factor
+					amr: [...AMR_FOR_METHOD.password_code],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.password_code]
 				}
 			};
 			delete interaction.payload.secondFactor;
@@ -2238,7 +2463,8 @@ export const ui = new Elysia()
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, CODE_REQUIRED_PAGE),
 				...(await lookNamingApp(interaction, bucketId)),
-				...(await apiRefusing(interaction))
+				...(await apiRefusing(interaction)),
+				...(await passkeyPlacement(refused))
 			});
 		}
 	)

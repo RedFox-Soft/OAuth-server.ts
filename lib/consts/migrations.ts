@@ -1994,6 +1994,27 @@ const newSignInAlertsFence: Migration = {
 	postgres: { noop: true, reason: NEW_SIGN_IN_ALERTS_FENCE_REASON }
 };
 
+/*
+ * A fence, not a change (specs/139 research R5). A sign-in row may now say it was made with a passkey (`method:
+ * 'passkey'`) or that a passkey was refused (`passkey_refused`), and a mailed link may now be about adding or removing a
+ * passkey; an older release's schemas know none of them, and would fail to read what this one wrote. Recording this
+ * migration makes its startup gate refuse the database instead. The new areas need no migration: `db:setup` and
+ * `db:setup:pg` provision them from the inventory.
+ */
+const PASSKEYS_FENCE_REASON =
+	'Nothing to change on this backend: the record of this migration is its effect, so a release older than passkeys refuses to start against a database that holds what it writes.';
+
+const passkeysFence: Migration = {
+	id: '2026-11-19-passkeys-fence',
+	description:
+		'Mark the database as signing people in with passkeys, so that an older release refuses to start against it rather than failing to read what it wrote',
+	reversible: false,
+	rerunnable:
+		'It changes no data; applying it again only rewrites the same record of having been applied.',
+	mongodb: { noop: true, reason: PASSKEYS_FENCE_REASON },
+	postgres: { noop: true, reason: PASSKEYS_FENCE_REASON }
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -2017,5 +2038,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	personAppUsageFence,
 	addressLookupFence,
 	adminSignInLogFence,
-	newSignInAlertsFence
+	newSignInAlertsFence,
+	passkeysFence
 ];

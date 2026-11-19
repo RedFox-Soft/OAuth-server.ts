@@ -7,6 +7,7 @@ import {
 	getBucketStore,
 	getGroupStore,
 	getOutsideAuthorizationServerStore,
+	getPasskeyStore,
 	getUserStore
 } from '../../adapters/index.js';
 import {
@@ -234,6 +235,8 @@ async function destroyClaimed(
 	await destroyBucketAccounts(claimed);
 	/* People's activity is unowned, so no cascade above reaches it (specs/133). */
 	await forgetProjectActivity(claimed._id);
+	/* Nor their passkeys (specs/139): unowned so a lock and a sign-out everywhere keep them. */
+	await getPasskeyStore().removeAllIn(claimed._id);
 	/* Its groups and every membership in them; nothing outside the bucket refers to either. */
 	await getBucketGroupStore().destroyByBucket(id);
 	/* The half that was missing: without this a deleted bucket left its `user_<bucket>` area behind for

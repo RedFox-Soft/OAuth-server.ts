@@ -47,6 +47,7 @@ import {
 } from './ResourceSignInFields.js';
 import { ToolRowConditions } from './ToolRowConditions.js';
 import { ApiCheckAccess } from './ApiCheckAccess.js';
+import { usePasskeysAccepted } from '../signin/passkeysAccepted.js';
 import { RefusedRecentlyCard } from '../RefusedRecentlyCard.js';
 import { resourcesApi, type ResourceView } from './resourceView.js';
 
@@ -138,7 +139,7 @@ function edgeTable(table: ToolsTableView) {
 
 function requirementText(requireCode: boolean, every: number | null): string {
 	const parts = [
-		...(requireCode ? ['A code from an authenticator app'] : []),
+		...(requireCode ? ['Two-step sign-in'] : []),
 		...(every !== null ? [signInEveryText(every)] : [])
 	];
 	return parts.length > 0 ? parts.join('; ') : 'none';
@@ -182,6 +183,7 @@ export function ApiAccessTab({
 	onChanged: () => void;
 }) {
 	const url = resourcesApi(bucketId, api.identifier);
+	const passkeys = usePasskeysAccepted(bucketId);
 	const byProxy = api.checkedBy === 'proxy';
 	const [form] = Form.useForm<AccessForm>();
 	const feedback = useFeedback();
@@ -469,6 +471,7 @@ export function ApiAccessTab({
 						<ResourceSignInFields
 							checkedBy={api.checkedBy}
 							every={values?.every}
+							passkeys={passkeys}
 						/>
 						{byProxy && (
 							<Flex

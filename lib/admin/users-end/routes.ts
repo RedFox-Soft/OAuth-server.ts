@@ -110,13 +110,16 @@ export const presentUser = <
 		userNameKey?: string;
 		externalIdKey?: string;
 		connectionsDeclined?: unknown;
+		webauthnUserId?: string;
 	}
 >(
 	user: T
 ) => {
 	/*
 	 * The derived keys are index material, not facts about the person; they stay with the store. So does the list of
-	 * accounts the person disconnected themselves (specs/120): their choice, which no administrator acts on.
+	 * accounts the person disconnected themselves (specs/120): their choice, which no administrator acts on. And so does
+	 * the person's passkey identity (specs/139): the user handle their devices hand back, which nothing an
+	 * administrator does needs.
 	 */
 	const {
 		password: _password,
@@ -124,6 +127,7 @@ export const presentUser = <
 		userNameKey: _userNameKey,
 		externalIdKey: _externalIdKey,
 		connectionsDeclined: _connectionsDeclined,
+		webauthnUserId: _webauthnUserId,
 		...safe
 	} = user;
 	return {

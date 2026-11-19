@@ -12,6 +12,7 @@ import {
 	type FormValues
 } from './clientForm.js';
 import { LogoField, OriginsField, PrimaryColorField } from './fields.js';
+import { secondStepWords } from '../signin/passkeysAccepted.js';
 
 /*
  * Every setting of an application, as fields of a form the caller owns. One body for the Settings tab and for
@@ -19,11 +20,14 @@ import { LogoField, OriginsField, PrimaryColorField } from './fields.js';
  */
 export function ClientFormFields({
 	form,
-	siblings
+	siblings,
+	passkeys = false
 }: {
 	form: FormInstance<FormValues>;
 	/* Other applications of the project with browser origins, offered to copy from. */
 	siblings: { label: string; origins: string[] }[];
+	/* Whether the project accepts passkeys, which meet a requirement of two-step sign-in too (specs/139). */
+	passkeys?: boolean;
 }) {
 	return (
 		<>
@@ -146,12 +150,12 @@ export function ClientFormFields({
 				{() => (
 					<Form.Item
 						name="requireCode"
-						label="Require a code from an authenticator app"
+						label="Require two-step sign-in"
 						valuePropName="checked"
 						extra={
 							form.getFieldValue('requireCode')
-								? 'Everyone who opens this application has typed a code from their authenticator app in this sign-in: once per sign-in, not every time they open it, and with no limit on how long ago. People without one, and people who sign in through a provider, can’t open it. Existing sign-ins keep working until the application next renews its tokens. Assertion grants (JWT bearer, identity assertions) are refused, and a token exchange needs a sign-in with a code.'
-								: 'Off: the application gets the sign-in the person already has. It can still ask for a code when it sends people to sign in.'
+								? `Everyone who opens this application has used ${secondStepWords(passkeys)} in this sign-in: once per sign-in, not every time they open it, and with no limit on how long ago. People without one, and people who sign in through a provider, can’t open it. Existing sign-ins keep working until the application next renews its tokens. Assertion grants (JWT bearer, identity assertions) are refused, and a token exchange needs two-step sign-in.`
+								: 'Off: the application gets the sign-in the person already has. It can still ask for two-step sign-in when it sends people to sign in.'
 						}
 					>
 						<Switch />

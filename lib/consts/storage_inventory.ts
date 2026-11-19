@@ -119,6 +119,8 @@ export const MODEL_AREAS = [
 	'Interaction',
 	'LoginThrottle',
 	'MailRequestTally',
+	'PasskeyAttemptTally',
+	'PasskeyCeremony',
 	'PasswordGuessingTally',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
@@ -185,6 +187,11 @@ export const STORE_AREAS = {
 	 * reconnect of the same upstream account is the same record by its primary key.
 	 */
 	connectedAccounts: 'connectedAccounts',
+	/*
+	 * People's passkeys (specs/139): one record per passkey, with its public key, counter and marks. One credential id per
+	 * project is the unique `{bucketId, credentialId}` index, not a rule a route has to remember.
+	 */
+	passkeys: 'passkeys',
 	/*
 	 * What this server decided about a person (specs/133): their sign-ins, failed sign-ins where the account was
 	 * known, and what apps behind the proxy and APIs checked at it asked or refused. One row per sign-in; anything
@@ -525,6 +532,23 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * records go with the window rather than with the project, since they name no one. Listed by project through
 	 * `findByIndexed`, so a project's figure is never a scan.
 	 */
+	/*
+	 * Failed passkey sign-ins from one caller address in one UTC hour (specs/139 research R10), in MailRequestTally's
+	 * shape and for its reason: keyed by a network address, kept no longer than two hours, owning nothing.
+	 */
+	modelArea(
+		'PasskeyAttemptTally',
+		EXPIRES_AT,
+		unowned(
+			'addressed by the computed id `${address}:${hourStartEpochSeconds}`, never swept; holds a network address for at most two hours'
+		)
+	),
+	/*
+	 * An add or a removal of a passkey prepared on the person's own page (specs/139 research R15), keyed by the
+	 * browser session. Account-owned, so a sign-out everywhere kills a half-done add with the session that began it;
+	 * point-read by id and expiring five minutes after its write.
+	 */
+	modelArea('PasskeyCeremony', EXPIRES_AT, byAccount),
 	modelArea(
 		'PasswordGuessingTally',
 		EXPIRES_AT,
@@ -793,6 +817,28 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 			{ key: { bucketId: 1, serviceId: 1 } },
 			/* The keep-alive pass's scan across projects (specs/118 R11). */
 			{ key: { refreshedAt: 1 } }
+		]
+	),
+	/*
+	 * Never reaped: a passkey works until its person removes it. Unowned on purpose, though every record names a
+	 * person, for the reason connected accounts are: an account owner here would mean "swept by every lock,
+	 * deactivation and sign-out everywhere", and a person keeps their passkeys through all three (specs/139 FR-032).
+	 * The paths that must delete them do so by hand: the person's deletion, the project's destruction, the completed
+	 * reset of an account whose address was never proven, and an invitation's reclaim.
+	 *
+	 * `{bucketId, credentialId}` unique is the sign-in lookup, and what keeps one passkey from being stored twice in a
+	 * project under a concurrent add. `{bucketId, accountId}` serves a person's list and count, and its prefix the
+	 * project's removal.
+	 */
+	storeArea(
+		STORE_AREAS.passkeys,
+		null,
+		unowned(
+			'a person keeps passkeys through a lock and a sign-out everywhere (specs/139); deleted by the person, project, unverified-reset and reclaim paths'
+		),
+		[
+			{ key: { bucketId: 1, credentialId: 1 }, unique: true },
+			{ key: { bucketId: 1, accountId: 1 } }
 		]
 	),
 	/*

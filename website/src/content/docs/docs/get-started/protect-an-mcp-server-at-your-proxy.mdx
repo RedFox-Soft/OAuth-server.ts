@@ -238,8 +238,8 @@ kinds of condition, with the same controls as the API's own:
   where](/docs/get-started/add-conditions-at-your-proxy/#from-where) shows.
 - **When**: the days and the hours, in the API's one time zone.
 
-A tool holds at most four conditions. It takes no attribute and no new sign-in. A code or a recent sign-in is set for
-the whole API: see [Ask for a code or a recent sign-in](#require-a-code-or-a-recent-sign-in).
+A tool holds at most four conditions. It takes no attribute and no new sign-in. Two-step sign-in or a recent sign-in is
+set for the whole API: see [Ask for two-step sign-in or a recent sign-in](#require-a-code-or-a-recent-sign-in).
 
 ### How a tool's conditions add up {#tool-conditions-add-up}
 
@@ -298,7 +298,7 @@ it.
 
 The API's **Access** tab ends with a **Check access** card. Choose a person, or **No person: an app acting for itself**. Then
 choose the scopes the app's token holds, the tool it calls or another request, an address and a time. When the API
-requires a code or a recent sign-in, also say whether the sign-in had a code and when it happened.
+requires two-step sign-in or a recent sign-in, also say whether the sign-in was two-step and when it happened.
 
 The card answers **Allowed**, **Refused** or **Asked to sign in again**, with the reason in plain words. It answers for
 the saved table and for the one you are editing. When it lacks something it needs, it answers **Not known** and names
@@ -309,14 +309,14 @@ your server's own copy.
 An agent sets a tool's conditions with `resource_update`, as `conditions` on a row of `tools`. Conditions on one tool
 are free on every plan.
 
-## Ask for a code or a recent sign-in {#require-a-code-or-a-recent-sign-in}
+## Ask for two-step sign-in or a recent sign-in {#require-a-code-or-a-recent-sign-in}
 
 A token says that someone signed in to the project. It does not say how. So a stolen password is enough to connect an
 agent to your MCP server. Two settings on the API's **Access** tab change that. Open the project's **APIs** tab, then the API, then
 **Access**:
 
-- **Require a code from an authenticator app.** A token for this API is issued only after a sign-in in which the
-  person typed a code from an authenticator app, such as Google Authenticator.
+- **Require two-step sign-in.** A token for this API is issued only after a sign-in in which the person typed a code
+  from an authenticator app, such as Google Authenticator, or used a passkey where the project accepts passkeys.
 - **Ask to sign in again every.** Choose every day, every 7 days, every 14 days, or **Custom**: a whole number of
   hours or days, from 1 hour to 14 days. The person behind a token must have signed in no longer ago than that.
 
@@ -331,8 +331,8 @@ There is a standard answer an API sends to ask for a stronger or more recent sig
 every client asks for a new token when it gets a `401`. FoxAuth issues that token, so it makes the requirement hold
 itself:
 
-- When a person signs in to get a token for this API, FoxAuth asks for the code, whatever the client asked for. When
-  the person's sign-in is older than allowed, FoxAuth asks them to sign in again.
+- When a person signs in to get a token for this API, FoxAuth asks for the code, whatever the client asked for. A
+  passkey sign-in needs no code. When the person's sign-in is older than allowed, FoxAuth asks them to sign in again.
 - The sign-in page has a line that names the API, such as "Files asks for a code from an authenticator app to
   connect." or "Files asks you to sign in again every day to stay connected."
 - A person with no authenticator app can set one up inside the same sign-in, if the project lets people set one up
@@ -361,9 +361,9 @@ in again:
   person signed in somewhere else, and FoxAuth cannot tell how.
 
 People who sign in through a provider, such as Google or your company's identity provider, are a third case. They
-cannot type a code at FoxAuth. So when the API requires a code, the sign-in page tells them they cannot connect this
-way. When the API only asks them to sign in again, FoxAuth sends them to the provider for a new sign-in. The provider
-decides how to do that, and FoxAuth cannot confirm that they signed in again.
+cannot type a code at FoxAuth. So when the API requires two-step sign-in, the sign-in page tells them they cannot
+connect this way. When the API only asks them to sign in again, FoxAuth sends them to the provider for a new sign-in.
+The provider decides how to do that, and FoxAuth cannot confirm that they signed in again.
 
 ### Before you save: whom it affects {#before-you-save}
 
@@ -406,7 +406,7 @@ If an app does not carry on after the new sign-in, ask it to try again.
 ## Try it {#try-it}
 
 1. Declare an MCP server as in [step 1](#declare-the-api) and configure your proxy, or take one you already have.
-2. Open its **Access** tab and turn on **Require a code from an authenticator app**. Read whom it affects, and
+2. Open its **Access** tab and turn on **Require two-step sign-in**. Read whom it affects, and
    save.
 3. Connect your MCP client to the server. The sign-in page names the API and asks for a code after the password. If
    you have no authenticator app, set one up there.

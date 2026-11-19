@@ -4,7 +4,7 @@ title: "A person's activity: sign-ins, what the proxy refused and what people us
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-16
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 # A person's activity: sign-ins and what the proxy refused
@@ -22,11 +22,16 @@ or API and application, that let them through (see "What a person used" below). 
   `noteResumedSignIn` in `lib/interactions/index.ts:309`, called from `resume()` (`:375`) and the device completion
   (`:478`), only when no confirmation page was answered. `completeSignIn` of an app behind the proxy is deliberately
   not a place: it would count the sign-in twice, with the proxy's address. The method is `password`,
-  `password_code` (acr multi-factor) or `provider`; a sign-in through `proxy.<bucketId>` keeps the origin of its
+  `password_code` (acr multi-factor), `passkey` (read from `amr` holding `pop` **before** `acr`, since a passkey
+  reports the same multi-factor context; spec 139, `lib/person_activity/record.ts:186`) or `provider`; a sign-in through `proxy.<bucketId>` keeps the origin of its
   validated redirect URI, so the read can name the app.
 - **Failures and stops** only where the account was already read: wrong password, `canSignIn` false (locked or
   deactivated), unverified address, wrong code (not a reused one), the code-required page, a provider sign-in into a
-  closed account (`lib/federation/routes.ts`, and the hand-off path in `lib/interactions/index.ts`). Never the
+  closed account (`lib/federation/routes.ts`, and the hand-off path in `lib/interactions/index.ts`), and since spec 139
+  a known account's passkey refused at the passkey door (`passkey_refused`; never for a passkey nobody here holds). A
+  refusal at the passkey door carries `method: 'passkey'`, which keeps it a row apart from the password door's and
+  words it as that door answered ("Right passkey, but the account is locked", seen: "This account can't sign in right
+  now…"), [[passkeys]]. Never the
   throttle, the attacker list or the closed password door: there the server deliberately does not read the account
   ([[shared-attacker-list]]), and an unknown email costs and records nothing.
 - **At the proxy**: `noteAppCheck` after `emitDecision` (`lib/behind_proxy/check.ts:488`, `:497`); `noteForPerson` in

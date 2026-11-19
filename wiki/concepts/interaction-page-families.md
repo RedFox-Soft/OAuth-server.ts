@@ -4,7 +4,7 @@ title: "The two interaction page families"
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-11-11
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
@@ -41,7 +41,11 @@ had also clipped a tall card at the top), and the console's Sign-in preview now 
 (`foxVarsFor`, `lib/html/theme/palette.ts:177`): the console's head carries no theme block, so the preview's
 provider buttons had been drawn with no frame. A `wide` variant (640 px, top-aligned, left-aligned) serves the end user's connected-apps page — the
 first plain page outside any interaction or email, chosen for the family because every step there must work
-without JavaScript ([[connected-apps-page]]).
+without JavaScript ([[connected-apps-page]]). Since spec 139 one of those pages, Sign-in and security, carries a single
+`<script src>` (`public/passkeyButton.js`, no inline script, no page data in it) while it shows the form that adds a
+passkey: a passkey cannot be made without the browser's API. The button stays disabled, with a sentence saying it
+needs JavaScript, until the script finds WebAuthn ([[passkeys]]). The antd sign-in page offers passkeys through
+`loginClient.js`, where `@simplewebauthn/browser` is bundled.
 
 Both families build their `Response` through `htmlResponse`. That is enforced, not merely conventional:
 see [[html-response-security-policy]].

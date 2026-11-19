@@ -1,6 +1,6 @@
 import { renderToString } from 'react-dom/server';
 import { StrictMode, type ReactElement } from 'react';
-import { LoginPage } from './loginPage.js';
+import { LoginPage, type PasskeyOnPage } from './loginPage.js';
 import { ConsentPage } from './consentPage.js';
 import { RegistrationPage } from './registration.js';
 import { TotpPage } from './totpPage.js';
@@ -122,9 +122,13 @@ export async function loginServer(
 		face?: SignInFace;
 		/* The attacker list's refusal (specs/125); pass `passwordLogin: false` with it. */
 		listRefusal?: { line: string; disputeUrl: string | null };
+		/* The passkey offer of this render (specs/139), with the challenge it was written with. */
+		passkey?: PasskeyOnPage;
+		/* The passkey door's own answer when it is not the error re-render's 400: its per-caller refusal is a 429. */
+		status?: number;
 	} = {}
 ) {
-	const { errorMessage, switcher, listRefusal } = options;
+	const { errorMessage, switcher, listRefusal, passkey } = options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
@@ -161,7 +165,8 @@ export async function loginServer(
 			logoSrc,
 			switcher,
 			face,
-			...(listRefusal ? { listRefusal } : {})
+			...(listRefusal ? { listRefusal } : {}),
+			...(passkey ? { passkey } : {})
 		},
 		<LoginPage
 			uid={uid}
@@ -177,13 +182,14 @@ export async function loginServer(
 			switcher={switcher}
 			face={face}
 			listRefusal={listRefusal}
+			passkey={passkey}
 		/>,
 		language,
 		options.accent
 	);
 	// A notice is not a failure: only the error re-render and the attacker list's refusal (specs/125) answer 400.
 	return htmlResponse(html, {
-		status: errorMessage || listRefusal ? 400 : 200,
+		status: options.status ?? (errorMessage || listRefusal ? 400 : 200),
 		handOffTo: options.handOffTo,
 		language
 	});
@@ -314,6 +320,8 @@ export async function codeRequiredServer(
 		provider?: string;
 		/* The API that requires the code, by its declared name (specs/130); the page then names it, not the app. */
 		api?: string;
+		/* A passkey sign-in offered as the way on (specs/139), first or after the page's own action. */
+		passkey?: 'primary' | 'secondary';
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
@@ -321,20 +329,21 @@ export async function codeRequiredServer(
 		face?: SignInFace;
 	}
 ) {
-	const { variant, email, provider, api, switcher } = options;
+	const { variant, email, provider, api, passkey, switcher } = options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	const logoSrc = versionedAsset('logo.svg');
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
 		SIGN_IN_TEXTS[language].titles.codeRequired,
-		{ uid, variant, email, provider, api, logoSrc, switcher, face },
+		{ uid, variant, email, provider, api, passkey, logoSrc, switcher, face },
 		<CodeRequiredPage
 			uid={uid}
 			variant={variant}
 			email={email}
 			provider={provider}
 			api={api}
+			passkey={passkey}
 			logoSrc={logoSrc}
 			switcher={switcher}
 			face={face}

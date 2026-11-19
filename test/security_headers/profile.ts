@@ -14,10 +14,11 @@ export const STRICT_TRANSPORT = 'max-age=63072000; includeSubDomains';
 /*
  * Restated as one string rather than assembled from a list, for the same reason as the rest of this
  * file: a joined list here would pass whatever the implementation joined, including a shorter one.
- * `clipboard-write` is absent on purpose — see lib/plugins/securityHeaders.ts.
+ * `clipboard-write` is absent on purpose — see lib/plugins/securityHeaders.ts. The two passkey features are
+ * granted to the server's own origin (specs/139), on every response kind alike.
  */
 export const PERMISSIONS_POLICY =
-	'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-get=(), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
+	'accelerometer=(), autoplay=(), camera=(), display-capture=(), encrypted-media=(), fullscreen=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), picture-in-picture=(), publickey-credentials-create=(self), publickey-credentials-get=(self), screen-wake-lock=(), usb=(), xr-spatial-tracking=()';
 export const ROBOTS = 'noindex, nofollow';
 
 const PROFILE_NAMES = [

@@ -1,7 +1,12 @@
-import { adapter, getUserStore } from '../../adapters/index.js';
+import {
+	adapter,
+	getPasskeyStore,
+	getUserStore
+} from '../../adapters/index.js';
 import type {
 	EndUserTally,
 	PasswordGuessingSetting,
+	User,
 	UserBucket
 } from '../../adapters/types.js';
 import { countsFor } from '../../attacker_list/counters.js';
@@ -31,7 +36,8 @@ export type SignInChange =
 	| 'verificationOn'
 	| 'authenticatorOn'
 	| 'signUpOpen'
-	| 'guessingRefuseOn';
+	| 'guessingRefuseOn'
+	| 'passkeysOff';
 
 export interface SignInPreview {
 	consequences: string[];
@@ -45,6 +51,7 @@ interface SignInPatch {
 	emailVerificationRequired?: boolean;
 	totpRequired?: boolean;
 	passwordGuessing?: Pick<PasswordGuessingSetting, 'mode'>;
+	passkeyLogin?: boolean;
 }
 
 export interface SignInCounts extends EndUserTally {
@@ -111,6 +118,15 @@ export async function signInPreview(
 	) {
 		changes.push('guessingRefuseOn');
 	}
+	/*
+	 * Turning passkeys off (specs/139 research R21) deletes none, but refuses them all: only a tightening when someone
+	 * holds a passkey and no other way in, which is counted below, so an ordinary turn-off applies at once.
+	 */
+	const passkeyOnly =
+		patch.passkeyLogin === false && bucket.passkeyLogin === true
+			? await passkeyOnlyPeople(bucket, passwordsAfter)
+			: 0;
+	if (passkeyOnly > 0) changes.push('passkeysOff');
 	if (changes.length === 0) return null;
 
 	const counts = await signInCounts(bucket);
@@ -171,6 +187,12 @@ export async function signInPreview(
 				);
 				break;
 			}
+			case 'passkeysOff':
+				expect.passkeyOnly = passkeyOnly;
+				consequences.push(
+					`${plural(passkeyOnly, 'person', 'people')} can only sign in with a passkey; they will not be able to sign in.`
+				);
+				break;
 			case 'signUpOpen':
 				consequences.push(
 					consoleBucket
@@ -188,6 +210,29 @@ export async function signInPreview(
 		);
 	}
 	return { consequences, expect, changes };
+}
+
+/*
+ * The people of the bucket who hold a passkey and would have no other way in: no password the bucket still accepts,
+ * and no link to a provider it offers (data-model "last way in"). Read person by person from the holders, who are
+ * few next to the bucket's people.
+ */
+async function passkeyOnlyPeople(
+	bucket: UserBucket,
+	passwordsAfter: boolean
+): Promise<number> {
+	const enabled = new Set(
+		bucket.federation
+			.filter((provider) => provider.enabled)
+			.map((provider) => provider.id)
+	);
+	const users = getUserStore(bucket._id);
+	const holders = await getPasskeyStore().holdersIn(bucket._id);
+	const people = await Promise.all(holders.map((id) => users.find(id)));
+	const otherWay = (user: User) =>
+		(passwordsAfter && user.passwordSet !== false) ||
+		(user.federated ?? []).some((link) => enabled.has(link.providerId));
+	return people.filter((user) => user !== null && !otherWay(user)).length;
 }
 
 /* The confirmation is of the counts previewed: every one of them, as fresh, and nothing else compared. */

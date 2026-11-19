@@ -69,6 +69,13 @@ const REAPED_ON_EXPIRES_AT = [
 	'LoginThrottle',
 	'MailRequestTally',
 	/*
+	 * Failed passkey sign-ins per caller and hour (specs/139), and an add or removal prepared on the account page: a
+	 * tally that never expired would hold an address refused for good, and a ceremony that never expired would be a
+	 * challenge to replay.
+	 */
+	'PasskeyAttemptTally',
+	'PasskeyCeremony',
+	/*
 	 * Attacker-list sign-in counts (specs/125). Expiry is the control: the figure an administrator decides with is
 	 * the last 7 days, and records that never expired would keep a project's old weeks in it.
 	 */
@@ -176,6 +183,8 @@ const PERMANENT = [
 	'behindProxyApps',
 	/* A connected account is the person's until they, an administrator or a deletion removes it (specs/117). */
 	'connectedAccounts',
+	/* A passkey works until its person removes it, or a deletion does (specs/139). */
+	'passkeys',
 	/*
 	 * A bucket group and its memberships live until an administrator or the owning directory removes them.
 	 * An expiry here would silently change what every relying party lets those people do.

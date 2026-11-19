@@ -41,6 +41,7 @@ import {
 } from './resources/ResourceSignInFields.js';
 import { useCodeConsent, withConsent } from './applications/codeConsent.js';
 import { VouchingCell } from './resources/vouching.js';
+import { usePasskeysAccepted } from './signin/passkeysAccepted.js';
 import {
 	CHECKED_BY_OPTIONS,
 	describedScopes,
@@ -148,6 +149,7 @@ export function Resources({
 }) {
 	const bucketBase = `/admin/api/projects/${encodeURIComponent(bucketId)}`;
 	const base = resourcesApi(bucketId);
+	const passkeys = usePasskeysAccepted(bucketId);
 	const [namespace, setNamespace] = useState<Namespace | null>(null);
 	const writable = canEdit && (namespace === 'project' || superAdmin);
 	const [rows, setRows] = useState<ResourceView[]>([]);
@@ -390,7 +392,7 @@ export function Resources({
 									)}
 									{(row.requireCode || row.signInEveryMinutes !== null) && (
 										<Space size={4}>
-											{row.requireCode && <Tag>Code required</Tag>}
+											{row.requireCode && <Tag>Two-step required</Tag>}
 											{row.signInEveryMinutes !== null && (
 												<Tag>{signInEveryText(row.signInEveryMinutes)}</Tag>
 											)}
@@ -611,6 +613,7 @@ export function Resources({
 					<ResourceSignInFields
 						checkedBy={checkedByValue}
 						every={everyValue}
+						passkeys={passkeys}
 					/>
 					{/*
 					 * FR-012: the check does not look a self-contained token's grant up on every request, so at the proxy

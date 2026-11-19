@@ -87,7 +87,8 @@ export function SignInPreview({
 				>
 					{/*
 					 * The fold is drawn open: the preview is inert, so a closed one would hide from the administrator
-					 * exactly which providers people have to open it to find.
+					 * exactly which providers people have to open it to find. The passkey offer carries no options, so
+					 * the button is drawn and can never start a prompt (specs/139 FR-012).
 					 */}
 					<LoginPage
 						embedded
@@ -99,6 +100,11 @@ export function SignInPreview({
 						providers={options.providers}
 						providersOpen
 						face={{ service }}
+						passkey={
+							options.passkeyLogin
+								? { remember: options.passwordLogin }
+								: undefined
+						}
 					/>
 				</div>
 				<Typography.Text

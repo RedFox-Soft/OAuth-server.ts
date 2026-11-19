@@ -17,7 +17,9 @@ const antdIconsSvgEsm: BunPlugin = {
 
 const targets: Array<{ entry: string; name: string }> = [
 	{ entry: './lib/interactions/loginClient.tsx', name: 'loginClient.[ext]' },
-	{ entry: './lib/admin/ui/adminClient.tsx', name: 'admin.[ext]' }
+	{ entry: './lib/admin/ui/adminClient.tsx', name: 'admin.[ext]' },
+	// The account pages' one script: the "Add a passkey" button (specs/139). Every other account page needs none.
+	{ entry: './lib/account_page/passkey_button.ts', name: 'passkeyButton.[ext]' }
 ];
 
 /*

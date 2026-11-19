@@ -1,6 +1,10 @@
 import { Elysia, t } from 'elysia';
 
-import { getBucketStore, getUserStore } from '../adapters/index.js';
+import {
+	getBucketStore,
+	getPasskeyStore,
+	getUserStore
+} from '../adapters/index.js';
 import { requestBucketFor } from '../admin/auth/bucketAddress.js';
 import { recordEndUserAudit } from '../admin/audit/record.js';
 import { AuthorizationCookies, routeNames } from '../consts/param_list.js';
@@ -8,6 +12,7 @@ import { hostOfRequest } from '../consts/request_host.js';
 import { shownNameOf, type RequestBucket } from '../configs/issuer.js';
 import {
 	disownAuthenticator,
+	disownPasskeys,
 	EndUserError,
 	enrolOwnAuthenticator,
 	enrolmentInstant,
@@ -26,11 +31,16 @@ import {
 	waitingOffer
 } from '../totp/enrollment.js';
 import { MAX_ATTEMPTS_PER_INTERACTION } from '../totp/consts.js';
+import epochTime from '../helpers/epoch_time.js';
+import { request as requestPasswordReset } from '../password_reset/challenge.js';
+import { selfServiceResetAllowed } from '../password_reset/eligibility.js';
 import { qrSvg } from '../totp/qr.js';
 import {
 	followLink,
 	freshCode,
+	freshPasskey,
 	freshPassword,
+	freshSignIn,
 	notifyEnrolled,
 	notifyTwoStep,
 	pageHolder,
@@ -40,15 +50,45 @@ import {
 	selfServiceState,
 	sendLink,
 	spendDisownLink,
+	strongRecentSignIn,
 	type LinkSent
 } from '../totp/self_service.js';
+import { versionedAsset } from '../html/versionedAsset.js';
+import { passkeysAccepted } from '../passkeys/accepted.js';
+import {
+	addAvailability,
+	completeAdd,
+	completeRemove,
+	creationOptionsFor,
+	isLastWayIn,
+	liveAdd,
+	liveRemove,
+	notMeBucketId,
+	notMePasskey,
+	ownPasskey,
+	passkeysOf,
+	prepareAdd,
+	prepareRemove,
+	renamePasskey,
+	type AddProof,
+	type AddRefused,
+	type PageSession,
+	type RemoveRefused
+} from '../passkeys/account.js';
+import { passkeyName } from '../passkeys/names.js';
+import { relyingPartyOf } from '../passkeys/relying_party.js';
+import type { Session } from '../models/session.js';
 import { accountPageBase } from './client.js';
 import {
 	disownConfirmPage,
 	disownOutcomePage,
 	outcomePage,
+	passkeyDisownConfirmPage,
+	passkeyDisownDonePage,
+	passkeyDisownGonePage,
 	securityPage,
 	type AccountNav,
+	type PasskeysView,
 	type SecurityNotice,
 	type SecurityView
 } from './html.js';
@@ -116,25 +156,54 @@ function providersOf(person: PagePerson): string[] {
 		.map((provider) => provider.displayName);
 }
 
+/* The name of the project a page is addressed to, as its people know it: the stored record carries its shown name. */
+async function serviceAt(addressed: RequestBucket): Promise<string> {
+	return shownNameOf((await getBucketStore().find(addressed._id)) ?? addressed);
+}
+
 function hasPassword(person: PagePerson): boolean {
 	return person.user.passwordSet !== false;
 }
 
 const PageQuery = t.Object({
-	sent: t.Optional(t.Union([t.Literal('enrol'), t.Literal('replace')])),
+	sent: t.Optional(
+		t.Union([
+			t.Literal('enrol'),
+			t.Literal('replace'),
+			t.Literal('passkey'),
+			t.Literal('passkey_remove')
+		])
+	),
 	done: t.Optional(t.String()),
 	notice: t.Optional(t.String()),
-	off: t.Optional(t.Literal('1'))
+	off: t.Optional(t.Literal('1')),
+	/* The passkey whose rename form to open, and the one whose removal to confirm (specs/139). */
+	rename: t.Optional(t.String()),
+	remove: t.Optional(t.String())
 });
 
 const PageBody = t.Object({
 	action: t.Optional(t.String()),
 	xsrf: t.Optional(t.String()),
-	code: t.Optional(t.String())
+	code: t.Optional(t.String()),
+	/* A passkey add: the browser's answer as JSON, read and bounded by lib/passkeys/ceremony.ts. */
+	credential: t.Optional(t.String()),
+	/* A passkey's record id, and the name a rename gives it. */
+	passkey: t.Optional(t.String()),
+	name: t.Optional(t.String())
 });
 
 const TokenQuery = t.Object({ token: t.Optional(t.String()) });
 const TokenBody = t.Object({ token: t.Optional(t.String()) });
+/* A passkey's "This wasn't me" link also names its project where the project's address cannot (`notMeBucketId`). */
+const NotMeQuery = t.Object({
+	token: t.Optional(t.String()),
+	project: t.Optional(t.String())
+});
+const NotMeBody = t.Object({
+	token: t.Optional(t.String()),
+	project: t.Optional(t.String())
+});
 
 function noticeFor(
 	query: { done?: string; notice?: string },
@@ -150,6 +219,12 @@ function noticeFor(
 			return { kind: 'success', text: T.securityDoneChanged };
 		case 'off':
 			return { kind: 'success', text: T.securityDoneOff };
+		case 'passkey_added':
+			return { kind: 'success', text: text(T.passkeyAdded, values) };
+		case 'passkey_renamed':
+			return { kind: 'success', text: T.passkeyRenamed };
+		case 'passkey_removed':
+			return { kind: 'success', text: text(T.passkeyRemoved, values) };
 	}
 	switch (query.notice) {
 		case 'throttled':
@@ -160,6 +235,23 @@ function noticeFor(
 			return { kind: 'error', text: T.securityLinkInvalid };
 		case 'changed':
 			return { kind: 'error', text: T.securityChanged };
+		case 'passkey_ready':
+			return { kind: 'success', text: T.passkeyReady };
+		case 'passkey_expired':
+			return { kind: 'error', text: T.passkeyTooLong };
+		case 'passkey_no_uv':
+			return { kind: 'error', text: T.passkeyNoUserVerification };
+		case 'passkey_exists':
+			return { kind: 'error', text: T.passkeyExists };
+		case 'passkey_failed':
+			return { kind: 'error', text: T.passkeyAddFailed };
+		case 'passkey_name':
+			return { kind: 'error', text: T.passkeyNameInvalid };
+		case 'passkey_last':
+			return {
+				kind: 'error',
+				text: text(T.passkeyLast, { service: shownNameOf(person.bucket) })
+			};
 	}
 	return undefined;
 }
@@ -172,7 +264,9 @@ function reauthenticate(
 	return seeOther(
 		signInRedirect(cookie, person.bucket, {
 			reauthenticate: { accountId: person.user._id },
-			security: step
+			security: step,
+			// Two-step verification's own acts need a password, or a password and its code: no passkey there (R13).
+			passwordOnly: step === 'enrol' || step === 'replace' || step === 'off'
 		})
 	);
 }
@@ -186,6 +280,124 @@ function sentAnswer(
 	return seeOther(
 		`${path}?notice=${sent === 'throttled' ? 'throttled' : 'mail'}`
 	);
+}
+
+/* The browser session the page's passkey ceremonies belong to (specs/139 research R15). */
+function pageSession(session: Session): PageSession {
+	return { uid: session.payload.uid, holder: pageHolder(session) };
+}
+
+/*
+ * The proof a strong recent sign-in gives an add (specs/139 research R13): a passkey, or a password with a code, in
+ * this browser within fifteen minutes. A password alone gives none: it needs the mailed link as well.
+ */
+function strongProof(session: Session): AddProof | undefined {
+	if (freshPasskey(session)) return 'passkey';
+	if (freshCode(session)) return 'password_code';
+	return undefined;
+}
+
+const REMOVE_REFUSED: Record<Exclude<RemoveRefused, 'gone'>, string> = {
+	last: 'passkey_last',
+	expired: 'passkey_expired'
+};
+
+const ADD_REFUSED: Record<AddRefused, string> = {
+	expired: 'passkey_expired',
+	no_user_verification: 'passkey_no_uv',
+	exists: 'passkey_exists',
+	full: 'passkey_failed',
+	unavailable: 'passkey_failed',
+	failed: 'passkey_failed'
+};
+
+/*
+ * The Passkeys part of the page (contracts/account-page.md), or none: shown where the project accepts passkeys, or
+ * where the person still holds some there. A strong recent sign-in prepares the add on the GET itself, so the button is
+ * ready the moment the page is; a live add (prepared before, or by a followed link) is used as it is, never replaced,
+ * so a mailed link's proof is not lost to a reload.
+ */
+async function passkeysView(
+	person: PagePerson,
+	language: ReturnType<typeof personLanguage>,
+	query: { sent?: string; rename?: string; remove?: string }
+): Promise<PasskeysView | undefined> {
+	const { user, bucket, session } = person;
+	const held = await passkeysOf(bucket, user);
+	if (!passkeysAccepted(bucket) && held.length === 0) return undefined;
+	const rpId = relyingPartyOf(bucket).rpId;
+	const at = pageSession(session);
+	const listed = (id: string | undefined) =>
+		id !== undefined && held.some((passkey) => passkey._id === id)
+			? id
+			: undefined;
+	const renaming = listed(query.rename);
+	const removing = listed(query.remove);
+	/*
+	 * A removal is confirmed on the page only where the act would be allowed: a strong recent sign-in, or a removal a
+	 * mailed link prepared in this browser for that very passkey.
+	 */
+	const confirms =
+		removing !== undefined &&
+		(strongRecentSignIn(session) ||
+			(await liveRemove(user, bucket, at, removing)));
+	const manage = {
+		...(renaming === undefined ? {} : { renaming }),
+		...(confirms ? { removing } : {}),
+		...(query.sent === 'passkey_remove' ? { removeSent: true } : {})
+	};
+	const rows = held.map((passkey) => ({
+		id: passkey._id,
+		name: passkeyName(passkey, language),
+		createdAt: new Date(passkey.createdAt),
+		...(passkey.lastUsedAt ? { lastUsedAt: new Date(passkey.lastUsedAt) } : {}),
+		synced: passkey.backedUp,
+		via: passkey.createdVia,
+		...(passkey.copiedAt
+			? { mark: 'copied' as const }
+			: passkey.rpId !== rpId
+				? { mark: 'oldAddress' as const }
+				: {})
+	}));
+	switch (await addAvailability(bucket, user, held.length)) {
+		case 'not_accepted':
+			return { rows, ...manage, state: 'stopped' };
+		case 'provider_only':
+			return {
+				rows,
+				...manage,
+				state: 'providerOnly',
+				providers: providersOf(person)
+			};
+		case 'no_mail':
+			return { rows, ...manage, state: 'noMail' };
+		case 'unconfirmed':
+			return { rows, ...manage, state: 'unconfirmed' };
+		case 'full':
+			return { rows, ...manage, state: 'full' };
+		case 'ready':
+			break;
+	}
+	let ceremony = await liveAdd(user, bucket, at);
+	const proof = strongProof(session);
+	if (!ceremony && proof) ceremony = await prepareAdd(bucket, user, at, proof);
+	const options = ceremony
+		? await creationOptionsFor(bucket, user, ceremony)
+		: undefined;
+	if (options) {
+		return {
+			rows,
+			...manage,
+			state: 'add',
+			options: JSON.stringify(options),
+			script: versionedAsset('passkeyButton.js')
+		};
+	}
+	return {
+		rows,
+		...manage,
+		state: query.sent === 'passkey' ? 'sent' : 'start'
+	};
 }
 
 /* Whether this person may set up a factor here at all, right now (FR-003, FR-004). */
@@ -218,6 +430,10 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 
 			const holder = pageHolder(session);
 			const waiting = await waitingOffer(holder, user._id, bucket._id);
+			const totpSent =
+				query.sent === 'passkey' || query.sent === 'passkey_remove'
+					? undefined
+					: query.sent;
 			const offerView = async (): Promise<SecurityView> => {
 				const shown = await offer(holder, user._id, bucket._id, {
 					email: user.email,
@@ -241,7 +457,7 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				view =
 					waiting?.replacing !== undefined
 						? await offerView()
-						: query.sent === 'replace'
+						: totpSent === 'replace'
 							? { state: 'sent', purpose: 'replace' }
 							: {
 									state: 'on',
@@ -260,8 +476,8 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				view = { state: 'unavailable' };
 			} else if (waiting) {
 				view = await offerView();
-			} else if (query.sent !== undefined) {
-				view = { state: 'sent', purpose: query.sent };
+			} else if (totpSent !== undefined) {
+				view = { state: 'sent', purpose: totpSent };
 			} else {
 				view = {
 					state: 'off',
@@ -269,7 +485,14 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 						!freshPassword(session) && !session.payload.amr?.includes('pwd')
 				};
 			}
-			return securityPage(frame, navOf(person), view, xsrf, notice);
+			return securityPage(
+				frame,
+				navOf(person),
+				view,
+				xsrf,
+				notice,
+				await passkeysView(person, language, query)
+			);
 		},
 		{ query: PageQuery }
 	)
@@ -440,6 +663,105 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 					});
 					return seeOther(`${pagePath}?done=off`);
 				}
+				case 'passkey_start': {
+					/*
+					 * Adding a passkey (specs/139 contracts/account-page.md): a strong recent sign-in opens the page's add
+					 * button at once; a fresh password alone mails a link that works only in this browser; anything else
+					 * signs in again, returning to this page and never to the act.
+					 */
+					const held = await passkeysOf(bucket, user);
+					if ((await addAvailability(bucket, user, held.length)) !== 'ready')
+						return seeOther(pagePath);
+					if (strongProof(session)) return seeOther(pagePath);
+					if (!freshPassword(session))
+						return reauthenticate(cookie, person, 'passkey_add');
+					const sent = await sendLink(bucket, user, 'passkey_add', holder, {
+						request,
+						urlFor: (token) => linkUrl(bucket, token)
+					});
+					if (sent === 'sent') return seeOther(`${pagePath}?sent=passkey`);
+					return seeOther(
+						`${pagePath}?notice=${sent === 'throttled' ? 'throttled' : 'mail'}`
+					);
+				}
+				case 'passkey_add': {
+					const added = await completeAdd(
+						bucket,
+						user,
+						pageSession(session),
+						body.credential ?? '',
+						request
+					);
+					return seeOther(
+						added.ok
+							? `${pagePath}?done=passkey_added`
+							: `${pagePath}?notice=${ADD_REFUSED[added.reason]}`
+					);
+				}
+				case 'passkey_rename': {
+					/* The person's own label (FR-028): a sign-in of any kind within fifteen minutes, else sign in again. */
+					const passkey = await ownPasskey(bucket, user, body.passkey);
+					if (!passkey) return seeOther(pagePath);
+					if (!freshSignIn(session))
+						return reauthenticate(cookie, person, 'passkey_rename');
+					const renamed = await renamePasskey(
+						bucket,
+						user,
+						passkey._id,
+						body.name
+					);
+					if (renamed === 'renamed')
+						return seeOther(`${pagePath}?done=passkey_renamed`);
+					if (renamed === 'invalid') {
+						return seeOther(
+							`${pagePath}?notice=passkey_name&rename=${encodeURIComponent(passkey._id)}`
+						);
+					}
+					return seeOther(pagePath);
+				}
+				case 'passkey_remove_start': {
+					/*
+					 * Removing a passkey takes the proof adding one does (FR-028): a strong recent sign-in confirms on the
+					 * page; a fresh password alone mails a link for this passkey that works only in this browser; anything
+					 * else signs in again, returning to this page. The last way in is refused before any of it (FR-029).
+					 */
+					const passkey = await ownPasskey(bucket, user, body.passkey);
+					if (!passkey) return seeOther(pagePath);
+					if (await isLastWayIn(bucket, user, passkey))
+						return seeOther(`${pagePath}?notice=passkey_last`);
+					if (strongRecentSignIn(session)) {
+						return seeOther(
+							`${pagePath}?remove=${encodeURIComponent(passkey._id)}`
+						);
+					}
+					if (!freshPassword(session))
+						return reauthenticate(cookie, person, 'passkey_remove');
+					const sent = await sendLink(bucket, user, 'passkey_remove', holder, {
+						request,
+						urlFor: (token) => linkUrl(bucket, token),
+						passkeyId: passkey._id
+					});
+					if (sent === 'sent')
+						return seeOther(`${pagePath}?sent=passkey_remove`);
+					return seeOther(
+						`${pagePath}?notice=${sent === 'throttled' ? 'throttled' : 'mail'}`
+					);
+				}
+				case 'passkey_remove': {
+					const removed = await completeRemove(
+						bucket,
+						user,
+						pageSession(session),
+						body.passkey,
+						strongRecentSignIn(session)
+					);
+					if (removed.ok) return seeOther(`${pagePath}?done=passkey_removed`);
+					return seeOther(
+						removed.reason === 'gone'
+							? pagePath
+							: `${pagePath}?notice=${REMOVE_REFUSED[removed.reason]}`
+					);
+				}
 				default:
 					return seeOther(pagePath);
 			}
@@ -463,6 +785,23 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				bucket._id
 			);
 			if (!link) return seeOther(`${path}?notice=link`);
+			/*
+			 * A passkey's proof link (specs/139 research R14) prepares an add, or the removal of one passkey, proved by the
+			 * mailbox, for this browser session only; it never becomes an authenticator offer.
+			 */
+			if (link.purpose === 'passkey_add') {
+				const held = await passkeysOf(bucket, user);
+				if ((await addAvailability(bucket, user, held.length)) !== 'ready')
+					return seeOther(path);
+				await prepareAdd(bucket, user, pageSession(session), 'password_mail');
+				return seeOther(`${path}?notice=passkey_ready`);
+			}
+			if (link.purpose === 'passkey_remove') {
+				const passkey = await ownPasskey(bucket, user, link.passkeyId);
+				if (!passkey) return seeOther(path);
+				await prepareRemove(bucket, user, pageSession(session), passkey._id);
+				return seeOther(`${path}?remove=${encodeURIComponent(passkey._id)}`);
+			}
 			if (
 				link.purpose === 'enrol' &&
 				(user.totp || !(await mayEnrol(person)))
@@ -570,4 +909,131 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 			return disownOutcomePage(shown, removed, service, forgot);
 		},
 		{ body: TokenBody, parse: 'urlencoded' }
+	)
+	/*
+	 * "This wasn't me" about an added passkey (specs/139 research R16, contracts/account-page.md). The link's state lives
+	 * on the passkey record, which a sign-out everywhere never touches, so whoever added the passkey cannot kill the
+	 * owner's link by signing out everywhere with it. The token is looked up only among the passkeys of the project the
+	 * request is addressed to, which is the address its mail named: at any other project's address it names nothing.
+	 */
+	.get(
+		routeNames.account_passkey_disown,
+		async ({ query, params, request }) => {
+			const addressed = await addressOfRequest(params, request);
+			const bucketId = await notMeBucketId(addressed, query.project);
+			const hit = bucketId
+				? await notMePasskey(bucketId, query.token ?? '')
+				: undefined;
+			const owner =
+				hit && bucketId
+					? await getUserStore(bucketId).find(hit.passkey.accountId)
+					: null;
+			const language = languageOfRequest(
+				request,
+				owner ? [storedLocaleRanges(owner)] : []
+			).language;
+			if (!hit || !owner) {
+				return passkeyDisownGonePage(language, await serviceAt(addressed));
+			}
+			return passkeyDisownConfirmPage(
+				language,
+				new URL(
+					`${accountPageBase(addressed)}${routeNames.account_passkey_disown}`
+				).pathname,
+				{
+					token: query.token ?? '',
+					...(bucketId === addressed._id ? {} : { project: bucketId })
+				},
+				owner.email
+			);
+		},
+		{ query: NotMeQuery }
+	)
+	.post(
+		routeNames.account_passkey_disown,
+		async ({ body, params, request }) => {
+			const addressed = await addressOfRequest(params, request);
+			if (
+				!fromThisOrigin(request, new URL(accountPageBase(addressed)).origin)
+			) {
+				return outcomePage(
+					'refused',
+					pathOf(addressed),
+					403,
+					languageOfRequest(request).language
+				);
+			}
+			const bucketId = await notMeBucketId(addressed, body.project);
+			const hit = bucketId
+				? await notMePasskey(bucketId, body.token ?? '')
+				: undefined;
+			const bucket =
+				hit && bucketId ? await getBucketStore().find(bucketId) : null;
+			const owner =
+				hit && bucket
+					? await getUserStore(bucket._id).find(hit.passkey.accountId)
+					: null;
+			const language = languageOfRequest(
+				request,
+				owner ? [storedLocaleRanges(owner)] : []
+			).language;
+			if (
+				!hit ||
+				!bucket ||
+				!owner ||
+				!(await getPasskeyStore().spendNotMe(
+					bucket._id,
+					hit.passkey._id,
+					hit.digest,
+					epochTime()
+				))
+			) {
+				return passkeyDisownGonePage(language, await serviceAt(addressed));
+			}
+			const { swept } = await disownPasskeys(
+				bucket,
+				owner._id,
+				new Date(hit.passkey.createdAt),
+				() =>
+					recordEndUserAudit(bucket._id, owner._id, 'enduser.passkey.disown', {
+						targetScope: bucket._id,
+						ownerGroupId: bucket.ownerGroupId
+					})
+			);
+			const service = shownNameOf(bucket);
+			const forgot = SIGN_IN_TEXTS[language].login.forgotPassword;
+			if (swept.failedAreas.length > 0) {
+				console.error('This wasn’t me about a passkey left access behind', {
+					failedAreas: swept.failedAreas
+				});
+				return passkeyDisownDonePage(language, {
+					done: false,
+					service,
+					email: owner.email,
+					forgot,
+					mail: 'none'
+				});
+			}
+			/* The password goes too where there is one to reset: whoever added the passkey knew it (FR-031). */
+			let mail: 'sent' | 'refused' | 'none' = 'none';
+			if (
+				owner.passwordSet !== false &&
+				selfServiceResetAllowed(bucket._id, bucket)
+			) {
+				const asked = await requestPasswordReset(
+					owner.email,
+					bucket._id,
+					language
+				);
+				mail = asked.ok && asked.sent ? 'sent' : 'refused';
+			}
+			return passkeyDisownDonePage(language, {
+				done: true,
+				service,
+				email: owner.email,
+				forgot,
+				mail
+			});
+		},
+		{ body: NotMeBody, parse: 'urlencoded' }
 	);

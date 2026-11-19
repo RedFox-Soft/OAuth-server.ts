@@ -23,6 +23,14 @@ function served(html: string): { markup: string; props: object } {
 	return { markup, props: JSON.parse(props) as object };
 }
 
+const PASSKEY_OPTIONS = {
+	challenge: 'Y2hhbGxlbmdl',
+	rpId: 'e.ly',
+	userVerification: 'required' as const,
+	timeout: 300000,
+	allowCredentials: []
+};
+
 const PAGES: Array<
 	[string, string, (language: Language) => Promise<Response>]
 > = [
@@ -30,6 +38,30 @@ const PAGES: Array<
 		'sign-in',
 		'login',
 		(language) => loginServer('uid-1', { errorMessage: 'wrong', language })
+	],
+	/*
+	 * With a passkey offer (specs/139): its button is disabled in both renders until the script checks the browser,
+	 * and the passkey door answers a refusal with this page at its own path, which hydrates the same way.
+	 */
+	[
+		'sign-in with a passkey offer',
+		'login',
+		(language) =>
+			loginServer('uid-1', {
+				passkey: { options: PASSKEY_OPTIONS, remember: true },
+				language
+			})
+	],
+	[
+		'passkey door’s refusal',
+		'passkey',
+		(language) =>
+			loginServer('uid-1', {
+				errorMessage: 'This passkey isn’t for Acme.',
+				passwordLogin: false,
+				passkey: { options: PASSKEY_OPTIONS, remember: false },
+				language
+			})
 	],
 	[
 		'registration',

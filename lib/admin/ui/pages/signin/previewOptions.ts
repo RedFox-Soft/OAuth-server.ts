@@ -9,6 +9,8 @@ export interface PreviewDraft {
 	passwordLogin: boolean;
 	registrationOpen: boolean;
 	totpRequired: boolean;
+	/* Passkeys on draws the passkey offer; the preview never starts a prompt (specs/139 FR-012). */
+	passkeyLogin: boolean;
 }
 
 /*

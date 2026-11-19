@@ -12,8 +12,8 @@ people would be stuck. This page shows the other way: each person decides for th
 
 ## What a person does {#steps}
 
-1. They sign in with their password and open their account page, **Two-step verification**. It sits beside their
-   connected apps, at `/account/security` under your project's address.
+1. They sign in with their password and open their account page, **Sign-in and security**, at its **Two-step
+   verification** part. The page sits beside their connected apps, at `/account/security` under your project's address.
 2. They choose **Turn on two-step verification**. FoxAuth emails them a link.
 3. They open the link in the same browser, within 10 minutes. A link opened in another browser does nothing, so a
    person cannot be talked into reading it out to someone who claims to be support.
@@ -58,14 +58,16 @@ On the project's **Sign-in** tab, the **Authenticator app** card has:
 
 - **Require an authenticator app for everyone who signs in with a password**, as before;
 - **Let people turn on two-step verification themselves**, on by default. It needs password sign-in and a mail server;
-- **Where a code is asked**: how many people have an authenticator app.
+- **Where two-step sign-in is asked**: how many people have an authenticator app.
 
 An agent can change the setting with `project_update` (`totpSelfService`). It cannot set up a code for anyone: only the
 person can.
 
 ## For your app {#app}
 
-Add a link named "Two-step verification" to your app's account settings that opens `/account/security` under your
+Add a link named "Sign-in and security" to your app's account settings that opens `/account/security` under your
 project's issuer. An app that requires a multi-factor sign-in, with an essential `acr` claim or under the IPSIE SL1
-profile, now gets it for every person who has turned this on. To require a code in one app without any parameter, see
-[Require a code in one app](/docs/get-started/require-a-code-for-an-app/).
+profile, now gets it for every person who has turned this on. To require two-step sign-in in one app without any
+parameter, see [Require two-step sign-in in one app](/docs/get-started/require-a-code-for-an-app/). Where the project
+accepts passkeys, people add one on the same page: see
+[Let people sign in with a passkey](/docs/get-started/let-people-sign-in-with-a-passkey/).

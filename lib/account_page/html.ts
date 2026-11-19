@@ -761,12 +761,208 @@ function securityBody(
 	}
 }
 
+// ---------------------------------------------------------------- passkeys (specs/139)
+
+/* One passkey as its owner's page lists it: never a credential id, a key or an AAGUID. */
+export interface PasskeyRowView {
+	/* The record's own id, which the row's forms name: never the credential id. */
+	id: string;
+	name: string;
+	createdAt: Date;
+	lastUsedAt?: Date;
+	synced: boolean;
+	via: 'passkey' | 'password_code' | 'password_mail';
+	/* Made for an address the project no longer has, or refused because it may have been copied: it no longer works. */
+	mark?: 'oldAddress' | 'copied';
+}
+
+/* The Passkeys part of "Sign-in and security" (contracts/account-page.md), one state at a time. */
+export type PasskeysView = {
+	rows: readonly PasskeyRowView[];
+	/* The passkey whose rename form is open (`?rename=`), and the one whose removal is to be confirmed (`?remove=`). */
+	renaming?: string;
+	removing?: string;
+	/* A link to confirm a removal was mailed to this browser. */
+	removeSent?: boolean;
+} & (
+	| { state: 'stopped' }
+	| { state: 'providerOnly'; providers: readonly string[] }
+	| { state: 'noMail' }
+	| { state: 'unconfirmed' }
+	| { state: 'full' }
+	| { state: 'start' }
+	| { state: 'sent' }
+	| {
+			state: 'add';
+			/* The creation options, as JSON, for the page's one script to hand the browser. */
+			options: string;
+			script: string;
+	  }
+);
+
+/* A plain form of the Passkeys part: its action, the page's anti-forgery value and the passkey it is about. */
+function passkeyForm(
+	frame: PageFrame,
+	fields: Record<string, string>,
+	label: string,
+	style: string
+): string {
+	return `<form method="post" action="${esc(frame.path)}" style="display:inline-block; margin:8px 16px 0 0;">${hidden(fields)}<button type="submit" style="${style}">${esc(label)}</button></form>`;
+}
+
+/*
+ * What a row offers: its rename form or its removal's confirmation when the page was opened for one, else a Rename link
+ * and a Remove button. While the project does not accept passkeys a row offers only Remove: a name helps nobody choose
+ * a passkey that cannot sign in.
+ */
+function passkeyActions(
+	row: PasskeyRowView,
+	frame: PageFrame,
+	view: PasskeysView,
+	xsrf: string
+): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const renames = view.state !== 'stopped';
+	if (view.removing === row.id) {
+		return [
+			`<p style="margin:8px 0 0;"><strong style="overflow-wrap:anywhere;">${html(T.passkeyRemoveTitle, { name: row.name })}</strong></p>`,
+			`<p style="margin:4px 0 0;">${html(T.passkeyRemoveEffect, { service: frame.service })}</p>`,
+			passkeyForm(
+				frame,
+				{ action: 'passkey_remove', xsrf, passkey: row.id },
+				T.passkeyRemoveButton,
+				BUTTON
+			),
+			`<a href="${esc(frame.path)}" style="${LINK}">${esc(T.cancel)}</a>`
+		].join('');
+	}
+	if (renames && view.renaming === row.id) {
+		const field = `passkey-name-${row.id}`;
+		return [
+			`<form method="post" action="${esc(frame.path)}" style="margin:8px 0 0;">${hidden({ action: 'passkey_rename', xsrf, passkey: row.id })}`,
+			`<label for="${esc(field)}" style="display:block; margin-bottom:4px;">${esc(T.passkeyNameLabel)}</label>`,
+			`<input id="${esc(field)}" name="name" value="${esc(row.name)}" maxlength="64" required style="font-size:16px; min-height:32px; padding:0 8px; border:1px solid ${foxVar('field-border')}; border-radius:6px; width:100%; max-width:24em; box-sizing:border-box;"/>`,
+			`<p style="margin:8px 0 0;"><button type="submit" style="${PRIMARY}">${esc(T.passkeySave)}</button> <a href="${esc(frame.path)}" style="${LINK}">${esc(T.cancel)}</a></p>`,
+			`</form>`
+		].join('');
+	}
+	return [
+		renames
+			? `<a href="${esc(`${frame.path}?rename=${encodeURIComponent(row.id)}`)}" style="${LINK} margin:8px 16px 0 0;">${esc(T.passkeyRename)}</a>`
+			: '',
+		passkeyForm(
+			frame,
+			{ action: 'passkey_remove_start', xsrf, passkey: row.id },
+			T.passkeyRemove,
+			BUTTON
+		)
+	].join('');
+}
+
+function passkeyRow(
+	row: PasskeyRowView,
+	frame: PageFrame,
+	view: PasskeysView,
+	xsrf: string
+): string {
+	const { language } = frame;
+	const T = ACCOUNT_TEXTS[language];
+	const day = (date: Date) => formatDate(language, date.getTime());
+	const via = {
+		passkey: T.passkeyViaPasskey,
+		password_code: T.passkeyViaCode,
+		password_mail: T.passkeyViaMail
+	}[row.via];
+	const facts = [
+		text(T.passkeyCreated, { date: day(row.createdAt) }),
+		row.lastUsedAt
+			? text(T.passkeyLastUsed, { date: day(row.lastUsedAt) })
+			: T.passkeyNeverUsed,
+		row.synced ? T.passkeySynced : T.passkeyThisDevice,
+		via
+	];
+	const mark =
+		row.mark === 'oldAddress'
+			? text(T.passkeyOldAddress, { service: frame.service })
+			: row.mark === 'copied'
+				? T.passkeyCopied
+				: undefined;
+	return [
+		`<li style="margin:0 0 12px;">`,
+		`<strong style="overflow-wrap:anywhere;">${esc(row.name)}</strong><br/>`,
+		`<span style="${MUTED}">${facts.map((fact) => esc(fact)).join(' · ')}</span>`,
+		mark
+			? `<br/><span style="color:${foxVar('danger-text')};">${esc(mark)}</span>`
+			: '',
+		`<div>${passkeyActions(row, frame, view, xsrf)}</div>`,
+		`</li>`
+	].join('');
+}
+
+function passkeysBody(
+	frame: PageFrame,
+	view: PasskeysView,
+	xsrf: string
+): string {
+	const T = ACCOUNT_TEXTS[frame.language];
+	const values = { service: frame.service, email: frame.email };
+	const list =
+		view.rows.length > 0
+			? `<ul style="list-style:none; padding:0; margin:8px 0;">${view.rows.map((row) => passkeyRow(row, frame, view, xsrf)).join('')}</ul>` +
+				(view.removeSent
+					? `<p>${html(T.passkeyRemoveSent, { email: frame.email })}</p>`
+					: '')
+			: '';
+	const intro = `<p>${esc(T.passkeysExplain)}</p>`;
+	switch (view.state) {
+		case 'stopped':
+			return list + `<p>${html(T.passkeysStopped, values)}</p>`;
+		case 'providerOnly':
+			return view.providers.length > 0
+				? `<p>${html(T.passkeysProviderOnly, { provider: formatList(frame.language, view.providers) })}</p>`
+				: `<p>${esc(T.passkeysNoPassword)}</p>`;
+		case 'noMail':
+			return list + `<p>${html(T.passkeysNoMail, values)}</p>`;
+		case 'unconfirmed':
+			return list + `<p>${esc(T.passkeysUnconfirmed)}</p>`;
+		case 'full':
+			return list + `<p>${esc(T.passkeysFull)}</p>`;
+		case 'start':
+			return (
+				(list || intro) +
+				securityForm(frame, xsrf, 'passkey_start', T.passkeyAdd, PRIMARY)
+			);
+		case 'sent':
+			return [
+				list,
+				`<p>${html(T.passkeysSent, values)}</p>`,
+				securityForm(frame, xsrf, 'passkey_start', T.securityResend, PRIMARY)
+			].join('');
+		case 'add':
+			/*
+			 * The page's one script (research R12): an external file, so no inline script; the options and the words it
+			 * may show travel as attributes of the form it reads. Without scripts the button stays disabled and the
+			 * sentence beside it says why; everything else on the page is a plain form.
+			 */
+			return [
+				list || intro,
+				`<form method="post" action="${esc(frame.path)}" data-passkey-add data-options="${esc(view.options)}" data-text-exists="${esc(T.passkeyExists)}" data-text-failed="${esc(T.passkeyAddFailed)}" data-text-no-uv="${esc(T.passkeyNoUserVerification)}" style="margin-top:8px;">`,
+				hidden({ action: 'passkey_add', xsrf, credential: '' }),
+				`<button type="button" disabled style="${PRIMARY}">${esc(T.passkeyAdd)}</button>`,
+				`<p data-passkey-status role="status" style="${MUTED}">${esc(T.passkeyNeedsScript)}</p>`,
+				`</form>`,
+				`<script src="${esc(view.script)}"></script>`
+			].join('');
+	}
+}
+
 export function securityPage(
 	frame: PageFrame,
 	nav: AccountNav,
 	view: SecurityView,
 	xsrf: string,
-	notice?: SecurityNotice
+	notice?: SecurityNotice,
+	passkeys?: PasskeysView
 ): Response {
 	const T = ACCOUNT_TEXTS[frame.language];
 	const box = notice
@@ -778,6 +974,10 @@ export function securityPage(
 		`<p style="margin:0 0 8px; overflow-wrap:anywhere;">${htmlWith(T.signedInAs, { email: `<strong>${esc(frame.email)}</strong>` })} · <a href="${esc(frame.signOutHref)}" style="${LINK}">${esc(T.signOut)}</a></p>`,
 		`<nav style="margin:0 0 8px;">${navLine(frame, nav)}</nav>`,
 		`<div role="status">${box}</div>`,
+		passkeys
+			? `<h2 style="font-size:20px; margin:24px 0 8px;">${esc(T.passkeysTitle)}</h2>${passkeysBody(frame, passkeys, xsrf)}`
+			: '',
+		`<h2 style="font-size:20px; margin:24px 0 8px;">${esc(T.twoStepTitle)}</h2>`,
 		securityBody(frame, view, xsrf)
 	].join('');
 	const response = page(T.securityTitle, body, 200, {
@@ -823,6 +1023,88 @@ export function disownOutcomePage(
 		removed ? 200 : 400,
 		{ language }
 	);
+}
+
+/*
+ * "This wasn't me" about an added passkey (specs/139 research R16). Opening the link shows only this; the form's POST
+ * is the act, so a mail scanner following the link changes nothing. No session is needed.
+ */
+export function passkeyDisownConfirmPage(
+	language: Language,
+	path: string,
+	fields: { token: string; project?: string },
+	email: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const response = page(
+		text(T.passkeyDisownTitle, { email }),
+		[
+			`<h1 style="font-size:20px; margin:0 0 8px; overflow-wrap:anywhere;">${html(T.passkeyDisownTitle, { email })}</h1>`,
+			`<p>${esc(T.passkeyDisownEffect)}</p>`,
+			`<form method="post" action="${esc(path)}">${hidden(fields)}<button type="submit" style="${BUTTON}">${esc(T.disownButton)}</button></form>`
+		].join(''),
+		200,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export function passkeyDisownGonePage(
+	language: Language,
+	service: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const response = page(
+		T.disownNothingTitle,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.disownNothingTitle)}</h1><p>${html(T.passkeyDisownNothing, { service })}</p>`,
+		400,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+/*
+ * The outcome: the passkeys are gone; whether every session ended; and, where the person has a password, that it must
+ * change now, with whether the reset mail went.
+ */
+export function passkeyDisownDonePage(
+	language: Language,
+	outcome: {
+		done: boolean;
+		service: string;
+		email: string;
+		forgot: string;
+		mail: 'sent' | 'refused' | 'none';
+	}
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const title = outcome.done ? T.passkeyDisownDoneTitle : T.signOutFailedTitle;
+	const values = {
+		service: outcome.service,
+		email: outcome.email,
+		forgot: outcome.forgot
+	};
+	const parts = outcome.done
+		? [
+				`<p>${esc(T.passkeyDisownDone)}</p>`,
+				...(outcome.mail === 'none'
+					? []
+					: [
+							`<p>${esc(T.passkeyDisownPassword)}</p>`,
+							`<p style="overflow-wrap:anywhere;">${html(outcome.mail === 'sent' ? T.signOutDoneMail : T.signOutDoneNoMail, values)}</p>`
+						])
+			]
+		: [`<p>${esc(T.signOutFailed)}</p>`];
+	const response = page(
+		title,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1>${parts.join('')}`,
+		outcome.done ? 200 : 500,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
 }
 
 // ---------------------------------------------------------------- "This wasn't me" about a new sign-in (specs/138)
@@ -917,6 +1199,8 @@ function methodWords(row: OwnSignIn, T: AccountTexts): string {
 			return T.methodPassword;
 		case 'password_code':
 			return T.methodPasswordCode;
+		case 'passkey':
+			return T.methodPasskey;
 		case 'provider':
 			return row.provider
 				? text(T.methodProvider, { provider: row.provider })

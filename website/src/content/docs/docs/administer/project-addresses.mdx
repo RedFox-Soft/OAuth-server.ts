@@ -133,6 +133,11 @@ The project keeps its slug, its signing keys, its end users, its applications, i
 trail records the change with the old and the new address in full, so a path `acme` and a subdomain `acme` are
 told apart.
 
+Passkeys belong to the host they were made at. A move between a path, a subdomain and a hostname leaves people's
+passkeys behind: they are listed as made for an old address, and people add new ones. A new path keeps them working,
+since every path shares the server's host. See
+[Let people sign in with a passkey](/docs/get-started/let-people-sign-in-with-a-passkey/#address).
+
 An owner of the project's team may change the address between the forms the setting allows, while no
 application, identity provider, SCIM connection or connected service depends on the project. Otherwise only a super administrator
 may. Only a super administrator gives a project a hostname.
@@ -165,7 +170,8 @@ reached its subdomain yet. Until one has, check the record and the certificate f
 
 A subdomain project's issuer is built from the instance's host. If you change `ISSUER`, every subdomain
 project's issuer changes with it, just as every path project's does. Treat it as a breaking change for every
-such project.
+such project. Passkeys belong to the host they were made at, so when the host changes people add new ones: see
+[Let people sign in with a passkey](/docs/get-started/let-people-sign-in-with-a-passkey/#address).
 
 </Aside>
 

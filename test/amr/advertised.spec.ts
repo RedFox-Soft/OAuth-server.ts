@@ -3,8 +3,11 @@ import { Type } from '@sinclair/typebox';
 import bootstrap from '../test_helper.ts';
 import { AuthorizationRequest } from '../AuthorizationRequest.ts';
 import { configStore, resetAdminMemoryStores } from 'lib/adapters/index.ts';
-import { ACR_DISTINCTIONS } from 'lib/consts/acr.ts';
-import { AMR_FOR_DISTINCTION } from 'lib/consts/amr.ts';
+import {
+	AMR_FOR_METHOD,
+	DISTINCTION_FOR_METHOD,
+	SIGN_IN_METHODS
+} from 'lib/consts/amr.ts';
 import { shaped } from 'test/shape.ts';
 import {
 	discoveryDocument,
@@ -61,8 +64,9 @@ async function supportedClaims() {
 
 /**
  * @proves A relying party can discover that the server reports authentication methods on every
- * instance — including one whose operator saved a claims setting before it did — and every method
- * the server reports is one the registry defines.
+ * instance — including one whose operator saved a claims setting before it did — every method
+ * the server reports is one the registry defines, and `mfa` is reported exactly with the
+ * multi-factor context, whichever way the person signed in.
  */
 describe('what the server says about authentication methods', () => {
 	let plainBucketId: string;
@@ -101,11 +105,20 @@ describe('what the server says about authentication methods', () => {
 		expect(amrOf(token)).toEqual(['pwd']);
 	});
 
-	it('reports, for every authentication context distinction, only registered methods', () => {
-		for (const distinction of ACR_DISTINCTIONS) {
-			for (const method of AMR_FOR_DISTINCTION[distinction]) {
-				expect(REGISTERED.has(method), `${distinction}: ${method}`).toBe(true);
+	it('reports, for every way of signing in, only registered methods', () => {
+		for (const way of SIGN_IN_METHODS) {
+			for (const method of AMR_FOR_METHOD[way]) {
+				expect(REGISTERED.has(method), `${way}: ${method}`).toBe(true);
 			}
+		}
+	});
+
+	// A relying party reads `mfa` as "two factors": it may appear only where the context says so, and must appear there.
+	it('reports mfa, for every way of signing in, exactly when that way reports the multi-factor context', () => {
+		for (const way of SIGN_IN_METHODS) {
+			expect(AMR_FOR_METHOD[way].includes('mfa'), way).toBe(
+				DISTINCTION_FOR_METHOD[way] === 'multi_factor'
+			);
 		}
 	});
 });

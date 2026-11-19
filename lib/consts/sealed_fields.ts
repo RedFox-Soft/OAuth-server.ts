@@ -216,6 +216,14 @@ export const DECLARED_PLAINTEXT: readonly { field: string; reason: string }[] =
 			field: 'digest',
 			reason:
 				"the SHA-256 of a project's proxy key (specs/124 research R5): a digest of 256 random bits, already irreversible, and only ever compared"
+		},
+		/*
+		 * A passkey's public key (specs/139): what a signature is checked against, never what makes one. The record's
+		 * "This wasn't me" secret is never stored, only its digest.
+		 */
+		{
+			field: 'publicKey',
+			reason: 'a public key: a copy grants nothing'
 		}
 	];
 

@@ -170,7 +170,15 @@ export const User = t.Object({
 		t.Array(t.Object({ serviceId: t.String(), upstreamId: t.String() }), {
 			maxItems: 50
 		})
-	)
+	),
+	/*
+	 * The user handle this account's passkeys are made for (specs/139 research R6): 32 random bytes, base64url,
+	 * written by `lib/end_users/service.ts` when the first add is prepared and never changed afterwards. Never the
+	 * account id or the address, which a device would otherwise hand to anyone who asks it (FR-009), and different per
+	 * account, so two accounts of one person in two projects never share it. Barred from administrative reads by
+	 * `presentUser`; never in a token, an event, a log line or an audit entry.
+	 */
+	webauthnUserId: t.Optional(t.String({ minLength: 43, maxLength: 43 }))
 });
 export type User = Static<typeof User>;
 
@@ -294,6 +302,8 @@ export type EndUserPatch = Partial<
 		| 'passwordSet'
 		/* Only `lib/end_users/service.ts` writes it, for the person's own disconnect and reconnect (specs/120). */
 		| 'connectionsDeclined'
+		/* Only `lib/end_users/service.ts` writes it, once, when a person's first passkey add is prepared (specs/139). */
+		| 'webauthnUserId'
 	>
 >;
 
@@ -2523,6 +2533,11 @@ export const ACTIVITY_REASONS = [
 	'insufficient_scope',
 	/* An app behind the proxy or an API checked at it let the person through (specs/134). */
 	'used',
+	/*
+	 * A known account's passkey failed at the sign-in door (specs/139): its signature, its counter or its mark. Never noted
+	 * for an unknown passkey, whose account nobody knows.
+	 */
+	'passkey_refused',
 	'other'
 ] as const;
 export type ActivityReason = (typeof ACTIVITY_REASONS)[number];
@@ -2589,7 +2604,9 @@ export const PersonActivityRow = t.Object({
 		t.Union([
 			t.Literal('password'),
 			t.Literal('password_code'),
-			t.Literal('provider')
+			t.Literal('provider'),
+			/* Read from the sign-in's `amr` holding `pop` (specs/139), before its context. */
+			t.Literal('passkey')
 		])
 	),
 	freshness: t.Optional(
@@ -2700,6 +2717,142 @@ export interface PersonActivityStoreInstance {
 
 export interface PersonActivityStoreConstructor {
 	new (): PersonActivityStoreInstance;
+}
+
+/* The transports WebAuthn Level 3 defines; a browser's other values are dropped, never stored (specs/139). */
+export const PASSKEY_TRANSPORTS = [
+	'usb',
+	'nfc',
+	'ble',
+	'internal',
+	'hybrid',
+	'cable',
+	'smart-card'
+] as const;
+export type PasskeyTransport = (typeof PASSKEY_TRANSPORTS)[number];
+
+/*
+ * A name a person gave a passkey: 1–64 characters, trimmed (no white space at either end), no control characters.
+ * A mail never carries it (specs/139 research R17): someone who added a passkey could name it to mislead.
+ */
+const PASSKEY_NAME_PATTERN =
+	'^[^\\s\\x00-\\x1F\\x7F](?:[^\\x00-\\x1F\\x7F]*[^\\s\\x00-\\x1F\\x7F])?$';
+
+/*
+ * One passkey of one person in one project (specs/139 data-model). Its own store area rather than a list on the
+ * person, because the counter and `lastUsedAt` change at every sign-in, and a list read and written back is what
+ * AGENTS.md forbids. Unowned (lib/consts/storage_inventory.ts): a person keeps passkeys through a lock and a sign-out
+ * everywhere, so the paths that delete a person, a project or an unproven account remove them by hand.
+ */
+export const Passkey = t.Object({
+	/* 22 random base64url characters: the id in URLs and forms, never the credential id. */
+	_id: t.String({ minLength: 22, maxLength: 22 }),
+	bucketId: t.String(),
+	accountId: t.String(),
+	/* base64url; at most 1023 bytes (WebAuthn §5.1). Unique with `bucketId`. */
+	credentialId: t.String({
+		minLength: 1,
+		maxLength: 1366,
+		pattern: '^[A-Za-z0-9_-]+$'
+	}),
+	/* The COSE public key, base64url. A public key: a copy grants nothing (lib/consts/sealed_fields.ts). */
+	publicKey: t.String({ minLength: 1, maxLength: 4096 }),
+	/* The RP ID the passkey was made for; compared with the project's current one at every use. */
+	rpId: t.String(),
+	/* The signature counter last accepted; written only by `recordUse`. */
+	counter: t.Integer({ minimum: 0 }),
+	/* The BE flag at creation: "can be synced". */
+	backupEligible: t.Boolean(),
+	/* The BS flag, refreshed at every use: "is synced". */
+	backedUp: t.Boolean(),
+	transports: t.Array(
+		t.Union(PASSKEY_TRANSPORTS.map((transport) => t.Literal(transport))),
+		{ maxItems: 8 }
+	),
+	/* As declared by the device, in UUID form; stored, never trusted or shown in this release. */
+	aaguid: t.String(),
+	createdAt: t.Date(),
+	/* The proof the add was made under (FR-026). */
+	createdVia: t.Union([
+		t.Literal('passkey'),
+		t.Literal('password_code'),
+		t.Literal('password_mail')
+	]),
+	/* The browser and system it was made on, from closed sets: the default name, and what a mail says. */
+	createdOn: t.Object({ browser: ActivityBrowser, system: ActivitySystem }),
+	name: t.Optional(
+		t.String({ minLength: 1, maxLength: 64, pattern: PASSKEY_NAME_PATTERN })
+	),
+	lastUsedAt: t.Optional(t.Date()),
+	/* Set when a use reported a lower counter (FR-015); while set, the passkey is refused for good. */
+	copiedAt: t.Optional(t.Date()),
+	/*
+	 * "This wasn't me" (specs/139 research R16): the sha256 hex of the mailed secret and its end (epoch seconds),
+	 * cleared once spent. On the passkey rather than in an account-owned area, so a sign-out everywhere by whoever
+	 * added it cannot kill the owner's link.
+	 */
+	notMe: t.Optional(t.Object({ digest: t.String(), exp: t.Number() }))
+});
+export type Passkey = Static<typeof Passkey>;
+
+/*
+ * People's passkeys (specs/139). Every read is scoped to a project, so a record of another project reads as absent.
+ * The conditional writes are single statements on every backend, so two racing writers cannot both win.
+ */
+export interface PasskeyStoreInstance {
+	/* Inserts; a passkey with the same credential id in the project answers 'exists' and writes nothing. */
+	create(record: Passkey): Promise<'created' | 'exists'>;
+	findByCredential(
+		bucketId: string,
+		credentialId: string
+	): Promise<Passkey | null>;
+	find(bucketId: string, id: string): Promise<Passkey | null>;
+	listOf(bucketId: string, accountId: string): Promise<Passkey[]>;
+	countOf(bucketId: string, accountId: string): Promise<number>;
+	/*
+	 * A sign-in's use: writes the counter, `lastUsedAt` and `backedUp` only where the stored counter is lower than the
+	 * new one, or both are zero, and the passkey is not marked copied. Answers whether it wrote; losing the race
+	 * refuses the sign-in (specs/139 research R5).
+	 */
+	recordUse(
+		bucketId: string,
+		id: string,
+		use: { counter: number; backedUp: boolean; at: Date }
+	): Promise<boolean>;
+	/* Sets `copiedAt` once; a later call keeps the first time. */
+	markCopied(bucketId: string, id: string, at: Date): Promise<void>;
+	rename(
+		bucketId: string,
+		accountId: string,
+		id: string,
+		name: string | undefined
+	): Promise<boolean>;
+	/* Answers whether it removed. */
+	remove(bucketId: string, accountId: string, id: string): Promise<boolean>;
+	/* Every passkey of the person created at or after `since`; answers how many went. */
+	removeAddedSince(
+		bucketId: string,
+		accountId: string,
+		since: Date
+	): Promise<number>;
+	removeAllOf(bucketId: string, accountId: string): Promise<number>;
+	removeAllIn(bucketId: string): Promise<number>;
+	/*
+	 * "This wasn't me": clears `notMe` only where its digest is `digest` and `exp > now` (epoch seconds). Answers
+	 * whether it did, so one link acts once even when two requests race.
+	 */
+	spendNotMe(
+		bucketId: string,
+		id: string,
+		digest: string,
+		now: number
+	): Promise<boolean>;
+	/* The distinct people of the project holding at least one passkey: the turn-off preview's count (R21). */
+	holdersIn(bucketId: string): Promise<string[]>;
+}
+
+export interface PasskeyStoreConstructor {
+	new (): PasskeyStoreInstance;
 }
 
 /*
@@ -3102,6 +3255,12 @@ export const UserBucket = t.Object({
 	 * off, except for the administrators' project, where absent means on: read it only through `alertsOn`.
 	 */
 	newSignInAlerts: t.Optional(t.Boolean()),
+	/*
+	 * Whether the project's people may sign in with a passkey and add passkeys on their own account page (specs/139).
+	 * Absent means off. Read only through `passkeysAccepted` (lib/passkeys/relying_party.ts), which also keeps it off
+	 * for the administrators' project. Turning it off deletes no passkey; on again, every one works again.
+	 */
+	passkeyLogin: t.Optional(t.Boolean()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -3193,6 +3352,7 @@ export interface UserBucketStoreInstance {
 				| 'passwordGuessing'
 				| 'totpSelfService'
 				| 'newSignInAlerts'
+				| 'passkeyLogin'
 			>
 		>
 	): Promise<UserBucket | null>;

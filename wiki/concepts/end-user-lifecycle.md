@@ -4,7 +4,7 @@ title: 'End-user lifecycle: ending access, the local lock, provisioned users'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-10-06
-updated: 2026-11-16
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
@@ -46,7 +46,10 @@ person themselves from Recent sign-ins (`signOutOwnAccount`, recorded as `enduse
    swept: they are rate limits, not access, and clearing a login throttle on an account under attack
    would reset the brute-force counter mid-incident. Nor are a person's **connected accounts** (spec 117):
    that store is declared unowned on purpose so a lock keeps them, and only deleting the person, the service
-   or the project removes them ([[connected-services]]).
+   or the project removes them ([[connected-services]]). Nor are a person's **passkeys** (spec 139): unowned for
+   the same reason, kept through a lock, a deactivation, a sign-out everywhere and a confirmed reset, and removed by
+   hand only by deleting the person, destroying the project, an unconfirmed account's completed reset and an
+   invitation reclaim ([[passkeys]]).
 
 Introspection needed no change: it already answers `active: false` once the grant behind a token is gone
 (`lib/actions/introspection.ts:134`).

@@ -34,6 +34,7 @@ const McpResult = Type.Object({
 		Type.Array(
 			Type.Object({
 				name: Type.String(),
+				description: Type.Optional(Type.String()),
 				inputSchema: Type.Optional(Type.Unknown())
 			})
 		)

@@ -142,7 +142,11 @@ export default {
 				},
 				totp: {
 					title: 'TOTP second factor',
-					body: 'Time-based one-time passwords: a project can require one from everyone, and each person can turn one on for their own account, proved by a link mailed to them. Every change is mailed, with a 72-hour "This was not me" link. One application can require a code on its own, and a person without one sets it up inside the same sign-in. Also available for the admin console.'
+					body: 'Time-based one-time passwords: a project can require one from everyone, and each person can turn one on for their own account, proved by a link mailed to them. Every change is mailed, with a 72-hour "This was not me" link. One application can require two-step sign-in on its own, and a person without a code sets one up inside the same sign-in. Also available for the admin console.'
+				},
+				passkeys: {
+					title: 'Sign in with a passkey',
+					body: 'A project can let people sign in with a fingerprint, face or screen lock instead of a password, from a button or the browser’s autofill. People add passkeys on their own Sign-in and security page, after a two-step sign-in or a password and a link mailed to that browser, and every new one is mailed with a 72-hour "This wasn’t me" link. A passkey works only at the project’s own address, and a passkey sign-in counts as two-step sign-in, so it meets every requirement for a code. Off until you turn it on; free on every plan.'
 				},
 				pairwise: {
 					title: 'Pairwise subject identifiers',
@@ -216,16 +220,16 @@ export default {
 				proxyConditions: {
 					title:
 						'Conditions at your proxy: network, hours, attribute, fresh sign-in',
-					body: 'A path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from your address ranges, opening hours in a time zone you choose, an attribute such as the department, groups for an API, and for an app a sign-in no older than N minutes, with a code from an authenticator app if you ask for one. Conditions only narrow access and add up down the paths. The proxy passes the address it saw with a key of the project, so a browser cannot choose its own. The console checks a case before you save and asks before any change that lets more people in.'
+					body: 'A path of an app behind your proxy, or an API whose tokens your proxy checks, can add conditions: only from or not from your address ranges, opening hours in a time zone you choose, an attribute such as the department, groups for an API, and for an app a sign-in no older than N minutes, with two-step sign-in (a code from an authenticator app, or a passkey) if you ask for one. Conditions only narrow access and add up down the paths. The proxy passes the address it saw with a key of the project, so a browser cannot choose its own. The console checks a case before you save and asks before any change that lets more people in.'
 				},
 				proxyNetworkFacts: {
 					title: 'Network facts at your proxy: Tor, VPNs, hosting, countries',
-					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and looks people's addresses up only in its own copy, so a condition sends no address anywhere. A matching address is refused or, on an app, asked to sign in again, with a code if you ask for one. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
+					body: "With FoxTrust's signed snapshot turned on, a path of an app behind your proxy, or an API your proxy checks, can keep out Tor, commercial VPNs, and hosting or clouds, and let in or keep out chosen countries. Each server downloads about 13 MB a day and an update every hour, checks the signature, and looks people's addresses up only in its own copy, so a condition sends no address anywhere. A matching address is refused or, on an app, asked to sign in again, with two-step sign-in if you ask for it. A snapshot more than 26 hours old closes those paths until a fresh one loads. Free on every plan. Country data: IP Geolocation by DB-IP, CC BY 4.0."
 				},
 				apiSignInRequirement: {
 					title:
-						'An API or MCP server that asks for a code or a recent sign-in',
-					body: 'Any API or MCP server a project declares can require a sign-in with a code from an authenticator app, a sign-in no older than a day, 7 days, 14 days or your own value from 1 hour, or both. FoxAuth issues the tokens, so it asks for the code or the new sign-in itself, whatever the client asked for, and checks it on every way of getting a token for a person, refresh included. A renewal that falls short is refused without spending the refresh token, so the client starts a new sign-in. At your proxy, a token that falls short gets the standard insufficient_user_authentication challenge (RFC 9470). Apps that act for no one and sign-ins by assertion cannot connect. Before you save, the console shows whom it affects. Free on every plan.'
+						'An API or MCP server that asks for two-step sign-in or a recent one',
+					body: 'Any API or MCP server a project declares can require two-step sign-in (a code from an authenticator app, or a passkey), a sign-in no older than a day, 7 days, 14 days or your own value from 1 hour, or both. FoxAuth issues the tokens, so it asks for the code or the new sign-in itself, whatever the client asked for, and checks it on every way of getting a token for a person, refresh included. A renewal that falls short is refused without spending the refresh token, so the client starts a new sign-in. At your proxy, a token that falls short gets the standard insufficient_user_authentication challenge (RFC 9470). Apps that act for no one and sign-ins by assertion cannot connect. Before you save, the console shows whom it affects. Free on every plan.'
 				},
 				apiToolConditions: {
 					title: 'Conditions on one MCP tool',

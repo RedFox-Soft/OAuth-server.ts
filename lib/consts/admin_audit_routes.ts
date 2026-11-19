@@ -946,7 +946,14 @@ const nonRouteActions = [
 	{ action: 'enduser.totp.enrol', targetType: 'EndUser' },
 	{ action: 'enduser.totp.replace', targetType: 'EndUser' },
 	{ action: 'enduser.totp.remove', targetType: 'EndUser' },
-	{ action: 'enduser.totp.disown', targetType: 'EndUser' }
+	{ action: 'enduser.totp.disown', targetType: 'EndUser' },
+	/*
+	 * A person's own passkeys (specs/139), from the account page or the "This wasn't me" link; no admin route does these
+	 * in this release. Renaming one is not audited: it is the person's own label.
+	 */
+	{ action: 'enduser.passkey.add', targetType: 'EndUser' },
+	{ action: 'enduser.passkey.remove', targetType: 'EndUser' },
+	{ action: 'enduser.passkey.disown', targetType: 'EndUser' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {

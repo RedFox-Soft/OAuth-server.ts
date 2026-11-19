@@ -4,7 +4,7 @@ title: 'Hardening headers on responses that are not pages'
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-08-26
-updated: 2026-10-26
+updated: 2026-11-19
 graph:
   node_type: concept
   relationships:
@@ -111,11 +111,12 @@ their own edge. There is no `runbooks/` page for this, so it is recorded here.
 
 ## Gotcha: `clipboard-write` is missing from `Permissions-Policy` on purpose
 
-The policy denies 17 features outright — `accelerometer`, `autoplay`, `camera`, `display-capture`,
+The policy denies 16 features outright — `accelerometer`, `autoplay`, `camera`, `display-capture`,
 `encrypted-media`, `fullscreen`, `geolocation`, `gyroscope`, `magnetometer`, `microphone`, `midi`,
-`payment`, `picture-in-picture`, `publickey-credentials-get`, `screen-wake-lock`, `usb`,
-`xr-spatial-tracking` — each with the empty allow-list `()`, which denies the feature even to this
-origin. That is the right strength because no page here uses any of them.
+`payment`, `picture-in-picture`, `screen-wake-lock`, `usb`, `xr-spatial-tracking` — each with the empty
+allow-list `()`, which denies the feature even to this origin. That is the right strength because no page
+here uses any of them. Since spec 139 it also grants `publickey-credentials-create=(self)` and
+`publickey-credentials-get=(self)` (`lib/plugins/securityHeaders.ts:109`): see below.
 
 `clipboard-write` is **not** on that list and must not be added. Five surfaces copy a value to the
 clipboard, one of them an end-user page: the TOTP enrolment secret (`lib/interactions/totpPage.tsx`),
@@ -127,9 +128,13 @@ to fail on the browser release that finally removes it — long after the change
 `test/security_headers/security_headers.spec.ts` asserts the absence by name so the reasoning is
 enforced rather than merely written down.
 
-`publickey-credentials-get` **is** denied, with eyes open: there is no WebAuthn in the server today,
-and a future passkey feature must remove the directive. Safe to deny now precisely because its failure
-mode is loud — a rejected promise, not a silent downgrade.
+`publickey-credentials-get` was denied until spec 139 (2026-11-19), with eyes open, while the server had no
+WebAuthn. It is now granted to this origin only, together with `publickey-credentials-create`: the sign-in
+page asks for a passkey and the person's own page adds one ([[passkeys]]). Granted on every response rather
+than per page (an owner's decision): a script already running in this origin could navigate to the sign-in
+page anyway, and `frame-ancestors 'none'` keeps another origin from framing any page. Each served origin is
+its own `self`, so a host or subdomain project's pages grant only to that project's origin.
+`test/security_headers/profile.ts` restates the value.
 
 The maximal list was rejected. `ambient-light-sensor`, `battery`, `document-domain`,
 `execution-while-*`, `keyboard-map`, `navigation-override`, `sync-xhr`, `web-share` are each removed

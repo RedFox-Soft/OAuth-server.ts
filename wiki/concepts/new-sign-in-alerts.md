@@ -4,7 +4,7 @@ title: "An email about a sign-in from a new network or browser"
 tags: [architecture, contract, security, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-11-18
-updated: 2026-11-18
+updated: 2026-11-19
 ---
 
 # An email about a sign-in from a new network or browser
@@ -51,7 +51,8 @@ last 90 days (`listForPerson`, limit 500, plus earlier rows of the same flush) t
 ## The email
 
 `lib/mail/templates/new_sign_in.ts`, texts `EMAIL_TEXTS[language].newSignIn` in three languages, language
-`emailLanguage(user)`. One fact a line: when (UTC), the application, how, the browser on the system (the account
+`emailLanguage(user)`. One fact a line: when (UTC), the application, how ("Passkey" for a passkey sign-in since
+spec 139, read from `amr`, [[passkeys]]), the browser on the system (the account
 page's tables, moved to `lib/person_activity/sign_in_words.ts`), city, region and country, and the network owner. Never
 the address, as the person's own Recent sign-ins page ([[connected-apps-page]]). The administrators' project is called
 "the FoxAuth console".

@@ -191,8 +191,8 @@ export const zhHans: PlainTexts = {
 			reason: '原因：{reason}，时间：{time}'
 		},
 		codeNeeded: {
-			title: '{host} 的此页面需要身份验证器应用中的验证码',
-			body: '您没有使用验证码登录就返回了。{host} 的其他页面可能仍可打开。',
+			title: '{host} 的此页面需要两步登录',
+			body: '您没有完成两步登录就返回了。{host} 的其他页面可能仍可打开。',
 			open: '打开 {host}',
 			reason: '原因：{reason}，时间：{time}'
 		},

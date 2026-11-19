@@ -38,6 +38,8 @@ interface Values {
 	count: number;
 	requireCode: boolean;
 	asking: string | null;
+	/* What the refused person proved at the door: a refusal row carries `method` only for the passkey door. */
+	proof: 'password' | 'passkey';
 }
 
 const OUTCOMES: Record<PersonActivityRow['outcome'], string> = {
@@ -51,10 +53,10 @@ const toolOr = (v: Values, fallback: string) => v.tool ?? fallback;
 const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	signed_in: () => 'Let in',
 	wrong_password: () => 'Wrong password',
-	locked: () => 'Right password, but the account is locked',
-	deactivated: () => 'Right password, but the account is deactivated',
-	email_unverified: () =>
-		'Right password, but the email address isn’t verified',
+	locked: (v) => `Right ${v.proof}, but the account is locked`,
+	deactivated: (v) => `Right ${v.proof}, but the account is deactivated`,
+	email_unverified: (v) =>
+		`Right ${v.proof}, but the email address isn’t verified`,
 	wrong_code: () => 'Wrong code from the authenticator app',
 	code_required: (v) =>
 		v.kind === 'api'
@@ -89,6 +91,8 @@ const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	old_client: () => 'App too old to name its tool',
 	bad_mcp_header: () => 'The app sent a malformed MCP header',
 	insufficient_scope: (v) => `Without the permission ${toolOr(v, v.api)} needs`,
+	passkey_refused: () =>
+		'A passkey that did not verify, or one that may have been copied',
 	used: (v) =>
 		v.kind === 'api' ? `${v.api} through ${v.client}` : `Used ${v.app}`,
 	other: (v) => `Not recorded one by one: ${String(v.count)} more`
@@ -105,9 +109,13 @@ function fill(text: string, values: Record<string, string>): string {
 function sawTextOf(reason: ActivityReason, v: Values): string | null {
 	const signIn = SIGN_IN_TEXTS.en;
 	switch (reason) {
-		case 'wrong_password':
 		case 'locked':
 		case 'deactivated':
+			/* The passkey door says the account cannot sign in, with no word about a password (specs/139 FR-014). */
+			if (v.proof === 'passkey')
+				return fill(signIn.errors.passkeyAccount, { service: 'the project' });
+			return signIn.errors.invalidCredentials;
+		case 'wrong_password':
 			return signIn.errors.invalidCredentials;
 		case 'wrong_code':
 			return signIn.errors.invalidCode;
@@ -121,6 +129,8 @@ function sawTextOf(reason: ActivityReason, v: Values): string | null {
 				: null;
 		case 'provider_closed':
 			return PLAIN_TEXTS.en.federation.inactive.title;
+		case 'passkey_refused':
+			return fill(signIn.errors.passkeyRefused, { service: 'the project' });
 		default:
 			return null;
 	}
@@ -129,6 +139,7 @@ function sawTextOf(reason: ActivityReason, v: Values): string | null {
 const METHODS: Record<NonNullable<PersonActivityRow['method']>, string> = {
 	password: 'Password',
 	password_code: 'Password and a code from an authenticator app',
+	passkey: 'Passkey',
 	provider: 'Through {provider}'
 };
 
@@ -193,7 +204,8 @@ export function wordsOf(row: PersonActivityRow, names: PlaceNames): RowWords {
 		provider: names.provider ?? 'a provider',
 		count: row.count,
 		requireCode: row.freshness?.requireCode === true,
-		asking: names.asking ?? null
+		asking: names.asking ?? null,
+		proof: row.method === 'passkey' ? 'passkey' : 'password'
 	};
 	return {
 		outcome: OUTCOMES[row.outcome],
@@ -222,6 +234,7 @@ export function reasonWords(
 		api: 'The API',
 		client: 'an application',
 		rule: 'this path',
+		proof: 'password',
 		tool: null,
 		provider: 'a provider',
 		count: 0,

@@ -10,6 +10,7 @@ import {
 	OutsideAuthorizationServerStore as MemoryOutsideAuthorizationServerStore,
 	BehindProxyAppStore as MemoryBehindProxyAppStore,
 	ConnectedAccountStore as MemoryConnectedAccountStore,
+	PasskeyStore as MemoryPasskeyStore,
 	BucketGroupStore as MemoryBucketGroupStore,
 	ContainerOwnershipStore as MemoryContainerOwnershipStore,
 	ActivityStore as MemoryActivityStore,
@@ -61,6 +62,8 @@ import type {
 	BehindProxyAppStoreInstance,
 	ConnectedAccountStoreConstructor,
 	ConnectedAccountStoreInstance,
+	PasskeyStoreConstructor,
+	PasskeyStoreInstance,
 	BucketGroupStoreConstructor,
 	BucketGroupStoreInstance,
 	ContainerOwnershipStoreConstructor,
@@ -130,6 +133,7 @@ let BehindProxyAppStoreClass: BehindProxyAppStoreConstructor =
 	MemoryBehindProxyAppStore;
 let ConnectedAccountStoreClass: ConnectedAccountStoreConstructor =
 	MemoryConnectedAccountStore;
+let PasskeyStoreClass: PasskeyStoreConstructor = MemoryPasskeyStore;
 let BucketGroupStoreClass: BucketGroupStoreConstructor = MemoryBucketGroupStore;
 let BucketKeysStoreClass: BucketKeysStoreConstructor = MemoryBucketKeysStore;
 let ContainerOwnershipStoreClass: ContainerOwnershipStoreConstructor =
@@ -196,6 +200,7 @@ if (backend === 'postgres') {
 		postgres.OutsideAuthorizationServerStore;
 	BehindProxyAppStoreClass = postgres.BehindProxyAppStore;
 	ConnectedAccountStoreClass = postgres.ConnectedAccountStore;
+	PasskeyStoreClass = postgres.PasskeyStore;
 	BucketGroupStoreClass = postgres.BucketGroupStore;
 	ContainerOwnershipStoreClass = postgres.ContainerOwnershipStore;
 	ActivityStoreClass = postgres.ActivityStore;
@@ -239,6 +244,7 @@ if (backend === 'mongodb') {
 		mongodb.OutsideAuthorizationServerStore;
 	BehindProxyAppStoreClass = mongodb.BehindProxyAppStore;
 	ConnectedAccountStoreClass = mongodb.ConnectedAccountStore;
+	PasskeyStoreClass = mongodb.PasskeyStore;
 	BucketGroupStoreClass = mongodb.BucketGroupStore;
 	ContainerOwnershipStoreClass = mongodb.ContainerOwnershipStore;
 	ActivityStoreClass = mongodb.ActivityStore;
@@ -605,6 +611,16 @@ export function getProvisioningRefusalStore(): ProvisioningRefusalStoreInstance 
 /*
  * A person's activity (specs/133): written only by the flush of lib/person_activity/, read by the person's page.
  */
+/*
+ * People's passkeys (specs/139). Not sealed: a passkey record holds a public key, which grants nothing to whoever
+ * reads it (lib/consts/sealed_fields.ts), and the "This wasn't me" secret only as a digest.
+ */
+let passkeyStoreSingleton: PasskeyStoreInstance | null = null;
+export function getPasskeyStore(): PasskeyStoreInstance {
+	passkeyStoreSingleton ??= new PasskeyStoreClass();
+	return passkeyStoreSingleton;
+}
+
 let personActivityStoreSingleton: PersonActivityStoreInstance | null = null;
 export function getPersonActivityStore(): PersonActivityStoreInstance {
 	personActivityStoreSingleton ??= new PersonActivityStoreClass();
@@ -775,6 +791,7 @@ export function resetStoresForTests(): void {
 	provisioningRefusalStoreSingleton = null;
 	personActivityStoreSingleton = null;
 	outsideAuthorizationServerStoreSingleton = null;
+	passkeyStoreSingleton = null;
 	behindProxyAppStoreSingleton = null;
 	rawConnectedAccountStoreSingleton = null;
 	connectedAccountStoreSingleton = null;

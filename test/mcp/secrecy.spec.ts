@@ -11,7 +11,11 @@ import bootstrap from '../test_helper.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Client } from 'lib/models/client.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
-import { getUserStore, adminAuditStore } from 'lib/adapters/index.ts';
+import {
+	getPasskeyStore,
+	getUserStore,
+	adminAuditStore
+} from 'lib/adapters/index.ts';
 import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.ts';
 import { mcpCatalogue } from 'lib/mcp/catalogue.ts';
@@ -48,7 +52,10 @@ const SECRETS = {
 	 * the one secret an account record carries; an administrator enrolled is what makes a projection
 	 * that forgets it visible here.
 	 */
-	adminTotpSecret: 'SECRETADMINTOTPMARKERJBSWY3DP'
+	adminTotpSecret: 'SECRETADMINTOTPMARKERJBSWY3DP',
+	/* A person's passkey identity (43 characters, as stored) and a passkey's public key (specs/139). */
+	webauthnUserId: 'SECRET-webauthn-user-id-marker-0123456789ab',
+	passkeyPublicKey: 'SECRET-passkey-public-key-marker-5e1f'
 };
 
 const NEWLINE = String.fromCharCode(10);
@@ -145,7 +152,7 @@ async function seedSecretHolders(token: string) {
 		}
 	});
 
-	await rpc(
+	const holder = await rpc(
 		call('project_user_create', {
 			id: bucketId,
 			email: `holder-${Math.random()}@x.io`,
@@ -153,6 +160,36 @@ async function seedSecretHolders(token: string) {
 		}),
 		token
 	);
+	const { _id: holderId } = shaped(
+		Type.Object({ _id: Type.String() }),
+		holder.result?.structuredContent?.result
+	);
+
+	/*
+	 * The person's passkey identity and a passkey's public key (specs/139). Neither is a secret in the sense the others
+	 * are — a public key grants nothing — but no administrative or agent read carries either: the identity is what a
+	 * device hands back, and nothing an administrator does needs it. Written straight to the stores, as the person's
+	 * own page writes them, because no administrative operation adds a passkey.
+	 */
+	await getUserStore(bucketId).update(holderId, {
+		webauthnUserId: SECRETS.webauthnUserId
+	});
+	await getPasskeyStore().create({
+		_id: 'secrecy-passkey-marker',
+		bucketId,
+		accountId: holderId,
+		credentialId: 'c2VjcmVjeS1jcmVkZW50aWFs',
+		publicKey: SECRETS.passkeyPublicKey,
+		rpId: 'e.ly',
+		counter: 0,
+		backupEligible: true,
+		backedUp: true,
+		transports: ['internal'],
+		aaguid: '00000000-0000-0000-0000-000000000000',
+		createdAt: new Date(),
+		createdVia: 'password_code',
+		createdOn: { browser: 'chrome', system: 'windows' }
+	});
 
 	/*
 	 * The issuer is stubbed because creating a provider validates it over the network. Without the stub
@@ -276,6 +313,7 @@ async function seedSecretHolders(token: string) {
 		 */
 		signingKey: longestLine(apple.signingKey),
 		bucketId,
+		holderId,
 		connectionId,
 		connectionSecret,
 		staticToken
@@ -293,8 +331,9 @@ function longestLine(pem: string): string {
 }
 
 /**
- * @proves No secret leaves the agent surface through any read, error path or audit entry, and a
- * client secret is disclosed exactly once at creation.
+ * @proves No secret leaves the agent surface through any read, error path or audit entry, a client
+ * secret is disclosed exactly once at creation, and no read carries a person's passkey identity or a
+ * passkey's key.
  */
 describe('MCP surface leaks no secrets', () => {
 	beforeAll(async () => {
@@ -373,6 +412,8 @@ describe('MCP surface leaks no secrets', () => {
 			project_activity_get: { id: seeded.bucketId },
 			project_summary_get: { id: seeded.bucketId },
 			project_user_list: { id: seeded.bucketId },
+			project_user_get: { id: seeded.bucketId, uid: seeded.holderId },
+			project_user_session_list: { id: seeded.bucketId, uid: seeded.holderId },
 			federation_provider_list: { id: seeded.bucketId },
 			behind_proxy_app_list: { id: seeded.bucketId }
 		};

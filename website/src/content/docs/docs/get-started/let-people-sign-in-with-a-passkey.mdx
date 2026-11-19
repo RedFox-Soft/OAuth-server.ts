@@ -1,0 +1,135 @@
+---
+title: Let people sign in with a passkey
+description: 'People sign in with a fingerprint, face or screen lock instead of a password, and a passkey sign-in counts as two-step sign-in.'
+sidebar:
+  order: 13
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A passkey signs a person in with their fingerprint, face or screen lock instead of a password. It stays on their
+phone, their laptop or in their password manager, and it works only at your project's own address, so a fake sign-in
+page cannot use it. This page shows how to turn passkeys on in a project and what your people then see.
+
+## Turn it on {#on}
+
+1. Open the project's **Sign-in** tab. Under **Ways to sign in**, switch on **Passkeys** and save.
+2. Check the notes beside the switch:
+   - The switch is disabled when the server is served at an IP address. Passkeys need a domain name.
+   - Over plain `http`, browsers do not offer passkeys. The console warns about it. `localhost` is the one exception,
+     for trying it on your own machine.
+   - Adding a passkey needs email, so the console says so when no mail server is set up.
+
+Passkeys are off in every project until you turn them on. The setting is free on every plan. The administrators'
+project has no such switch: administrators have no account page to add a passkey on.
+
+An agent turns it on with `project_update` (`passkeyLogin`). Nobody can add a passkey for someone else: only the
+person can.
+
+## What a person does {#steps}
+
+1. They sign in and open their account page, **Sign-in and security**, at `/account/security` under your project's
+   address. It has a **Passkeys** part above **Two-step verification**.
+2. They choose **Add a passkey**. Their browser or phone asks for a fingerprint, face or screen lock and makes the
+   passkey.
+3. The passkey is listed with a name such as "Chrome on Windows", the date it was created, when it was last used,
+   whether it is synced to their devices, and how it was added. FoxAuth emails them that a passkey was added.
+
+Adding a passkey needs JavaScript in the browser. A person can hold up to 20 passkeys in a project.
+
+## Why adding one needs a strong sign-in {#proof}
+
+Someone who learned the password must not be able to add their own passkey. So adding one needs either:
+
+- a sign-in in the last 15 minutes with a passkey, or with the password and a code from an authenticator app; or
+- a sign-in with the password in the last 15 minutes, and a link mailed to the account's address, opened in the same
+  browser within 10 minutes. A link opened in another browser does nothing.
+
+A person whose address is not confirmed yet, or who signs in only through a provider such as Google, cannot add a
+passkey yet. The page says why.
+
+## Signing in {#sign-in}
+
+The sign-in page offers **Sign in with a passkey**. When the person clicks into the email field, the browser also
+offers their passkeys for the project in its autofill list. The passkey block is there on every form of the page: with
+the password form, on a page with only providers, and on a page that refused a password from a known guessing address.
+
+A passkey sign-in asks for no code, even in a project that requires a code from everyone, and even when the person has
+an authenticator app. It counts as two-step sign-in, because the device checks the person and holds the key. So it
+meets every requirement of two-step sign-in:
+
+- an app with **Require two-step sign-in**, see [Require two-step sign-in in one app](/docs/get-started/require-a-code-for-an-app/);
+- an API with **Require two-step sign-in** on its **Access** tab;
+- a path behind your proxy with **with two-step sign-in** on its **Ask to sign in again** condition;
+- an app that asks for the multi-factor `acr` value itself.
+
+The page that tells a person an app needs two-step sign-in also offers **Sign in with a passkey** in a project that
+accepts passkeys.
+
+When a passkey cannot be used, the page says only "This passkey isn't for _project_. Choose another one, or sign in
+another way." It says the same for a passkey of another project, an unknown one, and one that may have been copied.
+After 30 such failures in an hour from one network, passkey sign-in is refused there until the hour ends. A locked or
+deactivated account gets "This account can't sign in right now." with no word about a password.
+
+## Rename and remove {#manage}
+
+On **Sign-in and security** a person can rename a passkey after a sign-in in the last 15 minutes. A name has 1 to 64
+characters, on one line.
+
+Removing one needs the same proof as adding one. It stops signing them in at once, and FoxAuth emails them that it was
+removed. The last way into the project cannot be removed: a person with no password the project accepts and no
+provider must add another way first.
+
+A passkey can be marked:
+
+- **Made for an old address**: the project's address changed since it was made, so it no longer works;
+- **Refused: it may have been copied**: the device reported a use count lower than the last one FoxAuth saw.
+
+Both can be removed like any other.
+
+## If someone else added one {#not-me}
+
+The email about a new passkey has a **This wasn't me** link. Within 72 hours it removes that passkey and every passkey
+added after it, and signs the account out everywhere. When the person has a password and the project lets people reset
+it, FoxAuth also emails them a link to set a new one, since someone else knows the password. The link works even after
+whoever added the passkey signed the account out everywhere.
+
+## One address {#address}
+
+A passkey belongs to the address it was made at:
+
+- every project at a path of the server, and the default project, share the server's host, such as
+  `auth.example.com`. A passkey of one of them is still refused at another;
+- a project at a subdomain, such as `acme.auth.example.com`, or at a hostname of its own, has its own.
+
+So when you move a project between a path, a subdomain and a hostname, or move the server's `ISSUER` to another host,
+its people's passkeys stop working. They are listed as made for an old address, and people add new ones. A new path
+keeps them working, since every path shares the server's host.
+
+<Aside type="caution">
+	A person whose only way in is a passkey cannot sign in after such a move. Make
+	sure people also have a password or a provider before you move a project.
+</Aside>
+
+## Turning it off {#off}
+
+Switching **Passkeys** off keeps every passkey people have. They are listed with a note that the project does not
+accept them now, and they work again when you switch it back on.
+
+If someone could then no longer sign in, because a passkey is their only way in, the console first shows how many
+people that is and asks you to confirm. An agent gets the same number to confirm.
+
+## For your app {#app}
+
+Your app receives the same ID token as after a password and a code: `acr` is your server's multi-factor value, and
+`amr` is `["pop", "user", "mfa"]`. A sign-in with a passkey shows as "Passkey" in the person's recent sign-ins, in the
+email about a sign-in from somewhere new, and in the project's activity.
+
+Add a link named "Sign-in and security" to your app's account settings that opens `/account/security` under your
+project's issuer. People who want a code from an authenticator app instead find it on the same page: see
+[Let people turn on two-step verification](/docs/get-started/turn-on-two-step-verification/).
+
+## Upgrading {#upgrading}
+
+Run `bun run db:setup` (or `bun run db:setup:pg`) after upgrading, so the server has its places to store passkeys,
+then `bun run db:migrate`. After that, an older release refuses to start against the database.

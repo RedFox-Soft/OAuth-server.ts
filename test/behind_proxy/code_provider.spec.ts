@@ -121,7 +121,7 @@ describe('a provider sign-in to a path behind the proxy that asks for a code', (
 		expect(props.provider).toBe('Acme SSO');
 		expect(page.text).not.toContain('/totp/enroll');
 		expect(textOf(page.text)).toContain(
-			`${new URL(app.address).host} asks for a code from an authenticator app`
+			`${new URL(app.address).host} asks for two-step sign-in`
 		);
 	});
 

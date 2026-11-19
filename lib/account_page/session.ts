@@ -17,6 +17,7 @@ import {
 	routeNames,
 	sessionCookieName
 } from '../consts/param_list.js';
+import { configuration } from '../configs/application.js';
 import type { RequestBucket } from '../configs/issuer.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import constantEquals from '../helpers/constant_equals.js';
@@ -146,13 +147,27 @@ export interface PendingSignIn {
 	signIns?: true;
 }
 
-export type SecurityStep = 'view' | 'enrol' | 'replace' | 'off';
+/*
+ * The passkey steps (specs/139): adding or removing one, which needs a strong recent sign-in or a fresh password and a
+ * link, and renaming one, which needs a sign-in of any kind within fifteen minutes.
+ */
+export type SecurityStep =
+	| 'view'
+	| 'enrol'
+	| 'replace'
+	| 'off'
+	| 'passkey_add'
+	| 'passkey_rename'
+	| 'passkey_remove';
 
 const SECURITY_STEPS: readonly SecurityStep[] = [
 	'view',
 	'enrol',
 	'replace',
-	'off'
+	'off',
+	'passkey_add',
+	'passkey_rename',
+	'passkey_remove'
 ];
 
 /*
@@ -260,6 +275,12 @@ export function signInRedirect(
 		security?: SecurityStep;
 		/* Return to the recent sign-ins page (specs/135). */
 		signIns?: boolean;
+		/*
+		 * The act needs a fresh password or a fresh code (two-step verification's start, replacement and removal), which
+		 * a passkey sign-in is neither: the request names only the password context, so the sign-in page offers no
+		 * passkey (specs/139 research R13, FR-019) and the person is not brought back to be asked again.
+		 */
+		passwordOnly?: boolean;
 	} = {}
 ): string {
 	const state = crypto.randomBytes(32).toString('base64url');
@@ -291,5 +312,7 @@ export function signInRedirect(
 		state
 	});
 	if (options.reauthenticate) params.set('prompt', 'login');
+	if (options.passwordOnly)
+		params.set('acr_values', configuration.acrMap.password);
 	return `${base}${routeNames.authorization}?${params.toString()}`;
 }

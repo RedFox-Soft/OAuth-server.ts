@@ -3,6 +3,7 @@ import { offeredProviders } from '../federation/offered.js';
 import { orderProviders } from '../federation/order.js';
 import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { selfServiceResetAllowed } from '../password_reset/eligibility.js';
+import { passkeysAccepted } from '../passkeys/accepted.js';
 
 /*
  * What the login page needs to know about a bucket in order to render itself: whether it accepts a password
@@ -39,6 +40,13 @@ export interface LoginOptions {
 	registrationOpen: boolean;
 	passwordReset: boolean;
 	/*
+	 * Whether the page offers signing in with a passkey and the passkey door accepts one (specs/139): the project's
+	 * setting, never on the administrators' project. Read here so the page, its re-renders and the console's preview
+	 * of a draft give one answer. Unlike the code requirement it is rendered: a passkey is asked for before anyone
+	 * names an account, so offering it says nothing about who has one.
+	 */
+	passkeyLogin: boolean;
+	/*
 	 * Only what the page renders: an id to build the link from, a label to show, and — when the upstream is
 	 * one this server recognises — which mark and wording its own branding requires. Never the credentials.
 	 *
@@ -71,6 +79,7 @@ export type SignInSettings = Pick<
 	| 'registrationOpen'
 	| 'federation'
 	| 'signInOrder'
+	| 'passkeyLogin'
 >;
 
 export function signInOptionsOf(
@@ -89,6 +98,10 @@ export function signInOptionsOf(
 		// A bucket that cannot be read counts as open, exactly as the registration door treats it.
 		registrationOpen: bucket?.registrationOpen !== false,
 		passwordReset: selfServiceResetAllowed(bucketId, bucket ?? null),
+		passkeyLogin: passkeysAccepted({
+			_id: bucketId,
+			passkeyLogin: bucket?.passkeyLogin
+		}),
 		/*
 		 * Recognition keys on the stored issuer, never on how the provider came to be configured — nothing
 		 * records that, deliberately. So a Google provider somebody typed in by hand long before the

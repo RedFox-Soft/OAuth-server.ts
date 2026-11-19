@@ -43,6 +43,11 @@ export const NOTICE_VERIFY_RECENT = 'verify_recent';
 export const NOTICE_VERIFY_UNSENT = 'verify_unsent';
 /* The same button, refused because this network asked for too much mail this hour (specs/115). */
 export const NOTICE_MAIL_LIMITED = 'mail_limited';
+/*
+ * From the two-step sign-in page (specs/139): a passkey sign-in meets the requirement, and the ceremony lives on the
+ * sign-in page, so that page's "Sign in with a passkey" is a link here rather than a prompt of its own.
+ */
+export const NOTICE_PASSKEY = 'passkey';
 
 // The words live in the sign-in catalogue (lib/i18n/texts/signIn), in every language; this maps an identifier to
 // its entry.
@@ -53,7 +58,8 @@ const NOTICES: Record<string, keyof SignInTexts['notices']> = {
 	[NOTICE_VERIFY_RECENT]: 'verifyRecent',
 	[NOTICE_VERIFY_UNSENT]: 'verifyUnsent',
 	[NOTICE_FEDERATION_LINK]: 'federationLink',
-	[NOTICE_MAIL_LIMITED]: 'mailLimited'
+	[NOTICE_MAIL_LIMITED]: 'mailLimited',
+	[NOTICE_PASSKEY]: 'passkey'
 };
 
 // No trimming, no case folding, no normalisation: an identifier is either one the server minted or it is
