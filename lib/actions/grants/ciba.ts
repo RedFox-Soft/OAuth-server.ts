@@ -1,3 +1,7 @@
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../../client_policy/require_passkey.ts';
 import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
@@ -20,6 +24,7 @@ import { AccessToken } from 'lib/models/access_token.js';
 import { BackchannelAuthenticationRequest } from 'lib/models/backchannel_authentication_request.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import { reachedAcr } from '../../helpers/acr_satisfaction.ts';
 import { assertSignInMeets } from '../../resources/sign_in_requirement.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { resourceTokenGroups } from '../../bucket_groups/claim.js';
@@ -137,7 +142,11 @@ export const handler = async function cibaHandler(
 	 * The sign-in check stops this before a code is issued (specs/127); this holds for one issued in the moment before
 	 * the application was made to require a code.
 	 */
-	if (codeRequiredAndMissing(oidc.client, request.payload.acr)) {
+	/* A back-channel authentication is never a phishing-resistant sign-in (specs/142 research R4). */
+	if (passkeyRequiredAndMissing(oidc.client, reachedAcr(request.payload))) {
+		throw new InvalidGrant(REQUIRE_PASSKEY_DESCRIPTION);
+	}
+	if (codeRequiredAndMissing(oidc.client, reachedAcr(request.payload))) {
 		throw new InvalidGrant(REQUIRE_CODE_DESCRIPTION);
 	}
 
@@ -156,6 +165,7 @@ export const handler = async function cibaHandler(
 		sid: request.payload.sid,
 		authTime: request.payload.authTime,
 		acr: request.payload.acr,
+		signInAcr: request.payload.signInAcr,
 		amr: request.payload.amr
 	});
 
@@ -178,7 +188,7 @@ export const handler = async function cibaHandler(
 		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		/* The API's sign-in requirement (specs/130), for a code issued before it was set or a sign-in that missed it. */
 		assertSignInMeets(at.resourceServer, {
-			acr: request.payload.acr,
+			acr: reachedAcr(request.payload),
 			authTime: request.payload.authTime
 		});
 		at.payload.scope = grant.getResourceScopeFiltered(resource, request.scopes);
@@ -206,6 +216,7 @@ export const handler = async function cibaHandler(
 			bucketId: request.payload.bucketId,
 			accountId: account.accountId,
 			acr: request.payload.acr,
+			signInAcr: request.payload.signInAcr,
 			amr: request.payload.amr,
 			authTime: request.payload.authTime,
 			claims: request.payload.claims,

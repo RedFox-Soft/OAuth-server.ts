@@ -75,6 +75,10 @@ address or storage. It is **peeked in a state initialiser and forgotten in an ef
 - Turning "Require two-step sign-in" on answers a 409 preview on the client POST and PATCH, the
   project PATCH's protocol; the console asks with the server's own consequences (`codeConsent.ts`) and resends with
   `confirm` and `expect`. The list and the page header mark such an application "Two-step required" ("Code required" until spec 139).
+- "Require a passkey" (spec 142, `requirePasskey`) sits above it and includes it: the same preview protocol, one 409 and
+  one confirmation when both turn on together, refused (409 `passkeys_not_accepted`) while the project does not accept
+  passkeys; marked "Passkey required". `connection.phishingResistantAcr` is present only where the project accepts
+  passkeys, and the Connect tab then shows how to ask for `phr` ([[acr-satisfaction]]).
 - `agentClients` on the project (`lib/admin/buckets/agent_clients.ts`) and `connection` on each declared resource
   (`lib/resources/connection.ts`: issuer, exact audience, RFC 9728 metadata, metadata URL, challenge). Computed on the
   server because the console's CSP is `connect-src 'self'`: it cannot read a subdomain or hostname project's

@@ -72,12 +72,18 @@ describe('what the server says it can report', () => {
 		}
 	});
 
+	/*
+	 * The default project here accepts no passkeys, the only sign-in reaching the phishing-resistant context, so that
+	 * one is produced nowhere at this issuer (specs/142; per project in test/passkeys/discovery.spec.ts).
+	 */
 	it('advertises every context some sign-in can produce', () => {
 		for (const distinction of ACR_DISTINCTIONS) {
+			if (distinction === 'phishing_resistant') continue;
 			expect(advertised, distinction).toContain(
 				configuration.acrMap[distinction]
 			);
 		}
+		expect(advertised).not.toContain(configuration.acrMap.phishing_resistant);
 	});
 
 	it('advertises no context carrying the reserved level-zero meaning', () => {

@@ -144,6 +144,51 @@ describe('a registration body naming internal client attributes', () => {
 		expect((await Client.find(own.clientId))['signIn.requireCode']).toBe(true);
 	});
 
+	// specs/142: only an administrator makes an application require a passkey, or lifts it.
+	it('requires no passkey for a registration or an update that names the requirement', async () => {
+		const own = await register({ 'signIn.requirePasskey': true });
+		expect((await Client.find(own.clientId))['signIn.requirePasskey']).toBe(
+			false
+		);
+
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb'],
+				'signIn.requirePasskey': true
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		expect((await Client.find(own.clientId))['signIn.requirePasskey']).toBe(
+			false
+		);
+	});
+
+	it('keeps an administrator’s requirement of a passkey through an update that replaces the registration', async () => {
+		const own = await register();
+		const stored = present(
+			await adapter('Client').find(own.clientId),
+			'the stored client'
+		);
+		await adapter('Client').upsert(own.clientId, {
+			...stored,
+			'signIn.requirePasskey': true
+		});
+
+		await agent.reg({ clientId: own.clientId }).put(
+			{
+				client_id: own.clientId,
+				redirect_uris: ['https://client.example.com/cb']
+			},
+			{ headers: { ...json, ...bearer(own.token) } }
+		);
+
+		expect((await Client.find(own.clientId))['signIn.requirePasskey']).toBe(
+			true
+		);
+	});
+
 	it('gives the person no checkboxes for a registration that asks for them', async () => {
 		const { clientId } = await register({
 			'consent.partial': true,

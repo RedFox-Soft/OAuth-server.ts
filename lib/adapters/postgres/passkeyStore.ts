@@ -189,13 +189,18 @@ export class PasskeyStore implements PasskeyStoreInstance {
 
 	async holdingIn(
 		bucketId: string,
-		rpId: string
+		rpId: string,
+		{ full = false }: { full?: boolean } = {}
 	): Promise<{ accountId: string; passkeys: number }[]> {
 		const handle = sql();
+		const fullOnly = full
+			? handle`AND (doc->'conditional') IS DISTINCT FROM 'true'::jsonb`
+			: handle``;
 		const rows: unknown[] = await handle`
 			SELECT doc->>'accountId' AS account, count(*)::int AS passkeys FROM ${handle(this.area)}
 			WHERE doc->>'bucketId' = ${bucketId} AND doc->>'rpId' = ${rpId}
 				AND (doc->'copiedAt' IS NULL OR jsonb_typeof(doc->'copiedAt') = 'null')
+				${fullOnly}
 			GROUP BY doc->>'accountId'
 		`;
 		return rows.flatMap((row) =>

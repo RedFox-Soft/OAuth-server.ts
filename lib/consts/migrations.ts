@@ -30,6 +30,7 @@ import { displayNameKeyOf, membershipIdOf } from '../adapters/end_user_keys.js';
 import { declarationId, ROOT_NAMESPACE } from '../resources/declaration_id.js';
 import { ROOT_KEY_OWNER } from './key_owner.js';
 import { FREE_PLAN_ID } from './plans.js';
+import { withPhishingResistant } from './acr.js';
 import { isList, isRecord, member } from '../helpers/_/object.js';
 import { auditTargetTypeFor, MIGRATION_ACTOR } from './admin_audit_routes.js';
 
@@ -2015,6 +2016,77 @@ const passkeysFence: Migration = {
 	postgres: { noop: true, reason: PASSKEYS_FENCE_REASON }
 };
 
+/*
+ * The phishing-resistant authentication context (specs/142 research R6). A stored `acrValues` replaces the default
+ * whole, so one saved before this release names three contexts and validation would refuse a fourth missing; this gives
+ * it `phr`, or `urn:foxauth:acr:phr` when the operator already uses `phr`, and keeps every other name. Its record is
+ * also a fence: a release that predates it does not know the new context or an application's requirement of a passkey
+ * (`signIn.requirePasskey`), which it would drop when it next wrote the client, and so must refuse this database.
+ */
+function phishingResistantReport(chosen: string | undefined): string[] {
+	return [
+		chosen
+			? `stored acrValues given phishing_resistant = ${chosen}`
+			: 'no stored acrValues to change'
+	];
+}
+
+/* The settings with the new context named, or undefined when there is nothing to change. */
+function settingsWithPhishingResistant(
+	config: unknown
+): { next: Doc; chosen: string } | undefined {
+	if (!isRecord(config)) return undefined;
+	const named = withPhishingResistant(config.acrValues);
+	return (
+		named && {
+			next: { ...config, acrValues: named.next },
+			chosen: named.chosen
+		}
+	);
+}
+
+const acrPhishingResistant: Migration = {
+	id: '2026-11-20-acr-phishing-resistant',
+	description:
+		'Name the phishing-resistant authentication context in a stored acrValues (phr, or urn:foxauth:acr:phr when phr is already taken), and mark the database as holding applications that require a passkey, so that an older release refuses to start against it',
+	reversible: false,
+	rerunnable:
+		'A stored acrValues that already names phishing_resistant is left alone, and an instance with none stored has nothing to change, so a second application writes nothing.',
+	mongodb: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for MongoDB that is the driver's `Db`.
+			const db = handle as MongoHandle;
+			const { ObjectId } = await import('mongodb');
+			const area = db.collection(STORE_AREAS.serviceConfig);
+			const _id = new ObjectId(SETTINGS_DOCUMENT_ID);
+			const stored = await area.findOne({ _id });
+			const change = settingsWithPhishingResistant(member(stored, 'config'));
+			if (!change) return phishingResistantReport(undefined);
+			// Rewritten whole: the keys hold dots, which a filter would read as nested paths.
+			await area.updateOne(
+				{ _id },
+				{ $set: { config: change.next, updatedAt: new Date() } },
+				{}
+			);
+			return phishingResistantReport(change.chosen);
+		}
+	},
+	postgres: {
+		async apply(handle) {
+			// The runner passes the selected backend's handle; for PostgreSQL that is Bun's SQL client.
+			const sql = handle as PostgresHandle;
+			const area = sql(STORE_AREAS.serviceConfig);
+			const stored = (
+				await sql`SELECT doc FROM ${area} WHERE id = ${SETTINGS_DOCUMENT_ID}`
+			).at(0);
+			const change = settingsWithPhishingResistant(member(stored, 'doc'));
+			if (!change) return phishingResistantReport(undefined);
+			await sql`UPDATE ${area} SET doc = ${change.next} WHERE id = ${SETTINGS_DOCUMENT_ID}`;
+			return phishingResistantReport(change.chosen);
+		}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -2039,5 +2111,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	addressLookupFence,
 	adminSignInLogFence,
 	newSignInAlertsFence,
-	passkeysFence
+	passkeysFence,
+	acrPhishingResistant
 ];

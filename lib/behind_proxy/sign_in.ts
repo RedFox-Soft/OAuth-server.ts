@@ -1,3 +1,4 @@
+import { meets, reachedAcr } from '../helpers/acr_satisfaction.ts';
 import { kindOf } from '../activity/kinds.js';
 import { markActivity } from '../activity/note.js';
 import type { BehindProxyApp } from '../adapters/types.js';
@@ -222,10 +223,7 @@ export async function completeSignIn(
 	 * A path that asked for a code is satisfied by the context the code carries, never by what the request said
 	 * (specs/128 FR-017): a request stripped of its `acr_values` comes back without one, and makes no session.
 	 */
-	if (
-		pending.requireCode &&
-		redeemed.how.acr !== configuration.acrMap.multi_factor
-	) {
+	if (pending.requireCode && !meets(redeemed.how.acr, 'multi_factor')) {
 		return codeNeeded(ctx);
 	}
 	/*
@@ -330,7 +328,10 @@ async function redeem(
 			...(typeof payload.authTime === 'number'
 				? { authTime: payload.authTime }
 				: {}),
-			...(typeof payload.acr === 'string' ? { acr: payload.acr } : {}),
+			/* What the sign-in reached, not what the request was told (specs/142 research R2). */
+			...(reachedAcr(payload) === undefined
+				? {}
+				: { acr: reachedAcr(payload) }),
 			...(Array.isArray(payload.amr) ? { amr: [...payload.amr] } : {})
 		}
 	};

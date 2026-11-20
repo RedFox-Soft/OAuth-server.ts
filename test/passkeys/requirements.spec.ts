@@ -31,6 +31,7 @@ import {
 let acme: Project;
 let billing: Project;
 
+const PASSWORD_CONTEXT = 'urn:example:acr:pwd';
 const MULTI_FACTOR = 'urn:example:acr:mfa';
 const FILES = 'https://files.acme.test/mcp';
 
@@ -116,6 +117,30 @@ describe('requirements of two-step sign-in, met by a passkey', () => {
 		expect(claimsOf(access_token)).toMatchObject({
 			aud: FILES,
 			acr: MULTI_FACTOR
+		});
+	});
+
+	it('meets an API’s requirement of two-step sign-in for an app that asked only for the password context', async () => {
+		const { device } = await holdingPasskey(acme);
+
+		const { auth, code } = await signInWithPasskey(
+			new Browser(acme.origin),
+			device,
+			acme,
+			{
+				scope: 'openid files:read',
+				resource: FILES,
+				acr_values: PASSWORD_CONTEXT
+			}
+		);
+
+		const { access_token } = await redeem(acme, auth, code, {
+			resource: FILES
+		});
+		expect(claimsOf(access_token)).toMatchObject({
+			aud: FILES,
+			acr: PASSWORD_CONTEXT,
+			amr: ['pop', 'user', 'mfa']
 		});
 	});
 

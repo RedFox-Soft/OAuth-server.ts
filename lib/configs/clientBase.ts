@@ -21,5 +21,6 @@ export const ClientDefaults: Omit<ClientData, 'clientId'> = {
 	'requestObject.require': false,
 	'consent.require': true,
 	'consent.partial': false,
-	'signIn.requireCode': false
+	'signIn.requireCode': false,
+	'signIn.requirePasskey': false
 };

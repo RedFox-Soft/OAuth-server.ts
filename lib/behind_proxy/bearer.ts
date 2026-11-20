@@ -1,3 +1,4 @@
+import { reachedAcr } from '../helpers/acr_satisfaction.ts';
 import {
 	issuingBucket,
 	servingBucketIdOf
@@ -48,12 +49,26 @@ export type Presented =
 			 */
 			signedInAt: number | null;
 			acr: string | null;
+			/*
+			 * The methods the sign-in used, as the token carries them (RFC 8176), or empty. A self-contained token says the
+			 * context reported to the application, which may be weaker than the one reached when the application asked for
+			 * less (specs/142 research R2), so a check of a code reads `mfa` here too: it is present exactly when the
+			 * sign-in held two factors.
+			 */
+			amr: readonly string[];
 	  }
 	| { ok: false; reason: BearerRefusal };
 
 const ACCESS_TOKEN_TYPES = new Set(['at+jwt', 'application/at+jwt']);
 
 type Api = Pick<ProtectedResource, 'identifier' | 'namespace' | 'bucketId'>;
+
+/* A list of strings as a token carries it, or empty. */
+function stringsOf(value: unknown): readonly string[] {
+	return Array.isArray(value)
+		? value.filter((item): item is string => typeof item === 'string')
+		: [];
+}
 
 function refused(reason: BearerRefusal): Presented {
 	return { ok: false, reason };
@@ -137,7 +152,8 @@ async function fromJwt(token: string, api: Api): Promise<Presented> {
 		...scopesOf(payload.scope),
 		accountId: await personOfJwt(payload, sub, clientId),
 		signedInAt: secondsOrNull(payload.auth_time),
-		acr: typeof payload.acr === 'string' ? payload.acr : null
+		acr: typeof payload.acr === 'string' ? payload.acr : null,
+		amr: stringsOf(payload.amr)
 	};
 }
 
@@ -227,7 +243,9 @@ async function fromRecord(token: string, api: Api): Promise<Presented> {
 		/* A machine token is a record of its own kind, and never stands for a person. */
 		accountId: person && payload.accountId ? payload.accountId : null,
 		signedInAt: secondsOrNull(person?.authTime),
-		acr: typeof person?.acr === 'string' ? person.acr : null
+		/* A stored token keeps the context its sign-in reached beside the reported one (research R2). */
+		acr: (person && reachedAcr(person)) ?? null,
+		amr: stringsOf(person?.amr)
 	};
 }
 

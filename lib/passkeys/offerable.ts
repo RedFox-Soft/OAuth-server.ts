@@ -49,3 +49,22 @@ export async function offerable(
 		PASSKEYS_PER_PERSON
 	);
 }
+
+/*
+ * Whether the person may create a passkey from the page that turns them away from an application requiring one (specs/142
+ * research R8): the safety half of the offer's conditions — the project accepts passkeys, the address is confirmed, mail
+ * works, they hold fewer than twenty, and "This wasn't me" is not holding them back. The offer's own opt-outs (the
+ * project's setting, "Don't ask again", the 30-day pause) do not apply: this is the person's own step, as on their page.
+ */
+export async function mayCreateAfterSignIn(
+	bucket: UserBucket,
+	user: User
+): Promise<boolean> {
+	if (!passkeysAccepted(bucket) || !user.verified) return false;
+	if (user.passkeyOffer?.held === true) return false;
+	if (!(await mailDeliveryConfigured())) return false;
+	return (
+		(await getPasskeyStore().countOf(bucket._id, user._id)) <
+		PASSKEYS_PER_PERSON
+	);
+}

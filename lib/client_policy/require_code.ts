@@ -1,4 +1,5 @@
 import { configuration } from '../configs/application.ts';
+import { meets } from '../helpers/acr_satisfaction.ts';
 
 /*
  * Whether an application that requires a code from an authenticator app is being reached without one (specs/127).
@@ -6,15 +7,17 @@ import { configuration } from '../configs/application.ts';
  * the token side cannot drift apart: a refresh token, a device or CIBA result, an assertion or an exchange is held to
  * the same rule a sign-in is.
  *
- * Only the multi-factor context meets it. A federated sign-in never asks for this server's code, and an absent or
- * unknown context — a grant from before contexts were recorded, an outside assertion — is not evidence of one.
+ * A context that meets the multi-factor one meets it (lib/consts/acr.ts SATISFIED_BY): a code, or a full passkey. A
+ * federated sign-in never asks for this server's code, and an absent or unknown context — a grant from before contexts
+ * were recorded, an outside assertion — is not evidence of one. Callers hand the context the sign-in reached
+ * (`reachedAcr`), never the value reported to the application (specs/142 research R2).
  */
 export function codeRequiredAndMissing(
 	client: { readonly 'signIn.requireCode'?: boolean } | undefined,
 	acr: string | undefined
 ): boolean {
 	if (client?.['signIn.requireCode'] !== true) return false;
-	return acr !== configuration.acrMap.multi_factor;
+	return !meets(acr, 'multi_factor');
 }
 
 /*
@@ -31,8 +34,10 @@ export function proxyAsksForCode(
 ): boolean {
 	if (client?.behindProxyBucketId === undefined) return false;
 	if (typeof acrValues !== 'string') return false;
-	const multiFactor = configuration.acrMap.multi_factor;
-	return acrValues.split(' ').includes(multiFactor) && acr !== multiFactor;
+	return (
+		acrValues.split(' ').includes(configuration.acrMap.multi_factor) &&
+		!meets(acr, 'multi_factor')
+	);
 }
 
 /*

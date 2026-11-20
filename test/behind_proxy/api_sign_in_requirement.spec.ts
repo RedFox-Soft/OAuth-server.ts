@@ -184,6 +184,25 @@ describe("an API's sign-in requirement at the proxy", () => {
 		expect(res.status).toBe(200);
 	});
 
+	it('a token whose application asked for the password context is let through when its sign-in had two factors', async () => {
+		const api = await declareApi(w.cookie, w.acme.id, { checkedBy: 'proxy' });
+		await requireOf(api, { requireCode: true });
+
+		const passkey = await check(api, {
+			auth_time: now() - 60,
+			acr: configuration.acrMap.password,
+			amr: ['pop', 'user', 'mfa']
+		});
+		const conditional = await check(api, {
+			auth_time: now() - 60,
+			acr: configuration.acrMap.password,
+			amr: ['pop', 'user']
+		});
+
+		expect(passkey.status).toBe(200);
+		expect(conditional.status).toBe(401);
+	});
+
 	it('a token whose sign-in is older than the API allows is asked for a new one, with the age in seconds', async () => {
 		const api = await declareApi(w.cookie, w.acme.id, { checkedBy: 'proxy' });
 		await requireOf(api, { signInEveryMinutes: 60 });

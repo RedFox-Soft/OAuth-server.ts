@@ -222,7 +222,11 @@ export function Clients({
 									{row.registeredDynamically ? (
 										<Tag>Self-registered</Tag>
 									) : null}
-									{row.requireCode ? <Tag>Two-step required</Tag> : null}
+									{row.requirePasskey ? (
+										<Tag>Passkey required</Tag>
+									) : row.requireCode ? (
+										<Tag>Two-step required</Tag>
+									) : null}
 								</Space>
 							)
 						},

@@ -243,6 +243,28 @@ check(
 		JSON.stringify(held) === JSON.stringify(['anna:2', 'bob:1']),
 		held.join(', ')
 	);
+	await store.create(
+		passkey({
+			bucketId: holding,
+			accountId: 'erin',
+			createdVia: 'password',
+			conditional: true
+		})
+	);
+	const all = (await store.holdingIn(holding, 'auth.example.test'))
+		.map((row) => row.accountId)
+		.sort();
+	const full = (
+		await store.holdingIn(holding, 'auth.example.test', { full: true })
+	)
+		.map((row) => row.accountId)
+		.sort();
+	check(
+		'holders of a full passkey leave out someone holding only a conditional one (specs/142)',
+		JSON.stringify(all) === JSON.stringify(['anna', 'bob', 'erin']) &&
+			JSON.stringify(full) === JSON.stringify(['anna', 'bob']),
+		`${all.join(', ')} / ${full.join(', ')}`
+	);
 	await store.removeAllIn(holding);
 }
 /* ---------------------------------------------------------- confirming, once (specs/141) */

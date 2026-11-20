@@ -1,3 +1,8 @@
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../client_policy/require_passkey.ts';
+import { reachedAcr } from '../helpers/acr_satisfaction.ts';
 import type { TokenParams } from '../actions/token.js';
 import { adapter } from '../adapters/index.js';
 import type { UserBucket } from '../adapters/types.js';
@@ -71,7 +76,8 @@ async function fromRecord(
 		throw refused('another project');
 	}
 	const audience: unknown = token.payload.aud;
-	const { acr } = token.payload;
+	/* The context the sign-in reached, which a stored token keeps beside the reported one (specs/142 research R2). */
+	const acr = reachedAcr(token.payload);
 	return {
 		accountId,
 		agentClientId: clientId,
@@ -160,6 +166,13 @@ export async function exchangeSubject(
 		presented.agentClientId === client.clientId
 			? client
 			: await adapter('Client').find(presented.agentClientId);
+	/* An exchanged token is no sign-in for this application, so it never meets a requirement of a passkey (specs/142). */
+	if (
+		passkeyRequiredAndMissing(client, undefined) ||
+		passkeyRequiredAndMissing(agent ?? undefined, undefined)
+	) {
+		throw refused(REQUIRE_PASSKEY_DESCRIPTION);
+	}
 	if (
 		codeRequiredAndMissing(client, presented.acr) ||
 		codeRequiredAndMissing(agent ?? undefined, presented.acr)

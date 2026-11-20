@@ -1,10 +1,18 @@
-import { configuration } from '../../../configs/application.ts';
-import { satisfiesAcr, sl1, sl1Exempt } from '../../../sl1/rules.ts';
+import { sl1, sl1Exempt } from '../../../sl1/rules.ts';
+import {
+	capForOtherBrowser,
+	meets,
+	satisfiesAny
+} from '../../acr_satisfaction.ts';
 import {
 	codeRequiredAndMissing,
 	proxyAsksForCode,
 	REQUIRE_CODE_DESCRIPTION
 } from '../../../client_policy/require_code.ts';
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../../../client_policy/require_passkey.ts';
 import { API_CODE_DESCRIPTION } from '../../../resources/sign_in_requirement.ts';
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
@@ -16,6 +24,15 @@ import {
 	CREATE_PROMPT,
 	CREATE_PROMPT_REASON
 } from '../../../consts/prompt_create.ts';
+
+/*
+ * The context the checks below judge: what the session reached, except in a device flow, whose tokens go to a device
+ * other than the browser that signed in and so reach no more than the multi-factor context (specs/142 research R4).
+ * Judging the session there would let an essential `phr` pass and the device's tokens then carry less.
+ */
+function judgedAcr(oidc: OIDCContext<PipelineParams>): string | undefined {
+	return oidc.entities.DeviceCode ? capForOtherBrowser(oidc.acr) : oidc.acr;
+}
 
 /* The first requested API with a sign-in requirement this check is about, and its identifier. */
 function requiringApi(
@@ -225,10 +242,8 @@ class LoginPromt extends Prompt {
 						'invalid claims.id_token.acr.values type'
 					);
 				}
-				if (request.values.includes(oidc.acr)) {
-					return false;
-				}
-				return true;
+				/* A stronger sign-in meets a weaker essential value, and the token then reports that value (research R3). */
+				return !satisfiesAny(request.values as string[], judgedAcr(oidc));
 			},
 			details: (oidc) => ({ acr: oidc.claims.id_token?.acr })
 		},
@@ -242,10 +257,10 @@ class LoginPromt extends Prompt {
 				if (!request.essential || !request.value) {
 					return false;
 				}
-				if (request.value === oidc.acr) {
-					return false;
-				}
-				return true;
+				return !satisfiesAny(
+					typeof request.value === 'string' ? [request.value] : [],
+					judgedAcr(oidc)
+				);
 			},
 			details: (oidc) => ({ acr: oidc.claims.id_token?.acr })
 		},
@@ -264,9 +279,21 @@ class LoginPromt extends Prompt {
 				if (!sl1() || sl1Exempt(oidc.client) || typeof values !== 'string') {
 					return false;
 				}
-				return !satisfiesAcr(values.split(' '), oidc.acr);
+				return !satisfiesAny(values.split(' '), judgedAcr(oidc));
 			},
 			details: (oidc) => ({ acr_values: oidc.params.acr_values })
+		},
+		{
+			reason: 'app_passkey',
+			description: REQUIRE_PASSKEY_DESCRIPTION,
+			/*
+			 * The application requires a passkey (specs/142), read from the client like the code requirement below and
+			 * checked before it, which it includes. Met only by a sign-in that reached the phishing-resistant context; a
+			 * device flow never does (`judgedAcr`), so its verification page shows why instead.
+			 */
+			error: 'unmet_authentication_requirements',
+			check: (oidc) => passkeyRequiredAndMissing(oidc.client, judgedAcr(oidc)),
+			details: () => ({ requirePasskey: true })
 		},
 		{
 			reason: 'second_factor',
@@ -279,8 +306,8 @@ class LoginPromt extends Prompt {
 			 */
 			error: 'unmet_authentication_requirements',
 			check: (oidc) =>
-				codeRequiredAndMissing(oidc.client, oidc.acr) ||
-				proxyAsksForCode(oidc.client, oidc.params.acr_values, oidc.acr),
+				codeRequiredAndMissing(oidc.client, judgedAcr(oidc)) ||
+				proxyAsksForCode(oidc.client, oidc.params.acr_values, judgedAcr(oidc)),
 			details: () => ({ requireCode: true })
 		},
 		{
@@ -294,8 +321,7 @@ class LoginPromt extends Prompt {
 			check: (oidc) =>
 				requiringApi(
 					oidc,
-					(signIn) =>
-						signIn.code && oidc.acr !== configuration.acrMap.multi_factor
+					(signIn) => signIn.code && !meets(judgedAcr(oidc), 'multi_factor')
 				) !== undefined,
 			details: (oidc) => ({
 				requireCode: true,

@@ -76,7 +76,8 @@ export const ALWAYS_PRESENT = [
 	'requestObject.require',
 	'consent.require',
 	'consent.partial',
-	'signIn.requireCode'
+	'signIn.requireCode',
+	'signIn.requirePasskey'
 ] as const;
 
 export type AlwaysPresent = (typeof ALWAYS_PRESENT)[number];

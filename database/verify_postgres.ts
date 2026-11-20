@@ -35,6 +35,7 @@ import {
 	verifyMailTallyRace
 } from './verify_client_address.js';
 import { verifyPlans } from './verify_plans.js';
+import { verifyAcrPhishingResistant } from './verify_acr_phishing_resistant.js';
 import { verifyAdminSignUp } from './verify_admin_signup.js';
 import {
 	FIXED_AREAS,
@@ -675,6 +676,34 @@ await verifyReservedHostnamesKey(
 			apply: async () => {
 				const step = MIGRATIONS.find((m) =>
 					m.id.endsWith('client-address-source')
+				);
+				if (!step || 'noop' in step.postgres) return null;
+				return step.postgres.apply(handle);
+			}
+		},
+		check
+	);
+	await verifyAcrPhishingResistant(
+		{
+			writeSettings: async (config) => {
+				if (config === null) {
+					await handle`DELETE FROM ${settingsArea} WHERE id = ${settingsId}`;
+					return;
+				}
+				await handle`
+					INSERT INTO ${settingsArea} (id, doc, expires_at)
+					VALUES (${settingsId}, ${config}, NULL)
+					ON CONFLICT (id) DO UPDATE SET doc = EXCLUDED.doc
+				`;
+			},
+			readSettings: async () => {
+				const [row]: ({ doc: Record<string, unknown> } | undefined)[] =
+					await handle`SELECT doc FROM ${settingsArea} WHERE id = ${settingsId}`;
+				return row?.doc ?? null;
+			},
+			apply: async () => {
+				const step = MIGRATIONS.find((m) =>
+					m.id.endsWith('acr-phishing-resistant')
 				);
 				if (!step || 'noop' in step.postgres) return null;
 				return step.postgres.apply(handle);

@@ -30,6 +30,7 @@ describe('Provider configuration', () => {
 		const named = {
 			password: 'bronze',
 			multi_factor: 'silver',
+			phishing_resistant: 'platinum',
 			federated: 'gold'
 		};
 
@@ -39,6 +40,7 @@ describe('Provider configuration', () => {
 			expect([...configuration.acrValues]).toEqual([
 				'bronze',
 				'silver',
+				'platinum',
 				'gold'
 			]);
 		});
@@ -51,7 +53,7 @@ describe('Provider configuration', () => {
 
 		it('refuses an authentication the server cannot distinguish', () => {
 			// @ts-expect-error an authentication the server cannot distinguish
-			ApplicationConfig.acrValues = { ...named, retina_scan: 'platinum' };
+			ApplicationConfig.acrValues = { ...named, retina_scan: 'diamond' };
 			expect(() => reloadConfiguration()).toThrow(
 				"acrValues names 'retina_scan'"
 			);

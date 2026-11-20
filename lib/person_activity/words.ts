@@ -93,6 +93,8 @@ const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	insufficient_scope: (v) => `Without the permission ${toolOr(v, v.api)} needs`,
 	passkey_refused: () =>
 		'A passkey that did not verify, or one that may have been copied',
+	passkey_required: (v) =>
+		`${v.app} asks for a passkey; this sign-in was not one`,
 	used: (v) =>
 		v.kind === 'api' ? `${v.api} through ${v.client}` : `Used ${v.app}`,
 	other: (v) => `Not recorded one by one: ${String(v.count)} more`
@@ -129,6 +131,10 @@ function sawTextOf(reason: ActivityReason, v: Values): string | null {
 				: null;
 		case 'provider_closed':
 			return PLAIN_TEXTS.en.federation.inactive.title;
+		case 'passkey_required':
+			return v.kind === 'signIn'
+				? fill(signIn.passkeyRequired.headingApp, { app: v.app })
+				: null;
 		case 'passkey_refused':
 			return fill(signIn.errors.passkeyRefused, { service: 'the project' });
 		default:

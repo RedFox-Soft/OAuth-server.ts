@@ -1,3 +1,4 @@
+import { meets } from '../helpers/acr_satisfaction.ts';
 import crypto from 'node:crypto';
 
 import {
@@ -114,7 +115,7 @@ export function freshPassword(session: Session): boolean {
 export function freshCode(session: Session): boolean {
 	const { acr, amr, loginTs } = session.payload;
 	return (
-		acr === configuration.acrMap.multi_factor &&
+		meets(acr, 'multi_factor') &&
 		Array.isArray(amr) &&
 		amr.includes('otp') &&
 		typeof loginTs === 'number' &&

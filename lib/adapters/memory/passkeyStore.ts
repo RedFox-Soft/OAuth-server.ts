@@ -127,14 +127,16 @@ export class PasskeyStore implements PasskeyStoreInstance {
 
 	async holdingIn(
 		bucketId: string,
-		rpId: string
+		rpId: string,
+		{ full = false }: { full?: boolean } = {}
 	): Promise<{ accountId: string; passkeys: number }[]> {
 		const counts = new Map<string, number>();
 		for (const held of this.matching(
 			(held) =>
 				held.bucketId === bucketId &&
 				held.rpId === rpId &&
-				held.copiedAt === undefined
+				held.copiedAt === undefined &&
+				(!full || held.conditional !== true)
 		)) {
 			counts.set(held.accountId, (counts.get(held.accountId) ?? 0) + 1);
 		}

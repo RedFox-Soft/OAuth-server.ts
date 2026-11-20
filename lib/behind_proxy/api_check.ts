@@ -257,7 +257,8 @@ async function evaluate({
 		token: {
 			scopes: presented.scopes,
 			signedInAt: presented.signedInAt,
-			signedInWithCode: hadCode(presented.acr)
+			/* Either says two factors: `acr` may be a weaker context the application asked for (specs/142 R2). */
+			signedInWithCode: hadCode(presented.acr) || presented.amr.includes('mfa')
 		},
 		headers,
 		person: await personFacts(api, presented.accountId, inPlay),

@@ -97,7 +97,9 @@ export type AdminErrorCode =
 	| 'invalid_address'
 	| 'attribute_matches_nobody'
 	/* A tool row with conditions while apps too old to name their tool are let in (specs/131 research R3). */
-	| 'old_clients_with_tool_conditions';
+	| 'old_clients_with_tool_conditions'
+	/* An application made to require a passkey in a project that does not accept them (specs/142). */
+	| 'passkeys_not_accepted';
 
 export class AdminError extends Error {
 	/*

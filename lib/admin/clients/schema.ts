@@ -127,6 +127,8 @@ const requireCodeConsent = {
 	expect: t.Optional(
 		t.Object({
 			withoutAuthenticator: t.Optional(PreviewCount),
+			/* The people without a confirmed passkey, when `requirePasskey` turns on (specs/142). */
+			withoutPasskey: t.Optional(PreviewCount),
 			providerOnly: t.Optional(PreviewCount),
 			holders: t.Optional(PreviewCount)
 		})
@@ -160,6 +162,8 @@ export const CreateClientBody = t.Object({
 	partialConsent: t.Optional(t.Boolean()),
 	// Every sign-in to it must include a code from an authenticator app (specs/127). Turning it on is previewed.
 	requireCode: t.Optional(t.Boolean()),
+	// Every sign-in to it must be with a passkey (specs/142). Turning it on is previewed; the project must accept them.
+	requirePasskey: t.Optional(t.Boolean()),
 	...requireCodeConsent,
 	backchannelTokenDeliveryMode: t.Optional(
 		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows
@@ -200,6 +204,8 @@ export const UpdateClientBody = t.Object({
 	partialConsent: t.Optional(t.Boolean()),
 	// Every sign-in to it must include a code from an authenticator app (specs/127). Turning it on is previewed.
 	requireCode: t.Optional(t.Boolean()),
+	// Every sign-in to it must be with a passkey (specs/142). Turning it on is previewed; the project must accept them.
+	requirePasskey: t.Optional(t.Boolean()),
 	...requireCodeConsent,
 	backchannelTokenDeliveryMode: t.Optional(
 		// 'push' is deliberately absent: nothing implements it (the backchannel result handler knows

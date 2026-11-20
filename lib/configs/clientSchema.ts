@@ -159,6 +159,15 @@ export const ClientSchema = t.Object({
 	'signIn.requireCode': t.Boolean(),
 
 	/*
+	 * signIn.requirePasskey
+	 *
+	 * description: Lets nobody into this application, or keep getting tokens for it, without a sign-in with a full
+	 * passkey at the browser that receives the result: the phishing-resistant context (specs/142). It includes
+	 * `signIn.requireCode`. An operator's decision, a base key no registration may name, for the reason that one is.
+	 */
+	'signIn.requirePasskey': t.Boolean(),
+
+	/*
 	 * registeredDynamically
 	 *
 	 * description: Whether this client was created on its own request through dynamic client

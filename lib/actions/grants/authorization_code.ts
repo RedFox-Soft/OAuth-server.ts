@@ -1,3 +1,7 @@
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../../client_policy/require_passkey.ts';
 import type { X509Certificate } from 'node:crypto';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
@@ -25,6 +29,7 @@ import { AuthorizationCode } from 'lib/models/authorization_code.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import { Grant } from 'lib/models/grant.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import { reachedAcr } from '../../helpers/acr_satisfaction.ts';
 import { assertSignInMeets } from '../../resources/sign_in_requirement.js';
 import { markRegistrationUsed } from '../../models/client/dynamic_registration.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
@@ -155,7 +160,10 @@ export const handler = async function authorizationCodeHandler(
 	 * The sign-in check stops this before a code is issued (specs/127); this holds for one issued in the moment before
 	 * the application was made to require a code.
 	 */
-	if (codeRequiredAndMissing(oidc.client, code.payload.acr)) {
+	if (passkeyRequiredAndMissing(oidc.client, reachedAcr(code.payload))) {
+		throw new InvalidGrant(REQUIRE_PASSKEY_DESCRIPTION);
+	}
+	if (codeRequiredAndMissing(oidc.client, reachedAcr(code.payload))) {
 		throw new InvalidGrant(REQUIRE_CODE_DESCRIPTION);
 	}
 
@@ -174,6 +182,7 @@ export const handler = async function authorizationCodeHandler(
 		sid: code.payload.sid,
 		authTime: code.payload.authTime,
 		acr: code.payload.acr,
+		signInAcr: code.payload.signInAcr,
 		amr: code.payload.amr
 	});
 
@@ -213,7 +222,7 @@ export const handler = async function authorizationCodeHandler(
 		at.resourceServer = new ResourceServer(resource, resourceServerInfo);
 		/* The API's sign-in requirement (specs/130), for a code issued before it was set or a sign-in that missed it. */
 		assertSignInMeets(at.resourceServer, {
-			acr: code.payload.acr,
+			acr: reachedAcr(code.payload),
 			authTime: code.payload.authTime
 		});
 		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
@@ -254,6 +263,7 @@ export const handler = async function authorizationCodeHandler(
 			bucketId: code.payload.bucketId,
 			accountId: account.accountId,
 			acr: code.payload.acr,
+			signInAcr: code.payload.signInAcr,
 			amr: code.payload.amr,
 			authTime: code.payload.authTime,
 			claims: code.payload.claims,

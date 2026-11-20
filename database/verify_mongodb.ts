@@ -31,6 +31,7 @@ import {
 	verifyMailTallyRace
 } from './verify_client_address.js';
 import { verifyPlans } from './verify_plans.js';
+import { verifyAcrPhishingResistant } from './verify_acr_phishing_resistant.js';
 import { verifyAdminSignUp } from './verify_admin_signup.js';
 
 /*
@@ -378,6 +379,36 @@ check(
 			apply: async () => {
 				const step = MIGRATIONS.find((m) =>
 					m.id.endsWith('client-address-source')
+				);
+				if (!step || 'noop' in step.mongodb) return null;
+				return step.mongodb.apply(db);
+			}
+		},
+		check
+	);
+	await verifyAcrPhishingResistant(
+		{
+			writeSettings: async (config) => {
+				if (config === null) {
+					await settings.deleteOne({ _id: settingsId });
+					return;
+				}
+				await settings.updateOne(
+					{ _id: settingsId },
+					{ $set: { config } },
+					{ upsert: true }
+				);
+			},
+			readSettings: async () => {
+				const config: unknown = (await settings.findOne({ _id: settingsId }))
+					?.config;
+				return config && typeof config === 'object'
+					? (config as Record<string, unknown>)
+					: null;
+			},
+			apply: async () => {
+				const step = MIGRATIONS.find((m) =>
+					m.id.endsWith('acr-phishing-resistant')
 				);
 				if (!step || 'noop' in step.mongodb) return null;
 				return step.mongodb.apply(db);

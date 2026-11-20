@@ -1,3 +1,7 @@
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../client_policy/require_passkey.ts';
 import type { TokenParams } from '../actions/token.js';
 import { findAccount } from '../addon/account.js';
 import { issuerFor } from '../configs/issuer.js';
@@ -86,6 +90,10 @@ async function fromIdToken(
 	 * An application that requires a code (specs/127) vouches for a person elsewhere only on a sign-in that gave one. A
 	 * refresh token as the subject is held to the same by `usableRefreshToken`.
 	 */
+	/* An assertion is no sign-in here, so it never meets a requirement of a passkey (specs/142 research R5). */
+	if (passkeyRequiredAndMissing(client, undefined)) {
+		throw refused(REQUIRE_PASSKEY_DESCRIPTION);
+	}
 	if (
 		codeRequiredAndMissing(
 			client,

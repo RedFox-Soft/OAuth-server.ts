@@ -6,6 +6,7 @@ import { RegistrationPage } from './registration.tsx';
 import { TotpPage } from './totpPage.tsx';
 import { CodeRequiredPage } from './codeRequiredPage.tsx';
 import { PasskeyOfferPage } from './passkeyOfferPage.tsx';
+import { PasskeyRequiredPage } from './passkeyRequiredPage.tsx';
 import type { SignInFace } from './signInMasthead.tsx';
 import { EndUserTheme } from '../html/theme/provider.tsx';
 import type { PaintedAccent } from '../html/theme/accent.ts';
@@ -107,6 +108,18 @@ function pageElement(
 				/>
 			);
 		case 'code-required':
+			/* An application's requirement of a passkey (specs/142) is served at the same address, told apart by its props. */
+			if ((props as { requirement?: unknown }).requirement === 'passkey') {
+				return (
+					<PasskeyRequiredPage
+						uid={uid}
+						face={UNNAMED}
+						requirement="passkey"
+						variant="passkeyAsk"
+						{...props}
+					/>
+				);
+			}
 			// The variant is the server's; the spread comes last so the server's value wins on hydration.
 			return (
 				<CodeRequiredPage

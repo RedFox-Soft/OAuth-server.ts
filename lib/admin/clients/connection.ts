@@ -1,3 +1,4 @@
+import { passkeysAccepted } from '../../passkeys/accepted.js';
 import { openidConfiguration } from '../../actions/discovery.js';
 import { accountPageUrl } from '../../account_page/client.js';
 import { addressing, type RequestBucket } from '../../configs/issuer.js';
@@ -28,6 +29,11 @@ export interface Connection {
 	 * asks for in `acr_values` and checks in the ID token. This instance's own value, not the default.
 	 */
 	multiFactorAcr: string;
+	/*
+	 * The context a passkey sign-in reports when an application asks for it (specs/142), present only where the project
+	 * accepts passkeys: elsewhere no sign-in produces it, and an application asking for it would turn everyone away.
+	 */
+	phishingResistantAcr?: string;
 }
 
 /* The members of a discovery document a client is configured with: its endpoints and where its keys are. */
@@ -41,7 +47,7 @@ export async function connectionOf(
 		redirectUris: readonly string[];
 		postLogoutRedirectUris?: readonly string[];
 	},
-	bucket: RequestBucket,
+	bucket: RequestBucket & { passkeyLogin?: boolean },
 	lastUsed: LastUsed | null
 ): Promise<Connection> {
 	const { issuer, discoveryUrl } = addressing(bucket);
@@ -67,6 +73,9 @@ export async function connectionOf(
 		endpoints,
 		signInPageUrl: issuer === null ? null : accountPageUrl(bucket),
 		lastUsed,
-		multiFactorAcr: configuration.acrMap.multi_factor
+		multiFactorAcr: configuration.acrMap.multi_factor,
+		...(passkeysAccepted(bucket)
+			? { phishingResistantAcr: configuration.acrMap.phishing_resistant }
+			: {})
 	};
 }

@@ -1,4 +1,4 @@
-import { ApplicationConfig, configuration } from '../configs/application.ts';
+import { ApplicationConfig } from '../configs/application.ts';
 import { ADMIN_BUCKET_ID } from '../admin/consts.ts';
 import { SL1_SIGNING_ALGORITHMS, type Sl1Rule } from '../consts/sl1.ts';
 import type { Client, ClientRecord } from '../models/client/types.ts';
@@ -154,22 +154,4 @@ export function sl1Algorithms<T extends string>(list: readonly T[]): T[] {
 	return sl1()
 		? list.filter((alg) => SL1_SIGNING_ALGORITHMS.has(alg))
 		: [...list];
-}
-
-/*
- * Whether a sign-in that reported `actual` satisfies a request naming any of `requested` (IPSIE SL1 §3.2.1: "authenticate
- * the user in a manner that satisfies one of the requested Authentication Context Class values"). A multi-factor sign-in
- * here is the password plus a second factor, so it satisfies a request for the password class too; Keycloak's levels
- * and Okta's `urn:okta:loa:*` order classes the same way. A federated sign-in satisfies only the federated class, and a
- * value this server does not define is never satisfied.
- */
-export function satisfiesAcr(
-	requested: readonly string[],
-	actual: string | undefined
-): boolean {
-	if (actual === undefined) return false;
-	const { acrMap } = configuration;
-	const satisfied = new Set([actual]);
-	if (actual === acrMap.multi_factor) satisfied.add(acrMap.password);
-	return requested.some((value) => satisfied.has(value));
 }

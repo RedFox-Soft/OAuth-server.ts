@@ -143,8 +143,38 @@ export function ClientFormFields({
 			 * Beside consent: it too is what a person passes through on the way in (specs/127). The explanation follows the
 			 * switch, so the off state says what an application can still do itself.
 			 */}
+			{/*
+			 * Above the code switch, which it includes (specs/142). Unavailable while the project does not accept passkeys:
+			 * nobody could meet it, and the server refuses it.
+			 */}
 			<Form.Item<FormValues>
-				shouldUpdate={(prev, cur) => prev.requireCode !== cur.requireCode}
+				shouldUpdate={(prev, cur) => prev.requirePasskey !== cur.requirePasskey}
+				noStyle
+			>
+				{() => (
+					<Form.Item
+						name="requirePasskey"
+						label="Require a passkey"
+						valuePropName="checked"
+						extra={
+							!passkeys && !form.getFieldValue('requirePasskey')
+								? 'Turn on passkeys on the Sign-in tab first.'
+								: form.getFieldValue('requirePasskey')
+									? 'Only people who sign in with a passkey can open this application. A fake sign-in page can’t use a passkey. People without one are asked to create one; people who sign in through a provider, and devices that sign in with a code shown on a TV or console, can’t open it. Existing sign-ins keep working until the application next renews its tokens.'
+									: 'Off: a passkey counts as two-step sign-in, and the application can still ask for one when it sends people to sign in.'
+						}
+					>
+						<Switch
+							disabled={!passkeys && !form.getFieldValue('requirePasskey')}
+						/>
+					</Form.Item>
+				)}
+			</Form.Item>
+			<Form.Item<FormValues>
+				shouldUpdate={(prev, cur) =>
+					prev.requireCode !== cur.requireCode ||
+					prev.requirePasskey !== cur.requirePasskey
+				}
 				noStyle
 			>
 				{() => (
@@ -153,9 +183,11 @@ export function ClientFormFields({
 						label="Require two-step sign-in"
 						valuePropName="checked"
 						extra={
-							form.getFieldValue('requireCode')
-								? `Everyone who opens this application has used ${secondStepWords(passkeys)} in this sign-in: once per sign-in, not every time they open it, and with no limit on how long ago. People without one, and people who sign in through a provider, can’t open it. Existing sign-ins keep working until the application next renews its tokens. Assertion grants (JWT bearer, identity assertions) are refused, and a token exchange needs two-step sign-in.`
-								: 'Off: the application gets the sign-in the person already has. It can still ask for two-step sign-in when it sends people to sign in.'
+							form.getFieldValue('requirePasskey')
+								? 'Included in Require a passkey.'
+								: form.getFieldValue('requireCode')
+									? `Everyone who opens this application has used ${secondStepWords(passkeys)} in this sign-in: once per sign-in, not every time they open it, and with no limit on how long ago. People without one, and people who sign in through a provider, can’t open it. Existing sign-ins keep working until the application next renews its tokens. Assertion grants (JWT bearer, identity assertions) are refused, and a token exchange needs two-step sign-in.`
+									: 'Off: the application gets the sign-in the person already has. It can still ask for two-step sign-in when it sends people to sign in.'
 						}
 					>
 						<Switch />

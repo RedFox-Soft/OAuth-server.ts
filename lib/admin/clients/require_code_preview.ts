@@ -33,7 +33,10 @@ function people(n: number, one: string, many: string): string {
 }
 
 /* Distinct people with a live sign-in to the application in this project. */
-async function holdersOf(clientId: string, bucketId: string): Promise<number> {
+export async function holdersOf(
+	clientId: string,
+	bucketId: string
+): Promise<number> {
 	const stored = await adapter('Grant').findByOwner('clientId', clientId);
 	const grants = await Promise.all(
 		stored.map((record) => Grant.fromStored(record))

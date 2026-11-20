@@ -27,6 +27,10 @@ import { assertApplicationRoom } from '../../plans/enforce.js';
 import { connectionOf } from './connection.js';
 import { readClientUsage } from '../../models/client/usage.js';
 import { requireCodePreview } from './require_code_preview.js';
+import {
+	assertPasskeysAccepted,
+	requirePasskeyPreview
+} from './require_passkey_preview.js';
 import { sameExpect } from '../buckets/sign_in_preview.js';
 import { parseClientIdentifierUrl } from '../../client_metadata_document/identifier.js';
 
@@ -50,12 +54,45 @@ function loadBucket(
  * The application under this bucket, answered exactly as a missing one when the bucket does not hold it,
  * so naming another bucket's application tells the caller nothing about it.
  */
+type Preview = {
+	consequences: string[];
+	expect: Record<string, number>;
+	changes: string[];
+};
+
 /*
- * The 409 that turning `requireCode` on answers until it is confirmed with the counts it previewed (specs/127): the
+ * The previews of what turning `requireCode` (specs/127) and `requirePasskey` (specs/142) on would do, as one: both may
+ * turn on in one change, and one confirmation must then cover both counts. Null when neither turns on.
+ */
+async function requirementPreview(
+	bucket: UserBucket,
+	current:
+		| { clientId: string; requireCode: boolean; requirePasskey: boolean }
+		| undefined,
+	changes: { requireCode?: boolean; requirePasskey?: boolean }
+): Promise<Preview | null> {
+	assertPasskeysAccepted(bucket, changes.requirePasskey);
+	const previews = [
+		await requirePasskeyPreview(bucket, current, changes.requirePasskey),
+		await requireCodePreview(bucket, current, changes.requireCode)
+	].filter((preview) => preview !== null);
+	if (previews.length === 0) return null;
+	return {
+		consequences: [...new Set(previews.flatMap((p) => p.consequences))],
+		expect: previews.reduce<Record<string, number>>(
+			(all, p) => ({ ...all, ...p.expect }),
+			{}
+		),
+		changes: previews.flatMap((p) => p.changes)
+	};
+}
+
+/*
+ * The 409 that turning a requirement on answers until it is confirmed with the counts it previewed (specs/127): the
  * protocol of the project PATCH, so the console and an agent consent the same way. Null when the change may go ahead.
  */
 function consentRefused(
-	preview: Awaited<ReturnType<typeof requireCodePreview>>,
+	preview: Preview | null,
 	confirm: boolean | undefined,
 	expect: Readonly<Record<string, number | undefined>> | undefined
 ) {
@@ -173,11 +210,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 				}
 			}
 			// Before the audit entry, so nothing is recorded for a change that was only described.
-			const preview = await requireCodePreview(
-				bucket,
-				undefined,
-				metadata.requireCode
-			);
+			const preview = await requirementPreview(bucket, undefined, metadata);
 			const refused = consentRefused(preview, confirm, expect);
 			if (refused) return status(409, refused);
 			await recordAdminAudit(ctx, 'client.create', clientId, scopeOf(bucket));
@@ -207,11 +240,7 @@ export const clientRoutes = new Elysia({ name: 'admin-clients' })
 			assertManaged(current);
 			const { confirm, expect, ...changes } = body;
 			// Before the audit entry, so nothing is recorded for a change that was only described.
-			const preview = await requireCodePreview(
-				bucket,
-				current,
-				changes.requireCode
-			);
+			const preview = await requirementPreview(bucket, current, changes);
 			const refused = consentRefused(preview, confirm, expect);
 			if (refused) return status(409, refused);
 			await recordAdminAudit(ctx, 'client.update', params.clientId, {

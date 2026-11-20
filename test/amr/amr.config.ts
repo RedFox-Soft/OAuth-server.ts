@@ -13,6 +13,7 @@ export const ApplicationConfig = {
 	acrValues: {
 		password: 'urn:example:acr:pwd',
 		multi_factor: 'urn:example:acr:mfa',
+		phishing_resistant: 'urn:example:acr:phr',
 		federated: 'urn:example:acr:federated'
 	}
 };

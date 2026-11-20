@@ -7,6 +7,7 @@ import { expiresWithSession, rarForAuthorizationCode } from '../addon/index.js';
 import { includeSid } from '../models/client/checks.ts';
 import { isRecord } from './_/object.ts';
 import { signInOf } from '../activity/kinds.js';
+import { reportedAcr } from './acr_satisfaction.ts';
 
 async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 	const grant = oidc.require('Grant');
@@ -22,7 +23,9 @@ async function codeHandler(oidc: OIDCContext<PipelineParams>) {
 		/* The address this request was made to — there is no earlier artifact to inherit from. */
 		bucketId: oidc.bucket._id,
 		accountId: oidc.session.payload.accountId,
-		acr: oidc.acr,
+		/* What the application is told, and what the sign-in reached (specs/142 research R2, R3). */
+		acr: reportedAcr(oidc.acr, oidc.claims),
+		signInAcr: oidc.acr,
 		amr: oidc.amr,
 		authTime: oidc.session.authTime(),
 		claims: oidc.claims,

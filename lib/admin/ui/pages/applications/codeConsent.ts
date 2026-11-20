@@ -9,6 +9,7 @@ interface Preview {
 	confirmationRequired: true;
 	consequences: string[];
 	expect: Record<string, number>;
+	changes?: string[];
 }
 
 function isPreview(body: unknown): body is Preview {
@@ -54,7 +55,9 @@ export function useCodeConsent(
 					? await confirm('behindProxy.codeCondition.confirm', asked)
 					: of === 'api'
 						? await confirm('resource.signIn.confirm', asked)
-						: await confirm('client.requireCode.confirm', asked);
+						: preview.changes?.includes('requirePasskeyOn')
+							? await confirm('client.requirePasskey.confirm', asked)
+							: await confirm('client.requireCode.confirm', asked);
 			return agreed ? send(go, name, preview.expect) : null;
 		}
 		return result;

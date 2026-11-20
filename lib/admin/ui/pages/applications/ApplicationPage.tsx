@@ -113,10 +113,16 @@ export function ApplicationPage({
 				]}
 				title={name}
 				tags={
-					client?.registeredDynamically || client?.requireCode ? (
+					client?.registeredDynamically ||
+					client?.requireCode ||
+					client?.requirePasskey ? (
 						<>
 							{client.registeredDynamically ? <Tag>Self-registered</Tag> : null}
-							{client.requireCode ? <Tag>Two-step required</Tag> : null}
+							{client.requirePasskey ? (
+								<Tag>Passkey required</Tag>
+							) : client.requireCode ? (
+								<Tag>Two-step required</Tag>
+							) : null}
 						</>
 					) : undefined
 				}

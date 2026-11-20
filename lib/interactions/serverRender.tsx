@@ -12,6 +12,10 @@ import {
 	PasskeyOfferPage,
 	type PasskeyOfferPageProps
 } from './passkeyOfferPage.js';
+import {
+	PasskeyRequiredPage,
+	type PasskeyRequiredPageProps
+} from './passkeyRequiredPage.js';
 import type { ConsentView } from './consentView.js';
 import type { SwitcherProps } from './languageSwitch.js';
 import type { OfferedProvider } from './signInOptions.js';
@@ -395,6 +399,45 @@ export async function passkeyOfferServer(
 	);
 	return htmlResponse(html, {
 		status: options.status ?? 200,
+		handOffTo: options.handOffTo,
+		language
+	});
+}
+
+/*
+ * An application requires a passkey and this sign-in was not one (specs/142), at the two-step page's address. Every
+ * value the page reads is in the props too, the creation options included.
+ */
+export async function passkeyRequiredServer(
+	props: Omit<PasskeyRequiredPageProps, 'logoSrc' | 'face' | 'requirement'>,
+	options: {
+		handOffTo?: string;
+		language?: Language;
+		accent?: PaintedAccent;
+		face?: SignInFace;
+		switcher?: SwitcherProps;
+	}
+) {
+	const language = options.language ?? 'en';
+	const face = faceOr(options.face);
+	const logoSrc = versionedAsset('logo.svg');
+	const all = {
+		...props,
+		requirement: 'passkey' as const,
+		logoSrc,
+		face,
+		...(options.switcher ? { switcher: options.switcher } : {})
+	};
+	const html = hydratedPage(
+		await htmlTeamplate.text(),
+		SIGN_IN_TEXTS[language].titles.passkeyRequired,
+		all,
+		<PasskeyRequiredPage {...all} />,
+		language,
+		options.accent
+	);
+	return htmlResponse(html, {
+		status: 200,
 		handOffTo: options.handOffTo,
 		language
 	});

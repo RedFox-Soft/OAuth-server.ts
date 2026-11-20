@@ -43,7 +43,8 @@ the client, or the registration endpoint from the project address it was reached
 
 An RFC 7592 `PUT` rebuilds the record from its body and carries over only the base keys
 `lib/actions/registration.ts` names. Since spec 127 that includes `signIn.requireCode`, an administrator's requirement
-of a code, which would otherwise fall back to its default and let an application lift it by registering itself again.
+of a code, which would otherwise fall back to its default and let an application lift it by registering itself again;
+since spec 142 also `signIn.requirePasskey`, for the same reason ([[acr-satisfaction]]).
 `consent.partial` is not carried and returns to `false`: that fails narrow, so it was left.
 
 ## Three things that fail silently if you get them wrong

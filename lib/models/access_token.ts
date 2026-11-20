@@ -32,6 +32,8 @@ export const AccessTokenPayload = t.Object({
 	 */
 	authTime: t.Optional(t.Number()),
 	acr: t.Optional(t.String()),
+	/* The context the sign-in reached (specs/142 research R2); never put in a JWT, where `acr` and `amr` speak. */
+	signInAcr: t.Optional(t.String()),
 	amr: t.Optional(t.Array(t.String()))
 });
 export type AccessTokenPayloadType = Static<typeof AccessTokenPayload>;

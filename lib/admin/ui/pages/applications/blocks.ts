@@ -151,14 +151,23 @@ export function agentBlock(
 				: '3. This is a public client: no secret; PKCE is what protects the code.',
 			'4. Validate the ID token issuer against the issuer above.'
 		);
-		// specs/127: say what the app gets, or how it can ask for a code on some pages only.
-		if (view.requireCode) {
+		// specs/127, specs/142: say what the app gets, or how it can ask for two-step sign-in or a passkey on some pages.
+		if (view.requirePasskey) {
 			lines.push(
-				'Every sign-in to this app includes a code from an authenticator app; no parameter is needed. A person turned away comes back with error=unmet_authentication_requirements: show a page that explains it.'
+				'Every sign-in to this app is with a passkey (phishing-resistant); no parameter is needed. A person turned away comes back with error=unmet_authentication_requirements: show a page that explains it.'
+			);
+		} else if (view.requireCode) {
+			lines.push(
+				'Every sign-in to this app includes two-step sign-in (a code from an authenticator app, or a passkey); no parameter is needed. A person turned away comes back with error=unmet_authentication_requirements: show a page that explains it.'
 			);
 		} else if (connection.multiFactorAcr) {
 			lines.push(
-				`To ask for a code from an authenticator app only on some pages, send acr_values=${connection.multiFactorAcr} and check acr in the ID token.`
+				`To ask for two-step sign-in only on some pages, send acr_values=${connection.multiFactorAcr}. The ID token carries it when the sign-in included a code or a passkey; amr says which (otp a code, pop a passkey, mfa in both).`
+			);
+		}
+		if (!view.requirePasskey && connection.phishingResistantAcr) {
+			lines.push(
+				`To ask for a passkey (phishing-resistant), send acr_values=${connection.phishingResistantAcr}: the ID token carries it only after a passkey sign-in; made essential, people without one are refused with unmet_authentication_requirements.`
 			);
 		}
 	}

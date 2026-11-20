@@ -29,7 +29,12 @@ const ALTERNATIVES: Record<string, unknown> = {
 		'https://example.test/type': { label: 'Example' }
 	},
 	scopes: ['openid'],
-	acrValues: { password: 'pwd', multi_factor: 'mfa', federated: 'fed' },
+	acrValues: {
+		password: 'pwd',
+		multi_factor: 'mfa',
+		phishing_resistant: 'phr',
+		federated: 'fed'
+	},
 	claims: {
 		acr: null,
 		sid: null,

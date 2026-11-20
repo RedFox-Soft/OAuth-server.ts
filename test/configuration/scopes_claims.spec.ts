@@ -100,11 +100,17 @@ describe('custom claims', () => {
 		ApplicationConfig.acrValues = {
 			password: 'bronze',
 			multi_factor: 'silver',
+			phishing_resistant: 'platinum',
 			federated: 'gold'
 		};
 		reloadConfiguration();
 
 		expect(configuration.claimsSupported).toContain('acr');
-		expect([...configuration.acrValues]).toEqual(['bronze', 'silver', 'gold']);
+		expect([...configuration.acrValues]).toEqual([
+			'bronze',
+			'silver',
+			'platinum',
+			'gold'
+		]);
 	});
 });

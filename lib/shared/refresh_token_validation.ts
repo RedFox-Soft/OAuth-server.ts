@@ -1,3 +1,8 @@
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../client_policy/require_passkey.ts';
+import { reachedAcr } from '../helpers/acr_satisfaction.ts';
 import type { X509Certificate } from 'node:crypto';
 
 import type { TokenParams } from '../actions/token.js';
@@ -151,7 +156,10 @@ export async function usableRefreshToken(
 	 * refresh tokens live: turning the requirement on would otherwise leave weeks of password-only tokens in it. The
 	 * application sends the person to sign in again, this time with a code.
 	 */
-	if (codeRequiredAndMissing(client, refreshToken.payload.acr)) {
+	if (passkeyRequiredAndMissing(client, reachedAcr(refreshToken.payload))) {
+		throw new RefreshTokenRefused(REQUIRE_PASSKEY_DESCRIPTION);
+	}
+	if (codeRequiredAndMissing(client, reachedAcr(refreshToken.payload))) {
 		throw new RefreshTokenRefused(REQUIRE_CODE_DESCRIPTION);
 	}
 

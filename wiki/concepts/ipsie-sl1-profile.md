@@ -75,9 +75,10 @@ walk on a real database found it. So in the three RS256-defaulted attributes a s
 listed as `default_algorithm`, and the write refuses RS256 only when it adds or changes it.
 
 **The `acr` ladder.** A multi-factor sign-in here is the password plus a second factor, so it satisfies a request for the
-password class (`satisfiesAcr`, `lib/sl1/rules.ts:163`). A federated sign-in satisfies only the federated class. Keycloak
-(levels of assurance) and Okta (`urn:okta:loa:*`) order classes the same way. The existing essential-`acr` checks
-compare exactly and are untouched, so a server with the profile off answers as before.
+password class, and a phishing-resistant one (a full passkey) satisfies both. A federated sign-in satisfies only the
+federated class. Keycloak (levels of assurance) and Okta (`urn:okta:loa:*`) order classes the same way. Since spec 142
+this is the one table every check reads (`satisfiesAny`, `lib/helpers/acr_satisfaction.ts`; `satisfiesAcr` is gone),
+the essential checks included ([[acr-satisfaction]]).
 
 ## What turning it on needs
 

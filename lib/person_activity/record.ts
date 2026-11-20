@@ -1,3 +1,4 @@
+import { meets } from '../helpers/acr_satisfaction.ts';
 import { randomUUID } from 'node:crypto';
 
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
@@ -15,7 +16,6 @@ import type { ApiReason } from '../behind_proxy/answers.js';
 import { parseAddress, type Address } from '../behind_proxy/net.js';
 import {
 	ApplicationConfig,
-	configuration,
 	onSettingsApplied
 } from '../configs/application.js';
 import {
@@ -188,7 +188,7 @@ export function noteSignedIn(input: {
 				? 'provider'
 				: input.login.amr?.includes('pop')
 					? 'passkey'
-					: input.login.acr === configuration.acrMap.multi_factor
+					: meets(input.login.acr, 'multi_factor')
 						? 'password_code'
 						: 'password';
 		const device = deviceOf(input.request.headers.get('user-agent'));
@@ -223,7 +223,9 @@ export type SignInRefusal =
 	| 'code_required'
 	| 'provider_closed'
 	/* A passkey of a known account refused at the passkey door (specs/139): never for a passkey nobody here holds. */
-	| 'passkey_refused';
+	| 'passkey_refused'
+	/* An application requires a passkey and this sign-in was not one (specs/142). */
+	| 'passkey_required';
 
 export function noteSignInRefused(input: {
 	bucketId: string;

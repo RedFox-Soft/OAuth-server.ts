@@ -51,6 +51,14 @@ export const ACTIONS = {
 		cancelText: 'Keep editing'
 	},
 
+	// Turns everyone who did not sign in with a passkey away from the application (specs/142), asked with the counts.
+	'client.requirePasskey.confirm': {
+		class: 'C2',
+		title: (t) => `Require a passkey for ${t}?`,
+		okText: 'Require a passkey',
+		cancelText: 'Keep editing'
+	},
+
 	// Turns machines, assertion sign-ins and people without a code away from an API (specs/130): asked with the counts.
 	'resource.signIn.confirm': {
 		class: 'C2',

@@ -40,6 +40,7 @@ function put(cookie: string, acrValues: unknown) {
 const named = {
 	password: 'bronze',
 	multi_factor: 'silver',
+	phishing_resistant: 'platinum',
 	federated: 'gold'
 };
 
@@ -76,7 +77,12 @@ describe('naming the authentication contexts', () => {
 	it('advertises the renamed values from the next request, without a restart', async () => {
 		await put(cookie, named);
 
-		expect([...configuration.acrValues]).toEqual(['bronze', 'silver', 'gold']);
+		expect([...configuration.acrValues]).toEqual([
+			'bronze',
+			'silver',
+			'platinum',
+			'gold'
+		]);
 		expect(configuration.claimsSupported).toContain('acr');
 	});
 
@@ -102,11 +108,21 @@ describe('naming the authentication contexts', () => {
 	it('refuses an authentication the server cannot distinguish', async () => {
 		const { response, error } = await put(cookie, {
 			...named,
-			retina_scan: 'platinum'
+			retina_scan: 'diamond'
 		});
 
 		expect(response.status).toBe(422);
 		expect(JSON.stringify(error?.value)).toContain("names 'retina_scan'");
+	});
+
+	it('refuses names saved without the phishing-resistant context, naming it', async () => {
+		const { phishing_resistant: _missing, ...beforePasskeys } = named;
+		const { response, error } = await put(cookie, beforePasskeys);
+
+		expect(response.status).toBe(422);
+		expect(JSON.stringify(error?.value)).toContain(
+			'acrValues.phishing_resistant must be a non-empty string'
+		);
 	});
 
 	it('refuses a list, which cannot say which authentication a value describes', async () => {

@@ -26,6 +26,7 @@ import { IdToken } from 'lib/models/id_token.js';
 import { RefreshToken } from 'lib/models/refresh_token.js';
 import { AccessToken } from 'lib/models/access_token.js';
 import ResourceServer from 'lib/helpers/resource_server.js';
+import { reachedAcr } from '../../helpers/acr_satisfaction.ts';
 import { assertSignInMeets } from '../../resources/sign_in_requirement.js';
 import type { DPoPProof } from 'lib/helpers/validate_dpop.js';
 import { resourceTokenGroups } from '../../bucket_groups/claim.js';
@@ -114,7 +115,7 @@ export const handler = async function refreshTokenHandler(
 			)
 		: undefined;
 	assertSignInMeets(resourceServer, {
-		acr: refreshToken.payload.acr,
+		acr: reachedAcr(refreshToken.payload),
 		authTime: refreshToken.payload.authTime
 	});
 
@@ -143,6 +144,7 @@ export const handler = async function refreshTokenHandler(
 			bucketId: refreshToken.payload.bucketId,
 			accountId: refreshToken.payload.accountId,
 			acr: refreshToken.payload.acr,
+			signInAcr: refreshToken.payload.signInAcr,
 			amr: refreshToken.payload.amr,
 			authTime: refreshToken.payload.authTime,
 			claims: refreshToken.payload.claims,
@@ -187,6 +189,7 @@ export const handler = async function refreshTokenHandler(
 		/* The original sign-in, not this refresh: a refresh is not a person signing in again. */
 		authTime: refreshToken.payload.authTime,
 		acr: refreshToken.payload.acr,
+		signInAcr: refreshToken.payload.signInAcr,
 		amr: refreshToken.payload.amr
 	});
 

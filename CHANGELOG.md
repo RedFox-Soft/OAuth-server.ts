@@ -24,9 +24,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   way in. After a password sign-in people are offered a passkey (spec 141; `passkeyOffer`, on by default): after a
   password and a code it is two-step at once, after a password alone it works like the password until confirmed from
   its mail in the same browser, and any reset or "This wasn't me" removes it. The account page keeps the browser's
-  passkey list current, and each project host serves `/.well-known/passkey-endpoints`. **Upgrade note:** run
-  `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then `db:migrate` (one
-  fence migration).
+  passkey list current, and each project host serves `/.well-known/passkey-endpoints`. A full passkey now reaches a
+  fourth `acr`, phishing-resistant (`phr` by default; spec 142): an app is told it only when it asks for it, and an app
+  that names `acr` values is told the strongest of them the sign-in met, so one that asks for the multi-factor value
+  keeps getting it. A sign-in confirmed with a device code or on a back channel never reaches it, and discovery lists
+  it only for projects that accept passkeys. An app can **Require a passkey** (`requirePasskey`), previewed like
+  "Require two-step sign-in"; people turned away can create a passkey on the spot. **Upgrade note:** run
+  `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then `db:migrate` (two
+  migrations: a fence, and naming `phishing_resistant` in a stored `acrValues`; the server refuses to start until
+  it has run).
 
 ### Fixed
 

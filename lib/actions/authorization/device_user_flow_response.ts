@@ -7,6 +7,10 @@ import { expiresWithSession } from '../../addon/index.js';
 import { eventBus } from '../../event_bus.js';
 import { includeSid } from 'lib/models/client.js';
 import { signInOf } from '../../activity/kinds.js';
+import {
+	capForOtherBrowser,
+	reportedAcr
+} from '../../helpers/acr_satisfaction.ts';
 
 export default async function deviceVerificationResponse(
 	oidc: OIDCContext<PipelineParams>
@@ -19,10 +23,17 @@ export default async function deviceVerificationResponse(
 		oidc.resourceServers
 	);
 
+	/*
+	 * The browser that confirmed the code is not the device that receives the tokens, so a passkey sign-in here resisted
+	 * no phishing of the code itself (specs/142 research R4, `11-critique-security` S11): the device's tokens reach no
+	 * more than the multi-factor context. The session keeps what it reached, for that browser's own sign-ins.
+	 */
+	const reached = capForOtherBrowser(oidc.acr);
 	const resources = Object.keys(oidc.resourceServers);
 	Object.assign(code.payload, {
 		accountId: oidc.session.payload.accountId,
-		acr: oidc.acr,
+		acr: reportedAcr(reached, oidc.claims),
+		signInAcr: reached,
 		amr: oidc.amr,
 		authTime: oidc.session.authTime(),
 		claims: oidc.claims,

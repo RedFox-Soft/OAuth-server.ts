@@ -65,6 +65,8 @@ export const BASE_METADATA_KEYS = [
 	 * judgement of what the application holds, never something it may claim or waive about itself (specs/127).
 	 */
 	'signIn.requireCode',
+	/* The same judgement about a passkey (specs/142): an operator's, never the application's to claim or waive. */
+	'signIn.requirePasskey',
 	/*
 	 * Whether the server created this client on its own request. A base key rather than recognised
 	 * metadata: it is not something a client may send — `lib/actions/registration.ts` sets it after the

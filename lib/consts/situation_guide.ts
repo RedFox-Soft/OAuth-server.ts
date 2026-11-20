@@ -2129,6 +2129,83 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		)
 	},
 	{
+		id: 'apppasskey',
+		tab: 'product',
+		title: 'Only let people in with a passkey',
+		sentence:
+			'One application, such as payments, lets nobody in without a passkey, a sign-in a fake site can’t use. The other applications of the project stay as they are.',
+		protocol: 'OpenID Connect acr · phr',
+		lanes: lanes('person', 'app', 'fox', 'passkey'),
+		steps: [
+			step(
+				'person',
+				'app',
+				'Opens it',
+				'The person opens the application and is sent to sign in.'
+			),
+			step(
+				'app',
+				'fox',
+				'Sign in',
+				'The application asks FoxAuth to sign the person in.'
+			),
+			step(
+				'person',
+				'passkey',
+				'Fingerprint or face',
+				'The person signs in with a passkey. Someone without one can create it right there and continue.'
+			),
+			step(
+				'passkey',
+				'fox',
+				'Signed answer',
+				'The device signs for this project’s address only, which a fake page cannot get.',
+				'request'
+			),
+			step(
+				'fox',
+				'app',
+				'Signed in with a passkey',
+				'FoxAuth tells the application the sign-in was with a passkey.',
+				'token'
+			)
+		],
+		problem: {
+			at: 'app',
+			mark: 'password',
+			caption:
+				'A password and a code typed into a fake page open the payments app.',
+			lanes: ['person', 'app']
+		},
+		fixCaption: 'The payments app takes only passkey sign-ins.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'A passkey sign-in, once per sign-in',
+				'Without a passkey, a page that offers to create one and continue',
+				'A sign-in through a provider, or with a code shown on a TV, is told it cannot open this app'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open Applications',
+			target: { area: 'applications' }
+		},
+		goodToKnow: [
+			'Turn on Passkeys on the project’s Sign-in tab first, then "Require a passkey" in the application’s Settings. Before it saves, you see how many people have no confirmed passkey.',
+			'A passkey made after a password alone counts once the person confirms it from our email, in the same browser.',
+			'Refresh tokens from other sign-ins stop working, so people sign in again with a passkey.',
+			'People who sign in through a provider, and devices that sign in with a code shown on a TV, cannot open the app this way.',
+			'To ask for a passkey only on some pages, the application sends acr_values=phr (the Connect tab shows this project’s value).'
+		],
+		prompt: prompt(
+			'Make my payments application in FoxAuth require a passkey, and tell me first how many people that affects.',
+			'client_update (requirePasskey)',
+			'Make my app show a helpful page when it receives unmet_authentication_requirements.'
+		)
+	},
+	{
 		id: 'apicode',
 		tab: 'product',
 		title: 'Ask for two-step sign-in to connect an MCP server or API',

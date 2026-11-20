@@ -1,3 +1,7 @@
+import {
+	passkeyRequiredAndMissing,
+	REQUIRE_PASSKEY_DESCRIPTION
+} from '../../client_policy/require_passkey.ts';
 import type { OIDCContext } from 'lib/helpers/oidc_context.js';
 import type { TokenParams } from 'lib/actions/token.js';
 import {
@@ -131,6 +135,9 @@ export async function jwtBearer(
 	 * An application that requires a code (specs/127) is reached only through a sign-in here in which the person typed
 	 * one. An outside issuer's assertion is not such a sign-in, whatever it says about its own second factor.
 	 */
+	if (passkeyRequiredAndMissing(client, undefined)) {
+		throw new InvalidGrant(REQUIRE_PASSKEY_DESCRIPTION);
+	}
 	if (codeRequiredAndMissing(client, undefined)) {
 		throw new InvalidGrant(REQUIRE_CODE_DESCRIPTION);
 	}

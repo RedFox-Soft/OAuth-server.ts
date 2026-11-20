@@ -7,7 +7,8 @@ export const zhHans: SignInTexts = {
 		totpEnroll: '设置身份验证器',
 		totpVerify: '两步验证',
 		codeRequired: '需要两步登录',
-		passkeyOffer: '下次登录更快'
+		passkeyOffer: '下次登录更快',
+		passkeyRequired: '需要使用通行密钥登录'
 	},
 
 	headings: {
@@ -151,6 +152,28 @@ export const zhHans: SignInTexts = {
 			'我们已向 {email} 发送一封邮件。请在此浏览器中打开它，并选择“是的，是我本人”以完成设置。',
 		continueApp: '继续前往 {app}',
 		continueAny: '继续'
+	},
+
+	passkeyRequired: {
+		headingApp: '{app} 要求您使用通行密钥登录',
+		headingAny: '您要登录的应用要求您使用通行密钥登录',
+		explain: '通行密钥让您用指纹、面容或屏幕锁登录，而且仿冒网站无法使用它。',
+		held: '您的账号 {email} 有通行密钥。用它登录即可继续。',
+		notConfirmed:
+			'您的通行密钥尚未确认。请在此浏览器中打开关于它的邮件并选择“是的，是我本人”，然后在这里用它登录。',
+		none: '您的账号 {email} 还没有通行密钥。',
+		ask: '您无法在这里创建通行密钥。请联系 {service} 的管理员。',
+		device:
+			'此次登录是通过另一台设备上显示的验证码发起的。通行密钥登录必须在应用自己的浏览器中进行，因此这次登录无法打开它。',
+		signIn: '使用通行密钥登录',
+		create: '创建通行密钥',
+		cancelled: '通行密钥未创建。您可以重试。',
+		exists: '此设备上已有您账户的通行密钥。',
+		failed: '无法创建通行密钥。您可以重试。',
+		needsScript: '创建通行密钥需要 JavaScript。',
+		createdFull: '通行密钥已创建。用它登录即可继续。',
+		createdConditional:
+			'通行密钥已创建。我们已向 {email} 发送一封邮件。请在此浏览器中打开它并选择“是的，是我本人”，然后在这里用通行密钥登录。'
 	},
 
 	errors: {

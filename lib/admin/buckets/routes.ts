@@ -65,7 +65,12 @@ import {
 	type PasskeysLostByMove
 } from '../../passkeys/ways_in.js';
 import { assertAdminBucketChange } from './admin_bucket.js';
-import { sameExpect, signInCounts, signInPreview } from './sign_in_preview.js';
+import {
+	appsRequiringPasskey,
+	sameExpect,
+	signInCounts,
+	signInPreview
+} from './sign_in_preview.js';
 import {
 	assertSomeWayToSignIn,
 	prospectiveBucket
@@ -461,6 +466,8 @@ interface AddressChangeCounts {
 	/* Only when passkeys stop working (specs/140): their holders, and those of them left with no other way in. */
 	passkeyPeople?: number;
 	passkeyOnly?: number;
+	/* The applications requiring a passkey (specs/142), which then refuse everyone until people make new ones. */
+	appsRequiringPasskey?: number;
 }
 
 interface AddressChangePreview {
@@ -530,6 +537,8 @@ async function addressChangePreview(
 	 * simply stops offering it, and nobody is told. Counted, and those it leaves with no way in named (specs/140 R7).
 	 */
 	const passkeys = await passkeysLostByMove(bucket, rpIdFor(target));
+	const requiringPasskey =
+		passkeys === null ? [] : await appsRequiringPasskey(bucket._id);
 
 	return {
 		from: issuerFor(bucket),
@@ -551,13 +560,19 @@ async function addressChangePreview(
 				: {
 						passkeyPeople: passkeys.people,
 						passkeyOnly: passkeys.withoutOtherWay
-					})
+					}),
+			...(requiringPasskey.length === 0
+				? {}
+				: { appsRequiringPasskey: requiringPasskey.length })
 		},
 		consequence:
 			'the issuer identifier changes, so every application listed stops validating tokens until it is reconfigured, every identity provider listed refuses sign-in until its upstream registration has the new callback address, and every provisioning connection listed stops until its directory is re-pointed, every connected service listed refuses new connections until its registration has the new callback address; the previous address stops answering and everyone signed in signs in again' +
 			(passkeys === null
 				? ''
-				: '; every passkey listed stops working, because passkeys are tied to the address')
+				: '; every passkey listed stops working, because passkeys are tied to the address') +
+			(requiringPasskey.length === 0
+				? ''
+				: `; ${requiringPasskey.join(', ')} ${requiringPasskey.length === 1 ? 'requires' : 'require'} a passkey and will refuse everyone until people create new passkeys for the new address`)
 	};
 }
 
@@ -573,7 +588,8 @@ function sameCounts(
 		expected.resources === actual.resources &&
 		// Absent reads as none: a client that previewed before anyone held a passkey is refused only if someone now does.
 		(expected.passkeyPeople ?? 0) === (actual.passkeyPeople ?? 0) &&
-		(expected.passkeyOnly ?? 0) === (actual.passkeyOnly ?? 0)
+		(expected.passkeyOnly ?? 0) === (actual.passkeyOnly ?? 0) &&
+		(expected.appsRequiringPasskey ?? 0) === (actual.appsRequiringPasskey ?? 0)
 	);
 }
 

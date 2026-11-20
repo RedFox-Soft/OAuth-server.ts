@@ -11,7 +11,8 @@ export const en = {
 		totpEnroll: 'Set Up Authenticator',
 		totpVerify: 'Two-Step Verification',
 		codeRequired: 'Two-Step Sign-In Needed',
-		passkeyOffer: 'Sign in faster next time'
+		passkeyOffer: 'Sign in faster next time',
+		passkeyRequired: 'Passkey Sign-In Needed'
 	},
 
 	/*
@@ -209,6 +210,34 @@ export const en = {
 			'We sent an email to {email}. Open it in this browser and choose “Yes, this was me” to finish setting it up.',
 		continueApp: 'Continue to {app}',
 		continueAny: 'Continue'
+	},
+
+	/*
+	 * An application requires a passkey and this sign-in was not one (specs/142 contracts/sign-in-and-refusal.md). What
+	 * a passkey is in one sentence, and the one step that gets the person in from where they stand.
+	 */
+	passkeyRequired: {
+		headingApp: '{app} asks you to sign in with a passkey',
+		headingAny:
+			'The app you’re signing in to asks you to sign in with a passkey',
+		explain:
+			'A passkey lets you sign in with your fingerprint, face or screen lock, and a fake site can’t use it.',
+		held: 'Your account, {email}, has a passkey. Sign in with it to continue.',
+		notConfirmed:
+			'Your passkey isn’t confirmed yet. Open the email about it in this browser and choose “Yes, this was me”, then sign in with it here.',
+		none: 'Your account, {email}, doesn’t have a passkey yet.',
+		ask: 'You can’t create one here. Ask the people who run {service}.',
+		device:
+			'This sign-in was started with a code shown on another device. A passkey sign-in has to happen in the app’s own browser, so this one can’t open it.',
+		signIn: 'Sign in with your passkey',
+		create: 'Create a passkey',
+		cancelled: 'The passkey wasn’t created. You can try again.',
+		exists: 'This device already has a passkey for your account.',
+		failed: 'We couldn’t create the passkey. You can try again.',
+		needsScript: 'Creating a passkey needs JavaScript.',
+		createdFull: 'Passkey created. Sign in with it to continue.',
+		createdConditional:
+			'Passkey created. We sent an email to {email}. Open it in this browser and choose “Yes, this was me”, then sign in with your passkey here.'
 	},
 
 	errors: {

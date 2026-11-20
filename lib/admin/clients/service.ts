@@ -47,6 +47,8 @@ export interface AdminClientView {
 	partialConsent: boolean;
 	/* Whether every sign-in to it must include a code from an authenticator app (specs/127). */
 	requireCode: boolean;
+	/* Whether every sign-in to it must be with a passkey (specs/142); it includes `requireCode`. */
+	requirePasskey: boolean;
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -190,6 +192,7 @@ export interface CreateClientInput extends KeyAndRequestInput {
 	requireConsent?: boolean;
 	partialConsent?: boolean;
 	requireCode?: boolean;
+	requirePasskey?: boolean;
 	backchannelTokenDeliveryMode?: string;
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: readonly string[];
@@ -301,7 +304,8 @@ function toMetadata(input: CreateClientInput, clientId: string) {
 		token_endpoint_auth_method: input.tokenEndpointAuthMethod,
 		'consent.require': input.requireConsent ?? true,
 		'consent.partial': input.partialConsent ?? false,
-		'signIn.requireCode': input.requireCode ?? false
+		'signIn.requireCode': input.requireCode ?? false,
+		'signIn.requirePasskey': input.requirePasskey ?? false
 	};
 	if (input.clientName !== undefined) metadata.client_name = input.clientName;
 	if (input.scope !== undefined) metadata.scope = input.scope;
@@ -347,6 +351,7 @@ function toView(client: Client): AdminClientView {
 		requireConsent: client['consent.require'],
 		partialConsent: client['consent.partial'],
 		requireCode: client['signIn.requireCode'],
+		requirePasskey: client['signIn.requirePasskey'],
 		backchannelTokenDeliveryMode: client.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
 			client.backchannelClientNotificationEndpoint,
@@ -463,6 +468,7 @@ export async function updateClient(
 		requireConsent: patch.requireConsent ?? existing['consent.require'],
 		partialConsent: patch.partialConsent ?? existing['consent.partial'],
 		requireCode: patch.requireCode ?? existing['signIn.requireCode'],
+		requirePasskey: patch.requirePasskey ?? existing['signIn.requirePasskey'],
 		backchannelTokenDeliveryMode:
 			patch.backchannelTokenDeliveryMode ??
 			existing.backchannelTokenDeliveryMode,

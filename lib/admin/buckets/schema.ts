@@ -100,7 +100,9 @@ export const ChangeBucketAddressBody = t.Object({
 			resources: PreviewCount,
 			/* Present when the preview said passkeys stop working (specs/140). */
 			passkeyPeople: t.Optional(PreviewCount),
-			passkeyOnly: t.Optional(PreviewCount)
+			passkeyOnly: t.Optional(PreviewCount),
+			/* Present when an application requiring a passkey would refuse everyone (specs/142). */
+			appsRequiringPasskey: t.Optional(PreviewCount)
 		})
 	)
 });
@@ -217,7 +219,9 @@ export const UpdateBucketBody = t.Object({
 			passwordWithoutAuthenticator: t.Optional(PreviewCount),
 			applications: t.Optional(PreviewCount),
 			listedAttempts: t.Optional(PreviewCount),
-			listedRightPassword: t.Optional(PreviewCount)
+			listedRightPassword: t.Optional(PreviewCount),
+			passkeyOnly: t.Optional(PreviewCount),
+			appsRequiringPasskey: t.Optional(PreviewCount)
 		})
 	)
 });

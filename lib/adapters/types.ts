@@ -2554,6 +2554,8 @@ export const ACTIVITY_REASONS = [
 	 * for an unknown passkey, whose account nobody knows.
 	 */
 	'passkey_refused',
+	/* An application requires a passkey and the sign-in was not one (specs/142). */
+	'passkey_required',
 	'other'
 ] as const;
 export type ActivityReason = (typeof ACTIVITY_REASONS)[number];
@@ -2889,7 +2891,9 @@ export interface PasskeyStoreInstance {
 	 */
 	holdingIn(
 		bucketId: string,
-		rpId: string
+		rpId: string,
+		/* `full`: leave conditional passkeys out, for a count of who can meet a requirement of a passkey (specs/142). */
+		options?: { full?: boolean }
 	): Promise<{ accountId: string; passkeys: number }[]>;
 	/*
 	 * Makes a conditional passkey full: removes `conditional` and `confirm` only where `conditional` is set. Answers

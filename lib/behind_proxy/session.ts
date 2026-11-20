@@ -1,3 +1,4 @@
+import { meets } from '../helpers/acr_satisfaction.ts';
 import crypto from 'node:crypto';
 
 import QuickLRU from 'quick-lru';
@@ -5,7 +6,6 @@ import QuickLRU from 'quick-lru';
 import { getUserStore } from '../adapters/index.js';
 import type { User } from '../adapters/types.js';
 import { groupIdsOfUser, groupNamesOf } from '../bucket_groups/service.js';
-import { configuration } from '../configs/application.js';
 import { ttl } from '../configs/liveTime.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
 import epochTime from '../helpers/epoch_time.js';
@@ -142,7 +142,7 @@ export async function readAppSession(
 		id,
 		accountId: record.accountId,
 		authTime: record.authTime ?? null,
-		withCode: record.acr === configuration.acrMap.multi_factor
+		withCode: meets(record.acr, 'multi_factor')
 	};
 }
 

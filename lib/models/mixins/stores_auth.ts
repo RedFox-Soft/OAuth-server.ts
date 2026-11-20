@@ -2,7 +2,13 @@ import { Type as t } from '@sinclair/typebox';
 
 export const authPayloadModel = t.Object({
 	accountId: t.Optional(t.String()),
+	/* The context reported to the application (specs/142 research R3): what every token and introspection carry. */
 	acr: t.Optional(t.String()),
+	/*
+	 * The context the sign-in reached, which every requirement is judged on (research R2). Absent on an artefact from
+	 * before the two were split, whose `acr` was both; read through `reachedAcr`.
+	 */
+	signInAcr: t.Optional(t.String()),
 	amr: t.Optional(t.Array(t.String())),
 	authTime: t.Optional(t.Number()),
 	claims: t.Optional(t.Object({})),

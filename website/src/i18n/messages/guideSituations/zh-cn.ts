@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = '905a0dced160';
+export const source = '0dcecfd5c16f';
 
 export default {
 	questions: {
@@ -1007,6 +1007,55 @@ export default {
 				'只有一步的登录所得的刷新令牌会失效，用户需要用两步重新登录。',
 				'通过身份提供方登录的人无法以这种方式打开此应用。',
 				'对于在你的代理之后的应用，请改为在路径的 “Ask to sign in again” 条件上勾选 “with two-step sign-in”。'
+			],
+			actionLabel: '打开应用'
+		},
+		apppasskey: {
+			title: '只允许使用通行密钥进入应用',
+			sentence:
+				'一个应用（例如支付）不允许任何人在没有通行密钥的情况下进入。仿冒网站无法使用这种登录。项目的其他应用保持不变。',
+			protocol: 'OpenID Connect acr · phr',
+			problemCaption: '在仿冒页面上输入的密码和验证码就能打开支付应用。',
+			fixCaption: '支付应用只接受通行密钥登录。',
+			lanes: {
+				person: '用户',
+				app: '你的应用',
+				fox: 'FoxAuth',
+				passkey: '手机或电脑'
+			},
+			steps: [
+				{
+					label: '打开应用',
+					text: '用户打开应用，被引导去登录。'
+				},
+				{
+					label: '登录',
+					text: '应用请 FoxAuth 为用户登录。'
+				},
+				{
+					label: '指纹或面容',
+					text: '用户使用通行密钥登录。没有通行密钥的人可以当场创建并继续。'
+				},
+				{
+					label: '签名的回答',
+					text: '设备只为这个项目的地址签名，仿冒页面无法得到这样的签名。'
+				},
+				{
+					label: '已使用通行密钥登录',
+					text: 'FoxAuth 告诉应用这次登录使用了通行密钥。'
+				}
+			],
+			sees: [
+				'使用通行密钥登录，每次登录一次',
+				'没有通行密钥时，会显示一个可以创建通行密钥并继续的页面',
+				'通过身份提供商登录或通过电视上显示的验证码登录时，会被告知无法以这种方式打开此应用'
+			],
+			goodToKnow: [
+				'先在项目的 Sign-in 标签页打开 Passkeys，再在应用的设置中打开“Require a passkey”。保存前，你会看到有多少人还没有已确认的通行密钥。',
+				'只凭密码登录后创建的通行密钥，需要用户在同一浏览器中通过我们的邮件确认后才算数。',
+				'其他登录方式得到的刷新令牌会失效，用户需要重新使用通行密钥登录。',
+				'通过身份提供商登录的人，以及通过电视上显示的验证码登录的设备，无法以这种方式打开该应用。',
+				'如果只想在某些页面要求通行密钥，应用可以发送 acr_values=phr（Connect 标签页会显示本项目的具体值）。'
 			],
 			actionLabel: '打开应用'
 		},

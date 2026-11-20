@@ -8,6 +8,7 @@ import {
 	DISTINCTION_FOR_METHOD,
 	SIGN_IN_METHODS
 } from 'lib/consts/amr.ts';
+import { SATISFIED_BY } from 'lib/consts/acr.ts';
 import { shaped } from 'test/shape.ts';
 import {
 	discoveryDocument,
@@ -114,10 +115,10 @@ describe('what the server says about authentication methods', () => {
 	});
 
 	// A relying party reads `mfa` as "two factors": it may appear only where the context says so, and must appear there.
-	it('reports mfa, for every way of signing in, exactly when that way reports the multi-factor context', () => {
+	it('reports mfa, for every way of signing in, exactly when that way meets the multi-factor context', () => {
 		for (const way of SIGN_IN_METHODS) {
 			expect(AMR_FOR_METHOD[way].includes('mfa'), way).toBe(
-				DISTINCTION_FOR_METHOD[way] === 'multi_factor'
+				SATISFIED_BY.multi_factor.includes(DISTINCTION_FOR_METHOD[way])
 			);
 		}
 	});

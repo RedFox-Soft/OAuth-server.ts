@@ -435,8 +435,13 @@ describe('Client metadata validation', () => {
 		 * some sign-in here actually produces. The values are named by this fixture rather than taken
 		 * from the shipped defaults, so the rule is asserted and the default strings are not pinned.
 		 */
-		const acrValues = { password: '1', multi_factor: '2', federated: '3' };
-		const permitted = ['1', '2', '3'];
+		const acrValues = {
+			password: '1',
+			multi_factor: '2',
+			phishing_resistant: '4',
+			federated: '3'
+		};
+		const permitted = ['1', '2', '4', '3'];
 
 		allows('default_acr_values', []);
 		permitted.forEach((value) => {
@@ -447,14 +452,14 @@ describe('Client metadata validation', () => {
 		rejects(
 			'default_acr_values',
 			['not a member'],
-			"default_acr_values can only contain '1', '2', or '3'",
+			"default_acr_values can only contain '1', '2', '4', or '3'",
 			undefined,
 			{ acrValues }
 		);
 		rejects(
 			'default_acr_values',
 			['not a member', '1'],
-			"default_acr_values can only contain '1', '2', or '3'",
+			"default_acr_values can only contain '1', '2', '4', or '3'",
 			undefined,
 			{ acrValues }
 		);
@@ -2608,7 +2613,14 @@ describe('Client metadata validation', () => {
 		it('de-duplicates repeated default_acr_values', async () => {
 			const client = await register(
 				{ default_acr_values: ['1', '1', '2'] },
-				{ acrValues: { password: '1', multi_factor: '2', federated: '3' } }
+				{
+					acrValues: {
+						password: '1',
+						multi_factor: '2',
+						phishing_resistant: '4',
+						federated: '3'
+					}
+				}
 			);
 
 			expect(toStored(client)).toHaveProperty('default_acr_values', ['1', '2']);
@@ -2667,7 +2679,12 @@ describe('Client metadata validation', () => {
 				'tls_client_auth',
 				'self_signed_tls_client_auth'
 			],
-			acrValues: { password: '1', multi_factor: '2', federated: '3' },
+			acrValues: {
+				password: '1',
+				multi_factor: '2',
+				phishing_resistant: '4',
+				federated: '3'
+			},
 			'encryption.enabled': true,
 			'jwtUserinfo.enabled': true,
 			'introspection.enabled': true,

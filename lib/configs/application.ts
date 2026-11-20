@@ -6,7 +6,7 @@ import {
 import { validateConfiguration, type Configuration } from './configuration.js';
 import { resolveNonceSecret } from './nonceSecret.js';
 // Import-free module, so this adds no runtime edge into the adapters or the models.
-import { DEFAULT_ACR_VALUES } from '../consts/acr.js';
+import { DEFAULT_ACR_VALUES, withPhishingResistant } from '../consts/acr.js';
 import type { UserCodeCharset } from '../helpers/user_codes.js';
 import type { ClientAddressSource } from '../consts/client_address.js';
 import { initPairwiseSalt } from './pairwiseSalt.js';
@@ -866,8 +866,8 @@ export const ApplicationConfig = {
 	 * acrValues
 	 *
 	 * description: Which Authentication Context Class Reference each authentication this server can
-	 *   distinguish is reported as. The server owns the distinctions, an operator owns the names:
-	 *   matching a requested context against a satisfied one is exact string comparison, so a
+	 *   distinguish is reported as. The server owns the distinctions and which meets which, an
+	 *   operator owns the names: a relying party compares the value it receives as a string, so a
 	 *   deployment whose relying parties expect their own vocabulary must be able to say so, while
 	 *   nobody can advertise a context that no sign-in here produces. `acr_values_supported` is
 	 *   derived from these values rather than stated beside them, so the two cannot disagree.
@@ -1239,6 +1239,18 @@ export function assertStoredSettingTypes(
 const storedSettings = (await configStore.get()) ?? {};
 assertStoredSettingTypes(storedSettings);
 Object.assign(ApplicationConfig, storedSettings);
+
+/*
+ * A stored `acrValues` from before the phishing-resistant context (specs/142 research R6) replaces the default whole, so
+ * it names no such context, and validation would refuse to boot with an error about a setting. The migration
+ * `2026-11-20-acr-phishing-resistant` writes the name; until it has run, the name is filled here in memory only, so the
+ * migration gate is what refuses the database, by name. Nothing is written: startup never migrates.
+ */
+const filledAcrValues = withPhishingResistant(ApplicationConfig.acrValues);
+if (filledAcrValues) {
+	ApplicationConfig.acrValues =
+		filledAcrValues.next as typeof ApplicationConfig.acrValues;
+}
 
 /*
  * Resolved here, between loading the persisted settings and validating them, and the position is the

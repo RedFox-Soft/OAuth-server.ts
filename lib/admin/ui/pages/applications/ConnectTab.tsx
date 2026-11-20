@@ -469,22 +469,55 @@ export function ConnectTab({
 							requested and the person consents to it.
 						</Typography.Paragraph>
 					)}
-					{/* specs/127: the application's own setting, or the parameter that asks for it on some pages only. */}
-					{client.requireCode ? (
+					{/*
+					 * specs/127, specs/142: the application's own setting, or the parameter that asks for it on some pages
+					 * only, and how to tell a code from a passkey.
+					 */}
+					{client.requirePasskey ? (
 						<Typography.Paragraph type="secondary">
-							Every sign-in to this application includes a code from an
-							authenticator app; no parameter is needed.
+							Every sign-in to this application is with a passkey (a
+							phishing-resistant sign-in); no parameter is needed. A person
+							turned away comes back with{' '}
+							<Typography.Text code>
+								error=unmet_authentication_requirements
+							</Typography.Text>
+							.
+						</Typography.Paragraph>
+					) : client.requireCode ? (
+						<Typography.Paragraph type="secondary">
+							Every sign-in to this application includes two-step sign-in (a
+							code from an authenticator app, or a passkey); no parameter is
+							needed.
 						</Typography.Paragraph>
 					) : connection.multiFactorAcr ? (
 						<Typography.Paragraph type="secondary">
-							To ask for a code only on some pages, send{' '}
+							To ask for two-step sign-in only on some pages, send{' '}
 							<Typography.Text code>
 								acr_values={connection.multiFactorAcr}
-							</Typography.Text>{' '}
-							and check <Typography.Text code>acr</Typography.Text> in the ID
-							token.
+							</Typography.Text>
+							. The ID token carries that value when the sign-in included a code
+							or a passkey. To know which, read{' '}
+							<Typography.Text code>amr</Typography.Text>:{' '}
+							<Typography.Text code>otp</Typography.Text> is a code,{' '}
+							<Typography.Text code>pop</Typography.Text> a passkey, and{' '}
+							<Typography.Text code>mfa</Typography.Text> is in both.
 						</Typography.Paragraph>
 					) : null}
+					{!client.requirePasskey && connection.phishingResistantAcr && (
+						<Typography.Paragraph type="secondary">
+							To ask for a passkey, a sign-in a fake site can’t use, send{' '}
+							<Typography.Text code>
+								acr_values={connection.phishingResistantAcr}
+							</Typography.Text>
+							: the ID token carries it only after a passkey sign-in. Made
+							essential in the <Typography.Text code>claims</Typography.Text>{' '}
+							parameter, people without a passkey are refused with{' '}
+							<Typography.Text code>
+								unmet_authentication_requirements
+							</Typography.Text>
+							.
+						</Typography.Paragraph>
+					)}
 				</Card>
 			)}
 

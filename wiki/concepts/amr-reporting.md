@@ -39,9 +39,11 @@ satisfied. Every ID token issued from a sign-in carries `amr`, whether or not th
 The values are declared once per sign-in **method** (`AMR_FOR_METHOD`, `lib/consts/amr.ts:38`), beside the
 distinction each method reports as `acr` (`DISTINCTION_FOR_METHOD`, `:46`), and every writer reads both from the
 same row, so the two claims cannot disagree. Until spec 139 the table was keyed by the distinction itself
-(`AMR_FOR_DISTINCTION`); a passkey reports the same `multi_factor` distinction as a password and a code but other
-methods, so the key became the method. `mfa` appears exactly for the methods whose distinction is
-`multi_factor`, which `test/amr/advertised.spec.ts` proves for every method. They are not operator-renamable, unlike the
+(`AMR_FOR_DISTINCTION`); a passkey reported the same `multi_factor` distinction as a password and a code but other
+methods, so the key became the method. Since spec 142 a full passkey reaches `phishing_resistant`
+([[acr-satisfaction]]). `mfa` appears exactly for the methods whose distinction meets `multi_factor` by the table,
+which `test/amr/advertised.spec.ts` proves for every method; the proxy's API check reads it as "had two factors" where
+a token's `acr` is a weaker context its application asked for. They are not operator-renamable, unlike the
 `acr` names: they are registered identifiers every relying party library knows. `mfa` sits beside the
 individual methods as RFC 8176 §2 allows; order is fixed for reproducible tokens and means nothing.
 

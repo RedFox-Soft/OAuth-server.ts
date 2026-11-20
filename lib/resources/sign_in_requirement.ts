@@ -1,4 +1,4 @@
-import { configuration } from '../configs/application.ts';
+import { meets } from '../helpers/acr_satisfaction.ts';
 import epochTime from '../helpers/epoch_time.ts';
 import { InvalidGrant } from '../helpers/errors.ts';
 import type { ResourceSignIn } from '../helpers/resource_server.ts';
@@ -25,7 +25,7 @@ export type { UnmetRequirement };
 
 /* Whether a sign-in with this authentication context included a code from an authenticator app. */
 export function hadCode(acr: string | null | undefined): boolean {
-	return acr === configuration.acrMap.multi_factor;
+	return meets(acr, 'multi_factor');
 }
 
 export function signInRequirementUnmet(

@@ -1,4 +1,10 @@
-import { satisfiesAcr, sl1, sl1Exempt } from '../../sl1/rules.ts';
+import { passkeyRequiredAndMissing } from '../../client_policy/require_passkey.ts';
+import { sl1, sl1Exempt } from '../../sl1/rules.ts';
+import {
+	capForOtherBrowser,
+	reportedAcr,
+	satisfiesAny
+} from '../../helpers/acr_satisfaction.ts';
 import { codeRequiredAndMissing } from '../../client_policy/require_code.ts';
 import { OIDCProviderError } from '../../helpers/errors.ts';
 import { BackchannelAuthenticationRequest } from '../../models/backchannel_authentication_request.js';
@@ -40,11 +46,12 @@ function satisfiesRequiredAcr(
 	if (!request?.essential) {
 		return true;
 	}
+	/* By the table: a stronger authentication meets a weaker essential value (specs/142 research R1, R3). */
 	if (Array.isArray(request.values)) {
-		return acr !== undefined && request.values.includes(acr);
+		return satisfiesAny(request.values, acr);
 	}
 	if (request.value !== undefined) {
-		return request.value === acr;
+		return satisfiesAny([request.value], acr);
 	}
 	// Essential, but naming no acceptable value: any context satisfies it, absence does not.
 	return acr !== undefined;
@@ -62,7 +69,22 @@ function satisfiesSl1AcrValues(
 	if (!sl1() || sl1Exempt(client) || typeof acrValues !== 'string') {
 		return true;
 	}
-	return satisfiesAcr(acrValues.split(' '), acr);
+	return satisfiesAny(acrValues.split(' '), acr);
+}
+
+/*
+ * The names the client asked for: its `acr` claim request, or `acr_values` when it made none, the precedence the
+ * authorization endpoint gives them (lib/actions/authorization/assign_claims.ts).
+ */
+function requestedClaims(payload: {
+	claims?: { id_token?: { acr?: RequestedAcr } };
+	params?: { acr_values?: unknown };
+}): unknown {
+	if (payload.claims?.id_token?.acr) return payload.claims;
+	const values = payload.params?.acr_values;
+	return typeof values === 'string'
+		? { id_token: { acr: { values: values.split(' ') } } }
+		: undefined;
 }
 
 /* What the end user's authentication device reports with a successful result (see the addon's notes). */
@@ -108,6 +130,7 @@ export async function backchannelResult(
 			? await Grant.find(resultOrId, { error: new Error('Grant not found') })
 			: resultOrId;
 
+	let reached: string | undefined;
 	switch (true) {
 		case result instanceof Grant:
 			if (request.payload.clientId !== result.payload.clientId) {
@@ -117,6 +140,12 @@ export async function backchannelResult(
 			if (request.payload.accountId !== result.payload.accountId) {
 				throw new Error('accountId mismatch');
 			}
+
+			/*
+			 * The person authenticated on a device of their own and the tokens go to the client, so the authentication
+			 * reaches no more than the multi-factor context, whatever the addon reports (specs/142 research R4).
+			 */
+			reached = capForOtherBrowser(acr);
 
 			/*
 			 * OIDC Core §5.5.1.1 requires an essential acr the authentication did not satisfy to be
@@ -129,14 +158,15 @@ export async function backchannelResult(
 			 * collect a token that will never exist.
 			 */
 			if (
-				!satisfiesRequiredAcr(request.payload.claims, acr) ||
+				!satisfiesRequiredAcr(request.payload.claims, reached) ||
 				!satisfiesSl1AcrValues(
 					request.payload.params?.acr_values,
-					acr,
+					reached,
 					client
 				) ||
-				// The application requires a code from an authenticator app (specs/127), whatever the request asked.
-				codeRequiredAndMissing(client, acr)
+				// The application requires a passkey (specs/142) or a code (specs/127), whatever the request asked.
+				passkeyRequiredAndMissing(client, reached) ||
+				codeRequiredAndMissing(client, reached)
 			) {
 				Object.assign(request.payload, {
 					error: 'transaction_failed',
@@ -148,7 +178,9 @@ export async function backchannelResult(
 
 			Object.assign(request.payload, {
 				grantId: result.jti,
-				acr,
+				/* What the client is told, and what the authentication reached (research R2, R3). */
+				acr: reportedAcr(reached, requestedClaims(request.payload)),
+				signInAcr: reached,
 				amr,
 				authTime,
 				sessionUid,

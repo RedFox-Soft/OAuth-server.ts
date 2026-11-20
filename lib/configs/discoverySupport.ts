@@ -43,9 +43,17 @@ type Config = typeof ApplicationConfig;
 // alone (supportedGrantTypes), and test/grants/grant_parity.spec.ts holds /token to it.
 
 // Mirrors lib/configs/configuration.ts: the advertised set is the values assigned to the
-// distinctions, so an operator cannot advertise a context that no sign-in here produces.
-function deriveAcrValues(config: Config): string[] {
-	return [...new Set(Object.values(config.acrValues))];
+// distinctions, so an operator cannot advertise a context that no sign-in here produces. The
+// phishing-resistant one is produced only by a passkey, so it is advertised only by an issuer whose
+// project accepts passkeys (specs/142 research R7): every project is its own issuer.
+function deriveAcrValues(config: Config, passkeys: boolean): string[] {
+	const { phishing_resistant: phishingResistant, ...others } = config.acrValues;
+	return [
+		...new Set([
+			...Object.values(others),
+			...(passkeys ? [phishingResistant] : [])
+		])
+	];
 }
 
 function deriveScopes(config: Config): string[] {
@@ -161,10 +169,12 @@ function endpoint(issuer: string, route: string): string {
 export function calculateDiscovery(
 	bucket?: { _id: string; slug?: string; host?: string },
 	keys?: IssuerKeys,
-	prompts?: string[]
+	prompts?: string[],
+	/* Whether this issuer's project accepts passkeys, the only sign-in reaching the phishing-resistant context. */
+	passkeys = false
 ) {
 	const config = ApplicationConfig;
-	const acrValues = deriveAcrValues(config);
+	const acrValues = deriveAcrValues(config, passkeys);
 	/*
 	 * The IPSIE SL1 profile accepts and signs only PS256, ES256 and EdDSA (IPSIE Common Requirements §3.3), so a relying
 	 * party reading this document is never offered anything else; read off the setting rather than through

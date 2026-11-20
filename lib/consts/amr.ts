@@ -6,8 +6,9 @@ import type { AcrDistinction } from './acr.ts';
  * invariant holds by construction: a sign-in reports the multi-factor context only with a method that holds two
  * factors, and its `amr` names that method — never a password and a code it did not ask for (specs/139 research
  * R11). A passkey is the second such method: possession of a key (`pop`) and the device's own check of the person
- * (`user`), so it reports the multi-factor context with its own methods, and every requirement of a code is met by it
- * with no check changed.
+ * (`user`), and a key the browser binds to the real site, so it reaches the phishing-resistant context (specs/142),
+ * which meets every requirement of a code (lib/consts/acr.ts SATISFIED_BY). An application is told the multi-factor
+ * context unless it asked for the phishing-resistant one (lib/helpers/acr_satisfaction.ts reportedAcr).
  *
  * The values are fixed, unlike the `acr` names an operator assigns: these are identifiers registered by RFC 8176 that
  * every relying party library already knows, and a renamed one would only be less understood. `mfa` sits beside the
@@ -55,7 +56,7 @@ export const AMR_FOR_METHOD: Record<SignInMethod, readonly AmrValue[]> = {
 export const DISTINCTION_FOR_METHOD: Record<SignInMethod, AcrDistinction> = {
 	password: 'password',
 	password_code: 'multi_factor',
-	passkey: 'multi_factor',
+	passkey: 'phishing_resistant',
 	passkey_conditional: 'password',
 	passkey_conditional_code: 'multi_factor',
 	federated: 'federated'

@@ -25,11 +25,13 @@ graph:
 # Reporting the authentication context a sign-in satisfied
 
 The `acr` claim says which Authentication Context Class the authentication *performed* satisfied —
-a statement of fact about the sign-in, never an echo of what was asked for. This server distinguishes
-three: a password alone, a password with a second factor, and a sign-in delegated to an upstream
-provider (`lib/consts/acr.ts`). Since spec 139 a passkey sign-in reports the second of them, `multi_factor`
-(`DISTINCTION_FOR_METHOD`, `lib/consts/amr.ts:46`), so it meets every requirement of two-step sign-in
-([[passkeys]]). Until commit `4101b93` it distinguished none of them, and an
+a statement of fact about the sign-in: a context it met, never one it did not. This server distinguishes
+four: a password alone, a password with a second factor, a full passkey (phishing-resistant, spec 142) and a
+sign-in delegated to an upstream provider (`lib/consts/acr.ts`). Since spec 142 a request that names contexts is told
+the strongest of them the sign-in met, and a passkey sign-in reports the multi-factor context unless the phishing-resistant
+one was asked for; which context meets which is one table, and requirements read what the sign-in reached rather than
+what the token reports — see [[acr-satisfaction]]. (Corrected 2026-11-20: this page said `acr` was "never an echo of
+what was asked for" and that a passkey reports `multi_factor`.) Until commit `4101b93` it distinguished none of them, and an
 **essential** `acr` request could therefore never be satisfied by anything.
 
 ## The server owns the distinctions, an operator owns the names
@@ -43,7 +45,8 @@ server cannot make and then advertise it.
 
 `acr_values_supported` is **derived** from the map's values in both mirrored implementations
 (`lib/configs/configuration.ts`, `lib/configs/discoverySupport.ts`) rather than stated beside them, so
-the advertised set and the producible set cannot disagree. (Corrected 2026-10-01: this page used to say
+the advertised set and the producible set cannot disagree; since spec 142 the phishing-resistant value is advertised
+only by a project that accepts passkeys. (Corrected 2026-10-01: this page used to say
 the `acr` entry in `claims_supported` is derived the same way. It is not — it comes from `acr: null` in
 the `claims` setting, so an operator who saves that setting without it stops advertising the claim.
 `amr`, which is read from the same per-method row as the distinction, is advertised unconditionally — see [[amr-reporting]].) The
@@ -155,8 +158,9 @@ a claims-parameter finding: see [[feature-flag-gating]] for the general shape.
 - **`acr_values` binds under the IPSIE SL1 profile** (spec 112, 2026-10-23). With `ipsieSl1.enabled` on, a
   request whose `acr_values` the sign-in does not satisfy ends in `unmet_authentication_requirements`
   (a new login check, `sl1_acr_values`), and on the backchannel in `transaction_failed`. A multi-factor
-  sign-in satisfies a request for the password class. With the profile off `acr_values` stays voluntary
-  and the essential checks above are unchanged. See [[ipsie-sl1-profile]].
+  sign-in satisfies a request for the password class. With the profile off `acr_values` stays voluntary.
+  See [[ipsie-sl1-profile]]. Since spec 142 both this check and the essential checks compare through the one table
+  ([[acr-satisfaction]]), so a stronger sign-in meets a weaker essential value and the token reports that value.
 - **A second factor is demanded by the project or held by the person** (since 2026-11-10, spec 126). The
   code step is staged when `totpRequired` is on *or* `user.totp` exists, so an end user with an authenticator, in
   any project, reports the multi-factor context and satisfies a relying party that requires it. Until then the

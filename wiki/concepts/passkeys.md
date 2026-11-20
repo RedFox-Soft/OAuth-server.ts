@@ -118,10 +118,13 @@ needs.
 
 ## What a passkey sign-in reports, and meets
 
-`AMR_FOR_METHOD.passkey` is `['pop', 'user', 'mfa']` and `DISTINCTION_FOR_METHOD.passkey` is `multi_factor`
-(`lib/consts/amr.ts:38-51`): one table both the `acr` and the `amr` writers read, so a passkey sign-in reports the
-multi-factor context and therefore meets every requirement of two-step sign-in (an app's `signIn.requireCode`, an
-API's sign-in requirement, a proxy condition `withCode`, an essential `acr`) with no code asked. The console and the
+`AMR_FOR_METHOD.passkey` is `['pop', 'user', 'mfa']` and, since spec 142, `DISTINCTION_FOR_METHOD.passkey` is
+`phishing_resistant` (`lib/consts/amr.ts`): a full passkey reaches the phishing-resistant context, which meets every
+requirement of two-step sign-in (an app's `signIn.requireCode`, an API's sign-in requirement, a proxy condition
+`withCode`, an essential `acr`) with no code asked, and an app is told the multi-factor context unless it asked for
+`phr` ([[acr-satisfaction]]). An app may also require a passkey (`signIn.requirePasskey`); its refusal page offers to
+sign in with the passkey held, confirm a conditional one, or create one by the offer's rules, without raising the
+sign-in in progress. The console and the
 agent's tools say "two-step sign-in" for those requirements, and "a code or a passkey" where the project accepts
 passkeys.
 

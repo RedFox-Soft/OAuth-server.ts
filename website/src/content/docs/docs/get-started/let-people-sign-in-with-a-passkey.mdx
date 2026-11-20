@@ -153,13 +153,27 @@ people that is and asks you to confirm. An agent gets the same number to confirm
 ## For your app {#app}
 
 Your app receives the same ID token as after a password and a code: `acr` is your server's multi-factor value, and
-`amr` is `["pop", "user", "mfa"]`. A passkey made after a password alone and not yet confirmed reports the password
+`amr` is `["pop", "user", "mfa"]`. Only an app that asks for a passkey receives a different `acr`: see below. A passkey made after a password alone and not yet confirmed reports the password
 `acr` and `["pop", "user"]`. A sign-in with a passkey shows as "Passkey" in the person's recent sign-ins, in the
 email about a sign-in from somewhere new, and in the project's activity.
 
 Add a link named "Sign-in and security" to your app's account settings that opens `/account/security` under your
 project's issuer. People who want a code from an authenticator app instead find it on the same page: see
 [Let people turn on two-step verification](/docs/get-started/turn-on-two-step-verification/).
+
+## Require a passkey {#require}
+
+A passkey can't be used by a fake sign-in page, so it is the only phishing-resistant sign-in this server has. To let
+nobody into one app without it, turn on **Require a passkey** in the app's Settings; the project must accept passkeys.
+Before it saves, the console shows how many people have no confirmed passkey. A person turned away sees a page that
+lets them create a passkey there, or sign in with the one they hold, and go on to the app. People who sign in through
+a provider, and devices that sign in with a code shown on a TV, can't open the app this way.
+
+To ask for a passkey only on some pages, send `acr_values=phr` (the OpenID value for a phishing-resistant sign-in; the
+**Connect** tab shows your server's value). The ID token carries `phr` only after a passkey sign-in. Made essential in
+the `claims` parameter, it turns people without a passkey away with `unmet_authentication_requirements`. When your app
+names values, it is told the strongest of them the sign-in met, so an app that asks for the multi-factor value keeps
+receiving it after a passkey.
 
 ## Upgrading {#upgrading}
 

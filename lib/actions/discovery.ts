@@ -22,6 +22,9 @@ import {
 import { hostOfRequest, normaliseHost } from 'lib/consts/request_host.js';
 import { keysFor, rootKeys } from 'lib/keys/issuer_keys.js';
 import { supportedPrompts } from '../addon/index.js';
+import { getBucketStore } from '../adapters/index.js';
+import { DEFAULT_BUCKET_ID } from '../admin/consts.js';
+import { passkeysAccepted } from '../passkeys/accepted.js';
 
 type BucketAddress = { _id: string; slug?: string; host?: string };
 
@@ -74,15 +77,27 @@ export async function openidConfiguration(bucket?: BucketAddress) {
 		calculateDiscovery(
 			bucket,
 			bucket ? await keysFor(bucket) : await rootKeys(),
-			[...supportedPrompts()]
+			[...supportedPrompts()],
+			await acceptsPasskeys(bucket)
 		)
 	);
+}
+
+/*
+ * Whether the issuer's project accepts passkeys (specs/142 research R7): the addressed project, or the default one,
+ * which signs people in at the root. Read per request, so a changed setting shows at once.
+ */
+async function acceptsPasskeys(bucket?: BucketAddress): Promise<boolean> {
+	const project = await getBucketStore().find(bucket?._id ?? DEFAULT_BUCKET_ID);
+	return project !== null && passkeysAccepted(project);
 }
 
 async function oauthAuthorizationServer(bucket?: BucketAddress) {
 	const body: DiscoveryDocument = calculateDiscovery(
 		bucket,
-		bucket ? await keysFor(bucket) : await rootKeys()
+		bucket ? await keysFor(bucket) : await rootKeys(),
+		undefined,
+		await acceptsPasskeys(bucket)
 	);
 
 	/*

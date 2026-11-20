@@ -38,7 +38,8 @@ export type SignInChange =
 	| 'authenticatorOn'
 	| 'signUpOpen'
 	| 'guessingRefuseOn'
-	| 'passkeysOff';
+	| 'passkeysOff'
+	| 'passkeyAppsOff';
 
 export interface SignInPreview {
 	consequences: string[];
@@ -128,6 +129,12 @@ export async function signInPreview(
 			? await passkeyOnlyPeople(bucket, passwordsAfter)
 			: 0;
 	if (passkeyOnly > 0) changes.push('passkeysOff');
+	/* An application that requires a passkey (specs/142) then refuses everyone; named, since each needs a decision. */
+	const requiringPasskey =
+		patch.passkeyLogin === false && bucket.passkeyLogin === true
+			? await appsRequiringPasskey(bucket._id)
+			: [];
+	if (requiringPasskey.length > 0) changes.push('passkeyAppsOff');
 	if (changes.length === 0) return null;
 
 	const counts = await signInCounts(bucket);
@@ -194,6 +201,12 @@ export async function signInPreview(
 					`${plural(passkeyOnly, 'person', 'people')} can only sign in with a passkey; they will not be able to sign in.`
 				);
 				break;
+			case 'passkeyAppsOff':
+				expect.appsRequiringPasskey = requiringPasskey.length;
+				consequences.push(
+					`${plural(requiringPasskey.length, 'application')} ${requiringPasskey.length === 1 ? 'requires' : 'require'} a passkey: ${requiringPasskey.join(', ')}. Nobody will be able to open ${requiringPasskey.length === 1 ? 'it' : 'them'} until passkeys are back on, or the requirement is removed.`
+				);
+				break;
 			case 'signUpOpen':
 				consequences.push(
 					consoleBucket
@@ -211,6 +224,23 @@ export async function signInPreview(
 		);
 	}
 	return { consequences, expect, changes };
+}
+
+/*
+ * The applications of the bucket that require a passkey (specs/142), by the name they are shown under: a change that
+ * stops the project's passkeys working leaves each refusing everyone.
+ */
+export async function appsRequiringPasskey(
+	bucketId: string
+): Promise<string[]> {
+	const clients = await adapter('Client').findByIndexed('bucketId', bucketId);
+	return clients
+		.filter((client) => client['signIn.requirePasskey'] === true)
+		.map((client) =>
+			typeof client.client_name === 'string' && client.client_name
+				? client.client_name
+				: String(client.client_id ?? client.clientId)
+		);
 }
 
 /*

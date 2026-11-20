@@ -45,6 +45,7 @@ import {
 	consentServer,
 	loginServer,
 	passkeyOfferServer,
+	passkeyRequiredServer,
 	registrationServer,
 	totpServer
 } from './serverRender.js';
@@ -52,6 +53,8 @@ import type { SignInFace } from './signInMasthead.js';
 import type { CodeRequiredVariant } from './codeRequiredPage.js';
 import { knownProviderByIssuer } from 'lib/consts/known_providers.js';
 import { REQUIRE_CODE_DESCRIPTION } from 'lib/client_policy/require_code.js';
+import { REQUIRE_PASSKEY_DESCRIPTION } from 'lib/client_policy/require_passkey.js';
+import type { PasskeyRequiredVariant } from './passkeyRequiredPage.js';
 import { verifyForAccount } from 'lib/totp/verify.js';
 import {
 	confirm as confirmEnrollment,
@@ -264,7 +267,11 @@ import {
 import { passkeysAccepted } from '../passkeys/accepted.js';
 import { CREDENTIAL_FIELD_MAX } from '../passkeys/consts.js';
 import { completeOffer, prepareOffer } from '../passkeys/offer.js';
-import { offerable, type OfferKind } from '../passkeys/offerable.js';
+import {
+	mayCreateAfterSignIn,
+	offerable,
+	type OfferKind
+} from '../passkeys/offerable.js';
 import { declineOffers, noteOfferShown } from '../end_users/service.js';
 import { holderOfSession } from '../totp/self_service.js';
 import { relyingPartyOf } from '../passkeys/relying_party.js';
@@ -1521,6 +1528,82 @@ async function apiAsking(
 	return (await findDeclaredResource(api, namespaceOf(bucket)))?.name;
 }
 
+/* Whether the application's requirement of a passkey (specs/142) is what stopped this sign-in. */
+function appRequiresPasskey(interaction: Interaction): boolean {
+	return (interaction.payload.prompt?.reasons ?? []).includes('app_passkey');
+}
+
+/*
+ * What the page for an application requiring a passkey offers (specs/142 research R8): the one step that gets the person
+ * in from where they stand. A device flow never can (research R4). A full passkey for the project's current site is
+ * signed in with; a conditional one is confirmed first; someone who signed in with a password may create one where the
+ * offer's safety conditions hold; anyone else is told to ask.
+ */
+async function passkeyRefusalVariant(
+	interaction: Interaction,
+	{ bucket, user, session }: RefusedSignIn
+): Promise<PasskeyRequiredVariant> {
+	if (interaction.payload.deviceCode) return 'device';
+	if (!bucket || !passkeysAccepted(bucket)) return 'passkeyAsk';
+	const { rpId } = relyingPartyOf(bucket);
+	const held = (await getPasskeyStore().listOf(bucket._id, user._id)).filter(
+		(passkey) => passkey.rpId === rpId && passkey.copiedAt === undefined
+	);
+	if (held.some((passkey) => passkey.conditional !== true)) {
+		return 'passkeySignIn';
+	}
+	if (held.length > 0) return 'passkeyConfirm';
+	if (!(session.payload.amr ?? []).includes('pwd')) return 'passkeyAsk';
+	return (await mayCreateAfterSignIn(bucket, user))
+		? 'passkeyCreate'
+		: 'passkeyAsk';
+}
+
+/* A passkey made on that page is full after a password and a code, conditional after a password alone (specs/141). */
+function creationKindOf(session: Session): OfferKind {
+	return (session.payload.amr ?? []).includes('otp') ? 'full' : 'conditional';
+}
+
+/* The page for an application requiring a passkey, with a fresh creation ceremony where creating is the step. */
+async function passkeyRequiredPage(
+	interaction: Interaction,
+	refused: RefusedSignIn,
+	bucketId: string,
+	shown: {
+		created?: 'full' | 'conditional';
+		refused?: 'failed' | 'exists';
+	} = {}
+): Promise<Response> {
+	const variant = await passkeyRefusalVariant(interaction, refused);
+	const holder = interaction.payload.session?.uid;
+	const options =
+		variant === 'passkeyCreate' && refused.bucket && holder
+			? await prepareOffer(
+					refused.bucket,
+					refused.user,
+					holderOfSession(holder),
+					creationKindOf(refused.session),
+					interaction.uid
+				)
+			: undefined;
+	return passkeyRequiredServer(
+		{
+			uid: interaction.uid,
+			variant,
+			email: refused.user.email,
+			...(options ? { options } : {}),
+			...(shown.created ? { created: shown.created } : {}),
+			...(shown.refused ? { refused: shown.refused } : {})
+		},
+		{
+			handOffTo: redirectUriOf(interaction),
+			language: languageOf(interaction),
+			switcher: switcherOf(interaction, CODE_REQUIRED_PAGE),
+			...(await lookNamingApp(interaction, bucketId))
+		}
+	);
+}
+
 /* Whether the application itself requires the code (specs/127), as against only a requested API (specs/130). */
 function appRequiresCode(interaction: Interaction): boolean {
 	return (interaction.payload.prompt?.reasons ?? []).includes('second_factor');
@@ -2618,6 +2701,17 @@ export const ui = new Elysia()
 			);
 			const refused = await refusedSignIn(interaction, bucketId);
 			if (!refused) return Response.redirect(buildUILoginPath(uid), 303);
+			if (appRequiresPasskey(interaction)) {
+				noteSignInRefused({
+					bucketId,
+					accountId: refused.user._id,
+					reason: 'passkey_required',
+					clientId: clientIdOf(interaction),
+					providerId: refused.session.payload.upstream?.providerId,
+					request
+				});
+				return passkeyRequiredPage(interaction, refused, bucketId);
+			}
 			const variant = await refusalVariant(refused);
 			if (variant === 'signIn') {
 				return Response.redirect(buildUILoginPath(uid), 303);
@@ -2655,20 +2749,67 @@ export const ui = new Elysia()
 	)
 	.post(
 		`ui/:uid/${CODE_REQUIRED_PAGE}`,
-		async ({ params: { uid }, interaction, cookie, route, request }) => {
+		async ({ params: { uid }, body, interaction, cookie, route, request }) => {
 			if (!refusalOf(interaction)) {
 				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			/*
+			 * Creating a passkey where an application requires one (specs/142 research R8): only where the page offers it, with
+			 * the ceremony it prepared, by the offer's rules. The sign-in in progress is not raised: signing in with the new
+			 * passkey is what meets the requirement.
+			 */
+			if (body.action === 'create') {
+				const bucketId = await resolveBucketForRequest(
+					clientIdOf(interaction),
+					resourceOf(interaction),
+					await addressedBucketOf(interaction)
+				);
+				const refused = await refusedSignIn(interaction, bucketId);
+				const holder = interaction.payload.session?.uid;
+				if (
+					!refused?.bucket ||
+					!holder ||
+					!appRequiresPasskey(interaction) ||
+					(await passkeyRefusalVariant(interaction, refused)) !==
+						'passkeyCreate'
+				) {
+					return Response.redirect(buildUIPath(uid, CODE_REQUIRED_PAGE), 303);
+				}
+				const made = await completeOffer(
+					refused.bucket,
+					refused.user,
+					holderOfSession(holder),
+					uid,
+					body.credential ?? '',
+					false,
+					request
+				);
+				return passkeyRequiredPage(
+					interaction,
+					refused,
+					bucketId,
+					made.ok
+						? { created: made.kind }
+						: { refused: made.reason === 'exists' ? 'exists' : 'failed' }
+				);
 			}
 			interaction.payload.result = {
 				...(interaction.payload.result ?? {}),
 				error: 'unmet_authentication_requirements',
-				error_description: appRequiresCode(interaction)
-					? REQUIRE_CODE_DESCRIPTION
-					: API_CODE_DESCRIPTION
+				error_description: appRequiresPasskey(interaction)
+					? REQUIRE_PASSKEY_DESCRIPTION
+					: appRequiresCode(interaction)
+						? REQUIRE_CODE_DESCRIPTION
+						: API_CODE_DESCRIPTION
 			};
 			return resume(interaction, cookie, { route, request });
 		},
-		{ body: t.Object({ action: t.Literal('return') }) }
+		{
+			body: t.Object({
+				action: t.Union([t.Literal('return'), t.Literal('create')]),
+				credential: t.Optional(t.String({ maxLength: CREDENTIAL_FIELD_MAX }))
+			})
+		}
 	)
 	/*
 	 * The passkey offer after a sign-in with a password (specs/141 contracts/sign-in-and-offer.md), reached only through

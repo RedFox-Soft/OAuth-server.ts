@@ -176,7 +176,8 @@ Each rule is the part that is easy to break. Read the named page before changing
   is ever recognised metadata. In the console an application is edited only on its own page, and a
   "situation" is a console preset, never an API field. An application's requirement of a code is an operator base key
   (`signIn.requireCode`), kept across a registration PUT and enforced at every grant for a person through
-  `codeRequiredAndMissing`, never only at the sign-in. → `client-identity-from-database.md`,
+  `codeRequiredAndMissing`, never only at the sign-in; its requirement of a passkey (`signIn.requirePasskey`) the same,
+  through `passkeyRequiredAndMissing`, checked first. → `client-identity-from-database.md`,
   `client-registration-attributes.md`, `mcp-server-authorization.md`, `application-page.md`, `totp-second-factor.md`
 - **The situation guide** — every situation in "What do you need?" is declared once, in
   `lib/consts/situation_guide.ts`, and the console and the site both draw from it. A change that adds, changes or
@@ -221,8 +222,10 @@ Each rule is the part that is easy to break. Read the named page before changing
   an administrator's revocation signs the person out everywhere, and whether someone has another way in is judged only
   in `lib/passkeys/ways_in.ts`. A passkey made after a password alone is conditional: it signs in as that password does,
   any reset or "This wasn't me" removes it, and only its mailed confirmation in the session that made it, or a strong
-  sign-in, makes it full.
-  → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`
+  sign-in, makes it full. Only a full passkey reaches the phishing-resistant `acr`; contexts are compared only through
+  `lib/helpers/acr_satisfaction.ts`, never by list order, and every requirement reads what the sign-in reached
+  (`reachedAcr`), never the `acr` a token reports.
+  → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`, `acr-satisfaction.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion
   resolves the person through the browser sign-in's ladder, never a copy; an ID-JAG may be re-submitted, a

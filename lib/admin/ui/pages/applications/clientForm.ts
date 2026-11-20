@@ -98,6 +98,7 @@ export interface Connection {
 	signInPageUrl: string | null;
 	lastUsed: LastUsed | null;
 	multiFactorAcr?: string;
+	phishingResistantAcr?: string;
 }
 
 export interface ClientView {
@@ -113,6 +114,7 @@ export interface ClientView {
 	requireConsent: boolean;
 	partialConsent?: boolean;
 	requireCode?: boolean;
+	requirePasskey?: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -141,6 +143,7 @@ export interface FormValues extends Omit<KeyAttributes, 'jwks'> {
 	requireConsent: boolean;
 	partialConsent?: boolean;
 	requireCode?: boolean;
+	requirePasskey?: boolean;
 	backchannelTokenDeliveryMode?: 'poll' | 'ping';
 	backchannelClientNotificationEndpoint?: string;
 	authorizationDetailsTypes?: string[];
@@ -179,6 +182,7 @@ export function formValuesOf(row: ClientRow): FormValues {
 		requireConsent: row.requireConsent,
 		partialConsent: row.partialConsent ?? false,
 		requireCode: row.requireCode ?? false,
+		requirePasskey: row.requirePasskey ?? false,
 		authorizationDetailsTypes: row.authorizationDetailsTypes,
 		backchannelTokenDeliveryMode: row.backchannelTokenDeliveryMode,
 		backchannelClientNotificationEndpoint:
@@ -257,6 +261,7 @@ export function buildBody(values: FormValues, stored: Stored | null = null) {
 		requireConsent: values.requireConsent,
 		partialConsent: Boolean(values.partialConsent),
 		requireCode: Boolean(values.requireCode),
+		requirePasskey: Boolean(values.requirePasskey),
 		corsOrigins: values.corsOrigins ?? [],
 		...(values.authorizationDetailsTypes?.length
 			? { authorizationDetailsTypes: values.authorizationDetailsTypes }
