@@ -10,7 +10,7 @@ export type Part =
 	| { strong: string }
 	| { em: string }
 	| { code: string }
-	| { link: string; href: string };
+	| { label: string; href: string };
 
 export type RichText = readonly Part[];
 
@@ -39,7 +39,7 @@ export function plain(text: RichText | string): string {
 			if ('strong' in part) return part.strong;
 			if ('em' in part) return part.em;
 			if ('code' in part) return part.code;
-			return part.link;
+			return part.label;
 		})
 		.join('');
 }

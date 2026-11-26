@@ -22,6 +22,7 @@ import { Session } from 'lib/models/session.js';
 import { DeviceCode } from 'lib/models/device_code.js';
 import { Interaction } from 'lib/models/interaction.js';
 import { Grant } from 'lib/models/grant.js';
+import { TestAdapter } from '../models.js';
 
 let uid: string;
 let userCode: string;
@@ -31,11 +32,13 @@ let userCode: string;
 async function buildResume({
 	auth = {},
 	result,
-	accountId
+	accountId,
+	code
 }: {
 	auth?: Record<string, unknown>;
 	result?: Record<string, unknown>;
 	accountId?: string;
+	code?: { exp?: number; accountId?: string; error?: string };
 } = {}) {
 	const session = new Session({
 		jti: nanoid(),
@@ -45,8 +48,17 @@ async function buildResume({
 	const sessionId = await session.save();
 
 	const params = { client_id: 'client', ...auth };
-	const deviceCode = new DeviceCode({ params, clientId: 'client', userCode });
+	const deviceCode = new DeviceCode({
+		params,
+		clientId: 'client',
+		userCode,
+		accountId: code?.accountId,
+		error: code?.error
+	});
 	await deviceCode.save();
+	if (code?.exp !== undefined) {
+		TestAdapter.for('DeviceCode').syncUpdate(deviceCode.id, { exp: code.exp });
+	}
 
 	const cookieID = nanoid();
 	const interaction = new Interaction(uid, {
@@ -59,15 +71,6 @@ async function buildResume({
 	await interaction.save(30);
 
 	return `_interaction=${cookieID}; ${DEFAULT_SESSION_COOKIE}=${sessionId}`;
-}
-
-// A device code in the state a case needs, where the lookup would otherwise find the one buildResume saved.
-function storedCode(state: {
-	exp?: number;
-	accountId?: string;
-	error?: string;
-}) {
-	return new DeviceCode({ params: {}, clientId: 'client', userCode, ...state });
 }
 
 function get(cookie: string) {
@@ -116,12 +119,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },
 					result: { login: { accountId } },
-					accountId
+					accountId,
+					code: { exp: epochTime() - 1 }
 				});
-
-				spyOn(DeviceCode, 'find').mockResolvedValue(
-					storedCode({ exp: epochTime() - 1 })
-				);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');
@@ -135,12 +135,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },
 					result: { login: { accountId } },
-					accountId
+					accountId,
+					code: { accountId: 'foo' }
 				});
-
-				spyOn(DeviceCode, 'find').mockResolvedValue(
-					storedCode({ accountId: 'foo' })
-				);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');
@@ -154,12 +151,9 @@ describe('device interaction resume /ui/:uid/device_resume', () => {
 				const cookie = await buildResume({
 					auth: { scope: 'openid' },
 					result: { login: { accountId } },
-					accountId
+					accountId,
+					code: { error: 'access_denied' }
 				});
-
-				spyOn(DeviceCode, 'find').mockResolvedValue(
-					storedCode({ error: 'access_denied' })
-				);
 
 				const { data } = await get(cookie);
 				expect(data).toContain('id="op.deviceInputForm"');

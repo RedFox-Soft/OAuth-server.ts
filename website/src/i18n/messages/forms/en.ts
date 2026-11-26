@@ -13,7 +13,7 @@ export default {
 		fallback: (address: string, href: string) =>
 			rich(
 				'Email us at ',
-				{ link: address, href },
+				{ label: address, href },
 				' and tell us about your deployment shape and the guarantees you need. We usually reply within two working days.'
 			)
 	},

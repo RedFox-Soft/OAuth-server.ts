@@ -184,20 +184,27 @@ async function personOfJwt(
  * grant — that grant still standing for the same client and person.
  */
 async function fromRecord(token: string, api: Api): Promise<Presented> {
-	const record =
-		(await AccessToken.tryFind(token)) ??
-		(await ClientCredentials.tryFind(token));
-	if (!record?.isValid) return refused('invalid_token');
-	const payload: {
-		clientId: string;
-		bucketId?: string;
-		aud?: string;
-		scope?: string;
-		accountId?: string;
-		grantId?: string;
-		jkt?: string;
-		'x5t#S256'?: string;
-	} = record.payload;
+	const access = await AccessToken.tryFind(token);
+	const creds = access ? undefined : await ClientCredentials.tryFind(token);
+	const payload:
+		| {
+				clientId: string;
+				bucketId?: string;
+				aud?: string;
+				scope?: string;
+				accountId?: string;
+				grantId?: string;
+				jkt?: string;
+				'x5t#S256'?: string;
+		  }
+		| undefined = access
+		? access.isValid
+			? access.payload
+			: undefined
+		: creds?.isValid
+			? creds.payload
+			: undefined;
+	if (!payload) return refused('invalid_token');
 	if (
 		(await servingBucketIdOf(payload.bucketId)) !==
 			(await servingBucketIdOf(api.bucketId)) ||
@@ -234,7 +241,7 @@ async function fromRecord(token: string, api: Api): Promise<Presented> {
 			subject = await pairwiseIdentifier(subject, client);
 		}
 	}
-	const person = record instanceof AccessToken ? record.payload : undefined;
+	const person = access?.payload;
 	return {
 		ok: true,
 		subject,

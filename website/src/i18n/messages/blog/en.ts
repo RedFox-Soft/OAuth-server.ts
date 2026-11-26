@@ -10,9 +10,9 @@ export default {
 		subscribe: (feed: string, guide: string) =>
 			rich(
 				'Subscribe with ',
-				{ link: 'the feed', href: feed },
+				{ label: 'the feed', href: feed },
 				', or read the ',
-				{ link: 'getting started guide', href: guide },
+				{ label: 'getting started guide', href: guide },
 				' if you would rather try the server than read about it.'
 			),
 		emptyHeading: 'Nothing published yet',

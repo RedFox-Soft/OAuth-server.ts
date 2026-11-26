@@ -211,7 +211,7 @@ export const collections = {
 			storageScope: z
 				.string()
 				.refine((value) => backendLabels().includes(value), {
-					message: `storageScope must name a datastore that ships: ${backendLabels().join(', ')}`
+					error: `storageScope must name a datastore that ships: ${backendLabels().join(', ')}`
 				})
 				.optional()
 		})

@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'ad08f33f804e';
+export const source = '55e915db7165';
 
 export default {
 	title: '你需要什么？',
@@ -21,12 +21,12 @@ export default {
 		moreTasksSub: '它们不是登录流程，但往往是你接下来需要的。',
 		pickSecond: '在第 2 个问题中选一个答案，它就会显示在这里。',
 		backToQuestions: rich('这里显示的是你选的任务。', {
-			link: '重新显示两个问题的答案',
+			label: '重新显示两个问题的答案',
 			href: '#g-panel-product'
 		}),
 		agentNative: rich(
 			'智能体是否运行在用户的电脑上，并以用户的身份登录？这和',
-			{ link: '桌面或终端里的应用', href: '#answer-native' },
+			{ label: '桌面或终端里的应用', href: '#answer-native' },
 			'是同一种情况。'
 		)
 	},

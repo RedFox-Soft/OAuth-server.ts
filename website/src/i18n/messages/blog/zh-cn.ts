@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '36cec294b076';
+export const source = '09d84c8451a0';
 
 export default {
 	eyebrow: '博客',
@@ -13,9 +13,9 @@ export default {
 		subscribe: (feed: string, guide: string) =>
 			rich(
 				'可以通过',
-				{ link: '订阅源', href: feed },
+				{ label: '订阅源', href: feed },
 				'订阅；如果你更想直接试用服务器而不是读文章，请看',
-				{ link: '快速开始指南', href: guide },
+				{ label: '快速开始指南', href: guide },
 				'。'
 			),
 		emptyHeading: '暂无文章',

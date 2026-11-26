@@ -16,7 +16,7 @@ export default {
 		body: (address: string, href: string) =>
 			rich(
 				'Email ',
-				{ link: address, href },
+				{ label: address, href },
 				' and keep the report off the public tracker. The security policy sets out what we do next and how long it takes.'
 			),
 		policy: 'Security policy'

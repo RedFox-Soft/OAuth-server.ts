@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '59e1195bff59';
+export const source = 'fd46e1b6bd8d';
 
 export default {
 	workEmail: '工作邮箱',
@@ -14,7 +14,7 @@ export default {
 		fallback: (address: string, href: string) =>
 			rich(
 				'请发邮件至 ',
-				{ link: address, href },
+				{ label: address, href },
 				'，告诉我们你的部署形态和你需要的保障。我们通常会在两个工作日内回复。'
 			)
 	},

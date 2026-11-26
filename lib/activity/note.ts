@@ -168,8 +168,11 @@ function signInOf(oidc: OIDCContext<TokenParams>) {
 	}
 	const { AuthorizationCode, DeviceCode, BackchannelAuthenticationRequest } =
 		oidc.entities;
-	return (AuthorizationCode ?? DeviceCode ?? BackchannelAuthenticationRequest)
-		?.payload.signIn;
+	return (
+		AuthorizationCode?.payload.signIn ??
+		DeviceCode?.payload.signIn ??
+		BackchannelAuthenticationRequest?.payload.signIn
+	);
 }
 
 function track(write: Promise<void>): void {

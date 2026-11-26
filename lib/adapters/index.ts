@@ -171,7 +171,12 @@ let sealingStoreFactory: () => SealingStoreInstance = () =>
 		connectedAccounts: () => {
 			const store = rawConnectedAccountStore();
 			/* Only the memory store is built here: this factory is replaced for both persistent backends. */
-			return store as MemoryConnectedAccountStore;
+			if (!(store instanceof MemoryConnectedAccountStore)) {
+				throw new Error(
+					'MemorySealingStore requires MemoryConnectedAccountStore'
+				);
+			}
+			return store;
 		},
 		secret: (kind) => rawSecretStores[kind]
 	});

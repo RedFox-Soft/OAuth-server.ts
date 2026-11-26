@@ -23,12 +23,12 @@ export default {
 		moreTasksSub: 'Not a sign-in flow, but often the next thing you need.',
 		pickSecond: 'Choose an answer to question 2 to see it here.',
 		backToQuestions: rich('This shows the task you picked. ', {
-			link: 'Show the answer to the two questions again',
+			label: 'Show the answer to the two questions again',
 			href: '#g-panel-product'
 		}),
 		agentNative: rich(
 			'Does the agent run on the person’s computer and sign in as them? That is the same case as ',
-			{ link: 'an app on a desktop or in a terminal', href: '#answer-native' },
+			{ label: 'an app on a desktop or in a terminal', href: '#answer-native' },
 			'.'
 		)
 	},

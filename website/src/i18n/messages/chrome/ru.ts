@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '5537c741c977';
+export const source = '294dd3facb68';
 
 export default {
 	skipToContent: 'Перейти к содержанию',
@@ -64,7 +64,7 @@ export default {
 		rich(
 			{ strong: 'Английская версия новее.' },
 			' Этот перевод сделан с более ранней редакции страницы, и в нём может не хватать изменений, внесённых с тех пор. ',
-			{ link: 'Читать английскую версию', href },
+			{ label: 'Читать английскую версию', href },
 			'.'
 		),
 	breadcrumbs: {

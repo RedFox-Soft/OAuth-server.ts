@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = 'ad08f33f804e';
+export const source = '55e915db7165';
 
 export default {
 	title: 'Что вам нужно?',
@@ -21,13 +21,13 @@ export default {
 		moreTasksSub: 'Это не схемы входа, но часто именно они нужны следующими.',
 		pickSecond: 'Выберите ответ на второй вопрос, и он появится здесь.',
 		backToQuestions: rich('Здесь показана задача, которую вы выбрали. ', {
-			link: 'Снова показать ответ на два вопроса',
+			label: 'Снова показать ответ на два вопроса',
 			href: '#g-panel-product'
 		}),
 		agentNative: rich(
 			'Агент работает на компьютере человека и входит от его имени? Тогда это тот же случай, что и ',
 			{
-				link: 'приложение на компьютере или в терминале',
+				label: 'приложение на компьютере или в терминале',
 				href: '#answer-native'
 			},
 			'.'

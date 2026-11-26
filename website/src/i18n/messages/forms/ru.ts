@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '59e1195bff59';
+export const source = 'fd46e1b6bd8d';
 
 export default {
 	workEmail: 'Рабочий email',
@@ -15,7 +15,7 @@ export default {
 		fallback: (address: string, href: string) =>
 			rich(
 				'Напишите нам на ',
-				{ link: address, href },
+				{ label: address, href },
 				' и расскажите, как устроено ваше развёртывание и какие гарантии вам нужны. Обычно мы отвечаем в течение двух рабочих дней.'
 			)
 	},

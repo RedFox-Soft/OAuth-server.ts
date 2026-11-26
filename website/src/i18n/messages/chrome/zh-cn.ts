@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '5537c741c977';
+export const source = '294dd3facb68';
 
 export default {
 	skipToContent: '跳到正文',
@@ -62,7 +62,7 @@ export default {
 		rich(
 			{ strong: '英文原文已有更新。' },
 			'本译文基于该页面较早的版本，可能缺少此后的改动。',
-			{ link: '阅读英文版', href },
+			{ label: '阅读英文版', href },
 			'。'
 		),
 	breadcrumbs: {

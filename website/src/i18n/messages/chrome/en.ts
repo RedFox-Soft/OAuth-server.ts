@@ -66,7 +66,7 @@ export default {
 		rich(
 			{ strong: 'The English version is newer.' },
 			' This translation was made from an earlier revision of the page, and may be missing the changes made since. ',
-			{ link: 'Read the English version', href },
+			{ label: 'Read the English version', href },
 			'.'
 		),
 	breadcrumbs: {

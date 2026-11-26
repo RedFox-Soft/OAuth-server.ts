@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '36cec294b076';
+export const source = '09d84c8451a0';
 
 const plural = new Intl.PluralRules('ru');
 
@@ -22,9 +22,9 @@ export default {
 		subscribe: (feed: string, guide: string) =>
 			rich(
 				'Подпишитесь на ',
-				{ link: 'RSS-ленту', href: feed },
+				{ label: 'RSS-ленту', href: feed },
 				' или откройте ',
-				{ link: 'руководство по началу работы', href: guide },
+				{ label: 'руководство по началу работы', href: guide },
 				', если вам интереснее попробовать сервер, чем читать о нём.'
 			),
 		emptyHeading: 'Пока ничего не опубликовано',

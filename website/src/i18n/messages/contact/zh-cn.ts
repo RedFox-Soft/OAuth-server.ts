@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '21f851ff1194';
+export const source = 'cda5ff522281';
 
 export default {
 	title: '联系我们',
@@ -19,7 +19,7 @@ export default {
 		body: (address: string, href: string) =>
 			rich(
 				'请发邮件至 ',
-				{ link: address, href },
+				{ label: address, href },
 				'，不要把报告提交到公开的问题跟踪器。安全策略说明了我们接下来会怎么做，以及需要多长时间。'
 			),
 		policy: '安全策略'

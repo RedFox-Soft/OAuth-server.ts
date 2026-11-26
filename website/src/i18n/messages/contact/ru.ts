@@ -1,7 +1,7 @@
 import { rich } from '../../types.ts';
 import type english from './en.ts';
 
-export const source = '21f851ff1194';
+export const source = 'cda5ff522281';
 
 export default {
 	title: 'Контакты',
@@ -19,7 +19,7 @@ export default {
 		body: (address: string, href: string) =>
 			rich(
 				'Напишите на ',
-				{ link: address, href },
+				{ label: address, href },
 				' и не публикуйте сообщение в публичном трекере. В политике безопасности описано, что мы делаем после вашего письма и в какие сроки.'
 			),
 		policy: 'Политика безопасности'
