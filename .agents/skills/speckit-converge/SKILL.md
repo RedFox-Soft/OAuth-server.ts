@@ -5,8 +5,7 @@ compatibility: "Requires spec-kit project structure with .specify/ directory"
 metadata:
   author: "github-spec-kit"
   source: "templates/commands/converge.md"
-user-invocable: true
-disable-model-invocation: false
+  version: "1.4.5"
 ---
 
 

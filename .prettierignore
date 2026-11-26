@@ -7,7 +7,8 @@ node_modules
 .env.*
 !.env.example
 
-# Ignore files for AI Claude and Skill Specify
+# Ignore files for AI agents and Skill Specify
+/.agents
 /.claude
 /.specify
 
