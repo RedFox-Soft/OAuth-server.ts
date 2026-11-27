@@ -106,6 +106,29 @@ jobs:
             "${IMAGE}@${digest}" > /dev/null
           echo "REF=${IMAGE}@${digest}" >> "$GITHUB_ENV"
 
+      # Remove any stopped leftover machine left behind by an earlier failed bluegreen deploy
+      # (production runs with auto_stop_machines = 'off', so a stopped machine beside a started
+      # one is always an orphan). Also stop conformance if this token can reach it, in case a
+      # probe woke it between the two jobs.
+      - name: Clean up leftover machines before production deploy
+        if: env.TARGET == 'production'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          machines=$(flyctl machine list -c "$CONFIG" --json)
+          started=$(echo "$machines" | jq '[.[] | select(.state == "started")] | length')
+          if [ "$started" -gt 0 ]; then
+            stopped=$(echo "$machines" | jq -r '.[] | select(.state == "stopped") | .id')
+            if [ -n "$stopped" ]; then
+              flyctl machine destroy -c "$CONFIG" $stopped
+            fi
+          fi
+          if conf_ids=$(flyctl machine list -c fly.conformance.toml --json 2>/dev/null | jq -r '.[] | select(.state == "started") | .id'); then
+            if [ -n "$conf_ids" ]; then
+              flyctl machine stop -c fly.conformance.toml --wait-timeout 60s $conf_ids || true
+            fi
+          fi
+
       # The config's release_command runs db:setup and db:migrate on a temporary Machine first and
       # aborts the deploy on a non-zero exit, which is what db:setup returns when a declared storage
       # constraint is not in force. --remote-only builds on Fly's builder, so the runner needs no
@@ -146,3 +169,17 @@ jobs:
             exit 1
           fi
           echo "issuer matches: $ADVERTISED"
+
+      # Stop the conformance machine once the smoke check passes rather than waiting for Fly's
+      # idle timeout: release.yml deploys production immediately after, and a personal Fly org's
+      # running-VM limit leaves no room for production's bluegreen deploy while conformance is
+      # still up. `auto_start_machines` wakes it on the next request.
+      - name: Stop conformance machine after smoke check
+        if: env.TARGET == 'conformance'
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+        run: |
+          ids=$(flyctl machine list -c "$CONFIG" --json | jq -r '.[] | select(.state == "started") | .id')
+          if [ -n "$ids" ]; then
+            flyctl machine stop -c "$CONFIG" --wait-timeout 60s $ids
+          fi
