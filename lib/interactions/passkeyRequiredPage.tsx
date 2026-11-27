@@ -38,6 +38,8 @@ export interface PasskeyRequiredPageProps {
 	requirement: 'passkey';
 	variant: PasskeyRequiredVariant;
 	email?: string;
+	/* The declared API whose requirement stopped the sign-in (specs/143), when the app itself did not. */
+	api?: string;
 	/* The creation options, for `passkeyCreate`. */
 	options?: PublicKeyCredentialCreationOptionsJSON;
 	/* A passkey just made on this page: full, or conditional and waiting for its mail. */
@@ -61,6 +63,7 @@ export function PasskeyRequiredPage({
 	uid,
 	variant,
 	email = '',
+	api,
 	options,
 	created,
 	refused,
@@ -106,7 +109,12 @@ export function PasskeyRequiredPage({
 			});
 	};
 
-	const heading = app ? (
+	const heading = api ? (
+		<Message
+			t={T.headingApi}
+			values={{ api }}
+		/>
+	) : app ? (
 		<Message
 			t={T.headingApp}
 			values={{ app }}

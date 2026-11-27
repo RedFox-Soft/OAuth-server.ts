@@ -70,7 +70,11 @@ export async function refusedRecently(
 			row.reason,
 			row.place.rule ?? '',
 			row.place.tool ?? '',
-			row.freshness?.requireCode ? 'code' : ''
+			row.freshness?.requirePasskey
+				? 'passkey'
+				: row.freshness?.requireCode
+					? 'code'
+					: ''
 		].join('\u0000');
 		const existing = folded.get(key);
 		if (existing) {

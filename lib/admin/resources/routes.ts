@@ -1,6 +1,7 @@
 import { networkFactsSummary } from '../../network_facts/state.js';
 import { apiSignInPreview, type ApiSignInPreview } from './sign_in_preview.js';
 import { sameExpect } from '../buckets/sign_in_preview.js';
+import { assertPasskeysAccepted } from '../clients/require_passkey_preview.js';
 import { now } from '../../telemetry/clock.js';
 import { Elysia } from 'elysia';
 import { uriPathParams } from 'lib/plugins/uri_path_params.js';
@@ -264,12 +265,14 @@ function resourceView(
 	| 'proxyAddressProvenAt'
 	| 'proxyAddressForgedAt'
 	| 'requireCode'
+	| 'requirePasskey'
 	| 'signInEveryMinutes'
 > & {
 	projectId: string;
 	checkedBy: 'server' | 'proxy';
-	/* The API's sign-in requirement (specs/130), always stated. */
+	/* The API's sign-in requirement (specs/130, specs/143), always stated. */
 	requireCode: boolean;
+	requirePasskey: boolean;
 	signInEveryMinutes: number | null;
 	connection: ResourceConnection;
 	addresses?: ReturnType<typeof addressesOfApi>;
@@ -283,6 +286,7 @@ function resourceView(
 		...shown,
 		checkedBy: rest.checkedBy ?? 'server',
 		requireCode: rest.requireCode === true,
+		requirePasskey: rest.requirePasskey === true,
 		signInEveryMinutes: rest.signInEveryMinutes ?? null,
 		projectId: bucketId,
 		...(rest.checkedBy === 'proxy' ? { addresses: addressesOfApi(rest) } : {}),
@@ -560,6 +564,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 			const namespace = namespaceOf(bucket);
 			assertMayWrite(ctx, namespace);
 			if (body.checkedBy === 'proxy') assertProxyCheckable(bucket, identifier);
+			assertPasskeysAccepted(bucket, body.requirePasskey);
 
 			/*
 			 * Checked before the audit write so a refused declaration leaves no entry describing a change
@@ -601,6 +606,7 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					trailingSlashSignificant: body.trailingSlashSignificant,
 					checkedBy: body.checkedBy,
 					requireCode: body.requireCode,
+					requirePasskey: body.requirePasskey,
 					signInEveryMinutes: body.signInEveryMinutes
 				});
 				set.status = 201;
@@ -731,6 +737,10 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 				const why = await whyCannotExchange(bucket, body.exchangedBy);
 				if (why) throw new AdminError(400, why, { field: 'exchangedBy' });
 			}
+			assertPasskeysAccepted(
+				bucket,
+				body.requirePasskey === true && existing.requirePasskey !== true
+			);
 
 			/*
 			 * Turning a sign-in requirement on, or shortening it, is consented to with the numbers it was previewed with
@@ -770,6 +780,8 @@ export const resourceRoutes = new Elysia({ name: 'admin-resources' })
 					JSON.stringify(tools) !== JSON.stringify(existing.tools)) ||
 				(body.requireCode !== undefined &&
 					body.requireCode !== (existing.requireCode === true)) ||
+				(body.requirePasskey !== undefined &&
+					body.requirePasskey !== (existing.requirePasskey === true)) ||
 				(body.signInEveryMinutes !== undefined &&
 					(body.signInEveryMinutes ?? undefined) !==
 						existing.signInEveryMinutes) ||

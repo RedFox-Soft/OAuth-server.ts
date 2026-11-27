@@ -34,6 +34,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
 		requireCode?: boolean;
+		requirePasskey?: boolean;
 		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource> {
 		const _id = declarationId(data.namespace, data.identifier);
@@ -86,8 +87,18 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 	): Promise<ProtectedResource | null> {
 		const resource = this.resources.get(declarationId(namespace, identifier));
 		if (!resource) return null;
-		const { exchangedBy, requireCode, signInEveryMinutes, ...rest } = patch;
-		const requirement = requirementPatch({ requireCode, signInEveryMinutes });
+		const {
+			exchangedBy,
+			requireCode,
+			requirePasskey,
+			signInEveryMinutes,
+			...rest
+		} = patch;
+		const requirement = requirementPatch({
+			requireCode,
+			requirePasskey,
+			signInEveryMinutes
+		});
 		Object.assign(resource, rest, requirement.set, { updatedAt: new Date() });
 		for (const key of requirement.unset) delete resource[key];
 		if (exchangedBy === null) delete resource.exchangedBy;

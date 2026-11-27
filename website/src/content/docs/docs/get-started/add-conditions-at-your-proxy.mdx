@@ -235,23 +235,25 @@ browser is sent to sign in again, and the sign-in page says why. A request that 
 - A person who signs in through an outside provider is asked to sign in there again. How fresh that sign-in is, the
   provider decides.
 
-### With two-step sign-in {#with-code}
+### With two-step sign-in or a passkey {#with-code}
 
-Tick **with two-step sign-in** under the condition. The path then opens only for a sign-in that included a code from an
-authenticator app, or was made with a passkey where the project accepts passkeys, and is not older than the time you
-chose, at most a day. The rule reads "signed in with two steps within 15 min".
+Under **Ask to sign in again**, choose the sign-in level the path needs: **Any sign-in**, **With two-step sign-in**, or
+**With a passkey** (when the project accepts passkeys). The same three choices exist on **Network facts** when a
+matching address is asked to sign in again.
 
-- Before it saves, the console shows how many of the people who may open the path have no authenticator app, and how
-  many can sign in only through a provider. You confirm with those numbers. Only someone who may manage the project's
-  people can turn it on.
-- A person with a code signs in again with the password and the code, even when they typed a code earlier that day. A
-  person with a passkey can sign in again with it instead, and is asked no code.
-- A person without one sees a page that names your app's address. If the project lets people set one up, they set it
-  up there and reach the page they opened, in the same sign-in. Otherwise the page asks them to contact you.
-- A person who signs in through a provider is told this way of signing in cannot open the page.
-- Going back without signing in ends on a page that says the page needs two-step sign-in. It never starts the same
-  sign-in again.
-- The console's **Check access** has a box for whether the person signed in with two steps (a code or a passkey).
+- **With two-step sign-in** opens the path only for a recent sign-in that included a code from an authenticator app, or
+  was made with a passkey where the project accepts passkeys. The rule reads "signed in with two steps within 15 min".
+- **With a passkey** opens the path only for a recent sign-in with a confirmed passkey. Password sign-ins, authenticator
+  codes, unconfirmed passkeys, and outside sign-in providers are turned away. The rule reads "signed in with a passkey
+  within 15 min".
+- Before saving either tightening (including raising a path from two-step sign-in to a passkey), the console shows how
+  many of the people who may open the path lack an authenticator app or a confirmed passkey, and how many can sign in
+  only through a provider. You confirm with those numbers. Only someone who may manage the project's people can turn it
+  on. Lowering from a passkey to two-step sign-in or any sign-in is treated as a widening and asks for confirmation.
+- A person who goes back without meeting the requirement lands on a page saying the path needs two-step sign-in or a
+  passkey, without starting a loop and without creating a session.
+- The console's **Check access** lets you pick the sign-in method: **Password only**, **Two-step (a code)**, or
+  **Passkey**.
 
 ## Groups and attributes for an API {#api}
 

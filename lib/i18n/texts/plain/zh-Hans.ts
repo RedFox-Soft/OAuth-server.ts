@@ -198,6 +198,12 @@ export const zhHans: PlainTexts = {
 			open: '打开 {host}',
 			reason: '原因：{reason}，时间：{time}'
 		},
+		passkeyNeeded: {
+			title: '{host} 的此页面需要使用通行密钥登录',
+			body: '您没有使用通行密钥登录就返回了。{host} 的其他页面可能仍可打开。',
+			open: '打开 {host}',
+			reason: '原因：{reason}，时间：{time}'
+		},
 		address: {
 			title: '{host} 看到的您的地址',
 			seen: '检查看到您的地址为 {address}。',

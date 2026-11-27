@@ -22,10 +22,15 @@ export type ResourceServerJwt = {
 };
 
 /*
- * How the person behind a token for this resource must have signed in (specs/130 research R2): with a code, and no
- * longer ago than `maxAgeSeconds`. Only a declared API carries it; every grant and the sign-in read it from here.
+ * How the person behind a token for this resource must have signed in (specs/130 research R2, specs/143): with a code
+ * or a passkey, and no longer ago than `maxAgeSeconds`. Only a declared API carries it; every grant and the sign-in
+ * read it from here.
  */
-export type ResourceSignIn = { code: boolean; maxAgeSeconds?: number };
+export type ResourceSignIn = {
+	code: boolean;
+	passkey?: boolean;
+	maxAgeSeconds?: number;
+};
 
 export type ResourceServerInfo = {
 	scope: string;

@@ -8,7 +8,7 @@ import {
 } from '../../helpers/errors.ts';
 import { member } from '../../helpers/_/object.ts';
 import presence from '../../helpers/validate_presence.ts';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import * as formatters from '../../helpers/formatters.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
 import resolveResource from '../../helpers/resolve_resource.ts';
@@ -207,6 +207,10 @@ export const handler = async function refreshTokenHandler(
 
 	if (resource && resourceServer) {
 		at.resourceServer = resourceServer;
+		/* An API that requires a passkey states so on every access token it receives (specs/143 FR-006). */
+		if (at.resourceServer.signIn?.passkey) {
+			at.payload.acr = configuration.acrMap.phishing_resistant;
+		}
 		at.payload.scope = grant.getResourceScopeFiltered(
 			resource,
 			[...scope].filter(Set.prototype.has.bind(at.resourceServer.scopes))

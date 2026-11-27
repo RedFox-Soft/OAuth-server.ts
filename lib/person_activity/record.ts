@@ -92,7 +92,11 @@ function rowOf(noted: Noted): PersonActivityRow {
 					noted.kind,
 					noted.outcome,
 					noted.reason,
-					noted.freshness?.requireCode ? 'code' : '',
+					noted.freshness?.requirePasskey
+						? 'passkey'
+						: noted.freshness?.requireCode
+							? 'code'
+							: '',
 					...placeKey(noted.place),
 					/*
 					 * A refusal at the passkey door is a row of its own (specs/139), so it never merges with the password
@@ -287,7 +291,12 @@ export function noteAppCheck(input: {
 	accountId: string | null;
 	decision: Pick<
 		Decision,
-		'outcome' | 'reason' | 'rule' | 'maxAgeSeconds' | 'requireCode'
+		| 'outcome'
+		| 'reason'
+		| 'rule'
+		| 'maxAgeSeconds'
+		| 'requireCode'
+		| 'requirePasskey'
 	>;
 	believed: Believed;
 }): void {
@@ -305,7 +314,11 @@ export function noteAppCheck(input: {
 		const freshness: PersonActivityRow['freshness'] =
 			decision.outcome === 'sign_in'
 				? {
-						...(decision.requireCode ? { requireCode: true as const } : {}),
+						...(decision.requirePasskey
+							? { requirePasskey: true as const }
+							: decision.requireCode
+								? { requireCode: true as const }
+								: {}),
 						...(decision.maxAgeSeconds === undefined
 							? {}
 							: { maxAgeSeconds: decision.maxAgeSeconds })
@@ -346,6 +359,7 @@ const API_REASONS: Partial<Record<ApiReason, ActivityReason>> = {
 	bad_mcp_header: 'bad_mcp_header',
 	insufficient_scope: 'insufficient_scope',
 	unsafe_value: 'unsafe_value',
+	passkey_required: 'passkey_required',
 	code_required: 'code_required',
 	sign_in_not_fresh: 'sign_in_not_fresh'
 };

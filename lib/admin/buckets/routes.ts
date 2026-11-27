@@ -66,7 +66,9 @@ import {
 } from '../../passkeys/ways_in.js';
 import { assertAdminBucketChange } from './admin_bucket.js';
 import {
+	apisRequiringPasskey,
 	appsRequiringPasskey,
+	pathsRequiringPasskey,
 	sameExpect,
 	signInCounts,
 	signInPreview
@@ -466,8 +468,10 @@ interface AddressChangeCounts {
 	/* Only when passkeys stop working (specs/140): their holders, and those of them left with no other way in. */
 	passkeyPeople?: number;
 	passkeyOnly?: number;
-	/* The applications requiring a passkey (specs/142), which then refuse everyone until people make new ones. */
+	/* The applications, APIs, and proxy paths requiring a passkey (specs/142, 143), which then refuse everyone until people make new ones. */
 	appsRequiringPasskey?: number;
+	apisRequiringPasskey?: number;
+	pathsRequiringPasskey?: number;
 }
 
 interface AddressChangePreview {
@@ -537,8 +541,19 @@ async function addressChangePreview(
 	 * simply stops offering it, and nobody is told. Counted, and those it leaves with no way in named (specs/140 R7).
 	 */
 	const passkeys = await passkeysLostByMove(bucket, rpIdFor(target));
-	const requiringPasskey =
-		passkeys === null ? [] : await appsRequiringPasskey(bucket._id);
+	const [requiringPasskey, requiringPasskeyApis, requiringPasskeyPaths] =
+		passkeys === null
+			? [[], [], []]
+			: await Promise.all([
+					appsRequiringPasskey(bucket._id),
+					apisRequiringPasskey(bucket._id),
+					pathsRequiringPasskey(bucket._id)
+				]);
+	const passkeyDependents = [
+		...requiringPasskey,
+		...requiringPasskeyApis,
+		...requiringPasskeyPaths
+	];
 
 	return {
 		from: issuerFor(bucket),
@@ -563,16 +578,22 @@ async function addressChangePreview(
 					}),
 			...(requiringPasskey.length === 0
 				? {}
-				: { appsRequiringPasskey: requiringPasskey.length })
+				: { appsRequiringPasskey: requiringPasskey.length }),
+			...(requiringPasskeyApis.length === 0
+				? {}
+				: { apisRequiringPasskey: requiringPasskeyApis.length }),
+			...(requiringPasskeyPaths.length === 0
+				? {}
+				: { pathsRequiringPasskey: requiringPasskeyPaths.length })
 		},
 		consequence:
 			'the issuer identifier changes, so every application listed stops validating tokens until it is reconfigured, every identity provider listed refuses sign-in until its upstream registration has the new callback address, and every provisioning connection listed stops until its directory is re-pointed, every connected service listed refuses new connections until its registration has the new callback address; the previous address stops answering and everyone signed in signs in again' +
 			(passkeys === null
 				? ''
 				: '; every passkey listed stops working, because passkeys are tied to the address') +
-			(requiringPasskey.length === 0
+			(passkeyDependents.length === 0
 				? ''
-				: `; ${requiringPasskey.join(', ')} ${requiringPasskey.length === 1 ? 'requires' : 'require'} a passkey and will refuse everyone until people create new passkeys for the new address`)
+				: `; ${passkeyDependents.join(', ')} ${passkeyDependents.length === 1 ? 'requires' : 'require'} a passkey and will refuse everyone until people create new passkeys for the new address`)
 	};
 }
 
@@ -589,7 +610,12 @@ function sameCounts(
 		// Absent reads as none: a client that previewed before anyone held a passkey is refused only if someone now does.
 		(expected.passkeyPeople ?? 0) === (actual.passkeyPeople ?? 0) &&
 		(expected.passkeyOnly ?? 0) === (actual.passkeyOnly ?? 0) &&
-		(expected.appsRequiringPasskey ?? 0) === (actual.appsRequiringPasskey ?? 0)
+		(expected.appsRequiringPasskey ?? 0) ===
+			(actual.appsRequiringPasskey ?? 0) &&
+		(expected.apisRequiringPasskey ?? 0) ===
+			(actual.apisRequiringPasskey ?? 0) &&
+		(expected.pathsRequiringPasskey ?? 0) ===
+			(actual.pathsRequiringPasskey ?? 0)
 	);
 }
 

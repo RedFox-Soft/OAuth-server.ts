@@ -53,6 +53,8 @@ export interface Person {
 	signedInAt?: number | null;
 	/* Whether that sign-in included a code from an authenticator app (specs/128). */
 	signedInWithCode?: boolean | null;
+	/* Whether that sign-in was with a confirmed passkey (specs/143). */
+	signedInWithPasskey?: boolean | null;
 }
 
 export type Outcome = 'allow' | 'sign_in' | 'deny';
@@ -102,6 +104,8 @@ export interface Decision {
 	maxAgeSeconds?: number;
 	/* For a fresh sign-in: the sign-in must include a code from an authenticator app (specs/128). */
 	requireCode?: true;
+	/* For a fresh sign-in: the sign-in must be with a confirmed passkey (specs/143). */
+	requirePasskey?: true;
 	/* A refusal by "From where": by its ranges, or by the network facts of the address (specs/129). */
 	networkPart?: 'ranges' | 'facts';
 }
@@ -400,17 +404,23 @@ function freshOf(
 }
 
 /*
- * What a sign-in for a path must meet (specs/128 research R3): the shortest interval of its fresh conditions, and a code
- * whenever any of them wants one, even one that holds today, because the sign-in replaces the app's session.
+ * What a sign-in for a path must meet (specs/128 research R3, specs/143): the shortest interval of its fresh
+ * conditions, and the strongest sign-in level any of them asks for (passkey over two-step), even one that holds today,
+ * because the sign-in replaces the app's session.
  */
 function signInAsked(
 	judged: readonly ConditionOutcome[]
-): Pick<Decision, 'maxAgeSeconds' | 'requireCode'> {
+): Pick<Decision, 'maxAgeSeconds' | 'requireCode' | 'requirePasskey'> {
 	const fresh = freshOf(judged).map((c) => c.condition);
 	if (fresh.length === 0) return {};
+	const requirePasskey = fresh.some((c) => c.withPasskey);
 	return {
 		maxAgeSeconds: Math.min(...fresh.map((c) => c.maxAgeMinutes)) * 60,
-		...(fresh.some((c) => c.withCode) ? { requireCode: true as const } : {})
+		...(requirePasskey
+			? { requirePasskey: true as const }
+			: fresh.some((c) => c.withCode)
+				? { requireCode: true as const }
+				: {})
 	};
 }
 
@@ -439,7 +449,10 @@ export function decide(input: DecideInput): Decision {
 	const decided = (
 		outcome: Outcome,
 		reason: Reason,
-		extra: Pick<Decision, 'maxAgeSeconds' | 'requireCode' | 'networkPart'> = {}
+		extra: Pick<
+			Decision,
+			'maxAgeSeconds' | 'requireCode' | 'requirePasskey' | 'networkPart'
+		> = {}
 	): Decision => ({
 		outcome,
 		reason,

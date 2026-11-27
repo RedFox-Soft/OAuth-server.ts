@@ -9,10 +9,14 @@
 
 export interface SignInRule {
 	readonly code: boolean;
+	/* Only a full passkey sign-in meets this (specs/143); includes two-step sign-in. */
+	readonly passkey?: boolean;
 	readonly maxAgeSeconds?: number;
 }
 
 export interface UnmetRequirement {
+	/* A passkey sign-in is required and this sign-in was not one (specs/143). */
+	readonly passkey: boolean;
 	/* A code from an authenticator app is required and the sign-in had none. */
 	readonly code: boolean;
 	/* A sign-in no older than the requirement is needed and this one is older, or its time is unknown. */
@@ -23,13 +27,15 @@ export function requirementUnmet(
 	signIn: SignInRule | undefined,
 	facts: {
 		readonly withCode: boolean;
+		readonly withPasskey?: boolean;
 		/* Seconds since the epoch. */
 		readonly authTime: number | null | undefined;
 	},
 	nowSeconds: number
 ): UnmetRequirement | null {
 	if (!signIn) return null;
-	const code = signIn.code && !facts.withCode;
+	const passkey = signIn.passkey === true && facts.withPasskey !== true;
+	const code = !passkey && signIn.code && !facts.withCode;
 	const maxAge = signIn.maxAgeSeconds;
 	const authTime = facts.authTime;
 	const recent =
@@ -39,5 +45,5 @@ export function requirementUnmet(
 			Number.isFinite(authTime) &&
 			nowSeconds - authTime <= maxAge
 		);
-	return code || recent ? { code, recent } : null;
+	return passkey || code || recent ? { passkey, code, recent } : null;
 }

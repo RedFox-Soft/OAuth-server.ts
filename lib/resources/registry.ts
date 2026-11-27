@@ -24,15 +24,20 @@ export interface DeclaredResourceInfo {
 	readonly signIn?: ResourceSignIn;
 }
 
-/* The record's sign-in requirement as the token path reads it, or undefined when it has none (specs/130 R2). */
+/* The record's sign-in requirement as the token path reads it, or undefined when it has none (specs/130 R2, specs/143). */
 export function signInOf(
-	resource: Pick<ProtectedResource, 'requireCode' | 'signInEveryMinutes'>
+	resource: Pick<
+		ProtectedResource,
+		'requireCode' | 'requirePasskey' | 'signInEveryMinutes'
+	>
 ): ResourceSignIn | undefined {
-	const code = resource.requireCode === true;
+	const passkey = resource.requirePasskey === true;
+	const code = !passkey && resource.requireCode === true;
 	const minutes = resource.signInEveryMinutes;
-	if (!code && minutes === undefined) return undefined;
+	if (!passkey && !code && minutes === undefined) return undefined;
 	return {
 		code,
+		...(passkey ? { passkey: true } : {}),
 		...(minutes === undefined ? {} : { maxAgeSeconds: minutes * 60 })
 	};
 }

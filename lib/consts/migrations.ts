@@ -2087,6 +2087,26 @@ const acrPhishingResistant: Migration = {
 	}
 };
 
+/*
+ * Fence migration for spec 143 (passkey requirement on APIs and behind-proxy paths): writes nothing,
+ * records its id in schemaMigrations so any older release that does not know `ProtectedResource.requirePasskey`
+ * or `FreshCondition.withPasskey` / `NetworkFactsOutcome.withPasskey` refuses to start against a migrated database.
+ */
+const passkeyApiProxyFence: Migration = {
+	id: '2026-11-26-passkey-api-proxy-fence',
+	description:
+		'Mark the database as holding APIs and behind-proxy paths that require a passkey, so an older release refuses to start against it',
+	reversible: false,
+	rerunnable:
+		'Writes nothing beyond recording this migration id; a second application is a no-op.',
+	mongodb: {
+		async apply() {}
+	},
+	postgres: {
+		async apply() {}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -2112,5 +2132,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	adminSignInLogFence,
 	newSignInAlertsFence,
 	passkeysFence,
-	acrPhishingResistant
+	acrPhishingResistant,
+	passkeyApiProxyFence
 ];

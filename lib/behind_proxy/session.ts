@@ -119,6 +119,8 @@ export interface AppSession {
 	 * recorded no context did not.
 	 */
 	withCode: boolean;
+	/* Whether that sign-in reached the phishing-resistant context (specs/143). */
+	withPasskey: boolean;
 }
 
 /*
@@ -142,7 +144,8 @@ export async function readAppSession(
 		id,
 		accountId: record.accountId,
 		authTime: record.authTime ?? null,
-		withCode: meets(record.acr, 'multi_factor')
+		withCode: meets(record.acr, 'multi_factor'),
+		withPasskey: meets(record.acr, 'phishing_resistant')
 	};
 }
 
@@ -166,6 +169,8 @@ export interface Standing {
 	signedInAt: number | null;
 	/* Whether that sign-in included a code from an authenticator app (specs/128). */
 	signedInWithCode: boolean;
+	/* Whether that sign-in was with a confirmed passkey (specs/143). */
+	signedInWithPasskey: boolean;
 }
 
 /*
@@ -217,7 +222,8 @@ export async function standingOf(
 		localeRanges: storedLocaleRanges(user),
 		attributes: attributesOf(user),
 		signedInAt: session.authTime,
-		signedInWithCode: session.withCode
+		signedInWithCode: session.withCode,
+		signedInWithPasskey: session.withPasskey
 	};
 	standings.set(session.id, { standing, at: now });
 	return standing;

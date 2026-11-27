@@ -36,7 +36,8 @@ if (!THROWAWAY.test(database)) {
 }
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
-const { getPasskeyStore } = await import('../lib/adapters/index.js');
+const { getBehindProxyAppStore, getPasskeyStore, getProtectedResourceStore } =
+	await import('../lib/adapters/index.js');
 type Passkey = import('../lib/adapters/types.js').Passkey;
 
 let failures = 0;
@@ -317,6 +318,114 @@ check(
 		(await store.countOf(other, 'anna')) === 1
 );
 await store.removeAllIn(other);
+
+/* ---------------------------------------------------------- API & proxy passkey rules (specs/143) */
+{
+	const resources = getProtectedResourceStore();
+	const apps = getBehindProxyAppStore();
+	const resBucket = `verify-passkey-rules-${String(stamp)}`;
+	const resId = `https://vault-${String(stamp)}.example.test/mcp`;
+
+	await resources.create({
+		namespace: resBucket,
+		identifier: resId,
+		bucketId: resBucket,
+		name: 'Vault',
+		scopes: ['read'],
+		tokenFormat: 'jwt',
+		requirePasskey: true,
+		requireCode: true
+	});
+	const createdRes = await resources.find(resBucket, resId);
+	check(
+		'ProtectedResource.requirePasskey persists and clears requireCode on create (specs/143)',
+		createdRes?.requirePasskey === true && createdRes.requireCode === undefined,
+		JSON.stringify({
+			requirePasskey: createdRes?.requirePasskey,
+			requireCode: createdRes?.requireCode
+		})
+	);
+
+	await resources.update(resBucket, resId, {
+		requirePasskey: false,
+		requireCode: true
+	});
+	const loweredRes = await resources.find(resBucket, resId);
+	check(
+		'ProtectedResource lowers requirePasskey to requireCode cleanly',
+		loweredRes?.requirePasskey === undefined &&
+			loweredRes?.requireCode === true,
+		JSON.stringify({
+			requirePasskey: loweredRes?.requirePasskey,
+			requireCode: loweredRes?.requireCode
+		})
+	);
+
+	await resources.update(resBucket, resId, { requirePasskey: true });
+	const raisedRes = await resources.find(resBucket, resId);
+	check(
+		'ProtectedResource raises requireCode to requirePasskey and clears requireCode',
+		raisedRes?.requirePasskey === true && raisedRes.requireCode === undefined,
+		JSON.stringify({
+			requirePasskey: raisedRes?.requirePasskey,
+			requireCode: raisedRes?.requireCode
+		})
+	);
+	await resources.destroy(resBucket, resId);
+
+	const appId = `app-${String(stamp)}`;
+	const now = new Date();
+	await apps.create({
+		_id: appId,
+		bucketId: resBucket,
+		name: 'Finance',
+		address: `https://finance-${String(stamp)}.example.test`,
+		proxyKind: 'caddy',
+		rules: [
+			{ path: '/', who: { kind: 'project' } },
+			{
+				path: '/payouts',
+				who: {
+					kind: 'conditional',
+					who: { kind: 'project' },
+					conditions: [
+						{ kind: 'fresh', maxAgeMinutes: 15, withPasskey: true },
+						{
+							kind: 'network',
+							only: [],
+							not: [],
+							facts: {
+								categories: ['vpn'],
+								outcome: {
+									kind: 'sign_in_again',
+									maxAgeMinutes: 15,
+									withPasskey: true
+								}
+							}
+						}
+					]
+				}
+			}
+		],
+		createdAt: now,
+		updatedAt: now
+	});
+	const storedApp = await apps.find(appId);
+	const payouts = storedApp?.rules.find((r) => r.path === '/payouts');
+	const conds =
+		payouts?.who.kind === 'conditional' ? payouts.who.conditions : [];
+	const freshCond = conds.find((c) => c.kind === 'fresh');
+	const netCond = conds.find((c) => c.kind === 'network');
+	check(
+		'BehindProxyApp persists withPasskey on fresh and network.facts.outcome (specs/143)',
+		freshCond?.kind === 'fresh' &&
+			freshCond.withPasskey === true &&
+			netCond?.kind === 'network' &&
+			netCond.facts?.outcome.kind === 'sign_in_again' &&
+			netCond.facts.outcome.withPasskey === true
+	);
+	await apps.delete(appId);
+}
 
 console.log(
 	failures === 0 ? 'all checks passed' : `${String(failures)} FAILED`

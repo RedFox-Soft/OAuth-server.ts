@@ -189,6 +189,7 @@ export function ConditionsEditor({
 							disabled={disabled}
 							factsOn={networkFactsOn}
 							signInAgain={kinds.includes('fresh')}
+							passkeys={passkeys}
 							onChange={replace}
 						/>
 					)}
@@ -284,12 +285,14 @@ function NetworkFields({
 	disabled,
 	factsOn,
 	signInAgain,
+	passkeys,
 	onChange
 }: {
 	condition: Extract<Condition, { kind: 'network' }>;
 	disabled: boolean;
 	factsOn: boolean;
 	signInAgain: boolean;
+	passkeys: boolean;
 	onChange: (next: Condition) => void;
 }) {
 	const [only, setOnly] = useState(condition.only.join('\n'));
@@ -343,6 +346,7 @@ function NetworkFields({
 				disabled={disabled}
 				factsOn={factsOn}
 				signInAgain={signInAgain}
+				passkeys={passkeys}
 				onChange={(facts) => {
 					const { facts: _dropped, ...rest } = condition;
 					onChange(facts ? { ...rest, facts } : rest);
@@ -410,12 +414,14 @@ function NetworkFactsFields({
 	disabled,
 	factsOn,
 	signInAgain,
+	passkeys,
 	onChange
 }: {
 	facts: NetworkFactsPart | undefined;
 	disabled: boolean;
 	factsOn: boolean;
 	signInAgain: boolean;
+	passkeys: boolean;
 	onChange: (next: NetworkFactsPart | undefined) => void;
 }) {
 	const base: NetworkFactsPart = facts ?? {
@@ -428,6 +434,14 @@ function NetworkFactsFields({
 		);
 	const locked = disabled || !factsOn;
 	const outcome = base.outcome;
+	const outcomeLevel =
+		outcome.kind === 'sign_in_again'
+			? outcome.withPasskey === true
+				? 'passkey'
+				: outcome.withCode === true
+					? 'code'
+					: 'any'
+			: 'any';
 	return (
 		<Flex
 			vertical
@@ -541,38 +555,55 @@ function NetworkFactsFields({
 						]}
 					/>
 					{outcome.kind === 'sign_in_again' && (
-						<Space wrap>
-							<span>within</span>
-							<InputNumber
-								aria-label="Minutes"
-								min={MIN_FRESH_MINUTES}
-								max={MAX_FRESH_MINUTES}
-								value={outcome.maxAgeMinutes}
-								disabled={locked}
-								onChange={(value) =>
-									set({
-										...base,
-										outcome: { ...outcome, maxAgeMinutes: value ?? 15 }
-									})
-								}
-							/>
-							<span>minutes</span>
-							<Checkbox
-								checked={outcome.withCode === true}
+						<Flex
+							vertical
+							gap={6}
+						>
+							<Space wrap>
+								<span>within</span>
+								<InputNumber
+									aria-label="Minutes"
+									min={MIN_FRESH_MINUTES}
+									max={MAX_FRESH_MINUTES}
+									value={outcome.maxAgeMinutes}
+									disabled={locked}
+									onChange={(value) =>
+										set({
+											...base,
+											outcome: { ...outcome, maxAgeMinutes: value ?? 15 }
+										})
+									}
+								/>
+								<span>minutes</span>
+							</Space>
+							<Radio.Group
+								aria-label="Sign-in required for matching addresses"
+								value={outcomeLevel}
 								disabled={locked}
 								onChange={(e) => {
-									const { withCode: _dropped, ...rest } = outcome;
+									const next = String(e.target.value);
+									const { withCode: _c, withPasskey: _p, ...rest } = outcome;
 									set({
 										...base,
-										outcome: e.target.checked
-											? { ...rest, withCode: true }
-											: rest
+										outcome:
+											next === 'passkey'
+												? { ...rest, withPasskey: true as const }
+												: next === 'code'
+													? { ...rest, withCode: true as const }
+													: rest
 									});
 								}}
-							>
-								with two-step sign-in
-							</Checkbox>
-						</Space>
+								options={[
+									{ value: 'any', label: 'Any sign-in' },
+									{ value: 'code', label: 'With two-step sign-in' },
+									{
+										value: 'passkey',
+										label: 'With a passkey',
+										disabled: !passkeys && outcomeLevel !== 'passkey'
+									}
+								]}
+							/>
+						</Flex>
 					)}
 					<Typography.Text type="secondary">
 						What FoxTrust knows about a network can be wrong. Asking for a new
@@ -869,6 +900,12 @@ function FreshFields({
 	onChange: (next: Condition) => void;
 }) {
 	const preset = FRESH_PRESETS.includes(condition.maxAgeMinutes);
+	const level =
+		condition.withPasskey === true
+			? 'passkey'
+			: condition.withCode === true
+				? 'code'
+				: 'any';
 	return (
 		<Flex
 			vertical
@@ -913,19 +950,45 @@ function FreshFields({
 					</Space.Compact>
 				)}
 			</Flex>
-			<Checkbox
-				checked={condition.withCode === true}
+			<Radio.Group
+				aria-label="Sign-in required"
+				value={level}
 				disabled={disabled}
 				onChange={(e) => {
-					const { withCode: _was, ...plain } = condition;
+					const next = String(e.target.value);
+					const { withCode: _c, withPasskey: _p, ...plain } = condition;
 					onChange(
-						e.target.checked ? { ...plain, withCode: true as const } : plain
+						next === 'passkey'
+							? { ...plain, withPasskey: true as const }
+							: next === 'code'
+								? { ...plain, withCode: true as const }
+								: plain
 					);
 				}}
-			>
-				with two-step sign-in
-			</Checkbox>
-			{condition.withCode && (
+				options={[
+					{ value: 'any', label: 'Any sign-in' },
+					{ value: 'code', label: 'With two-step sign-in' },
+					{
+						value: 'passkey',
+						label: 'With a passkey',
+						disabled: !passkeys && level !== 'passkey'
+					}
+				]}
+			/>
+			{!passkeys && level !== 'passkey' && (
+				<Typography.Text type="secondary">
+					Turn on passkeys on the project&apos;s Sign-in tab to ask for a
+					passkey here.
+				</Typography.Text>
+			)}
+			{level === 'passkey' && (
+				<Typography.Text type="secondary">
+					Only a confirmed passkey opens this path. Password sign-ins,
+					authenticator codes, unconfirmed passkeys, and outside sign-in
+					providers are turned away.
+				</Typography.Text>
+			)}
+			{level === 'code' && (
 				<Typography.Text type="secondary">
 					{passkeys
 						? 'A code from an authenticator app, or a passkey. People with neither, and people who sign in through a provider, can’t open this path. People without an authenticator app are asked to set one up when the project lets them.'
@@ -936,7 +999,7 @@ function FreshFields({
 				Pages that load data in the background, such as dashboards, stop working
 				until the person reloads the page. Use this on admin paths, not on the
 				whole app.
-				{condition.withCode
+				{level !== 'any'
 					? ''
 					: ' A person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides.'}
 			</Typography.Text>

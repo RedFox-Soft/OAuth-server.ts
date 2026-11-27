@@ -101,8 +101,10 @@ export const ChangeBucketAddressBody = t.Object({
 			/* Present when the preview said passkeys stop working (specs/140). */
 			passkeyPeople: t.Optional(PreviewCount),
 			passkeyOnly: t.Optional(PreviewCount),
-			/* Present when an application requiring a passkey would refuse everyone (specs/142). */
-			appsRequiringPasskey: t.Optional(PreviewCount)
+			/* Present when an application, API, or proxy path requiring a passkey would refuse everyone (specs/142, 143). */
+			appsRequiringPasskey: t.Optional(PreviewCount),
+			apisRequiringPasskey: t.Optional(PreviewCount),
+			pathsRequiringPasskey: t.Optional(PreviewCount)
 		})
 	)
 });
@@ -221,7 +223,9 @@ export const UpdateBucketBody = t.Object({
 			listedAttempts: t.Optional(PreviewCount),
 			listedRightPassword: t.Optional(PreviewCount),
 			passkeyOnly: t.Optional(PreviewCount),
-			appsRequiringPasskey: t.Optional(PreviewCount)
+			appsRequiringPasskey: t.Optional(PreviewCount),
+			apisRequiringPasskey: t.Optional(PreviewCount),
+			pathsRequiringPasskey: t.Optional(PreviewCount)
 		})
 	)
 });

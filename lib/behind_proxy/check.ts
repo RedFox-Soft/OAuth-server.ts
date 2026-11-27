@@ -209,8 +209,11 @@ async function reserved(
 	switch (path) {
 		case START_PATH: {
 			const maxAge = maxAgeOf(query.get('max_age'));
-			/* A retry of a sign-in the path asked a code of keeps asking (specs/128 FR-018); only a fresh one can. */
-			const requireCode = maxAge !== undefined && query.get('code') === '1';
+			/* A retry of a sign-in the path asked a passkey or code of keeps asking (specs/128, 143); only a fresh one can. */
+			const requirePasskey =
+				maxAge !== undefined && query.get('passkey') === '1';
+			const requireCode =
+				!requirePasskey && maxAge !== undefined && query.get('code') === '1';
 			return startSignIn(
 				ctx,
 				returnToOf(query.get('rd'), ctx.app.address),
@@ -220,6 +223,7 @@ async function reserved(
 						? { prompt: 'login' as const }
 						: {}),
 					...(maxAge === undefined ? {} : { maxAge }),
+					...(requirePasskey ? { requirePasskey: true as const } : {}),
 					...(requireCode ? { requireCode: true as const } : {})
 				}
 			);
@@ -462,7 +466,8 @@ async function evaluate({
 					groupIds: person.standing.groupIds,
 					attributes: person.standing.attributes,
 					signedInAt: person.standing.signedInAt,
-					signedInWithCode: person.standing.signedInWithCode
+					signedInWithCode: person.standing.signedInWithCode,
+					signedInWithPasskey: person.standing.signedInWithPasskey
 				}
 			: null,
 		address: believed.address,
@@ -519,7 +524,11 @@ async function evaluate({
 					...(decision.maxAgeSeconds === undefined
 						? {}
 						: { maxAge: decision.maxAgeSeconds }),
-					...(decision.requireCode ? { requireCode: true as const } : {})
+					...(decision.requirePasskey
+						? { requirePasskey: true as const }
+						: decision.requireCode
+							? { requireCode: true as const }
+							: {})
 				}
 			);
 		}

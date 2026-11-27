@@ -23,8 +23,9 @@ import { keysFor } from '../keys/issuer_keys.js';
 import { MCP_RESOURCE } from '../mcp/consts.js';
 import { AccessToken } from '../models/access_token.js';
 import type { Grant } from '../models/grant.js';
-import { findDeclaredResource } from '../resources/registry.js';
+import { findDeclaredResource, signInOf } from '../resources/registry.js';
 import { namespaceOf } from '../resources/namespace.js';
+import { assertSignInMeets } from '../resources/sign_in_requirement.js';
 import {
 	codeRequiredAndMissing,
 	REQUIRE_CODE_DESCRIPTION
@@ -52,8 +53,9 @@ interface Presented {
 	jkt?: string;
 	/* An opaque token names its grant; a JWT does not. */
 	grantId?: string;
-	/* The sign-in the token came from, when it says (specs/127). */
+	/* The sign-in the token came from, when it says (specs/127, specs/143). */
 	acr?: string;
+	authTime?: number;
 }
 
 function refused(detail: string): InvalidGrant {
@@ -78,11 +80,13 @@ async function fromRecord(
 	const audience: unknown = token.payload.aud;
 	/* The context the sign-in reached, which a stored token keeps beside the reported one (specs/142 research R2). */
 	const acr = reachedAcr(token.payload);
+	const authTime = token.payload.authTime;
 	return {
 		accountId,
 		agentClientId: clientId,
 		grantId,
 		...(typeof acr === 'string' ? { acr } : {}),
+		...(typeof authTime === 'number' ? { authTime } : {}),
 		...(typeof audience === 'string' ? { audience } : {}),
 		...(jkt ? { jkt } : {})
 	};
@@ -127,10 +131,12 @@ async function fromJwt(value: string, bucket: UserBucket): Promise<Presented> {
 			: undefined;
 	const aud: unknown = payload.aud;
 	const acr: unknown = payload.acr;
+	const authTime: unknown = payload.auth_time;
 	return {
 		accountId: sub,
 		agentClientId: clientId,
 		...(typeof acr === 'string' ? { acr } : {}),
+		...(typeof authTime === 'number' ? { authTime } : {}),
 		...(typeof aud === 'string' ? { audience: aud } : {}),
 		...(typeof jkt === 'string' ? { jkt } : {})
 	};
@@ -187,14 +193,14 @@ export async function exchangeSubject(
 		throw refused('agent');
 	}
 
+	const resource =
+		presented.audience === undefined
+			? undefined
+			: await findDeclaredResource(
+					presented.audience,
+					namespaceOf(oidc.bucket)
+				);
 	if (client.clientId !== presented.agentClientId) {
-		const resource =
-			presented.audience === undefined
-				? undefined
-				: await findDeclaredResource(
-						presented.audience,
-						namespaceOf(oidc.bucket)
-					);
 		if (
 			!resource ||
 			resource.bucketId !== bucket._id ||
@@ -206,6 +212,19 @@ export async function exchangeSubject(
 		/* The token's own holder presents it here as anywhere: with a proof of its key (specs/118 FR-008). */
 		if (!dPoP || dPoP.thumbprint !== presented.jkt) {
 			throw refused('proof of possession');
+		}
+	}
+	/*
+	 * An API's sign-in requirement holds on an exchanged token through the sign-in behind the subject token, never the
+	 * exchange itself (specs/143 FR-003, Edge Cases).
+	 */
+	if (resource && resource.bucketId === bucket._id) {
+		const signIn = signInOf(resource);
+		if (signIn) {
+			assertSignInMeets(
+				{ signIn },
+				{ acr: presented.acr, authTime: presented.authTime }
+			);
 		}
 	}
 

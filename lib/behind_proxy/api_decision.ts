@@ -61,6 +61,8 @@ export interface ApiCallFacts {
 		/* Seconds since the epoch, or null for a token no sign-in stands behind. */
 		readonly signedInAt: number | null;
 		readonly signedInWithCode: boolean;
+		/* Whether that sign-in reached the phishing-resistant context (specs/143). */
+		readonly signedInWithPasskey?: boolean;
 	};
 	readonly headers: McpHeaders;
 	/* Null for a token that names nobody of this project. Looked up only when a condition in play needs it. */
@@ -234,6 +236,7 @@ export function decideApiCall(api: ApiView, facts: ApiCallFacts): ApiDecision {
 			api.signIn,
 			{
 				withCode: facts.token.signedInWithCode,
+				withPasskey: facts.token.signedInWithPasskey === true,
 				authTime: facts.token.signedInAt
 			},
 			Math.floor(facts.at / 1000)

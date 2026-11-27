@@ -204,6 +204,12 @@ export const ru: PlainTexts = {
 			open: 'Открыть {host}',
 			reason: 'Причина: {reason}, время: {time}'
 		},
+		passkeyNeeded: {
+			title: 'Этой странице {host} нужен вход с ключом доступа',
+			body: 'Вы вернулись, не войдя с ключом доступа. Другие страницы {host} могут открываться.',
+			open: 'Открыть {host}',
+			reason: 'Причина: {reason}, время: {time}'
+		},
 		address: {
 			title: 'Ваш адрес глазами {host}',
 			seen: 'Проверка видит ваш адрес как {address}.',

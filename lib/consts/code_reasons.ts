@@ -6,6 +6,7 @@
  */
 export const CODE_REASONS: ReadonlySet<string> = new Set([
 	'app_passkey',
+	'resource_passkey',
 	'second_factor',
 	'resource_code'
 ]);

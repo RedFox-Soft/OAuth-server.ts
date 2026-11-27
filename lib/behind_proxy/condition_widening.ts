@@ -21,6 +21,11 @@ export interface Loosened {
 	before: Condition;
 }
 
+/* Ordering of sign-in requirements on a fresh condition or network-facts step-up (specs/143): none < two-step < passkey. */
+function signInLevel(c: { withCode?: true; withPasskey?: true }): 0 | 1 | 2 {
+	return c.withPasskey === true ? 2 : c.withCode === true ? 1 : 0;
+}
+
 function rangesWithin(
 	narrow: readonly string[],
 	wide: readonly string[]
@@ -61,10 +66,7 @@ function factsAtLeastAsStrict(
 	const b = after.outcome;
 	if (b.kind === 'refuse') return true;
 	if (a.kind === 'refuse') return false;
-	return (
-		b.maxAgeMinutes <= a.maxAgeMinutes &&
-		(a.withCode !== true || b.withCode === true)
-	);
+	return b.maxAgeMinutes <= a.maxAgeMinutes && signInLevel(b) >= signInLevel(a);
 }
 
 /* Whether `after` admits no request `before` refuses, for two conditions of one kind. */
@@ -115,11 +117,11 @@ function atLeastAsStrict(
 				after.values.every((value) => before.values.includes(value))
 			);
 		case 'fresh':
-			/* Dropping the code (specs/128) admits a sign-in without one, however recent. */
+			/* Lowering the sign-in level (passkey -> two-step -> none) admits sign-ins refused before (specs/128, 143). */
 			return (
 				after.kind === 'fresh' &&
 				after.maxAgeMinutes <= before.maxAgeMinutes &&
-				(before.withCode !== true || after.withCode === true)
+				signInLevel(after) >= signInLevel(before)
 			);
 		case 'group':
 			return (

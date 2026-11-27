@@ -199,6 +199,30 @@ export function codeNeededPage(input: {
 	);
 }
 
+/*
+ * A page that asks for a sign-in with a passkey, reached without one (specs/143): the person went back from the
+ * refusal page, or the sign-in came back without a passkey. Starts nothing; the one link opens the app's start page
+ * only when that page does not ask for a passkey itself.
+ */
+export function passkeyNeededPage(input: {
+	host: string;
+	openHref?: string;
+	language: Language;
+}): Response {
+	const t = PLAIN_TEXTS[input.language].behindProxy.passkeyNeeded;
+	return page(
+		text(t.title, { host: input.host }),
+		`<h2 style="${heading}">${html(t.title, { host: input.host })}</h2>` +
+			`<p style="${body}">${html(t.body, { host: input.host })}</p>` +
+			(input.openHref
+				? `<p style="margin-top:12px;"><a href="${esc(input.openHref)}" style="color:${foxVar('link')};">${html(t.open, { host: input.host })}</a></p>`
+				: '') +
+			reasonLine(t.reason, 'passkey_required', input.language),
+		403,
+		{ language: input.language }
+	);
+}
+
 export type AddressCause = 'noKey' | 'wrongKey' | 'several' | 'notPublic';
 
 /*

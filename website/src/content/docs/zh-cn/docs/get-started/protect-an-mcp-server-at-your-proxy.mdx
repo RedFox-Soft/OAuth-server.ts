@@ -1,7 +1,7 @@
 ---
 title: 在代理处保护 MCP 服务器
 description: 让 Caddy、Traefik 或 nginx 代理请 FoxAuth 检查每个令牌以及每个工具需要的权限，MCP 服务器无需任何授权代码。
-source: 69757460530a
+source: 765374ec4c02
 sidebar:
   order: 8
 ---
@@ -227,31 +227,31 @@ MCP 服务器上新增或改名的工具还不在工具表中。在你把它加�
 
 ### 检查访问 {#tool-conditions-check-access}
 
-该 API 的 **Access** 选项卡最下方有一张 **Check access** 卡片。选择一个人，或者选择 **No person: an app acting for itself**（没有对应的人：应用以自己的身份行事）。然后选择应用令牌持有的权限、调用的工具或其他请求、地址和时间。如果 API 要求两步登录或近期登录，还要说明登录是否为两步登录，以及何时登录。
+该 API 的 **Access** 选项卡最下方有一张 **Check access** 卡片。选择一个人，或者选择 **No person: an app acting for itself**（没有对应的人：应用以自己的身份行事）。然后选择应用令牌持有的权限、调用的工具或其他请求、地址和时间。如果 API 要求两步登录、通行密钥或近期登录，还要说明此人是如何登录的（仅密码、两步登录或通行密钥）以及何时登录。
 
 卡片会回答 **Allowed**（允许）、**Refused**（拒绝）或 **Asked to sign in again**（要求重新登录），并用平实的话说明原因。它会分别针对已保存的工具表和你正在编辑的工具表作答。如果缺少需要的信息，它会回答 **Not known**（未知），并说明缺少什么。卡片在你的浏览器中运行与代理处检查相同的判断。不由任何服务器替它判断，也不会写入审计记录。如果某个条件需要网络信息，卡片会在你的服务器自己的副本中查找这个地址。
 
 智能体可以用 `resource_update` 设置工具的条件，即 `tools` 中某一行的 `conditions`。单个工具的条件在所有方案中免费提供。
 
-## 连接时要求两步登录或近期登录 {#require-a-code-or-a-recent-sign-in}
+## 连接时要求两步登录、通行密钥或近期登录 {#require-a-code-or-a-recent-sign-in}
 
 令牌只说明有人登录了这个项目，并不说明是怎样登录的。所以，一个被盗的密码就足以让智能体连接到你的 MCP 服务器。API 的 **Access** 选项卡中的两项设置可以改变这一点。打开项目的 **APIs** 标签页，再打开该 API，然后打开 **Access**：
 
-- **Require two-step sign-in**。只有在用户登录时输入了身份验证器应用（例如 Google Authenticator）中的验证码，或者在项目接受通行密钥时使用了通行密钥之后，才会为这个 API 签发令牌。
+- **Sign-in required**。选择 **Any**（任意）、**Two-step sign-in**（两步登录：需要身份验证器应用中的验证码，或在项目接受通行密钥时使用通行密钥），或 **Passkey**（通行密钥：需要已确认的通行密钥，项目必须接受通行密钥）。开启 **Passkey** 时，签发给该 API 的每个访问令牌（JWT 和不透明令牌自省结果）都会在 `acr` 中携带抗钓鱼认证上下文（默认为 `phr`），即使客户端应用没有请求它。
 - **Ask to sign in again every**。选择每天、每 7 天、每 14 天，或 **Custom**：一个整数的小时数或天数，从 1 小时到 14 天。令牌所代表的用户，其登录时间不能早于这个时长。
 
-可以只设置其中一项，也可以两项都设置。无论谁检查这个 API 的令牌（你的代理或 API 自己的服务器），这两项设置都有效。智能体也可以通过管理 MCP 服务器设置它们：在 `resource_declare` 和 `resource_update` 中使用 `requireCode` 和 `signInEveryMinutes`。所有方案均免费提供。
+可以只设置其中一项，也可以两项都设置。无论谁检查这个 API 的令牌（你的代理或 API 自己的服务器），这两项设置都有效。智能体也可以通过管理 MCP 服务器设置它们：在 `resource_declare` 和 `resource_update` 中使用 `requireCode`、`requirePasskey` 和 `signInEveryMinutes`。所有方案均免费提供。
 
 ### FoxAuth 会做什么 {#what-foxauth-does}
 
 API 要求更强或更近期的登录时，有一个标准的回答：带有 `error="insufficient_user_authentication"` 的 `401`（RFC 9470）。截至 2026-11-12，我们查看过的 MCP 客户端都不理解它。但每个客户端在收到 `401` 时都会去申请新令牌。这个令牌由 FoxAuth 签发，所以 FoxAuth 自己保证这一要求得到满足：
 
-- 当用户为获取这个 API 的令牌而登录时，无论客户端请求了什么，FoxAuth 都会要求输入验证码。使用通行密钥登录则不需要验证码。如果用户的登录早于允许的时长，FoxAuth 会要求重新登录。
-- 登录页面上有一行文字写出 API 的名称，例如“Files 需要身份验证器应用中的验证码才能连接。”或“Files 要求您每天重新登录一次，以保持连接。”
-- 没有身份验证器应用的用户可以在同一次登录中设置一个，前提是项目允许用户自行设置。
-- 为用户获取令牌的每一种方式都会检查这一要求：授权码、设备流程（device flow）、CIBA 和刷新令牌。
+- 当用户为获取这个 API 的令牌而登录时，无论客户端请求了什么，FoxAuth 都会要求验证码或通行密钥。对于两步登录要求，使用通行密钥登录不需要验证码；对于通行密钥要求，只有已确认的通行密钥可以通过。如果用户的登录早于允许的时长，FoxAuth 会要求重新登录。
+- 登录页面上有一行文字写出 API 的名称，例如“Files 需要身份验证器应用中的验证码才能连接。”、“Files 需要通行密钥才能连接。”或“Files 要求您每天重新登录一次，以保持连接。”
+- 没有身份验证器应用或通行密钥的用户可以在同一次登录中设置一个，前提是项目允许用户自行设置。
+- 为用户获取令牌的每一种方式都会检查这一要求：授权码、设备流程（device flow）、CIBA 和刷新令牌。需要通行密钥的 API 会拒绝设备流程、CIBA 和令牌交换，因为它们不能证明此次登录发生在同一个浏览器中。
 - 如果用刷新令牌续期得到的令牌不满足要求，续期会以 `invalid_grant` 被拒绝。刷新令牌本身不会被用掉。客户端随后会开始新的登录，而该用户的其他连接继续正常工作。
-- 在你的代理处，检查会根据每个令牌来自的那次登录来判断它。不满足要求的令牌会收到 `401`，带有 `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 以及 `acr_values="…"` 或 `max_age="…"`。这是标准的质询，供将来支持它的客户端使用。`X-Auth-Reason` 为 `code_required` 或 `sign_in_not_fresh`。
+- 在你的代理处，检查会根据每个令牌来自的那次登录来判断它。不满足要求的令牌会收到 `401`，带有 `WWW-Authenticate: Bearer error="insufficient_user_authentication"` 以及 `acr_values="…"`（多因素值或 `phr`）或 `max_age="…"`。这是标准的质询，供将来支持它的客户端使用。`X-Auth-Reason` 为 `code_required`、`passkey_required` 或 `sign_in_not_fresh`。
 - 令牌内省会返回 `acr` 和 `auth_time`，所以自己检查令牌的 API 也可以应用同样的规则。
 
 对于自己检查令牌的 API，已经签发的令牌由它自己决定如何处理。在你开启要求之前签发的令牌，在那里会一直有效到过期，除非你的服务器检查令牌中的 `acr` 和 `auth_time`。它的续期则无论如何都会被拒绝。
@@ -262,6 +262,7 @@ API 要求更强或更近期的登录时，有一个标准的回答：带有 `er
 
 - **不代表任何人的应用**。通过 client credentials 授权类型为自己获取令牌的应用，拿不到这个 API 的令牌。在你的代理处，这样的令牌会收到 `403`。
 - **通过断言（assertion）登录**。来自 JWT bearer 授权类型、identity assertions 或 ID-JAG 的令牌也会被拒绝。用户是在别处登录的，FoxAuth 无法知道是怎样登录的。
+- **需要通行密钥时的设备、CIBA、令牌交换、身份提供方和未确认的通行密钥**。只有当用户在同一个浏览器中使用已确认的通行密钥登录时，才能拿到该 API 的令牌。
 
 通过身份提供方（例如 Google 或你公司的身份提供方）登录的人是第三种情况。他们无法在 FoxAuth 输入验证码。所以当 API 要求两步登录时，登录页面会告诉他们无法以这种方式连接。当 API 只要求重新登录时，FoxAuth 会把他们送到身份提供方重新登录。怎样重新登录由身份提供方决定，FoxAuth 无法确认他们确实重新登录了。
 

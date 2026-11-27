@@ -11,9 +11,13 @@ import {
 } from '../../../client_policy/require_code.ts';
 import {
 	passkeyRequiredAndMissing,
+	proxyAsksForPasskey,
 	REQUIRE_PASSKEY_DESCRIPTION
 } from '../../../client_policy/require_passkey.ts';
-import { API_CODE_DESCRIPTION } from '../../../resources/sign_in_requirement.ts';
+import {
+	API_CODE_DESCRIPTION,
+	API_PASSKEY_DESCRIPTION
+} from '../../../resources/sign_in_requirement.ts';
 import * as errors from '../../errors.ts';
 import { pairwiseIdentifier } from '../../../addon/index.js';
 import { Prompt, type CheckPartial } from '../prompt.js';
@@ -37,7 +41,11 @@ function judgedAcr(oidc: OIDCContext<PipelineParams>): string | undefined {
 /* The first requested API with a sign-in requirement this check is about, and its identifier. */
 function requiringApi(
 	oidc: OIDCContext<PipelineParams>,
-	about: (signIn: { code: boolean; maxAgeSeconds?: number }) => boolean
+	about: (signIn: {
+		code: boolean;
+		passkey?: boolean;
+		maxAgeSeconds?: number;
+	}) => boolean
 ): string | undefined {
 	for (const [identifier, server] of Object.entries(oidc.resourceServers)) {
 		if (server.signIn && about(server.signIn)) return identifier;
@@ -287,13 +295,41 @@ class LoginPromt extends Prompt {
 			reason: 'app_passkey',
 			description: REQUIRE_PASSKEY_DESCRIPTION,
 			/*
-			 * The application requires a passkey (specs/142), read from the client like the code requirement below and
-			 * checked before it, which it includes. Met only by a sign-in that reached the phishing-resistant context; a
-			 * device flow never does (`judgedAcr`), so its verification page shows why instead.
+			 * The application requires a passkey (specs/142), or a path behind the proxy asks for one through its own
+			 * client (specs/143), checked before the code requirements below which it includes. Met only by a sign-in that
+			 * reached the phishing-resistant context; a device flow never does (`judgedAcr`), so its verification page
+			 * shows why instead.
 			 */
 			error: 'unmet_authentication_requirements',
-			check: (oidc) => passkeyRequiredAndMissing(oidc.client, judgedAcr(oidc)),
+			check: (oidc) =>
+				passkeyRequiredAndMissing(oidc.client, judgedAcr(oidc)) ||
+				proxyAsksForPasskey(
+					oidc.client,
+					oidc.params.acr_values,
+					judgedAcr(oidc)
+				),
 			details: () => ({ requirePasskey: true })
+		},
+		{
+			reason: 'resource_passkey',
+			description: API_PASSKEY_DESCRIPTION,
+			/*
+			 * A requested API requires a passkey sign-in (specs/143 research R4): checked before `second_factor` and
+			 * `resource_code` so a person is never asked to enrol an authenticator app only to be refused for wanting a
+			 * passkey immediately afterward.
+			 */
+			error: 'unmet_authentication_requirements',
+			check: (oidc) =>
+				requiringApi(
+					oidc,
+					(signIn) =>
+						signIn.passkey === true &&
+						!meets(judgedAcr(oidc), 'phishing_resistant')
+				) !== undefined,
+			details: (oidc) => ({
+				requirePasskey: true,
+				api: requiringApi(oidc, (signIn) => signIn.passkey === true)
+			})
 		},
 		{
 			reason: 'second_factor',

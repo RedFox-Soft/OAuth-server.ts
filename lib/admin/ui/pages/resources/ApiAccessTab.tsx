@@ -43,7 +43,10 @@ import {
 	everyMinutes,
 	ResourceSignInFields,
 	signInEveryText,
-	type SignInFieldValues
+	signInFlagsOf,
+	signInLevelOf,
+	type SignInFieldValues,
+	type SignInMethodLevel
 } from './ResourceSignInFields.js';
 import { ToolRowConditions } from './ToolRowConditions.js';
 import { ApiCheckAccess } from './ApiCheckAccess.js';
@@ -63,6 +66,7 @@ type AccessForm = ToolsForm & SignInFieldValues;
 /* What the tab was last saved with; the baseline every change is measured against. */
 interface Saved {
 	requireCode: boolean;
+	requirePasskey: boolean;
 	signInEveryMinutes: number | null;
 	tools: ToolsTableView | undefined;
 }
@@ -76,7 +80,7 @@ function formOf(saved: Saved): AccessForm {
 		})),
 		otherTools: saved.tools?.otherTools ?? 'refuse',
 		withoutMethod: saved.tools?.withoutMethod ?? 'refuse',
-		requireCode: saved.requireCode,
+		signInLevel: signInLevelOf(saved),
 		customUnit: 'days',
 		...everyFields(saved.signInEveryMinutes)
 	};
@@ -137,24 +141,32 @@ function edgeTable(table: ToolsTableView) {
 	};
 }
 
-function requirementText(requireCode: boolean, every: number | null): string {
+function requirementText(
+	level: SignInMethodLevel,
+	every: number | null
+): string {
 	const parts = [
-		...(requireCode ? ['Two-step sign-in'] : []),
+		...(level === 'passkey'
+			? ['Passkey']
+			: level === 'code'
+				? ['Two-step sign-in']
+				: []),
 		...(every !== null ? [signInEveryText(every)] : [])
 	];
 	return parts.length > 0 ? parts.join('; ') : 'none';
 }
 
 function viewOf(
-	requireCode: boolean,
+	level: SignInMethodLevel,
 	every: number | null,
 	tools: ToolsTableView | undefined
 ): ApiView {
 	return {
-		...(requireCode || every !== null
+		...(level !== 'any' || every !== null
 			? {
 					signIn: {
-						code: requireCode,
+						code: level === 'code',
+						...(level === 'passkey' ? { passkey: true } : {}),
 						...(every !== null ? { maxAgeSeconds: every * 60 } : {})
 					}
 				}
@@ -191,6 +203,7 @@ export function ApiAccessTab({
 	const signInConsent = useCodeConsent('api');
 	const [saved, setSaved] = useState<Saved>(() => ({
 		requireCode: api.requireCode,
+		requirePasskey: api.requirePasskey,
 		signInEveryMinutes: api.signInEveryMinutes,
 		tools: api.tools
 	}));
@@ -249,24 +262,22 @@ export function ApiAccessTab({
 		values?.rows !== undefined
 			? tableOf({ ...formOf(saved), ...values }, conditions, zone, byProxy)
 			: savedTable;
-	const editedRequireCode =
-		values?.requireCode === undefined ? saved.requireCode : values.requireCode;
+	const savedLevel = signInLevelOf(saved);
+	const editedLevel = values?.signInLevel ?? savedLevel;
+	const editedFlags = signInFlagsOf(editedLevel);
 	const editedEvery =
 		values?.every === undefined
 			? saved.signInEveryMinutes
 			: everyMinutes(values);
 
 	const changes: Change[] = [];
-	if (
-		editedRequireCode !== saved.requireCode ||
-		editedEvery !== saved.signInEveryMinutes
-	) {
+	if (editedLevel !== savedLevel || editedEvery !== saved.signInEveryMinutes) {
 		changes.push({
 			key: 'signIn',
 			label: 'Sign-in requirement',
 			group: 'access',
-			from: requirementText(saved.requireCode, saved.signInEveryMinutes),
-			to: requirementText(editedRequireCode, editedEvery)
+			from: requirementText(savedLevel, saved.signInEveryMinutes),
+			to: requirementText(editedLevel, editedEvery)
 		});
 	}
 	if (
@@ -310,13 +321,9 @@ export function ApiAccessTab({
 	const dirty = changes.length > 0;
 	useLeaveGuard(dirty, changes.length);
 
-	const savedView = viewOf(
-		saved.requireCode,
-		saved.signInEveryMinutes,
-		saved.tools
-	);
+	const savedView = viewOf(savedLevel, saved.signInEveryMinutes, saved.tools);
 	const editedView = dirty
-		? viewOf(editedRequireCode, editedEvery, editedTable)
+		? viewOf(editedLevel, editedEvery, editedTable)
 		: null;
 
 	/* The form follows a save or a discard; it never re-reads the API while the administrator is editing. */
@@ -341,8 +348,7 @@ export function ApiAccessTab({
 			return;
 		}
 		const requirementChanged =
-			editedRequireCode !== saved.requireCode ||
-			editedEvery !== saved.signInEveryMinutes;
+			editedLevel !== savedLevel || editedEvery !== saved.signInEveryMinutes;
 		const tableChanged = changes.some(
 			(c) => c.key === 'access' || c.key === 'tools'
 		);
@@ -358,8 +364,11 @@ export function ApiAccessTab({
 		}
 		/* Sent only when it changed, so an edit of anything else is never previewed or audited as one (specs/130). */
 		const body = {
-			...(editedRequireCode !== saved.requireCode
-				? { requireCode: editedRequireCode }
+			...(editedLevel !== savedLevel
+				? {
+						requireCode: editedFlags.requireCode,
+						requirePasskey: editedFlags.requirePasskey
+					}
 				: {}),
 			...(editedEvery !== saved.signInEveryMinutes
 				? { signInEveryMinutes: editedEvery }
@@ -400,7 +409,12 @@ export function ApiAccessTab({
 			]);
 			feedback.done(`Access to ${api.name} saved.`);
 			setSaved({
-				requireCode: requirementChanged ? editedRequireCode : saved.requireCode,
+				requireCode: requirementChanged
+					? editedFlags.requireCode
+					: saved.requireCode,
+				requirePasskey: requirementChanged
+					? editedFlags.requirePasskey
+					: saved.requirePasskey,
 				signInEveryMinutes: requirementChanged
 					? editedEvery
 					: saved.signInEveryMinutes,
@@ -470,6 +484,7 @@ export function ApiAccessTab({
 					<Card title="Who can call it">
 						<ResourceSignInFields
 							checkedBy={api.checkedBy}
+							level={editedLevel}
 							every={values?.every}
 							passkeys={passkeys}
 						/>

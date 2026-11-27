@@ -1645,7 +1645,8 @@ const NetworkFactsSchema = t.Object(
 				{
 					kind: t.Literal('sign_in_again'),
 					maxAgeMinutes: t.Integer({ minimum: 5, maximum: 1440 }),
-					withCode: t.Optional(t.Literal(true))
+					withCode: t.Optional(t.Literal(true)),
+					withPasskey: t.Optional(t.Literal(true))
 				},
 				closed
 			)
@@ -1685,7 +1686,9 @@ const FreshConditionSchema = t.Object(
 		kind: t.Literal('fresh'),
 		maxAgeMinutes: t.Integer({ minimum: 5, maximum: 1440 }),
 		/* Only a sign-in with a code from an authenticator app meets it (specs/128); present only when on. */
-		withCode: t.Optional(t.Literal(true))
+		withCode: t.Optional(t.Literal(true)),
+		/* Only a full passkey sign-in meets it (specs/143); present only when on, never beside `withCode`. */
+		withPasskey: t.Optional(t.Literal(true))
 	},
 	closed
 );
@@ -1816,6 +1819,7 @@ export const ProtectedResource = t.Object({
 	 * holds whoever checks this API's tokens.
 	 */
 	requireCode: t.Optional(t.Literal(true)),
+	requirePasskey: t.Optional(t.Literal(true)),
 	signInEveryMinutes: t.Optional(
 		t.Number({ minimum: 60, maximum: 20160, multipleOf: 60 })
 	),
@@ -1847,8 +1851,9 @@ export type ProtectedResourcePatch = Partial<
 > & {
 	/* `null` removes the API's exchanging application (specs/118 R3). */
 	exchangedBy?: string | null;
-	/* `false` and `null` remove the requirement (specs/130); never stored as such. */
+	/* `false` and `null` remove the requirement (specs/130, specs/143); never stored as such. */
 	requireCode?: boolean;
+	requirePasskey?: boolean;
 	signInEveryMinutes?: number | null;
 };
 
@@ -1866,6 +1871,7 @@ export interface ProtectedResourceStoreInstance {
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
 		requireCode?: boolean;
+		requirePasskey?: boolean;
 		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource>;
 	find(
@@ -2630,6 +2636,7 @@ export const PersonActivityRow = t.Object({
 	freshness: t.Optional(
 		t.Object({
 			requireCode: t.Optional(t.Literal(true)),
+			requirePasskey: t.Optional(t.Literal(true)),
 			maxAgeSeconds: t.Optional(t.Integer({ minimum: 0 }))
 		})
 	),

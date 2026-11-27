@@ -1,7 +1,7 @@
 ---
 title: 使用通行密钥登录
 description: '用户用指纹、面容或屏幕锁登录，无需密码，通行密钥登录算作两步登录。'
-source: 5fc7178ca12d
+source: 4265967a49b8
 sidebar:
   order: 13
 ---
@@ -115,7 +115,13 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## 要求通行密钥 {#require}
 
-仿冒的登录页面无法使用通行密钥，所以它是本服务器唯一能抵御网络钓鱼的登录方式。要让某个应用只允许使用通行密钥进入，请在应用的设置中打开 **Require a passkey**，项目必须接受通行密钥。保存前，控制台会显示有多少人还没有已确认的通行密钥。被拒绝的用户会看到一个页面，可以在那里创建通行密钥，或用已有的通行密钥登录，然后进入应用。通过身份提供商登录的人，以及通过电视上显示的验证码登录的设备，无法以这种方式打开该应用。
+仿冒的登录页面无法使用通行密钥，所以它是本服务器唯一能抵御网络钓鱼的登录方式。你可以在三个地方要求通行密钥，项目必须先接受通行密钥：
+
+- **应用**：在应用的设置中打开 **Require a passkey**。保存前，控制台会显示有多少人还没有已确认的通行密钥。被拒绝的用户会看到一个页面，可以在那里创建通行密钥，或用已有的通行密钥登录，然后进入应用。通过身份提供商登录的人，以及通过电视上显示的验证码登录的设备，无法以这种方式打开该应用。
+- **API 或 MCP 服务器**：在 API 的 **Access** 选项卡中的 **Sign-in required** 下选择 **Passkey**（或通过代理检查令牌时同样适用）。签发给该 API 的每个访问令牌（JWT 和自省结果）都会在 `acr` 中标明抗钓鱼认证上下文（默认为 `phr`），即使客户端没有请求。请参阅[在代理处保护 MCP 服务器](/zh-cn/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in)。
+- **代理后的应用路径**：在 **Ask to sign in again** 条件或 **From where** 网络事实的重新登录结果中选择 **with a passkey**。请参阅[在代理处添加条件](/zh-cn/docs/get-started/add-conditions-at-your-proxy/#with-code)。
+
+在项目的 **Sign-in** 选项卡中关闭 **Passkeys** 或更改会更换 RP ID 的项目地址之前，控制台和智能体都会列出有多少 API 和代理路径要求通行密钥，并请你确认。
 
 如果只想在某些页面要求通行密钥，请发送 `acr_values=phr`（这是 OpenID 中抵御网络钓鱼登录的值，**Connect** 标签页会显示你服务器的值）。只有使用通行密钥登录后，ID 令牌才会带有 `phr`。如果在 `claims` 参数中把它设为必需（essential），没有通行密钥的人会收到 `unmet_authentication_requirements`。当应用列出多个值时，它会收到登录满足的最强的那个值，所以请求多因素值的应用在通行密钥登录后仍然收到多因素值。
 

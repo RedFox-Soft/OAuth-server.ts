@@ -1,20 +1,21 @@
 ---
 type: concept
-title: "An API's sign-in requirement: a code, or a recent sign-in"
+title: "An API's sign-in requirement: a code, a passkey, or a recent sign-in"
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-12
-updated: 2026-11-19
+updated: 2026-11-27
 ---
 
-# An API's sign-in requirement: a code, or a recent sign-in
+# An API's sign-in requirement: a code, a passkey, or a recent sign-in
 
-Spec 130. Any declared API (whoever checks its tokens: its own server or the operator's proxy) can carry two fields
-an administrator sets: `requireCode` (a token is issued only after a sign-in with a code from an authenticator app,
-or since spec 139 with a passkey, which reports the same multi-factor `acr`; the console calls it "Require two-step
-sign-in", [[passkeys]])
-and `signInEveryMinutes` (60 to 20160, whole hours: the sign-in behind a token may be no older). They live at the top
-level of `ProtectedResource` (`lib/adapters/types.ts`), written only by the admin routes.
+Spec 130, extended by spec 143 (2026-11-26) for passkeys. Any declared API (whoever checks its tokens: its own server
+or the operator's proxy) can carry three fields an administrator sets: `requireCode` (two-step sign-in: an authenticator
+code or, since spec 139, a passkey), `requirePasskey` (a full passkey reaching `phishing_resistant`, spec 143; setting
+`requirePasskey: true` clears `requireCode` on write and read via `lib/adapters/resource_requirement.ts`, and is refused
+with `409 passkeys_not_accepted` when the project does not accept passkeys), and `signInEveryMinutes` (60 to 20160,
+whole hours: the sign-in behind a token may be no older). They live at the top level of `ProtectedResource`
+(`lib/adapters/types.ts`), written only by the admin routes.
 
 ## Why the authorization server enforces it, not the client
 
@@ -44,17 +45,21 @@ link during that sign-in can outlast its wait for the redirect. It speaks MCP 20
 ## One answer everywhere
 
 `signInRequirementUnmet(signIn, { acr, authTime }, now)` (`lib/resources/sign_in_requirement.ts`) answers
-`{ code, recent }` or null. Since spec 131 its arithmetic is `requirementUnmet` in the import-free
-`lib/resources/sign_in_rule.ts`, given whether the sign-in had a code, so the console's "Check access" bundles the same
-rule; the wrapper maps `acr` to that flag (`hadCode`). A missing or non-finite `authTime` is never recent: `undefined` arithmetic is `NaN`, and
+`{ code, passkey, recent }` or null. Since spec 131 its arithmetic is `requirementUnmet` in the import-free
+`lib/resources/sign_in_rule.ts`, given `signInLevel` (`'none' | 'code' | 'passkey'`), so the console's "Check access"
+bundles the same rule; the wrapper maps `acr` through `meets(..., 'phishing_resistant')` and `meets(..., 'multi_factor')`.
+A missing or non-finite `authTime` is never recent: `undefined` arithmetic is `NaN`, and
 every comparison with `NaN` is false, which would read as a pass. The requirement reaches every token path through the
 descriptor the path already builds: `signInOf` (`lib/resources/registry.ts:28`) fills `ResourceServer.signIn`, so no
 check reads the store again.
 
 ## The sign-in
 
-Two login-prompt reasons (`lib/helpers/interaction_policy/prompts/login.ts:120`, `:287`):
+Three login-prompt reasons (`lib/helpers/interaction_policy/prompts/login.ts`):
 
+- `resource_passkey` (spec 143): a requested API requires a passkey and the session's acr does not meet
+  `phishing_resistant`. It joins `app_passkey` in `PASSKEY_REASONS` (`lib/consts/code_reasons.ts`), checked ahead of
+  `resource_code`, and renders the passkey-required page naming the API by its declared name (`apiAsking`).
 - `resource_code`: a requested API requires a code and the session's acr is not multi-factor. It joins spec 127's
   `second_factor` in `CODE_REASONS` (`lib/consts/code_reasons.ts`), so the refusal page, the set-up from it (with the
   fresh password and the mailed link, never `totpRequired`'s bare QR) and "Return" are spec 127's own. The page names
@@ -64,12 +69,20 @@ Two login-prompt reasons (`lib/helpers/interaction_policy/prompts/login.ts:120`,
   (`lib/interactions/index.ts:1304`) sends a provider `prompt=login` and the smaller of the request's and the API's
   `max_age`.
 
-## Every grant
+## Every grant and Option A `acr` on access tokens
 
-`assertSignInMeets` (`lib/resources/sign_in_requirement.ts:67`) after the resource server is built in the
-authorization code, device and CIBA grants. jwt-bearer (ID-JAG, plain assertions) and client credentials are refused
-for such an API outright (`jwt_bearer.ts:188`, `client_credentials.ts:132`): an assertion carries no sign-in this
-server saw, and a machine token stands for no one. Token exchange issues no access token of this server.
+`assertSignInMeets` (`lib/resources/sign_in_requirement.ts:67`) runs after the resource server is built in the
+authorization code, device and CIBA grants. Because device codes and CIBA are capped below `phishing_resistant`
+([[acr-satisfaction]]), they can never satisfy `requirePasskey`. jwt-bearer (ID-JAG, plain assertions) and client
+credentials are refused for any API with a sign-in requirement outright (`jwt_bearer.ts:188`,
+`client_credentials.ts:132`): an assertion carries no sign-in this server saw, and a machine token stands for no one.
+Token exchange (`lib/connected_services/subject.ts`) also refuses `requirePasskey` APIs (`invalid_target`).
+
+**Option A for passkey-required APIs (spec 143):** every access token minted for an API with `requirePasskey: true`
+(at authorization code and refresh token grants) always sets `at.payload.acr = configuration.acrMap.phishing_resistant`
+(`phr` by default), so both self-contained JWT access tokens and opaque token introspection answers carry `phr` even
+when the client app never asked for it. ID tokens, refresh tokens, and non-passkey APIs keep spec 142's reporting rule
+unchanged.
 
 ## Refresh: refused before rotation
 
@@ -85,8 +98,8 @@ and before the tools table, so it holds for every request whatever MCP method it
 own `signedInAt` and `acr` (`lib/behind_proxy/bearer.ts:49`), from the JWT or the opaque record, never from the
 person: a pairwise JWT has no `accountId` and is still judged. No sign-in time → `403 no_person`, never a `401`
 (a machine asked to sign in again would loop). Otherwise `401` with `error="insufficient_user_authentication"`,
-`acr_values` (the configured multi-factor value) and/or `max_age`, and `X-Auth-Reason` `code_required` or
-`sign_in_not_fresh`, the app check's own reasons.
+`acr_values` (the configured `phishing_resistant` value when `passkey` is unmet, else `multi_factor`) and/or `max_age`,
+and `X-Auth-Reason` `passkey_required`, `code_required`, or `sign_in_not_fresh`, the app check's own reasons.
 
 `challenge()` (`api_check.ts:90`) keeps only parameters whose value is RFC 6750 §3 text (`quotable`, `:81`). Bun
 throws building a header with a value outside Latin-1 (that was a `500`), and a quote let a value add a parameter.
@@ -95,14 +108,14 @@ throws building a header with a value outside Latin-1 (that was a `500`), and a 
 
 - Introspection returns `acr` and `auth_time` (RFC 9470 §6.2), so an API that checks its own tokens can apply the
   same rule.
-- Turning a requirement on, or shortening it, is previewed and confirmed with its counts
-  (`lib/admin/resources/sign_in_preview.ts:167`), the application requirement's protocol; usage per API is not
+- Turning a requirement on, raising two-step to passkey, or shortening freshness is previewed and confirmed with its counts
+  (`lib/admin/resources/sign_in_preview.ts`), including `withoutPasskey` for passkey requirements; usage per API is not
   recorded, so the counts are an upper bound over the project or the API's group condition.
 - A code typed again after another window used it says "This code was just used" (`reason: 'reused'`,
   `lib/totp/verify.ts:132`) and is not reported as an attack: VS Code opens several sign-in windows at once.
-- A no-op fence migration `2026-11-14-api-sign-in-requirement-fence` (`lib/consts/migrations.ts:1863`): the top level
-  of `ProtectedResource` is an open schema, so an older release would read past the fields and issue tokens without a
-  code.
+- No-op fence migrations: `2026-11-14-api-sign-in-requirement-fence` (spec 130) and `2026-11-26-passkey-api-proxy-fence`
+  (spec 143, `lib/consts/migrations.ts`): the top level of `ProtectedResource` is an open schema, so an older release
+  would read past `requireCode` / `requirePasskey` and issue tokens without enforcing them.
 
 ## Not here (later specs)
 

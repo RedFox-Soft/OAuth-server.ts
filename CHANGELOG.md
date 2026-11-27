@@ -29,10 +29,15 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   that names `acr` values is told the strongest of them the sign-in met, so one that asks for the multi-factor value
   keeps getting it. A sign-in confirmed with a device code or on a back channel never reaches it, and discovery lists
   it only for projects that accept passkeys. An app can **Require a passkey** (`requirePasskey`), previewed like
-  "Require two-step sign-in"; people turned away can create a passkey on the spot. **Upgrade note:** run
-  `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then `db:migrate` (two
-  migrations: a fence, and naming `phishing_resistant` in a stored `acrValues`; the server refuses to start until
-  it has run).
+  "Require two-step sign-in"; people turned away can create a passkey on the spot. Declared APIs and MCP servers can
+  also **Require a passkey** (`requirePasskey`, spec 143; enforced at sign-in, every grant, refresh before rotation,
+  token exchange and the proxy check with `401 passkey_required`, and every access token and introspection answer for
+  such an API always reports `acr = phr` even when the client did not ask for it), and apps behind your proxy can
+  require a fresh passkey on **Ask to sign in again** and **From where** network-facts conditions (`withPasskey`).
+  Turning passkeys off or moving a project to a new RP ID previews how many APIs and proxy paths require a passkey.
+  **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then
+  `db:migrate` (three migrations: the passkeys fence, naming `phishing_resistant` in a stored `acrValues`, and the
+  `2026-11-26-passkey-api-proxy-fence` fence; the server refuses to start until all have run).
 
 ### Fixed
 

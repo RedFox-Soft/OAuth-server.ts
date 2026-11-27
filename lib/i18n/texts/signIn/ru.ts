@@ -102,6 +102,8 @@ export const ru: SignInTexts = {
 		freshSignIn: '{host} просит войти ещё раз, чтобы открыть эту страницу.',
 		freshSignInCode:
 			'{host} просит войти ещё раз с кодом из приложения-аутентификатора, чтобы открыть эту страницу.',
+		freshSignInPasskey:
+			'{host} просит войти ещё раз с ключом доступа, чтобы открыть эту страницу.',
 		codeAskedByApp: '{app} просит код из приложения-аутентификатора.',
 		codeAsked:
 			'Приложение, в которое вы входите, просит код из приложения-аутентификатора.',
@@ -110,6 +112,7 @@ export const ru: SignInTexts = {
 	},
 
 	apiNotices: {
+		passkeyAsked: '{api} просит войти с ключом доступа для подключения.',
 		codeAsked:
 			'{api} просит код из приложения-аутентификатора для подключения.',
 		everyHour:
@@ -181,6 +184,7 @@ export const ru: SignInTexts = {
 
 	passkeyRequired: {
 		headingApp: '{app} просит войти с ключом доступа',
+		headingApi: '{api} просит войти с ключом доступа',
 		headingAny:
 			'Приложение, в которое вы входите, просит войти с ключом доступа',
 		explain:

@@ -1,6 +1,8 @@
 import {
 	adapter,
+	getBehindProxyAppStore,
 	getPasskeyStore,
+	getProtectedResourceStore,
 	getUserStore
 } from '../../adapters/index.js';
 import type {
@@ -39,7 +41,9 @@ export type SignInChange =
 	| 'signUpOpen'
 	| 'guessingRefuseOn'
 	| 'passkeysOff'
-	| 'passkeyAppsOff';
+	| 'passkeyAppsOff'
+	| 'passkeyApisOff'
+	| 'passkeyPathsOff';
 
 export interface SignInPreview {
 	consequences: string[];
@@ -129,12 +133,20 @@ export async function signInPreview(
 			? await passkeyOnlyPeople(bucket, passwordsAfter)
 			: 0;
 	if (passkeyOnly > 0) changes.push('passkeysOff');
-	/* An application that requires a passkey (specs/142) then refuses everyone; named, since each needs a decision. */
-	const requiringPasskey =
-		patch.passkeyLogin === false && bucket.passkeyLogin === true
-			? await appsRequiringPasskey(bucket._id)
-			: [];
+	/* An application, API, or proxy path that requires a passkey (specs/142, 143) then refuses everyone; named, since each needs a decision. */
+	const turningPasskeysOff =
+		patch.passkeyLogin === false && bucket.passkeyLogin === true;
+	const [requiringPasskey, requiringPasskeyApis, requiringPasskeyPaths] =
+		turningPasskeysOff
+			? await Promise.all([
+					appsRequiringPasskey(bucket._id),
+					apisRequiringPasskey(bucket._id),
+					pathsRequiringPasskey(bucket._id)
+				])
+			: [[], [], []];
 	if (requiringPasskey.length > 0) changes.push('passkeyAppsOff');
+	if (requiringPasskeyApis.length > 0) changes.push('passkeyApisOff');
+	if (requiringPasskeyPaths.length > 0) changes.push('passkeyPathsOff');
 	if (changes.length === 0) return null;
 
 	const counts = await signInCounts(bucket);
@@ -207,6 +219,18 @@ export async function signInPreview(
 					`${plural(requiringPasskey.length, 'application')} ${requiringPasskey.length === 1 ? 'requires' : 'require'} a passkey: ${requiringPasskey.join(', ')}. Nobody will be able to open ${requiringPasskey.length === 1 ? 'it' : 'them'} until passkeys are back on, or the requirement is removed.`
 				);
 				break;
+			case 'passkeyApisOff':
+				expect.apisRequiringPasskey = requiringPasskeyApis.length;
+				consequences.push(
+					`${plural(requiringPasskeyApis.length, 'API')} ${requiringPasskeyApis.length === 1 ? 'requires' : 'require'} a passkey: ${requiringPasskeyApis.join(', ')}. Nobody will be able to use ${requiringPasskeyApis.length === 1 ? 'it' : 'them'} until passkeys are back on, or the requirement is removed.`
+				);
+				break;
+			case 'passkeyPathsOff':
+				expect.pathsRequiringPasskey = requiringPasskeyPaths.length;
+				consequences.push(
+					`${plural(requiringPasskeyPaths.length, 'proxy path')} ${requiringPasskeyPaths.length === 1 ? 'requires' : 'require'} a passkey: ${requiringPasskeyPaths.join(', ')}. Nobody will be able to open ${requiringPasskeyPaths.length === 1 ? 'it' : 'them'} until passkeys are back on, or the requirement is removed.`
+				);
+				break;
 			case 'signUpOpen':
 				consequences.push(
 					consoleBucket
@@ -241,6 +265,39 @@ export async function appsRequiringPasskey(
 				? client.client_name
 				: String(client.client_id ?? client.clientId)
 		);
+}
+
+/* The declared APIs of the bucket that require a passkey (specs/143), by name. */
+export async function apisRequiringPasskey(
+	bucketId: string
+): Promise<string[]> {
+	const resources = await getProtectedResourceStore().listByBucket(bucketId);
+	return resources
+		.filter((resource) => resource.requirePasskey === true)
+		.map((resource) => resource.name || resource.identifier);
+}
+
+/* The behind-proxy app paths of the bucket that ask for a passkey (specs/143), as `<host> <path>`. */
+export async function pathsRequiringPasskey(
+	bucketId: string
+): Promise<string[]> {
+	const apps = await getBehindProxyAppStore().listByBucket(bucketId);
+	const found: string[] = [];
+	for (const app of apps) {
+		const host = new URL(app.address).host;
+		for (const rule of app.rules) {
+			if (rule.who.kind !== 'conditional') continue;
+			const asks = rule.who.conditions.some(
+				(condition) =>
+					(condition.kind === 'fresh' && condition.withPasskey === true) ||
+					(condition.kind === 'network' &&
+						condition.facts?.outcome.kind === 'sign_in_again' &&
+						condition.facts.outcome.withPasskey === true)
+			);
+			if (asks) found.push(`${host} ${rule.path}`);
+		}
+	}
+	return found;
 }
 
 /*

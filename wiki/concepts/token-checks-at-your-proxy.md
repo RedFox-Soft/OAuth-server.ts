@@ -4,7 +4,7 @@ title: 'Token checks at your proxy: an API or MCP server with no authorization c
 tags: [architecture, contract, gotcha, oauth, mcp]
 sources: [oauth-server-codebase]
 created: 2026-11-05
-updated: 2026-11-12
+updated: 2026-11-27
 ---
 
 # Token checks at your proxy
@@ -97,9 +97,10 @@ condition whose input was not given is `unknown` rather than a refusal; the chec
 through both the function and the live check. With an empty table, only the token is checked, and the two choices
 under it (other tools, old clients) do nothing.
 
-An API's sign-in requirement (a code, or a recent sign-in) is judged before the tools table and after the access
+An API's sign-in requirement (a code, a passkey, or a recent sign-in) is judged before the tools table and after the access
 conditions, on the presented token's own `acr` and `auth_time`, and answered with RFC 9470's
-`insufficient_user_authentication` (spec 130, [[api-sign-in-requirement]]). Its arithmetic lives in the
+`insufficient_user_authentication` (`X-Auth-Reason` `passkey_required`, `code_required`, or `sign_in_not_fresh`, with
+`acr_values` set to `phishing_resistant` or `multi_factor`; spec 130, 143, [[api-sign-in-requirement]]). Its arithmetic lives in the
 import-free `lib/resources/sign_in_rule.ts` so the console can bundle it.
 
 - **Conditions on one tool (spec 131).** A row may carry up to four conditions of its own (group, network, time; the

@@ -15,6 +15,7 @@ const HOUR = 3600;
  */
 describe("whether a sign-in meets an API's requirement", () => {
 	const contexts = [
+		configuration.acrMap.phishing_resistant,
 		configuration.acrMap.multi_factor,
 		configuration.acrMap.password,
 		configuration.acrMap.federated,
@@ -34,17 +35,22 @@ describe("whether a sign-in meets an API's requirement", () => {
 	];
 
 	it('is answered by every combination exactly as the rule says', () => {
-		for (const code of [false, true]) {
+		for (const level of ['none', 'code', 'passkey'] as const) {
+			const passkey = level === 'passkey';
+			const code = level === 'code';
 			for (const maxAgeSeconds of [undefined, HOUR]) {
 				for (const acr of contexts) {
 					for (const authTime of times) {
 						const unmet = signInRequirementUnmet(
-							{ code, ...(maxAgeSeconds ? { maxAgeSeconds } : {}) },
+							{ passkey, code, ...(maxAgeSeconds ? { maxAgeSeconds } : {}) },
 							{ acr, authTime },
 							NOW
 						);
-						const missesCode =
-							code && acr !== configuration.acrMap.multi_factor;
+						const withPasskey = acr === configuration.acrMap.phishing_resistant;
+						const withCode =
+							withPasskey || acr === configuration.acrMap.multi_factor;
+						const missesPasskey = passkey && !withPasskey;
+						const missesCode = !missesPasskey && code && !withCode;
 						const tooOld =
 							maxAgeSeconds !== undefined &&
 							!(
@@ -53,14 +59,22 @@ describe("whether a sign-in meets an API's requirement", () => {
 								NOW - authTime <= maxAgeSeconds
 							);
 
-						expect({ code, maxAgeSeconds, acr, authTime, unmet }).toEqual({
+						expect({
+							passkey,
+							code,
+							maxAgeSeconds,
+							acr,
+							authTime,
+							unmet
+						}).toEqual({
+							passkey,
 							code,
 							maxAgeSeconds,
 							acr,
 							authTime,
 							unmet:
-								missesCode || tooOld
-									? { code: missesCode, recent: tooOld }
+								missesPasskey || missesCode || tooOld
+									? { passkey: missesPasskey, code: missesCode, recent: tooOld }
 									: null
 						});
 					}
@@ -69,21 +83,27 @@ describe("whether a sign-in meets an API's requirement", () => {
 		}
 	});
 
-	it('is answered the same by the rule the console bundles, given whether the sign-in had a code', () => {
-		for (const code of [false, true]) {
+	it('is answered the same by the rule the console bundles, given whether the sign-in had a code or passkey', () => {
+		for (const level of ['none', 'code', 'passkey'] as const) {
+			const passkey = level === 'passkey';
+			const code = level === 'code';
 			for (const maxAgeSeconds of [undefined, HOUR]) {
 				for (const acr of contexts) {
 					for (const authTime of times) {
 						const signIn = {
+							passkey,
 							code,
 							...(maxAgeSeconds ? { maxAgeSeconds } : {})
 						};
+						const withPasskey = acr === configuration.acrMap.phishing_resistant;
 
 						expect(
 							requirementUnmet(
 								signIn,
 								{
-									withCode: acr === configuration.acrMap.multi_factor,
+									withPasskey,
+									withCode:
+										withPasskey || acr === configuration.acrMap.multi_factor,
 									authTime
 								},
 								NOW

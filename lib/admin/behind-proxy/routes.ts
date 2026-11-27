@@ -13,7 +13,11 @@ import { getBehindProxyAppStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { bucketCan } from '../auth/can.js';
 import { sameExpect } from '../buckets/sign_in_preview.js';
-import { codeConditionPreview } from './code_preview.js';
+import { passkeysAccepted } from '../../passkeys/relying_party.js';
+import {
+	codeConditionPreview,
+	pathsNewlyAskingForPasskey
+} from './code_preview.js';
 import {
 	createApp,
 	deleteApp,
@@ -137,19 +141,34 @@ export const behindProxyRoutes = new Elysia({ name: 'admin-behind-proxy' })
 			const { confirm, expect, ...body } = given;
 			if (body.rules !== undefined) {
 				const current = await loadApp(bucket, params.appId);
+				const nextRules = await rulesOf(bucket, body.rules);
+				/*
+				 * A path can ask for a passkey only while the project accepts passkeys (specs/143 US4-7).
+				 * Existing passkey paths are left alone so unrelated edits and removals keep working if passkeys go off.
+				 */
+				if (
+					pathsNewlyAskingForPasskey(current.rules, nextRules).length > 0 &&
+					!passkeysAccepted(bucket)
+				) {
+					throw new AdminError(
+						409,
+						"Turn on passkeys on the project's Sign-in tab first.",
+						{ code: 'passkeys_not_accepted', field: 'rules' }
+					);
+				}
 				const preview = await codeConditionPreview(
 					bucket,
 					current.rules,
-					await rulesOf(bucket, body.rules)
+					nextRules
 				);
 				/*
 				 * The counts are what the people list shows (S15): only someone who may manage the project's people asks for
-				 * a code on its paths and sees them.
+				 * two-step sign-in or a passkey on its paths and sees them.
 				 */
 				if (preview && !bucketCan(ctx, bucket).manageUsers) {
 					throw new AdminError(
 						403,
-						"asking for a code on a path needs the right to manage this project's people"
+						"asking for two-step sign-in or a passkey on a path needs the right to manage this project's people"
 					);
 				}
 				// Before the audit entry, so nothing is recorded for a change that was only described.

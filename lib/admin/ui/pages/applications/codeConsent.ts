@@ -52,9 +52,13 @@ export function useCodeConsent(
 			};
 			const agreed =
 				of === 'path'
-					? await confirm('behindProxy.codeCondition.confirm', asked)
+					? preview.changes?.includes('passkeyConditionOn')
+						? await confirm('behindProxy.passkeyCondition.confirm', asked)
+						: await confirm('behindProxy.codeCondition.confirm', asked)
 					: of === 'api'
-						? await confirm('resource.signIn.confirm', asked)
+						? preview.changes?.includes('apiRequirePasskeyOn')
+							? await confirm('resource.requirePasskey.confirm', asked)
+							: await confirm('resource.signIn.confirm', asked)
 						: preview.changes?.includes('requirePasskeyOn')
 							? await confirm('client.requirePasskey.confirm', asked)
 							: await confirm('client.requireCode.confirm', asked);

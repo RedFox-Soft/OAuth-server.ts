@@ -309,20 +309,26 @@ your server's own copy.
 An agent sets a tool's conditions with `resource_update`, as `conditions` on a row of `tools`. Conditions on one tool
 are free on every plan.
 
-## Ask for two-step sign-in or a recent sign-in {#require-a-code-or-a-recent-sign-in}
+## Ask for two-step sign-in, a passkey, or a recent sign-in {#require-a-code-or-a-recent-sign-in}
 
 A token says that someone signed in to the project. It does not say how. So a stolen password is enough to connect an
 agent to your MCP server. Two settings on the API's **Access** tab change that. Open the project's **APIs** tab, then the API, then
 **Access**:
 
-- **Require two-step sign-in.** A token for this API is issued only after a sign-in in which the person typed a code
-  from an authenticator app, such as Google Authenticator, or used a passkey where the project accepts passkeys.
+- **Sign-in required.** Choose one of three levels:
+  - **Any sign-in**: no factor requirement.
+  - **Two-step sign-in**: a token for this API is issued only after a sign-in in which the person typed a code from an
+    authenticator app, such as Google Authenticator, or used a passkey where the project accepts passkeys.
+  - **Passkey**: available when the project accepts passkeys. A token is issued only after a sign-in with a confirmed
+    passkey. Password sign-ins, authenticator codes, unconfirmed passkeys, outside providers, device-code sign-ins, and
+    CIBA are refused. Every access token for the API (JWT or opaque introspection) carries the phishing-resistant context
+    (`phr` by default), even when the client did not ask for it.
 - **Ask to sign in again every.** Choose every day, every 7 days, every 14 days, or **Custom**: a whole number of
   hours or days, from 1 hour to 14 days. The person behind a token must have signed in no longer ago than that.
 
-You can set one, the other or both. They work on any API, whoever checks its tokens: your proxy or the API's own
-server. An agent can set them through the admin MCP server, with `requireCode` and `signInEveryMinutes` in
-`resource_declare` and `resource_update`. They are free on every plan.
+You can set the sign-in level, the interval, or both. They work on any API, whoever checks its tokens: your proxy or the
+API's own server. An agent can set them through the admin MCP server, with `requireCode`, `requirePasskey` and
+`signInEveryMinutes` in `resource_declare` and `resource_update`. They are free on every plan.
 
 ### What FoxAuth does {#what-foxauth-does}
 

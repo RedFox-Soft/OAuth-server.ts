@@ -4,7 +4,7 @@ title: 'Conditions at your proxy: network, hours, attribute, fresh sign-in'
 tags: [architecture, contract, gotcha, security]
 sources: [oauth-server-codebase]
 created: 2026-11-06
-updated: 2026-11-19
+updated: 2026-11-27
 ---
 
 # Conditions at your proxy
@@ -85,40 +85,45 @@ shortest interval, and a code if any fresh condition wants one, even one that ho
 the app session. Since spec 128 a first sign-in (`no_session`) to such a path carries them too, so nobody signs in once
 without and is sent straight back.
 
-## A code at the proxy (`withCode`)
+## A code or a passkey at the proxy (`withCode`, `withPasskey`)
 
-Spec 128. `FreshCondition.withCode: true` (stored only when on) holds only when the app session's sign-in had the
-multi-factor acr (`AppSession.withCode` = `acr === configuration.acrMap.multi_factor`, `session.ts`) and is within N.
-No separate "time of the code" field: every sign-in with a code is a `loginAccount` that sets its own `auth_time`, so
-"a code within N" is "a sign-in with a code within N" (critique Н7). `decide()` cannot read `configuration` (it is
-console-bundled), so the fact `signedInWithCode` is computed server-side; the console simulator has a checkbox.
+Spec 128 (`withCode`), extended by spec 143 (`withPasskey`). `FreshCondition.withCode: true` holds when the app
+session's sign-in meets `multi_factor` (`AppSession.withCode`, `session.ts`) and is within N; `FreshCondition.withPasskey: true`
+(which clears `withCode` when normalized in `lib/admin/conditions.ts`, and is refused with `409 passkeys_not_accepted`
+when the project does not accept passkeys) holds only when the app session's sign-in meets `phishing_resistant`
+(`AppSession.withPasskey = meets(record.acr, 'phishing_resistant')`) and is within N.
+No separate "time of the code/passkey" field: every sign-in with a code or passkey is a `loginAccount` that sets its own `auth_time`, so
+"a code/passkey within N" is "a sign-in with a code/passkey within N" (critique Н7). `decide()` cannot read `configuration` (it is
+console-bundled), so `signedInWithCode` and `signedInWithPasskey` are computed server-side; the console simulator has a 3-level selector.
 
-- **Why `max_age` and `acr_values` both** (S13): an essential acr alone says nothing about how fresh the code must be —
-  a person who typed a code yesterday still holds a multi-factor session, `/auth` would pass silently with the old
-  code, and the callback would refuse it in a loop. `max_age` forces a new password-and-code sign-in; `acr_values`
-  makes the refusal page appear for someone without a code.
-- **The request binds only for the proxy's own client** (`proxyAsksForCode`, `lib/client_policy/require_code.ts`), at
-  Part B's `second_factor` check, so the loop guard, refusal page, in-sign-in set-up and "Return" are reused. For every
-  other client `acr_values` stays voluntary (OIDC Core §3.1.2.1, S9). Binding here gives nobody anything: the pending
-  sign-in records `requireCode` server-side and the callback refuses a code without the multi-factor acr whatever the
-  request said.
-- **No loop after "Return"**: the callback turns `error=unmet_authentication_requirements` (with `requireCode`) into
-  the plain code-needed page (`codeNeededPage`, reason `code_required`), not the sign-in-failed page whose "Sign in
-  again" would lead to the same refusal. Its only link opens the app's `/`, and only when `/` gathers no code condition.
-  The not-fresh page's retry keeps `code=1` on `/_foxauth/start`.
-- **Preview** (`lib/admin/behind-proxy/code_preview.ts`): a save in which a path newly gathers a code condition answers
-  409 with counts over the rule's audience (project tally, or the named groups' members paged through the people
-  list's own `memberOf`/`totpEnrolled` filters), Part B's confirm/`expect` protocol, and needs `manageUsers` (S15). The
-  audience ignores the path's other conditions, so the counts are an upper bound.
-- Turning it off is a loosening (`atLeastAsStrict` requires `!before.withCode || after.withCode`).
+- **Why `max_age` and `acr_values` both** (S13): an essential acr alone says nothing about how fresh the sign-in must be —
+  a person who signed in yesterday still holds a strong session, `/auth` would pass silently with the old
+  sign-in, and the callback would refuse it in a loop. `max_age` forces a new sign-in; `acr_values` (multi-factor for
+  `withCode`, `phishing_resistant` for `withPasskey`) makes the refusal page appear for someone who lacks the factor.
+- **The request binds only for the proxy's own client** (`proxyAsksForCode` in `lib/client_policy/require_code.ts`,
+  `proxyAsksForPasskey` in `lib/client_policy/require_passkey.ts`), so the loop guard, refusal page, in-sign-in set-up
+  and "Return" are reused. For every other client `acr_values` stays voluntary (OIDC Core §3.1.2.1, S9). Stripping
+  `acr_values` from `/authorize` gives nobody anything: the pending sign-in records `requireCode` / `requirePasskey`
+  server-side and the callback refuses a code whose `acr` falls short whatever the request said.
+- **No loop after "Return"**: the callback turns `error=unmet_authentication_requirements` into
+  the plain code-needed page (`codeNeededPage`, reason `code_required`) or passkey-needed page (`passkeyNeededPage`,
+  reason `passkey_required`), not the sign-in-failed page whose "Sign in again" would lead to the same refusal. Its
+  only link opens the app's `/`, and only when `/` gathers no matching requirement. The not-fresh page's retry keeps
+  `code=1` or `passkey=1` on `/_foxauth/start`.
+- **Preview** (`lib/admin/behind-proxy/code_preview.ts`): a save in which a path newly gathers a code or passkey
+  condition answers 409 with counts over the rule's audience (including `withoutPasskey` for passkey conditions),
+  Part B's confirm/`expect` protocol, and needs `manageUsers` (S15). The audience ignores the path's other conditions,
+  so the counts are an upper bound.
+- Lowering passkey → two-step → any is a loosening (`signInLevel`: `none (0) < two-step (1) < passkey (2)` in
+  `condition_widening.ts`, for both `fresh` and `network.facts.outcome`).
 
-## Network facts in "From where" (spec 129)
+## Network facts in "From where" (spec 129, 143)
 
 The network condition may carry `facts`: FoxTrust categories to keep out (tor, vpn, hosting with cloud), countries
-"only from" or "not from", and an outcome, Refuse or (apps only) Sign in again within N, optionally with a code (the
-console's "with two-step sign-in" since spec 139: a passkey sign-in meets `withCode` too, [[passkeys]]). A
+"only from" or "not from", and an outcome, Refuse or (apps only) Sign in again within N, optionally with a code
+(`withCode`, "with two-step sign-in") or a passkey (`withPasskey`, spec 143). A
 Refuse match is decided with the ranges, before any session; a sign-in-again match joins the fresh conditions
-(`freshOf`, `decide.ts`), so the sign-in, the callback's code check and the code pages above serve it unchanged.
+(`freshOf`, `decide.ts`), so the sign-in, the callback's code/passkey check and the refusal pages above serve it unchanged.
 Facts that are off, not loaded, older than 26 hours or unreadable fail every such condition: the opposite of the
 attacker list, and the reason the proxy answers `network_facts_unknown`. An address with no record has no category
 and no country, so a non-public address passes "not from" categories and countries, unlike "Not from" ranges. Saving
@@ -148,7 +153,9 @@ Spec 128 adds `2026-11-12-proxy-code-condition-fence` for `withCode`, which the 
 release refuses. Spec 129 adds `2026-11-13-proxy-network-facts-fence` for `facts`, with which the ranges may be empty
 and an older release would otherwise let everyone through. Spec 131 adds `2026-11-15-api-tool-conditions-fence`: a
 tool row with conditions (and possibly no scope) and an `access` with no condition but a zone are refused by an older
-release's closed schema at every check.
+release's closed schema at every check. Spec 143 adds `2026-11-26-passkey-api-proxy-fence`: `withPasskey` on `fresh`
+and `network.facts.outcome`, plus `requirePasskey` on `ProtectedResource`, so an older release refuses to start rather
+than silently reading past `requirePasskey` or failing on `withPasskey`.
 
 ## Related
 

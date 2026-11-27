@@ -36,8 +36,10 @@ import {
 	everyMinutes,
 	ResourceSignInFields,
 	signInEveryText,
+	signInFlagsOf,
 	type EveryChoice,
-	type EveryUnit
+	type EveryUnit,
+	type SignInMethodLevel
 } from './resources/ResourceSignInFields.js';
 import { useCodeConsent, withConsent } from './applications/codeConsent.js';
 import { VouchingCell } from './resources/vouching.js';
@@ -89,7 +91,7 @@ interface FormValues {
 	accessTokenTTL: number | null;
 	trailingSlashSignificant: boolean;
 	checkedBy: CheckedBy;
-	requireCode?: boolean;
+	signInLevel?: SignInMethodLevel;
 	every?: EveryChoice;
 	customAmount?: number;
 	customUnit?: EveryUnit;
@@ -103,7 +105,7 @@ const DEFAULT_VALUES: FormValues = {
 	accessTokenTTL: 900,
 	trailingSlashSignificant: false,
 	checkedBy: 'server',
-	requireCode: false,
+	signInLevel: 'any',
 	every: 'off',
 	customUnit: 'days'
 };
@@ -173,6 +175,7 @@ export function Resources({
 	const ttlValue = useWatched(form, 'accessTokenTTL') ?? 900;
 	const formatValue = useWatched(form, 'tokenFormat') ?? 'jwt';
 	const checkedByValue = useWatched(form, 'checkedBy') ?? 'server';
+	const levelValue = useWatched(form, 'signInLevel') ?? 'any';
 	const everyValue = useWatched(form, 'every');
 	const signInConsent = useCodeConsent('api');
 
@@ -235,7 +238,9 @@ export function Resources({
 	async function submit(values: FormValues) {
 		const scopes = splitScopes(values.scopes);
 		const scopeDescriptions = describedScopes(scopes, values.descriptions);
-		const requireCode = values.requireCode === true;
+		const { requireCode, requirePasskey } = signInFlagsOf(
+			values.signInLevel ?? 'any'
+		);
 		const signInEveryMinutes = everyMinutes(values);
 		const body = {
 			identifier: values.identifier,
@@ -247,6 +252,7 @@ export function Resources({
 			trailingSlashSignificant: values.trailingSlashSignificant,
 			checkedBy: values.checkedBy,
 			...(requireCode ? { requireCode } : {}),
+			...(requirePasskey ? { requirePasskey } : {}),
 			...(signInEveryMinutes === null ? {} : { signInEveryMinutes })
 		};
 		setSaving(true);
@@ -390,9 +396,15 @@ export function Resources({
 											Tokens checked by your proxy
 										</Typography.Text>
 									)}
-									{(row.requireCode || row.signInEveryMinutes !== null) && (
+									{(row.requirePasskey ||
+										row.requireCode ||
+										row.signInEveryMinutes !== null) && (
 										<Space size={4}>
-											{row.requireCode && <Tag>Two-step required</Tag>}
+											{row.requirePasskey ? (
+												<Tag>Passkey required</Tag>
+											) : (
+												row.requireCode && <Tag>Two-step required</Tag>
+											)}
 											{row.signInEveryMinutes !== null && (
 												<Tag>{signInEveryText(row.signInEveryMinutes)}</Tag>
 											)}
@@ -612,6 +624,7 @@ export function Resources({
 					</Form.Item>
 					<ResourceSignInFields
 						checkedBy={checkedByValue}
+						level={levelValue}
 						every={everyValue}
 						passkeys={passkeys}
 					/>

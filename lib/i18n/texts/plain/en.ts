@@ -208,6 +208,13 @@ export const en = {
 			open: 'Open {host}',
 			reason: 'Reason: {reason}, at {time}'
 		},
+		/* A page that asks for a sign-in with a passkey, reached without one (specs/143). */
+		passkeyNeeded: {
+			title: 'This page of {host} needs a passkey sign-in',
+			body: 'You went back without signing in with a passkey. Other pages of {host} may still open.',
+			open: 'Open {host}',
+			reason: 'Reason: {reason}, at {time}'
+		},
 		address: {
 			title: 'Your address, as {host} sees it',
 			seen: 'The check sees your address as {address}.',

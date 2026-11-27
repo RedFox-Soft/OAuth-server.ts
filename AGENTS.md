@@ -267,8 +267,9 @@ Each rule is the part that is easy to break. Read the named page before changing
   proxy key and one strict `X-Forwarded-For`, compared, and kept only on that person's activity and only when the proxy
   proves it (`proves`); conditions accumulate down the paths, and from an API to its tool rows, never replacing the API's;
   a tool row's conditions refuse apps too old to name their tool; an older release
-  must fail closed on them. A condition asking for a code is judged on the app session's acr and checked again on the
-  redeemed code, never on what the sign-in request said. → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`,
+  must fail closed on them. A condition asking for a code (`withCode`) or a passkey (`withPasskey`, which supersedes `withCode`) is judged on the app session's acr and checked again on the
+  redeemed code, never on what the sign-in request said; turning passkeys off or changing to a different RP ID counts
+  APIs and proxy paths requiring a passkey in the preview (`apisRequiringPasskey`, `pathsRequiringPasskey`). → `behind-your-proxy.md`, `token-checks-at-your-proxy.md`,
   `conditions-at-your-proxy.md`
 - **A person's activity** — noted only by a synchronous, never-throwing call beside the decision, never through the
   event bus or a datastore read on the request path, and for the administrators' project only sign-ins, read by super
@@ -290,10 +291,14 @@ Each rule is the part that is easy to break. Read the named page before changing
   in `lib/consts/attack_report_fields.ts`; an attack is counted by one synchronous `noteAttack` beside the
   refusal, only when a credential was presented, and its address never goes to a log line or a bus event. The usage
   report also carries the instance's public key, never its private half. → `instance-telemetry.md`, `attack-reports.md`
-- **An API's sign-in requirement** — a code, or a recent sign-in, declared on the API and enforced by this server,
-  never by the client: judged on the sign-in's own `acr` and `auth_time` through `signInRequirementUnmet`, at the
-  sign-in, at every grant for a person, at a refresh before it rotates, and at the proxy; a token no sign-in can fix
-  (a machine's, an assertion's) is refused, never asked to sign in again. → `api-sign-in-requirement.md`
+- **An API's sign-in requirement** — a code (`requireCode`), a passkey (`requirePasskey`, which clears `requireCode`
+  and always reports `acr = phr` on every access token and introspection answer even when the client did not ask), or a
+  recent sign-in, declared on the API and enforced by this server, never by the client: judged on the sign-in's own
+  `acr` and `auth_time` through `signInRequirementUnmet`, at the sign-in, at every grant for a person (device, CIBA and
+  token exchange refused for `requirePasskey`), at a refresh before it rotates, and at the proxy (`401 passkey_required`
+  with `acr_values=<phr>`); a token no sign-in can fix (a machine's, an assertion's) is refused, never asked to sign in
+  again. Fence `2026-11-26-passkey-api-proxy-fence` prevents older releases from ignoring `requirePasskey` / `withPasskey`.
+  → `api-sign-in-requirement.md`
 - **FoxTrust's network facts** — downloaded and verified per process through `lib/foxtrust/` with the same pinned keys,
   never an older pair than one accepted, and they fail CLOSED: off, not loaded or more than 26 hours old is
   `{ known: false }`, which closes every path with a network facts condition. Looked up only for the address the check

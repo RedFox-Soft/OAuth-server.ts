@@ -163,13 +163,27 @@ project's issuer. People who want a code from an authenticator app instead find 
 
 ## Require a passkey {#require}
 
-A passkey can't be used by a fake sign-in page, so it is the only phishing-resistant sign-in this server has. To let
-nobody into one app without it, turn on **Require a passkey** in the app's Settings; the project must accept passkeys.
-Before it saves, the console shows how many people have no confirmed passkey. A person turned away sees a page that
-lets them create a passkey there, or sign in with the one they hold, and go on to the app. People who sign in through
-a provider, and devices that sign in with a code shown on a TV, can't open the app this way.
+A passkey can't be used by a fake sign-in page, so it is the only phishing-resistant sign-in this server has. You can
+require a confirmed passkey in three places once the project accepts passkeys:
 
-To ask for a passkey only on some pages, send `acr_values=phr` (the OpenID value for a phishing-resistant sign-in; the
+- **One application.** Turn on **Require a passkey** in the app's Settings. Before it saves, the console shows how many
+  people have no confirmed passkey. A person turned away sees a page that lets them create a passkey there, or sign in
+  with the one they hold, and go on to the app. People who sign in through a provider, and devices that sign in with a
+  code shown on a TV, can't open the app this way.
+- **One API or MCP server.** Choose **Passkey** under **Sign-in required** on the API's **Access** tab. Every access
+  token for that API (JWT or opaque introspection) carries the phishing-resistant context (`phr` by default), even when
+  the client app did not request it, and tokens checked at your proxy get a `401` challenge with `acr_values` when they
+  fall short. See [Protect an MCP server at your
+  proxy](/docs/get-started/protect-an-mcp-server-at-your-proxy/#require-a-code-or-a-recent-sign-in).
+- **One path behind your proxy.** Choose **With a passkey** on **Ask to sign in again** (or on a **Network facts**
+  sign-in-again outcome) for a sensitive path such as `/payouts`. See [Add conditions at your
+  proxy](/docs/get-started/add-conditions-at-your-proxy/#with-code).
+
+Turning **Passkeys** off on the project, or moving the project to an address that stops its passkeys working, previews
+and names every application, API, and proxy path that requires a passkey. Turning passkeys off leaves them closed until
+passkeys are back on or the requirement is lowered.
+
+To ask for a passkey only on some pages of your own app, send `acr_values=phr` (the OpenID value for a phishing-resistant sign-in; the
 **Connect** tab shows your server's value). The ID token carries `phr` only after a passkey sign-in. Made essential in
 the `claims` parameter, it turns people without a passkey away with `unmet_authentication_requirements`. When your app
 names values, it is told the strongest of them the sign-in met, so an app that asks for the multi-factor value keeps

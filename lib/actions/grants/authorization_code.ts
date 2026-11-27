@@ -8,7 +8,7 @@ import type { TokenParams } from 'lib/actions/token.js';
 import { InvalidGrant } from '../../helpers/errors.ts';
 import presence from '../../helpers/validate_presence.ts';
 import { findAccount } from '../../addon/account.js';
-import { ApplicationConfig } from 'lib/configs/application.js';
+import { ApplicationConfig, configuration } from 'lib/configs/application.js';
 import { verifyPKCE } from '../../helpers/pkce.js';
 import revoke from '../../helpers/revoke.ts';
 import filterClaims from '../../helpers/filter_claims.ts';
@@ -225,6 +225,13 @@ export const handler = async function authorizationCodeHandler(
 			acr: reachedAcr(code.payload),
 			authTime: code.payload.authTime
 		});
+		/*
+		 * An API that requires a passkey states so on every access token it receives (specs/143 FR-006), even
+		 * when the client app did not ask for `phr`. ID tokens and refresh tokens keep spec 142's rule.
+		 */
+		if (at.resourceServer.signIn?.passkey) {
+			at.payload.acr = configuration.acrMap.phishing_resistant;
+		}
 		at.payload.scope = grant.getResourceScopeFiltered(resource, code.scopes);
 		/* The user's groups, when the authorization granted them (specs/071 research R9). */
 		Object.assign(

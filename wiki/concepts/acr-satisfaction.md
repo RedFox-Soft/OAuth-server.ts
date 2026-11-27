@@ -4,7 +4,7 @@ title: "Which sign-in meets which context, and what a token is told"
 tags: [oidc, contract, security, passkeys]
 sources: [oauth-server-codebase]
 created: 2026-11-20
-updated: 2026-11-20
+updated: 2026-11-27
 graph:
   node_type: concept
   relationships:
@@ -65,6 +65,11 @@ only an app that asked for it, an app comparing `acr === mfa` keeps working afte
 the password value is told that value. This is what Keycloak does (`AcrUtils.mapLoaToAcr`), and Okta's tokens reflect
 the requested value. The essential checks use `satisfiesAny`, so an essential password request is no longer refused
 for a stronger sign-in.
+
+**Exception for passkey-required APIs (spec 143, Option A):** when an access token is issued for a declared API with
+`requirePasskey: true`, `at.payload.acr` is always set to `configuration.acrMap.phishing_resistant` (`phr` by default),
+whether or not the client asked for `phr`, so both JWT access tokens and opaque token introspection answers tell the API
+the phishing-resistant context was met. ID tokens, refresh tokens, and non-passkey APIs keep the general rule above.
 
 ## A device code or a back channel never reaches phr
 

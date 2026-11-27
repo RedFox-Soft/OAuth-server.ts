@@ -1,30 +1,36 @@
-import { adapter } from '../../adapters/index.js';
+import { adapter, getPasskeyStore } from '../../adapters/index.js';
 import type { ProtectedResource, UserBucket } from '../../adapters/types.js';
 import { Grant } from '../../models/grant.js';
+import { rpIdFor } from '../../passkeys/relying_party.js';
 import { selfServiceState } from '../../totp/self_service.js';
 import { groupMembers } from '../behind-proxy/code_preview.js';
 import { signInCounts } from '../buckets/sign_in_preview.js';
 
 /*
- * What making an API require a code from an authenticator app, or a sign-in every so often, would do, counted before it
- * is done (specs/130 research R9). The protocol is the application setting's (lib/admin/clients/require_code_preview.ts):
- * the first save answers 409 with these, and the change applies only when repeated with `confirm` and the same counts
- * as `expect`, so the console and an agent consent the same way and to the numbers they were shown.
+ * What making an API require a code from an authenticator app, a passkey, or a sign-in every so often, would do,
+ * counted before it is done (specs/130 research R9, specs/143 R7). The protocol is the application setting's
+ * (lib/admin/clients/require_code_preview.ts): the first save answers 409 with these, and the change applies only when
+ * repeated with `confirm` and the same counts as `expect`, so the console and an agent consent the same way and to the
+ * numbers they were shown.
  *
  * Usage is not recorded per API, so "who used it lately" cannot be counted. What can: the people the API can reach
- * (the project, or the members of its group condition) who have no authenticator app or sign in only through a
- * provider, as an upper bound; the people holding a live sign-in that includes this API through the project's own
- * applications; and, by name, the applications that act for no one or sign in by assertion, which never meet it.
+ * (the project, or the members of its group condition) who have no authenticator app or no confirmed passkey, or who
+ * sign in only through a provider, as an upper bound; the people holding a live sign-in that includes this API through
+ * the project's own applications; and, by name, the applications that act for no one or sign in by assertion, which
+ * never meet it.
  *
- * Only a tightening is previewed: turning the code on, or setting or shortening the interval.
+ * Only a tightening is previewed: turning two-step or passkey on, raising two-step to a passkey, or setting or
+ * shortening the interval. Lowering from a passkey to two-step or off applies without a preview.
  */
 
-export type ApiSignInChange = 'apiRequireCodeOn' | 'apiSignInEvery';
+export type ApiSignInChange =
+	'apiRequireCodeOn' | 'apiRequirePasskeyOn' | 'apiSignInEvery';
 
 export interface ApiSignInPreview {
 	consequences: string[];
 	expect: {
-		withoutAuthenticator: number;
+		withoutAuthenticator?: number;
+		withoutPasskey?: number;
 		providerOnly: number;
 		holders: number;
 	};
@@ -35,6 +41,7 @@ export interface ApiSignInPreview {
 
 export interface RequirementChange {
 	requireCode?: boolean;
+	requirePasskey?: boolean;
 	signInEveryMinutes?: number | null;
 }
 
@@ -50,11 +57,22 @@ function people(n: number, one: string, many: string): string {
 }
 
 function changesOf(
-	before: Pick<ProtectedResource, 'requireCode' | 'signInEveryMinutes'>,
+	before: Pick<
+		ProtectedResource,
+		'requireCode' | 'requirePasskey' | 'signInEveryMinutes'
+	>,
 	next: RequirementChange
 ): ApiSignInChange[] {
 	const changes: ApiSignInChange[] = [];
-	if (next.requireCode === true && before.requireCode !== true) {
+	const passkeyOn =
+		next.requirePasskey === true && before.requirePasskey !== true;
+	if (passkeyOn) {
+		changes.push('apiRequirePasskeyOn');
+	} else if (
+		before.requirePasskey !== true &&
+		next.requireCode === true &&
+		before.requireCode !== true
+	) {
 		changes.push('apiRequireCodeOn');
 	}
 	const minutes = next.signInEveryMinutes;
@@ -102,6 +120,38 @@ async function audienceCounts(
 			? members.length - withPassword.length
 			: members.length
 	};
+}
+
+async function audiencePasskeyCounts(
+	bucket: UserBucket,
+	groupIds: string[] | undefined
+): Promise<{ withoutPasskey: number; providerOnly: number }> {
+	const passwords = bucket.passwordLogin;
+	const holding = await getPasskeyStore().holdingIn(
+		bucket._id,
+		rpIdFor(bucket),
+		{ full: true }
+	);
+	if (groupIds === undefined) {
+		const counts = await signInCounts(bucket);
+		return {
+			withoutPasskey: Math.max(0, counts.total - holding.length),
+			providerOnly: passwords
+				? counts.withoutAuthenticator - counts.passwordWithoutAuthenticator
+				: counts.total
+		};
+	}
+	const members = [
+		...(await groupMembers(bucket._id, groupIds, false)).values()
+	];
+	const holdingIds = new Set(holding.map((holder) => holder.accountId));
+	const withoutPasskey = members.filter(
+		(user) => !holdingIds.has(user._id)
+	).length;
+	const providerOnly = passwords
+		? members.filter((user) => user.passwordSet === false).length
+		: members.length;
+	return { withoutPasskey, providerOnly };
 }
 
 /*
@@ -168,41 +218,66 @@ export async function apiSignInPreview(
 	bucket: UserBucket,
 	identifier: string,
 	existing:
-		| Pick<ProtectedResource, 'requireCode' | 'signInEveryMinutes' | 'tools'>
+		| Pick<
+				ProtectedResource,
+				'requireCode' | 'requirePasskey' | 'signInEveryMinutes' | 'tools'
+		  >
 		| undefined,
 	next: RequirementChange
 ): Promise<ApiSignInPreview | null> {
 	const changes = changesOf(existing ?? {}, next);
 	if (changes.length === 0) return null;
+	const passkeyOn = changes.includes('apiRequirePasskeyOn');
 	const codeOn = changes.includes('apiRequireCodeOn');
-	const counts = await audienceCounts(bucket, audienceGroups(existing));
-	const withoutAuthenticator = codeOn ? counts.withoutAuthenticator : 0;
-	const { providerOnly } = counts;
+	const groups = audienceGroups(existing);
 	const apps = await appsNeverMeetingIt(bucket._id);
 	const holders =
 		existing === undefined
 			? 0
 			: await holdersOf(identifier, apps.clientIds, bucket._id);
-	const selfService = (await selfServiceState(bucket)) === 'on';
 
 	const consequences: string[] = [];
-	if (codeOn) {
+	let expect: ApiSignInPreview['expect'];
+	if (passkeyOn) {
+		const { withoutPasskey, providerOnly } = await audiencePasskeyCounts(
+			bucket,
+			groups
+		);
 		consequences.push(
-			withoutAuthenticator === 0
-				? 'Everyone who may connect with a password has an authenticator app.'
-				: selfService
-					? `${people(withoutAuthenticator, 'who may connect with a password has', 'who may connect with a password have')} no authenticator app. They will be asked to set one up first.`
-					: `${people(withoutAuthenticator, 'who may connect with a password has', 'who may connect with a password have')} no authenticator app, and this project does not let people set one up themselves. They can't connect.`
+			withoutPasskey === 0
+				? 'Everyone who may call this API has a confirmed passkey.'
+				: `${people(withoutPasskey, 'who may call this API has', 'who may call this API have')} no confirmed passkey. They will be asked to create one, or to confirm the one they made, before they can connect.`
 		);
 		if (providerOnly > 0) {
 			consequences.push(
-				`${people(providerOnly, 'can', 'can')} sign in only through a provider. They can't connect.`
+				`${people(providerOnly, 'can', 'can')} sign in only through a provider and cannot create a passkey here. They can't connect.`
 			);
 		}
+		expect = { withoutPasskey, providerOnly, holders };
+	} else {
+		const counts = await audienceCounts(bucket, groups);
+		const withoutAuthenticator = codeOn ? counts.withoutAuthenticator : 0;
+		const { providerOnly } = counts;
+		const selfService = (await selfServiceState(bucket)) === 'on';
+		if (codeOn) {
+			consequences.push(
+				withoutAuthenticator === 0
+					? 'Everyone who may connect with a password has an authenticator app.'
+					: selfService
+						? `${people(withoutAuthenticator, 'who may connect with a password has', 'who may connect with a password have')} no authenticator app. They will be asked to set one up first.`
+						: `${people(withoutAuthenticator, 'who may connect with a password has', 'who may connect with a password have')} no authenticator app, and this project does not let people set one up themselves. They can't connect.`
+			);
+			if (providerOnly > 0) {
+				consequences.push(
+					`${people(providerOnly, 'can', 'can')} sign in only through a provider. They can't connect.`
+				);
+			}
+		}
+		expect = { withoutAuthenticator, providerOnly, holders };
 	}
-	if (changes.includes('apiSignInEvery') && providerOnly > 0) {
+	if (changes.includes('apiSignInEvery') && expect.providerOnly > 0) {
 		consequences.push(
-			`${people(providerOnly, 'signs', 'sign')} in only through a provider. The provider is asked for a new sign-in, but FoxAuth can't confirm one happened.`
+			`${people(expect.providerOnly, 'signs', 'sign')} in only through a provider. The provider is asked for a new sign-in, but FoxAuth can't confirm one happened.`
 		);
 	}
 	if (holders > 0) {
@@ -225,7 +300,7 @@ export async function apiSignInPreview(
 	}
 	return {
 		consequences,
-		expect: { withoutAuthenticator, providerOnly, holders },
+		expect,
 		changes,
 		machineApps: apps.machineApps,
 		assertionApps: apps.assertionApps

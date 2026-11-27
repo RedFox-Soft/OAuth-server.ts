@@ -17,7 +17,12 @@ import { Grant } from '../models/grant.js';
 import { redirect, withReason, type AnswerReason } from './answers.js';
 import { behindProxyCallbackUri, behindProxyClientId } from './client.js';
 import { gatherConditions, hasControlCharacter } from './decide.js';
-import { codeNeededPage, notConfirmedPage, signInFailedPage } from './pages.js';
+import {
+	codeNeededPage,
+	notConfirmedPage,
+	passkeyNeededPage,
+	signInFailedPage
+} from './pages.js';
 import { pendingSignIns, savePendingSignIn } from './records.js';
 import {
 	cookieHeader,
@@ -91,7 +96,12 @@ export async function startSignIn(
 	{ bucket, app }: SignInContext,
 	returnTo: string,
 	reason: AnswerReason,
-	options: { prompt?: 'login'; maxAge?: number; requireCode?: true } = {}
+	options: {
+		prompt?: 'login';
+		maxAge?: number;
+		requireCode?: true;
+		requirePasskey?: true;
+	} = {}
 ): Promise<Response> {
 	const state = randomValue();
 	const marker = randomValue();
@@ -107,7 +117,11 @@ export async function startSignIn(
 			used: false,
 			exp: epochTime() + SIGN_IN_SECONDS,
 			...(options.maxAge === undefined ? {} : { maxAge: options.maxAge }),
-			...(options.requireCode ? { requireCode: true as const } : {})
+			...(options.requirePasskey
+				? { requirePasskey: true as const }
+				: options.requireCode
+					? { requireCode: true as const }
+					: {})
 		},
 		SIGN_IN_SECONDS
 	);
@@ -125,11 +139,13 @@ export async function startSignIn(
 		params.set('max_age', String(options.maxAge));
 	}
 	/*
-	 * A path that asks for a code (specs/128 research R4): binding at the sign-in for this client only, so a person who
-	 * holds one is asked for it and anyone else meets the refusal page. Only a hint all the same — the callback checks
-	 * the code it is handed, so removing this gets whoever removed it refused there.
+	 * A path that asks for a passkey (specs/143) or a code (specs/128 research R4): binding at the sign-in for this
+	 * client only. Only a hint all the same — the callback checks the code it is handed, so removing this gets whoever
+	 * removed it refused there.
 	 */
-	if (options.requireCode) {
+	if (options.requirePasskey) {
+		params.set('acr_values', configuration.acrMap.phishing_resistant);
+	} else if (options.requireCode) {
 		params.set('acr_values', configuration.acrMap.multi_factor);
 	}
 	return redirect(
@@ -154,6 +170,28 @@ function codeNeeded({ app, request }: SignInContext): Response {
 			language: languageOfRequest(request).language
 		}),
 		'code_required'
+	);
+}
+
+/*
+ * The page a sign-in that asked for a passkey ends on without one (specs/143). Its one link opens the app's start
+ * page only when no condition there asks for a passkey.
+ */
+function passkeyNeeded({ app, request }: SignInContext): Response {
+	const startAsksForPasskey = gatherConditions(app.rules, '/').some(
+		({ condition }) =>
+			(condition.kind === 'fresh' && condition.withPasskey === true) ||
+			(condition.kind === 'network' &&
+				condition.facts?.outcome.kind === 'sign_in_again' &&
+				condition.facts.outcome.withPasskey === true)
+	);
+	return withReason(
+		passkeyNeededPage({
+			host: new URL(app.address).host,
+			...(startAsksForPasskey ? {} : { openHref: `${app.address}/` }),
+			language: languageOfRequest(request).language
+		}),
+		'passkey_required'
 	);
 }
 
@@ -205,9 +243,15 @@ export async function completeSignIn(
 
 	const code = query.get('code');
 	/*
-	 * The person went back from the refusal page without a code (specs/128 FR-019). "Sign in again" there would only lead
-	 * to the same refusal, so the page says what the path needs and starts nothing.
+	 * The person went back from the refusal page without a passkey (specs/143) or a code (specs/128 FR-019).
+	 * "Sign in again" there would only lead to the same refusal, so the page says what the path needs and starts nothing.
 	 */
+	if (
+		pending.requirePasskey &&
+		query.get('error') === 'unmet_authentication_requirements'
+	) {
+		return passkeyNeeded(ctx);
+	}
 	if (
 		pending.requireCode &&
 		query.get('error') === 'unmet_authentication_requirements'
@@ -220,9 +264,16 @@ export async function completeSignIn(
 	const redeemed = await redeem(ctx, code, pending.codeVerifier);
 	if (!redeemed) return failed(ctx, 'sign_in_failed');
 	/*
-	 * A path that asked for a code is satisfied by the context the code carries, never by what the request said
-	 * (specs/128 FR-017): a request stripped of its `acr_values` comes back without one, and makes no session.
+	 * A path that asked for a passkey (specs/143) or a code (specs/128 FR-017) is satisfied by the context the code
+	 * carries, never by what the request said: a request stripped of its `acr_values` comes back without one and makes
+	 * no session.
 	 */
+	if (
+		pending.requirePasskey &&
+		!meets(redeemed.how.acr, 'phishing_resistant')
+	) {
+		return passkeyNeeded(ctx);
+	}
 	if (pending.requireCode && !meets(redeemed.how.acr, 'multi_factor')) {
 		return codeNeeded(ctx);
 	}
@@ -241,7 +292,7 @@ export async function completeSignIn(
 				notConfirmedPage({
 					host: new URL(app.address).host,
 					reason: 'sign_in_not_fresh',
-					startHref: `${START_PATH}?max_age=${String(pending.maxAge)}${pending.requireCode ? '&code=1' : ''}&rd=${encodeURIComponent(pending.returnTo)}`,
+					startHref: `${START_PATH}?max_age=${String(pending.maxAge)}${pending.requirePasskey ? '&passkey=1' : pending.requireCode ? '&code=1' : ''}&rd=${encodeURIComponent(pending.returnTo)}`,
 					language: languageOfRequest(request).language
 				}),
 				'sign_in_not_fresh'

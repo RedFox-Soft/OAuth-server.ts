@@ -78,7 +78,8 @@ const NetworkFactsBody = t.Object(
 				{
 					kind: t.Literal('sign_in_again'),
 					maxAgeMinutes: t.Number({ minimum: 5, maximum: 1440, multipleOf: 1 }),
-					withCode: t.Optional(t.Boolean())
+					withCode: t.Optional(t.Boolean()),
+					withPasskey: t.Optional(t.Boolean())
 				},
 				closed
 			)
@@ -118,7 +119,9 @@ const FreshBody = t.Object(
 		kind: t.Literal('fresh'),
 		maxAgeMinutes: t.Number({ minimum: 5, maximum: 1440, multipleOf: 1 }),
 		/* Only a sign-in with a code from an authenticator app meets it (specs/128). */
-		withCode: t.Optional(t.Boolean())
+		withCode: t.Optional(t.Boolean()),
+		/* Only a sign-in with a confirmed passkey meets it (specs/143). */
+		withPasskey: t.Optional(t.Boolean())
 	},
 	closed
 );
@@ -197,6 +200,7 @@ export const UpdateBehindProxyAppBody = t.Object(
 					withoutAuthenticator: t.Optional(
 						t.Number({ minimum: 0, multipleOf: 1 })
 					),
+					withoutPasskey: t.Optional(t.Number({ minimum: 0, multipleOf: 1 })),
 					providerOnly: t.Optional(t.Number({ minimum: 0, multipleOf: 1 }))
 				},
 				{ additionalProperties: false }

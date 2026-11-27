@@ -66,6 +66,13 @@ export const ACTIONS = {
 		okText: 'Save the requirement',
 		cancelText: 'Keep editing'
 	},
+	// Turns everyone who did not sign in with a passkey away from an API (specs/143): asked with the counts.
+	'resource.requirePasskey.confirm': {
+		class: 'C2',
+		title: (t) => `Require a passkey for ${t}?`,
+		okText: 'Require a passkey',
+		cancelText: 'Keep editing'
+	},
 
 	'resource.declare': { class: 'C0' },
 	'resource.edit': { class: 'C0' },
@@ -336,6 +343,13 @@ export const ACTIONS = {
 		class: 'C2',
 		title: (t) => `Ask for a code on ${t}?`,
 		okText: 'Ask for a code',
+		cancelText: 'Keep editing'
+	},
+	// Turns everyone who did not sign in with a passkey away from a path (specs/143): asked with the counts.
+	'behindProxy.passkeyCondition.confirm': {
+		class: 'C2',
+		title: (t) => `Ask for a passkey on ${t}?`,
+		okText: 'Ask for a passkey',
 		cancelText: 'Keep editing'
 	},
 	'behindProxy.delete': {

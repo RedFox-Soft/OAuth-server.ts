@@ -42,7 +42,12 @@ export interface NetworkFactsInput {
 	countries?: { mode: 'only' | 'not'; codes: string[] };
 	outcome:
 		| { kind: 'refuse' }
-		| { kind: 'sign_in_again'; maxAgeMinutes: number; withCode?: boolean };
+		| {
+				kind: 'sign_in_again';
+				maxAgeMinutes: number;
+				withCode?: boolean;
+				withPasskey?: boolean;
+		  };
 }
 
 export type ConditionInput =
@@ -57,7 +62,12 @@ export type ConditionInput =
 			windows: { days: number[]; start: number; end: number }[];
 	  }
 	| { kind: 'attribute'; attribute: string; values: string[] }
-	| { kind: 'fresh'; maxAgeMinutes: number; withCode?: boolean }
+	| {
+			kind: 'fresh';
+			maxAgeMinutes: number;
+			withCode?: boolean;
+			withPasskey?: boolean;
+	  }
 	| { kind: 'group'; groups: string[] };
 
 const RANGE_PROBLEMS = {
@@ -186,7 +196,11 @@ function networkFactsFrom(
 		outcome = {
 			kind: 'sign_in_again',
 			maxAgeMinutes: minutes,
-			...(input.outcome.withCode === true ? { withCode: true as const } : {})
+			...(input.outcome.withPasskey === true
+				? { withPasskey: true as const }
+				: input.outcome.withCode === true
+					? { withCode: true as const }
+					: {})
 		};
 	}
 	return { categories, ...(countries ? { countries } : {}), outcome };
@@ -278,11 +292,15 @@ export async function conditionsFrom(
 				break;
 			}
 			case 'fresh':
-				/* Stored only when on, so a condition without it is the record it always was (specs/128 R1). */
+				/* Stored only when on, so a condition without it is the record it always was (specs/128 R1, specs/143). */
 				out.push({
 					kind: 'fresh',
 					maxAgeMinutes: condition.maxAgeMinutes,
-					...(condition.withCode === true ? { withCode: true as const } : {})
+					...(condition.withPasskey === true
+						? { withPasskey: true as const }
+						: condition.withCode === true
+							? { withCode: true as const }
+							: {})
 				});
 				break;
 			case 'group':

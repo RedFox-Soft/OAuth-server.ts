@@ -28,6 +28,11 @@ export function hadCode(acr: string | null | undefined): boolean {
 	return meets(acr, 'multi_factor');
 }
 
+/* Whether a sign-in with this authentication context reached the phishing-resistant context (specs/143). */
+export function hadPasskey(acr: string | null | undefined): boolean {
+	return meets(acr, 'phishing_resistant');
+}
+
 export function signInRequirementUnmet(
 	signIn: ResourceSignIn | undefined,
 	facts: SignInFacts,
@@ -35,7 +40,11 @@ export function signInRequirementUnmet(
 ): UnmetRequirement | null {
 	return requirementUnmet(
 		signIn,
-		{ withCode: hadCode(facts.acr), authTime: facts.authTime },
+		{
+			withCode: hadCode(facts.acr),
+			withPasskey: hadPasskey(facts.acr),
+			authTime: facts.authTime
+		},
 		nowSeconds
 	);
 }
@@ -44,6 +53,7 @@ export function signInRequirementUnmet(
  * What a refusal says at the token endpoint and to the client a sign-in hands back. Fixed ASCII, no names. "Two-step":
  * a code from an authenticator app, or a passkey where the project accepts them (specs/139 research R22).
  */
+export const API_PASSKEY_DESCRIPTION = 'the API requires a passkey sign-in';
 export const API_CODE_DESCRIPTION = 'the API requires two-step sign-in';
 export const API_RECENT_DESCRIPTION = 'the API requires a more recent sign-in';
 
@@ -53,12 +63,17 @@ export const API_MACHINE_DESCRIPTION =
 	"this API accepts only tokens from a person's sign-in";
 
 /* The proxy's `error_description` (RFC 6750 §3: printable ASCII without `"` or `\`). */
+export const CHALLENGE_PASSKEY_DESCRIPTION = 'a passkey sign-in is required';
 export const CHALLENGE_CODE_DESCRIPTION = 'two-step sign-in is required';
 export const CHALLENGE_RECENT_DESCRIPTION = 'a more recent sign-in is required';
 
-/* One description for a refusal, the code first. */
+/* One description for a refusal, passkey first, then code. */
 export function descriptionOf(unmet: UnmetRequirement): string {
-	return unmet.code ? API_CODE_DESCRIPTION : API_RECENT_DESCRIPTION;
+	return unmet.passkey
+		? API_PASSKEY_DESCRIPTION
+		: unmet.code
+			? API_CODE_DESCRIPTION
+			: API_RECENT_DESCRIPTION;
 }
 
 /*

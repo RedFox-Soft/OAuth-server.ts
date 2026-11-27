@@ -1778,12 +1778,12 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 		goodToKnow: [
 			'Choose 15 minutes, an hour, 8 hours or a day. Pages that load data in the background, such as dashboards, stop working until the person reloads, so use it on admin paths.',
 			'Anyone who set up an authenticator app types a code when signing in again, whether or not the project requires one.',
-			'Tick "with two-step sign-in" and only a recent sign-in with a code from an authenticator app, or with a passkey, opens the path. Before it saves, you see how many people it turns away; people without an authenticator app are asked to set one up when the project lets them.',
-			'Without two-step sign-in, a person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides. With it, they cannot open the path.',
+			'Choose "With two-step sign-in" and only a recent sign-in with a code from an authenticator app, or with a passkey, opens the path. Choose "With a passkey" (when the project accepts passkeys) and only a recent sign-in with a confirmed passkey opens it, shutting out passwords, codes, unconfirmed passkeys and outside providers. Before either saves, you see how many people it turns away.',
+			'With "Any sign-in", a person who signs in through an outside provider is asked to sign in there again; how fresh that sign-in is, the provider decides. With two-step sign-in or a passkey, they cannot open the path.',
 			'It is on every plan.'
 		],
 		prompt: prompt(
-			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old, and to use two-step sign-in.\nAdd a fresh sign-in condition with withCode to the rule for /admin, and tell me first how many people that affects.',
+			'Ask people to sign in again before /admin of my app behind the proxy, when their sign-in is more than 15 minutes old, and to use two-step sign-in (or a passkey).\nAdd a fresh sign-in condition with withCode or withPasskey to the rule for /admin, and tell me first how many people that affects.',
 			'behind_proxy_app_update with rules[].conditions',
 			'Use it on admin paths: a dashboard that loads data in the background stops until it is reloaded.'
 		)
@@ -2272,6 +2272,75 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Make my MCP server in FoxAuth require two-step sign-in, and tell me first whom that affects.',
 			'resource_update (requireCode, signInEveryMinutes)',
 			'If my MCP server checks its own tokens, make it refuse a token whose acr is not the multi-factor value FoxAuth names.'
+		)
+	},
+	{
+		id: 'apipasskey',
+		tab: 'product',
+		title: 'Require a passkey to connect an MCP server or API',
+		sentence:
+			'An agent connects to your MCP server or API only after its person signs in with a confirmed passkey, a sign-in a fake site can’t use.',
+		protocol: 'OAuth 2.0 Step Up Authentication Challenge (RFC 9470) · phr',
+		lanes: lanes('person', 'agent', 'fox', 'mcp'),
+		steps: [
+			step(
+				'agent',
+				'fox',
+				'Connect',
+				'The agent asks FoxAuth for a token for your MCP server.'
+			),
+			step(
+				'person',
+				'fox',
+				'Passkey sign-in',
+				'FoxAuth asks the person to sign in with a passkey, whatever the agent asked for. Someone without one can create it right there and continue.'
+			),
+			step(
+				'fox',
+				'agent',
+				'Token with phr',
+				'The access token states the phishing-resistant context (phr) even when the client did not ask for it.',
+				'token'
+			),
+			step(
+				'agent',
+				'mcp',
+				'Calls a tool',
+				'Your server, or your proxy, accepts only a token whose sign-in was with a confirmed passkey.'
+			)
+		],
+		problem: {
+			at: 'mcp',
+			mark: 'password',
+			caption:
+				'A password and a code typed into a fake page connect an agent to your MCP server.',
+			lanes: ['person', 'mcp']
+		},
+		fixCaption: 'Only a confirmed passkey connects an agent.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'A line on the sign-in page that names your MCP server',
+				'A passkey sign-in, or a page offering to create one and continue',
+				'Password, code, unconfirmed passkey, provider, and device-code sign-ins are refused'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open APIs',
+			target: { area: 'apis' }
+		},
+		goodToKnow: [
+			'Turn on Passkeys on the project’s Sign-in tab first, then choose "Passkey" under "Sign-in required" on the API’s Access tab. Before it saves, you see how many people have no confirmed passkey.',
+			'Every access token for this API (JWT or opaque introspection) carries the phishing-resistant context (phr by default), even when the client app did not request it.',
+			'Connections from password, authenticator code, unconfirmed passkey, provider, device-code, CIBA, machine, or assertion sign-ins are refused; existing refresh tokens from non-passkey sign-ins stop at their next renewal without being spent.',
+			'Combine with "Ask to sign in again every" to require a fresh passkey sign-in as often as you choose.'
+		],
+		prompt: prompt(
+			'Make my MCP server in FoxAuth require a passkey, and tell me first whom that affects.',
+			'resource_update (requirePasskey, signInEveryMinutes)',
+			'If my MCP server checks its own tokens, make it refuse a token whose acr is not FoxAuth’s phishing-resistant value (phr by default).'
 		)
 	},
 	{

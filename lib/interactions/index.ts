@@ -196,7 +196,10 @@ import { lookup } from '../i18n/languages.js';
 import { formatDate, formatMinutesAgo } from '../i18n/format.js';
 import { plural, text } from '../i18n/message.js';
 import { asksForCode } from '../consts/code_reasons.js';
-import { API_CODE_DESCRIPTION } from '../resources/sign_in_requirement.js';
+import {
+	API_CODE_DESCRIPTION,
+	API_PASSKEY_DESCRIPTION
+} from '../resources/sign_in_requirement.js';
 import { isBehindProxyClient } from '../behind_proxy/client.js';
 import { uiLocalesRanges } from '../i18n/resolve.js';
 import { CONSENT_TEXTS } from '../i18n/texts/consent/index.js';
@@ -1363,16 +1366,30 @@ function freshSignInNotice(interaction: Interaction): string | undefined {
 	if (host === undefined) return undefined;
 	const params = (interaction.payload.params ?? {}) as Record<string, unknown>;
 	const reasons = interaction.payload.prompt?.reasons ?? [];
-	/* The path also asks for a code (specs/128): one notice says both, and Part B's own notice stands down. */
-	const asksForCode =
-		typeof params.acr_values === 'string' &&
-		params.acr_values.split(' ').includes(configuration.acrMap.multi_factor);
+	/* The path also asks for a passkey (specs/143) or a code (specs/128): one notice says both. */
+	const acrValues =
+		typeof params.acr_values === 'string' ? params.acr_values.split(' ') : [];
+	const asksForPasskey = acrValues.includes(
+		configuration.acrMap.phishing_resistant
+	);
+	const asksForCode = acrValues.includes(configuration.acrMap.multi_factor);
 	const fresh = params.max_age !== undefined && reasons.includes('max_age');
-	if (!fresh && !(asksForCode && reasons.includes('second_factor'))) {
+	if (
+		!fresh &&
+		!(asksForPasskey && reasons.includes('app_passkey')) &&
+		!(asksForCode && reasons.includes('second_factor'))
+	) {
 		return undefined;
 	}
 	const T = SIGN_IN_TEXTS[languageOf(interaction)].notices;
-	return text(asksForCode ? T.freshSignInCode : T.freshSignIn, { host });
+	return text(
+		asksForPasskey
+			? T.freshSignInPasskey
+			: asksForCode
+				? T.freshSignInCode
+				: T.freshSignIn,
+		{ host }
+	);
 }
 
 /*
@@ -1533,6 +1550,14 @@ function appRequiresPasskey(interaction: Interaction): boolean {
 	return (interaction.payload.prompt?.reasons ?? []).includes('app_passkey');
 }
 
+/* Whether the application or a requested API requires a passkey (specs/142, specs/143). */
+function requiresPasskey(interaction: Interaction): boolean {
+	const reasons = interaction.payload.prompt?.reasons ?? [];
+	return (
+		reasons.includes('app_passkey') || reasons.includes('resource_passkey')
+	);
+}
+
 /*
  * What the page for an application requiring a passkey offers (specs/142 research R8): the one step that gets the person
  * in from where they stand. A device flow never can (research R4). A full passkey for the project's current site is
@@ -1586,11 +1611,15 @@ async function passkeyRequiredPage(
 					interaction.uid
 				)
 			: undefined;
+	const api = appRequiresPasskey(interaction)
+		? undefined
+		: await apiAsking(interaction);
 	return passkeyRequiredServer(
 		{
 			uid: interaction.uid,
 			variant,
 			email: refused.user.email,
+			...(api ? { api } : {}),
 			...(options ? { options } : {}),
 			...(shown.created ? { created: shown.created } : {}),
 			...(shown.refused ? { refused: shown.refused } : {})
@@ -1651,6 +1680,9 @@ function apiNotice(
 	if (api === undefined) return undefined;
 	const reasons = interaction.payload.prompt?.reasons ?? [];
 	const language = languageOf(interaction);
+	if (reasons.includes('resource_passkey')) {
+		return text(SIGN_IN_TEXTS[language].apiNotices.passkeyAsked, { api });
+	}
 	if (reasons.includes('resource_code')) {
 		return text(SIGN_IN_TEXTS[language].apiNotices.codeAsked, { api });
 	}
@@ -2701,13 +2733,17 @@ export const ui = new Elysia()
 			);
 			const refused = await refusedSignIn(interaction, bucketId);
 			if (!refused) return Response.redirect(buildUILoginPath(uid), 303);
-			if (appRequiresPasskey(interaction)) {
+			if (requiresPasskey(interaction)) {
+				const asking = appRequiresPasskey(interaction)
+					? undefined
+					: interaction.payload.prompt?.details.api;
 				noteSignInRefused({
 					bucketId,
 					accountId: refused.user._id,
 					reason: 'passkey_required',
 					clientId: clientIdOf(interaction),
 					providerId: refused.session.payload.upstream?.providerId,
+					...(typeof asking === 'string' ? { resource: asking } : {}),
 					request
 				});
 				return passkeyRequiredPage(interaction, refused, bucketId);
@@ -2769,7 +2805,7 @@ export const ui = new Elysia()
 				if (
 					!refused?.bucket ||
 					!holder ||
-					!appRequiresPasskey(interaction) ||
+					!requiresPasskey(interaction) ||
 					(await passkeyRefusalVariant(interaction, refused)) !==
 						'passkeyCreate'
 				) {
@@ -2798,9 +2834,11 @@ export const ui = new Elysia()
 				error: 'unmet_authentication_requirements',
 				error_description: appRequiresPasskey(interaction)
 					? REQUIRE_PASSKEY_DESCRIPTION
-					: appRequiresCode(interaction)
-						? REQUIRE_CODE_DESCRIPTION
-						: API_CODE_DESCRIPTION
+					: requiresPasskey(interaction)
+						? API_PASSKEY_DESCRIPTION
+						: appRequiresCode(interaction)
+							? REQUIRE_CODE_DESCRIPTION
+							: API_CODE_DESCRIPTION
 			};
 			return resume(interaction, cookie, { route, request });
 		},

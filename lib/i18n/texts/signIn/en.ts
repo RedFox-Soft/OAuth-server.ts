@@ -125,6 +125,9 @@ export const en = {
 		/* The same, when the page also asks for a code from an authenticator app (specs/128). */
 		freshSignInCode:
 			'{host} asks you to sign in again with a code from an authenticator app to open this page.',
+		/* The same, when the page asks for a passkey (specs/143). */
+		freshSignInPasskey:
+			'{host} asks you to sign in again with a passkey to open this page.',
 		/* An application that requires a code, before this sign-in has one (specs/127). */
 		codeAskedByApp: '{app} asks for a code from an authenticator app.',
 		codeAsked:
@@ -140,6 +143,7 @@ export const en = {
 	 * project declared it. The app never is, unless the project stands behind it.
 	 */
 	apiNotices: {
+		passkeyAsked: '{api} asks you to sign in with a passkey to connect.',
 		codeAsked: '{api} asks for a code from an authenticator app to connect.',
 		everyHour: '{api} asks you to sign in again every hour to stay connected.',
 		everyDay: '{api} asks you to sign in again every day to stay connected.',
@@ -218,6 +222,7 @@ export const en = {
 	 */
 	passkeyRequired: {
 		headingApp: '{app} asks you to sign in with a passkey',
+		headingApi: '{api} asks you to sign in with a passkey',
 		headingAny:
 			'The app you’re signing in to asks you to sign in with a passkey',
 		explain:

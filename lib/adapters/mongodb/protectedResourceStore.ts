@@ -61,6 +61,7 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		trailingSlashSignificant?: boolean;
 		checkedBy?: 'server' | 'proxy';
 		requireCode?: boolean;
+		requirePasskey?: boolean;
 		signInEveryMinutes?: number | null;
 	}): Promise<ProtectedResource> {
 		const now = new Date();
@@ -117,8 +118,18 @@ export class ProtectedResourceStore implements ProtectedResourceStoreInstance {
 		identifier: string,
 		patch: ProtectedResourcePatch
 	): Promise<ProtectedResource | null> {
-		const { exchangedBy, requireCode, signInEveryMinutes, ...rest } = patch;
-		const requirement = requirementPatch({ requireCode, signInEveryMinutes });
+		const {
+			exchangedBy,
+			requireCode,
+			requirePasskey,
+			signInEveryMinutes,
+			...rest
+		} = patch;
+		const requirement = requirementPatch({
+			requireCode,
+			requirePasskey,
+			signInEveryMinutes
+		});
 		const unset = [
 			...requirement.unset,
 			...(exchangedBy === null ? ['exchangedBy'] : [])

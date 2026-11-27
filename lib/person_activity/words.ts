@@ -37,6 +37,7 @@ interface Values {
 	provider: string;
 	count: number;
 	requireCode: boolean;
+	requirePasskey: boolean;
 	asking: string | null;
 	/* What the refused person proved at the door: a refusal row carries `method` only for the passkey door. */
 	proof: 'password' | 'passkey';
@@ -81,9 +82,11 @@ const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	unsafe_value: () =>
 		'Their email or a group name holds a character a header cannot carry',
 	sign_in_again: (v) =>
-		v.requireCode
-			? `Signed in without a code; ${v.rule} asks for one`
-			: `Signed in too long ago for ${v.rule}`,
+		v.requirePasskey
+			? `Signed in without a passkey; ${v.rule} asks for one`
+			: v.requireCode
+				? `Signed in without a code; ${v.rule} asks for one`
+				: `Signed in too long ago for ${v.rule}`,
 	sign_in_not_fresh: (v) => `Signed in too long ago for ${v.api}`,
 	no_person: (v) => `The token stands for no person ${v.api} accepts`,
 	tool_not_listed: (v) => `${toolOr(v, 'The tool')} is not in the API’s table`,
@@ -94,7 +97,11 @@ const REASONS: Record<ActivityReason, (v: Values) => string> = {
 	passkey_refused: () =>
 		'A passkey that did not verify, or one that may have been copied',
 	passkey_required: (v) =>
-		`${v.app} asks for a passkey; this sign-in was not one`,
+		v.kind === 'api'
+			? `Signed in without a passkey; ${v.api} asks for one`
+			: v.asking
+				? `Signed in to ${v.app} without a passkey; ${v.asking} asks for one`
+				: `${v.app} asks for a passkey; this sign-in was not one`,
 	used: (v) =>
 		v.kind === 'api' ? `${v.api} through ${v.client}` : `Used ${v.app}`,
 	other: (v) => `Not recorded one by one: ${String(v.count)} more`
@@ -133,7 +140,7 @@ function sawTextOf(reason: ActivityReason, v: Values): string | null {
 			return PLAIN_TEXTS.en.federation.inactive.title;
 		case 'passkey_required':
 			return v.kind === 'signIn'
-				? fill(signIn.passkeyRequired.headingApp, { app: v.app })
+				? fill(signIn.passkeyRequired.headingApp, { app: v.asking ?? v.app })
 				: null;
 		case 'passkey_refused':
 			return fill(signIn.errors.passkeyRefused, { service: 'the project' });
@@ -210,6 +217,7 @@ export function wordsOf(row: PersonActivityRow, names: PlaceNames): RowWords {
 		provider: names.provider ?? 'a provider',
 		count: row.count,
 		requireCode: row.freshness?.requireCode === true,
+		requirePasskey: row.freshness?.requirePasskey === true,
 		asking: names.asking ?? null,
 		proof: row.method === 'passkey' ? 'passkey' : 'password'
 	};
@@ -245,6 +253,7 @@ export function reasonWords(
 		provider: 'a provider',
 		count: 0,
 		requireCode: false,
+		requirePasskey: false,
 		asking: null
 	});
 }

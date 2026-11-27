@@ -107,6 +107,7 @@ export const CreateResourceBody = t.Object(
 		trailingSlashSignificant: t.Optional(t.Boolean()),
 		checkedBy: t.Optional(CheckedBy),
 		requireCode: t.Optional(t.Boolean()),
+		requirePasskey: t.Optional(t.Boolean()),
 		signInEveryMinutes: t.Optional(SignInEveryMinutes),
 		...ConsentFields
 	},
@@ -148,6 +149,7 @@ export const UpdateResourceBody = t.Object(
 		checkedBy: t.Optional(CheckedBy),
 		tools: t.Optional(ToolsTableBody),
 		requireCode: t.Optional(t.Boolean()),
+		requirePasskey: t.Optional(t.Boolean()),
 		/* `null` removes the requirement. */
 		signInEveryMinutes: t.Optional(t.Union([SignInEveryMinutes, t.Null()])),
 		...ConsentFields

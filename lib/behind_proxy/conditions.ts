@@ -22,7 +22,12 @@ export type { NetworkCategory } from '../consts/network_facts.js';
  */
 export type NetworkFactsOutcome =
 	| { kind: 'refuse' }
-	| { kind: 'sign_in_again'; maxAgeMinutes: number; withCode?: true };
+	| {
+			kind: 'sign_in_again';
+			maxAgeMinutes: number;
+			withCode?: true;
+			withPasskey?: true;
+	  };
 
 /*
  * The part of "From where" judged on FoxTrust's network facts (specs/129): categories to keep out, and countries to
@@ -58,6 +63,7 @@ export type FreshCondition = {
 	kind: 'fresh';
 	maxAgeMinutes: number;
 	withCode?: true;
+	withPasskey?: true;
 };
 export type GroupCondition = { kind: 'group'; groupIds: string[] };
 
@@ -147,6 +153,8 @@ export interface Facts {
 		 * server from the session's recorded context, because this module cannot read the instance's settings.
 		 */
 		signedInWithCode?: boolean | null;
+		/* Whether that sign-in was with a confirmed passkey (specs/143): worked out by the server from `acr`. */
+		signedInWithPasskey?: boolean | null;
 	} | null;
 	/*
 	 * The network facts of `address` (specs/129). Absent when nobody looked them up: live, that closes a condition
@@ -251,7 +259,11 @@ export function judgeNetwork(
 			const asks: FreshCondition = {
 				kind: 'fresh',
 				maxAgeMinutes: part.outcome.maxAgeMinutes,
-				...(part.outcome.withCode ? { withCode: true as const } : {})
+				...(part.outcome.withPasskey
+					? { withPasskey: true as const }
+					: part.outcome.withCode
+						? { withCode: true as const }
+						: {})
 			};
 			return {
 				result: evaluate(asks, facts),
@@ -296,6 +308,10 @@ export function evaluate(condition: Condition, facts: Facts): ConditionResult {
 		}
 		case 'fresh': {
 			if (!facts.person) return 'unknown';
+			/* A sign-in without a passkey never meets a condition that asks for one, however recent (specs/143). */
+			if (condition.withPasskey && facts.person.signedInWithPasskey !== true) {
+				return 'fail';
+			}
 			/* A sign-in without a code never meets a condition that asks for one, however recent. */
 			if (condition.withCode && facts.person.signedInWithCode !== true) {
 				return 'fail';

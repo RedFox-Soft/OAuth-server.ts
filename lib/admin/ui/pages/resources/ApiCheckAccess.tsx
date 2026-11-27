@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Card, Checkbox, Flex, Input, Select, Tag, Typography } from 'antd';
+import { Card, Flex, Input, Select, Tag, Typography } from 'antd';
 import { request } from '../../frame/request.js';
 import { useRoute } from '../../frame/router.js';
 import { usersApi, type EndUser } from '../users/endUser.js';
@@ -76,9 +76,11 @@ function reasonOf(decision: ApiDecision, who: string): string {
 		case 'insufficient':
 			return `The app's token lacks ${decision.needed.join(', ')}, which ${decision.tool} needs.`;
 		case 'sign_in':
-			return decision.unmet.code
-				? 'The sign-in was not two-step, which this API requires, so the app is asked to sign in again.'
-				: 'The sign-in is older than this API allows, so the app is asked to sign in again.';
+			return decision.unmet.passkey
+				? 'The sign-in was not with a passkey, which this API requires, so the app is asked to sign in again.'
+				: decision.unmet.code
+					? 'The sign-in was not two-step, which this API requires, so the app is asked to sign in again.'
+					: 'The sign-in is older than this API allows, so the app is asked to sign in again.';
 		case 'unknown':
 			return `Not enough to judge: ${decision.kinds
 				.map((kind: ConditionKind) => KIND_LABELS[kind].toLowerCase())
@@ -142,7 +144,9 @@ export function ApiCheckAccess({
 	const [from, setFrom] = useState('');
 	const [moment, setMoment] = useState('');
 	const [signedInAgo, setSignedInAgo] = useState(0);
-	const [withCode, setWithCode] = useState(false);
+	const [signInMethod, setSignInMethod] = useState<
+		'password' | 'code' | 'passkey'
+	>('password');
 	const [personId, setPersonId] = useState(NOBODY);
 	const [people, setPeople] = useState<PersonOption[]>([]);
 	const [chosen, setChosen] = useState<PersonOption | null>(null);
@@ -256,7 +260,8 @@ export function ApiCheckAccess({
 			scopes: new Set(held),
 			/* An app acting for itself carries no sign-in. */
 			signedInAt: person ? Math.floor(at / 1000) - signedInAgo * 60 : null,
-			signedInWithCode: person ? withCode : false
+			signedInWithCode: person ? signInMethod !== 'password' : false,
+			signedInWithPasskey: person ? signInMethod === 'passkey' : false
 		},
 		headers,
 		person,
@@ -306,8 +311,10 @@ export function ApiCheckAccess({
 						onChange={(id: string) => {
 							setPersonId(id);
 							setChosen(people.find((p) => p.id === id) ?? null);
-							setWithCode(
+							setSignInMethod(
 								people.find((p) => p.id === id)?.view.totpEnrolled === true
+									? 'code'
+									: 'password'
 							);
 						}}
 						options={[
@@ -397,12 +404,17 @@ export function ApiCheckAccess({
 									label: `Signed in ${o.label}`
 								}))}
 							/>
-							<Checkbox
-								checked={withCode}
-								onChange={(e) => setWithCode(e.target.checked)}
-							>
-								Signed in with two steps (a code or a passkey)
-							</Checkbox>
+							<Select
+								aria-label="Sign-in method"
+								style={{ width: 220 }}
+								value={signInMethod}
+								onChange={setSignInMethod}
+								options={[
+									{ value: 'password', label: 'Signed in with password only' },
+									{ value: 'code', label: 'Signed in with two steps (code)' },
+									{ value: 'passkey', label: 'Signed in with a passkey' }
+								]}
+							/>
 						</>
 					)}
 				</Flex>

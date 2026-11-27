@@ -867,8 +867,10 @@ function AccessCheck({
 		lookedUp && lookedUp.address === from.trim() ? lookedUp.answer : null;
 	const [moment, setMoment] = useState('');
 	const [signedInAgo, setSignedInAgo] = useState(0);
-	/* Unset until the operator ticks it: then it follows whether the chosen person holds an authenticator app. */
-	const [withCodeChoice, setWithCode] = useState<boolean | null>(null);
+	/* Unset until the operator chooses: follows the chosen person's authenticator enrollment, defaulting to password. */
+	const [signInMethodChoice, setSignInMethod] = useState<
+		'password' | 'code' | 'passkey' | null
+	>(null);
 	const [method, setMethod] = useState('GET');
 	const [personId, setPersonId] = useState('');
 	const [people, setPeople] = useState<PersonOption[]>([]);
@@ -935,12 +937,14 @@ function AccessCheck({
 				}
 			: null
 	);
-	const withCode = withCodeChoice ?? chosen?.view.totpEnrolled === true;
+	const signInMethod: 'password' | 'code' | 'passkey' =
+		signInMethodChoice ?? (chosen?.view.totpEnrolled ? 'code' : 'password');
 	const person = viewed
 		? {
 				...viewed,
 				signedInAt: Math.floor(at / 1000) - signedInAgo * 60,
-				signedInWithCode: withCode
+				signedInWithCode: signInMethod !== 'password',
+				signedInWithPasskey: signInMethod === 'passkey'
 			}
 		: null;
 	const typed = address.trim();
@@ -1010,7 +1014,10 @@ function AccessCheck({
 			case 'attribute_mismatch':
 				return `${who} does not have the attribute the conditions ask for.`;
 			case 'sign_in_again':
-				/* A code condition failed for want of a code, not of time (specs/128): say which. */
+				/* A passkey or code condition failed for want of it, not of time (specs/128, 143): say which. */
+				if (decision.requirePasskey && person?.signedInWithPasskey !== true) {
+					return `${who} did not sign in with a passkey, so they are asked to sign in again with one.`;
+				}
 				return decision.requireCode && person?.signedInWithCode !== true
 					? `${who} did not use two-step sign-in, so they are asked to sign in again with it.`
 					: `${who} signed in longer ago than the path allows, so they are asked to sign in again.`;
@@ -1140,12 +1147,17 @@ function AccessCheck({
 							label: `Signed in ${o.label}`
 						}))}
 					/>
-					<Checkbox
-						checked={withCode}
-						onChange={(e) => setWithCode(e.target.checked)}
-					>
-						Signed in with two steps (a code or a passkey)
-					</Checkbox>
+					<Select<'password' | 'code' | 'passkey'>
+						aria-label="Sign-in method"
+						style={{ width: 200 }}
+						value={signInMethod}
+						onChange={setSignInMethod}
+						options={[
+							{ value: 'password', label: 'Password only' },
+							{ value: 'code', label: 'Two-step (a code)' },
+							{ value: 'passkey', label: 'Passkey' }
+						]}
+					/>
 				</Flex>
 				{wantsFacts && facts && (
 					<Flex

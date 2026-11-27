@@ -18,8 +18,10 @@ import { configuration } from '../configs/application.js';
 import { signInOf } from '../resources/registry.js';
 import {
 	CHALLENGE_CODE_DESCRIPTION,
+	CHALLENGE_PASSKEY_DESCRIPTION,
 	CHALLENGE_RECENT_DESCRIPTION,
-	hadCode
+	hadCode,
+	hadPasskey
 } from '../resources/sign_in_requirement.js';
 import {
 	chargeApp,
@@ -258,7 +260,9 @@ async function evaluate({
 			scopes: presented.scopes,
 			signedInAt: presented.signedInAt,
 			/* Either says two factors: `acr` may be a weaker context the application asked for (specs/142 R2). */
-			signedInWithCode: hadCode(presented.acr) || presented.amr.includes('mfa')
+			signedInWithCode: hadCode(presented.acr) || presented.amr.includes('mfa'),
+			/* Only the phishing-resistant context proves a full passkey (specs/143 R5). */
+			signedInWithPasskey: hadPasskey(presented.acr)
 		},
 		headers,
 		person: await personFacts(api, presented.accountId, inPlay),
@@ -332,11 +336,15 @@ async function evaluate({
 		}
 		case 'sign_in': {
 			/*
-			 * How the person signed in (specs/130 research R6): a person's token whose sign-in does not meet the API's
-			 * requirement is asked for a new one, in RFC 9470's words.
+			 * How the person signed in (specs/130 research R6, specs/143 R5): a person's token whose sign-in does not meet
+			 * the API's requirement is asked for a new one, in RFC 9470's words.
 			 */
 			const { unmet } = decided;
-			const reason = unmet.code ? 'code_required' : 'sign_in_not_fresh';
+			const reason = unmet.passkey
+				? 'passkey_required'
+				: unmet.code
+					? 'code_required'
+					: 'sign_in_not_fresh';
 			const maxAgeSeconds = view.signIn?.maxAgeSeconds;
 			emitDecision(addressed, 'refuse', reason, {
 				clientId: presented.clientId,
@@ -349,12 +357,16 @@ async function evaluate({
 				{
 					'WWW-Authenticate': challenge(metadataUrl, {
 						error: 'insufficient_user_authentication',
-						error_description: unmet.code
-							? CHALLENGE_CODE_DESCRIPTION
-							: CHALLENGE_RECENT_DESCRIPTION,
-						...(unmet.code
-							? { acr_values: configuration.acrMap.multi_factor }
-							: {}),
+						error_description: unmet.passkey
+							? CHALLENGE_PASSKEY_DESCRIPTION
+							: unmet.code
+								? CHALLENGE_CODE_DESCRIPTION
+								: CHALLENGE_RECENT_DESCRIPTION,
+						...(unmet.passkey
+							? { acr_values: configuration.acrMap.phishing_resistant }
+							: unmet.code
+								? { acr_values: configuration.acrMap.multi_factor }
+								: {}),
 						...(unmet.recent && maxAgeSeconds !== undefined
 							? { max_age: String(maxAgeSeconds) }
 							: {})

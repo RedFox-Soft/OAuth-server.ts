@@ -1,3 +1,4 @@
+import { configuration } from '../configs/application.ts';
 import { meets } from '../helpers/acr_satisfaction.ts';
 
 /*
@@ -15,6 +16,24 @@ export function passkeyRequiredAndMissing(
 ): boolean {
 	if (client?.['signIn.requirePasskey'] !== true) return false;
 	return !meets(acr, 'phishing_resistant');
+}
+
+/*
+ * Whether the sign-in for a path behind the proxy that asks for a passkey (specs/143 research R4) is being reached
+ * without one. Mirrors `proxyAsksForCode`: binds only for the project's proxy client, and the proxy callback checks
+ * the redeemed code whatever the request said.
+ */
+export function proxyAsksForPasskey(
+	client: { readonly behindProxyBucketId?: string } | undefined,
+	acrValues: unknown,
+	acr: string | undefined
+): boolean {
+	if (client?.behindProxyBucketId === undefined) return false;
+	if (typeof acrValues !== 'string') return false;
+	return (
+		acrValues.split(' ').includes(configuration.acrMap.phishing_resistant) &&
+		!meets(acr, 'phishing_resistant')
+	);
 }
 
 /* What a refusal says, at the token endpoint and to an application its sign-in hands back. Fixed ASCII. */

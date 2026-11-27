@@ -94,6 +94,7 @@ export const zhHans: SignInTexts = {
 		freshSignIn: '{host} 要求您重新登录以打开此页面。',
 		freshSignInCode:
 			'{host} 要求您使用身份验证器应用中的验证码重新登录以打开此页面。',
+		freshSignInPasskey: '{host} 要求您使用通行密钥重新登录以打开此页面。',
 		codeAskedByApp: '{app} 需要身份验证器应用中的验证码。',
 		codeAsked: '您要登录的应用需要身份验证器应用中的验证码。',
 		passkey: '请使用您的通行密钥登录以继续。',
@@ -101,6 +102,7 @@ export const zhHans: SignInTexts = {
 	},
 
 	apiNotices: {
+		passkeyAsked: '{api} 要求您使用通行密钥登录才能连接。',
 		codeAsked: '{api} 需要身份验证器应用中的验证码才能连接。',
 		everyHour: '{api} 要求您每小时重新登录一次，以保持连接。',
 		everyDay: '{api} 要求您每天重新登录一次，以保持连接。',
@@ -156,6 +158,7 @@ export const zhHans: SignInTexts = {
 
 	passkeyRequired: {
 		headingApp: '{app} 要求您使用通行密钥登录',
+		headingApi: '{api} 要求您使用通行密钥登录',
 		headingAny: '您要登录的应用要求您使用通行密钥登录',
 		explain: '通行密钥让您用指纹、面容或屏幕锁登录，而且仿冒网站无法使用它。',
 		held: '您的账号 {email} 有通行密钥。用它登录即可继续。',

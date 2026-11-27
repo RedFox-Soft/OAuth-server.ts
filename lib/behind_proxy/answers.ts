@@ -52,9 +52,10 @@ export type ApiReason =
 	| 'network_facts_unknown'
 	| 'outside_hours'
 	/*
-	 * The API requires a sign-in with a code, or a recent one, and the token's sign-in is not one (specs/130 research
-	 * R6): the app check's own reasons, reused so a proxy's log reads the same for both.
+	 * The API requires a sign-in with a passkey, a code, or a recent one, and the token's sign-in is not one (specs/130
+	 * research R6, specs/143): the app check's own reasons, reused so a proxy's log reads the same for both.
 	 */
+	| 'passkey_required'
 	| 'code_required'
 	| 'sign_in_not_fresh';
 

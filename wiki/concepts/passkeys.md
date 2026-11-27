@@ -4,7 +4,7 @@ title: 'Passkeys: one RP ID per address, one origin, records that outlive a lock
 tags: [architecture, contract, gotcha]
 sources: [oauth-server-codebase]
 created: 2026-11-19
-updated: 2026-11-19
+updated: 2026-11-27
 graph:
   node_type: concept
   relationships:
@@ -203,6 +203,8 @@ it**, `revokeAccountAccess`, then a password-reset mail where the person has a p
     `ways_in.ts:175`): counts, the people with and without another way in after the move, and the first 20 addresses of
     those without.
   - It counts whether or not the project accepts passkeys now: a move ends them for good.
+  - Since spec 143, both `addressChangePreview` (when RP ID changes) and turning passkeys off in `sign_in_preview.ts`
+    also count `apisRequiringPasskey` and `pathsRequiringPasskey` (`expect` carries both, with absent read as 0).
   - `expect` gains `passkeyPeople` and `passkeyOnly`, and `sameCounts` compares them with absent read as 0 (`:576`).
   - The move deletes no passkey; the old ones list as `old_address`.
   - Root to path and path to path keep the RP ID, so they say nothing about passkeys.

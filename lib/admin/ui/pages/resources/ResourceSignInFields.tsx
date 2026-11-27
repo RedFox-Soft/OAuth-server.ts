@@ -1,24 +1,45 @@
-import { Alert, Form, InputNumber, Select, Space, Switch } from 'antd';
+import { Alert, Form, InputNumber, Radio, Select, Space } from 'antd';
 
 import { secondStepWords } from '../signin/passkeysAccepted.js';
 
 /*
- * An API's sign-in requirement (specs/130): two-step sign-in, and a sign-in every so often. The words
- * are the application's own (specs/127), and the text about apps is always there: FoxAuth makes the requirement hold
- * by refusing renewals and asking at the next sign-in, and what a person then sees depends on the app they use.
+ * An API's sign-in requirement (specs/130, specs/143): one level choice (any, two-step, or passkey), and a sign-in
+ * every so often. The words are the application's own (specs/127, specs/142), and the text about apps is always there:
+ * FoxAuth makes the requirement hold by refusing renewals and asking at the next sign-in, and what a person then sees
+ * depends on the app they use.
  */
 
 export const CLIENTS_PAGE =
 	'https://foxauth.dev/docs/get-started/protect-an-mcp-server-at-your-proxy/#what-your-people-see-in-each-app';
 
+export type SignInMethodLevel = 'any' | 'code' | 'passkey';
 export type EveryChoice = 'off' | '1440' | '10080' | '20160' | 'custom';
 export type EveryUnit = 'hours' | 'days';
 
 export interface SignInFieldValues {
-	requireCode?: boolean;
+	signInLevel?: SignInMethodLevel;
 	every?: EveryChoice;
 	customAmount?: number;
 	customUnit?: EveryUnit;
+}
+
+export function signInLevelOf(flags: {
+	requireCode?: boolean;
+	requirePasskey?: boolean;
+}): SignInMethodLevel {
+	if (flags.requirePasskey) return 'passkey';
+	if (flags.requireCode) return 'code';
+	return 'any';
+}
+
+export function signInFlagsOf(level: SignInMethodLevel): {
+	requireCode: boolean;
+	requirePasskey: boolean;
+} {
+	return {
+		requireCode: level === 'code',
+		requirePasskey: level === 'passkey'
+	};
 }
 
 const EVERY_OPTIONS: { label: string; value: EveryChoice }[] = [
@@ -67,23 +88,43 @@ export function signInEveryText(minutes: number): string {
 
 export function ResourceSignInFields({
 	checkedBy,
+	level = 'any',
 	every,
 	passkeys = false
 }: {
 	checkedBy: 'server' | 'proxy';
+	level?: SignInMethodLevel;
 	every: EveryChoice | undefined;
-	/* Whether the project accepts passkeys, which meet the requirement too (specs/139). */
+	/* Whether the project accepts passkeys, which meet two-step and unlock the passkey level (specs/139, specs/143). */
 	passkeys?: boolean;
 }) {
+	const levelExtra =
+		level === 'passkey'
+			? "Only people who sign in with a passkey can get a token for this API. People without a confirmed passkey are asked to create or confirm one; people who sign in through a provider, devices (TVs, consoles) and back-channel sign-ins can't connect."
+			: level === 'code'
+				? `A token for this API is issued only after a sign-in with ${secondStepWords(passkeys)}. People without an authenticator app are asked to set one up, if this project lets them; people who sign in through a provider can't connect.`
+				: passkeys
+					? 'Any sign-in to this project can get a token for this API.'
+					: "Any sign-in to this project can get a token for this API. Turn on passkeys on the project's Sign-in tab to require a passkey.";
 	return (
 		<>
 			<Form.Item
-				name="requireCode"
-				label="Require two-step sign-in"
-				valuePropName="checked"
-				extra={`A token for this API is issued only after a sign-in with ${secondStepWords(passkeys)}. People without an authenticator app are asked to set one up, if this project lets them; people who sign in through a provider can't connect.`}
+				name="signInLevel"
+				label="How people must sign in"
+				extra={levelExtra}
 			>
-				<Switch />
+				<Radio.Group
+					optionType="button"
+					options={[
+						{ value: 'any', label: 'Any sign-in' },
+						{ value: 'code', label: 'Two-step sign-in' },
+						{
+							value: 'passkey',
+							label: 'Passkey',
+							disabled: !passkeys && level !== 'passkey'
+						}
+					]}
+				/>
 			</Form.Item>
 			<Form.Item
 				label="Ask to sign in again every"

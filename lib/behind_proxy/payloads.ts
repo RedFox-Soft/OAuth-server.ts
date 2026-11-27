@@ -55,6 +55,11 @@ export const BehindProxySignInPayload = t.Object({
 	 * The path asked for a sign-in with a code from an authenticator app (specs/128): the callback refuses one without,
 	 * whatever the request to the sign-in said.
 	 */
-	requireCode: t.Optional(t.Literal(true))
+	requireCode: t.Optional(t.Literal(true)),
+	/*
+	 * The path asked for a sign-in with a passkey (specs/143): the callback refuses one without, whatever the request
+	 * to the sign-in said.
+	 */
+	requirePasskey: t.Optional(t.Literal(true))
 });
 export type BehindProxySignInPayload = Static<typeof BehindProxySignInPayload>;

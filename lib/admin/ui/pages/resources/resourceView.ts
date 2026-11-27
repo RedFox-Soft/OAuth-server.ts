@@ -34,8 +34,9 @@ export interface ResourceView {
 	/* Whether the API's own server checks its tokens (spec 107) or the operator's proxy asks this project (specs/123). */
 	checkedBy: CheckedBy;
 	tools?: ToolsTableView;
-	/* How the person behind a token must have signed in (specs/130). */
+	/* How the person behind a token must have signed in (specs/130, specs/143). */
 	requireCode: boolean;
+	requirePasskey: boolean;
 	signInEveryMinutes: number | null;
 	/* When who may get in last changed (specs/134); absent until the first such save. */
 	accessSavedAt?: string;
