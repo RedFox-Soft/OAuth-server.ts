@@ -19,9 +19,15 @@ export const PasskeyCeremonyPayload = t.Object({
 	holder: t.String(),
 	/*
 	 * `offer` is the passkey offer after a password sign-in (specs/141), keyed `offer:<interaction uid>`; its holder is
-	 * the browser session the sign-in made, as an add's is.
+	 * the browser session the sign-in made, as an add's is. `admin_link` is a standalone enrollment link ceremony
+	 * prepared on `/account/passkey-setup` (specs/145).
 	 */
-	purpose: t.Union([t.Literal('add'), t.Literal('remove'), t.Literal('offer')]),
+	purpose: t.Union([
+		t.Literal('add'),
+		t.Literal('remove'),
+		t.Literal('offer'),
+		t.Literal('admin_link')
+	]),
 	/*
 	 * The proof the ceremony was prepared under; an add stores it as the passkey's `createdVia`. `password` is an offer
 	 * after a password alone, whose passkey is conditional.
@@ -30,7 +36,9 @@ export const PasskeyCeremonyPayload = t.Object({
 		t.Literal('passkey'),
 		t.Literal('password_code'),
 		t.Literal('password_mail'),
-		t.Literal('password')
+		t.Literal('password'),
+		t.Literal('admin_link'),
+		t.Literal('federated_mail')
 	]),
 	/* An add: 32 random bytes, base64url, the challenge its options carried. */
 	challenge: t.Optional(t.String()),
@@ -41,11 +49,82 @@ export const PasskeyCeremonyPayload = t.Object({
 	origin: t.Optional(t.String()),
 	/* A removal: the passkey record it is for. */
 	passkeyId: t.Optional(t.String()),
+	/* An admin enrollment link ceremony: the link digest and whether an enrolled TOTP has been passed in this browser. */
+	linkId: t.Optional(t.String()),
+	totpVerified: t.Optional(t.Boolean()),
 	/* Mirrors the adapter's expiry (epoch seconds): five minutes from the write. */
 	exp: t.Number()
 });
 
 export type PasskeyCeremonyPayload = Static<typeof PasskeyCeremonyPayload>;
+
+/*
+ * Pre-account passkey registration challenge (specs/145 Q2=A, S4): keyed by sha256(token) in link mode or by random id
+ * in code / decoy mode. Unowned because no account exists yet; expires after ten minutes.
+ */
+export const PasskeyRegistrationChallengePayload = t.Object({
+	bucketId: t.String(),
+	email: t.String(),
+	holder: t.String(),
+	method: t.Union([t.Literal('link'), t.Literal('code')]),
+	exists: t.Boolean(),
+	codeHash: t.Optional(t.String()),
+	attempts: t.Number(),
+	language: t.String(),
+	exp: t.Number()
+});
+
+export type PasskeyRegistrationChallengePayload = Static<
+	typeof PasskeyRegistrationChallengePayload
+>;
+
+/*
+ * Self-service passkey recovery link (specs/145 S3): keyed by sha256(token), bound to the requesting browser
+ * interaction (`holder`). Account-owned so deletion, lock, or deactivation ends it immediately; expires after ten minutes.
+ */
+export const PasskeyRecoveryChallengePayload = t.Object({
+	accountId: t.String(),
+	bucketId: t.String(),
+	email: t.String(),
+	holder: t.String(),
+	language: t.String(),
+	exp: t.Number()
+});
+
+export type PasskeyRecoveryChallengePayload = Static<
+	typeof PasskeyRecoveryChallengePayload
+>;
+
+/*
+ * Administrator-sent passkey enrollment link (specs/145 S14): keyed by sha256(token), usable in any browser for
+ * twenty-four hours. Account-owned so deletion, lock, deactivation, or sign-out everywhere ends it.
+ */
+export const PasskeyAdminLinkPayload = t.Object({
+	accountId: t.String(),
+	bucketId: t.String(),
+	email: t.String(),
+	sentBy: t.String(),
+	language: t.String(),
+	exp: t.Number()
+});
+
+export type PasskeyAdminLinkPayload = Static<typeof PasskeyAdminLinkPayload>;
+
+/*
+ * Rate-limit window and latest-link pointer for passkey registration, recovery, and admin enrollment links (specs/145).
+ * Keyed by `${purpose}:${bucketId}:${emailOrAccountId}`; unowned because registration throttles addresses with no account.
+ */
+export const PasskeyLinkThrottlePayload = t.Object({
+	lastSentAt: t.Number(),
+	windowStart: t.Number(),
+	dayCount: t.Number(),
+	challengeId: t.Optional(t.String()),
+	exp: t.Number()
+});
+
+export type PasskeyLinkThrottlePayload = Static<
+	typeof PasskeyLinkThrottlePayload
+>;
 
 /*
  * Failed passkey sign-ins from one caller address in one UTC hour, keyed `${address}:${hourStartEpochSeconds}`, as

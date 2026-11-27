@@ -414,11 +414,14 @@ ${JSON.stringify(outcome.preview, null, 2)}`
 					};
 				}
 
+				/*
+				 * A 204 No Content route (such as sending a passkey setup link) returns no body; MCP's text
+				 * content requires a string, so surface `{ ok: true }` rather than `JSON.stringify(undefined)`.
+				 */
+				const data = outcome.data === undefined ? { ok: true } : outcome.data;
 				return {
-					content: [
-						{ type: 'text', text: JSON.stringify(outcome.data, null, 2) }
-					],
-					structuredContent: { result: outcome.data }
+					content: [{ type: 'text', text: JSON.stringify(data, null, 2) }],
+					structuredContent: { result: data }
 				};
 			}
 		);

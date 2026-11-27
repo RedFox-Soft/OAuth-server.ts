@@ -46,14 +46,8 @@ export interface LoginOptions {
 	 * names an account, so offering it says nothing about who has one.
 	 */
 	passkeyLogin: boolean;
-	/*
-	 * Only what the page renders: an id to build the link from, a label to show, and — when the upstream is
-	 * one this server recognises — which mark and wording its own branding requires. Never the credentials.
-	 *
-	 * `brand` is resolved here rather than in the component, and that is the whole reason this module
-	 * exists: the login page renders twice from one props payload, and a value computed during render
-	 * would be computed twice and could differ. Resolved once, it travels with the rest.
-	 */
+	/* Whether "Forgot your passkey?" is offered on the sign-in page (specs/145 Q1=A): non-admin opt-in only. */
+	passkeyRecovery: boolean;
 	providers: OfferedProvider[];
 }
 
@@ -80,6 +74,7 @@ export type SignInSettings = Pick<
 	| 'federation'
 	| 'signInOrder'
 	| 'passkeyLogin'
+	| 'passkeyRecovery'
 >;
 
 export function signInOptionsOf(
@@ -87,6 +82,10 @@ export function signInOptionsOf(
 	bucket: SignInSettings | null | undefined,
 	federationOn: boolean
 ): LoginOptions {
+	const passkeyLogin = passkeysAccepted({
+		_id: bucketId,
+		passkeyLogin: bucket?.passkeyLogin
+	});
 	return {
 		// Defaulted true for a bucket that predates the field, which the stores also do on read — belt and
 		// braces here because a falsy value would silently close the password door.
@@ -98,10 +97,9 @@ export function signInOptionsOf(
 		// A bucket that cannot be read counts as open, exactly as the registration door treats it.
 		registrationOpen: bucket?.registrationOpen !== false,
 		passwordReset: selfServiceResetAllowed(bucketId, bucket ?? null),
-		passkeyLogin: passkeysAccepted({
-			_id: bucketId,
-			passkeyLogin: bucket?.passkeyLogin
-		}),
+		passkeyLogin,
+		passkeyRecovery:
+			bucketId !== 'admin' && passkeyLogin && bucket?.passkeyRecovery === true,
 		/*
 		 * Recognition keys on the stored issuer, never on how the provider came to be configured — nothing
 		 * records that, deliberately. So a Google provider somebody typed in by hand long before the

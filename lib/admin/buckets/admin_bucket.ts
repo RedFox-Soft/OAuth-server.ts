@@ -1,6 +1,7 @@
 import { getPasskeyStore, getUserStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
 import { meets } from '../../helpers/acr_satisfaction.ts';
+import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { rpIdFor } from '../../passkeys/relying_party.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
@@ -162,10 +163,35 @@ async function assertMayTurnPasswordsOff(
 	const linked = (acting?.federated ?? []).some(
 		(link) => link.providerId === provider?.id
 	);
-	if (!provider || !linked) {
+	const provedByProvider = Boolean(provider && linked);
+
+	let provedByPasskey = false;
+	if (!provedByProvider && after.passkeyLogin) {
+		const rpId = rpIdFor(bucket);
+		const held = await getPasskeyStore().listOf(ADMIN_BUCKET_ID, ctx.userId);
+		const hasWorking = held.some(
+			(passkey) =>
+				passkey.rpId === rpId &&
+				passkey.copiedAt === undefined &&
+				passkey.conditional !== true
+		);
+		if (hasWorking && meets(ctx.signInAcr, 'phishing_resistant')) {
+			if (!(await mailDeliveryConfigured())) {
+				throw new AdminError(
+					409,
+					'Configure mail delivery first so super administrators can send passkey setup links to colleagues before turning password sign-in off.'
+				);
+			}
+			provedByPasskey = true;
+		}
+	}
+
+	if (!provedByProvider && !provedByPasskey) {
 		throw new AdminError(
 			409,
-			"Sign in through one of this project's identity providers first, then turn password sign-in off."
+			after.passkeyLogin
+				? "Sign in with a passkey or through one of this project's identity providers first, then turn password sign-in off."
+				: "Sign in through one of this project's identity providers first, then turn password sign-in off."
 		);
 	}
 	const state = await loadReachabilityState();

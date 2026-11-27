@@ -40,7 +40,21 @@ const SIGN_IN_ROUTES: Record<
 	'GET /ui/:uid/federation/:providerId/start': 'records none',
 	// The passkey offer after a password sign-in (specs/141): it follows a finished sign-in and writes no login of its own.
 	'GET /ui/:uid/passkey-offer': 'records none',
-	'POST /ui/:uid/passkey-offer': 'records none'
+	'POST /ui/:uid/passkey-offer': 'records none',
+	// Pre-account passkey registration (specs/145): only /create finishes sign-in with phishing_resistant + passkey methods.
+	'GET /ui/:uid/registration/passkey': 'records none',
+	'POST /ui/:uid/registration/passkey': 'records none',
+	'GET /ui/:uid/registration/passkey/verify': 'records none',
+	'POST /ui/:uid/registration/passkey/code': 'records none',
+	'GET /ui/:uid/registration/passkey/create': 'records none',
+	'POST /ui/:uid/registration/passkey/create': 'records a context and methods',
+	// Self-service passkey recovery (specs/145): never auto-signs-in; returns a link to /login instead.
+	'GET /ui/:uid/passkey-recovery': 'records none',
+	'POST /ui/:uid/passkey-recovery': 'records none',
+	'GET /ui/:uid/passkey-recovery/verify': 'records none',
+	'POST /ui/:uid/passkey-recovery/totp': 'records none',
+	'GET /ui/:uid/passkey-recovery/create': 'records none',
+	'POST /ui/:uid/passkey-recovery/create': 'records none'
 };
 
 /**

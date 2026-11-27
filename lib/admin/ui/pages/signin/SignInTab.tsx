@@ -41,6 +41,12 @@ interface Policy {
 	passkeyLogin: boolean;
 	/* Whether people are offered a passkey after a password sign-in (specs/141); absent means on. */
 	passkeyOffer: boolean;
+	/* Opt-in self-service passkey recovery via email link (specs/145); absent means off. */
+	passkeyRecovery: boolean;
+	/* Project-wide adoption campaign ("Ask everyone to create a passkey", specs/145); absent means off. */
+	passkeyRequired: boolean;
+	/* Opt-in passkey creation for provider-only users (specs/145); absent means off. */
+	passkeyForFederated: boolean;
 	/* Whether signing in to the console and MCP requires a passkey (specs/144); administrators' project only. */
 	consolePasskeyRequired: boolean;
 	registrationOpen: boolean;
@@ -55,6 +61,9 @@ const LABELS: Record<keyof Policy, string> = {
 	newSignInAlerts: 'Email about sign-ins from a new network or browser',
 	passkeyLogin: 'Passkeys',
 	passkeyOffer: 'Offer a passkey after a password sign-in',
+	passkeyRecovery: 'Allow self-service passkey recovery',
+	passkeyRequired: 'Ask everyone to create a passkey',
+	passkeyForFederated: 'Allow passkeys for identity-provider users',
 	consolePasskeyRequired: 'Require a passkey to sign in to the console',
 	registrationOpen: 'Self-service sign-up',
 	emailVerificationRequired: 'Require a verified email address',
@@ -69,6 +78,9 @@ export function policyOf(bucket: BucketView): Policy {
 		newSignInAlerts: bucket.newSignInAlerts ?? bucket._id === ADMIN_BUCKET_ID,
 		passkeyLogin: bucket.passkeyLogin === true,
 		passkeyOffer: bucket.passkeyOffer !== false,
+		passkeyRecovery: bucket.passkeyRecovery === true,
+		passkeyRequired: bucket.passkeyRequired === true,
+		passkeyForFederated: bucket.passkeyForFederated === true,
 		consolePasskeyRequired: bucket.consolePasskeyRequired === true,
 		registrationOpen: bucket.registrationOpen,
 		emailVerificationRequired: bucket.emailVerificationRequired,
@@ -83,6 +95,7 @@ export function signInKey(bucket: BucketView): string {
 
 /* What turning password sign-in off or requiring passkeys for the console would do (GET /admin/api/admins/sign-in-readiness). */
 interface SignInReadiness {
+	mailDeliveryConfigured?: boolean;
 	signedInWith: string | null;
 	signedInWithPasskey?: boolean;
 	callerHasPasskey?: boolean;
@@ -273,22 +286,42 @@ export function SignInTab({
 		defaultBucket && counts?.applications !== undefined
 			? `This changes sign-in for ${plural(counts.applications, 'application', 'applications')}.`
 			: null;
-	const mayTurnPasswordsOff =
+	const mailReady = summary?.mailDeliveryConfigured !== false;
+	const adminMailReady = readiness?.mailDeliveryConfigured ?? mailReady;
+	const provedByProvider =
 		readiness !== null &&
 		readiness.signedInWith !== null &&
 		readiness.callerLinkedAt.includes(readiness.signedInWith);
-	const mailReady = summary?.mailDeliveryConfigured !== false;
+	const provedByPasskey =
+		readiness !== null &&
+		draft.passkeyLogin &&
+		readiness.callerHasPasskey === true &&
+		readiness.signedInWithPasskey === true &&
+		adminMailReady;
+	const mayTurnPasswordsOff = provedByProvider || provedByPasskey;
 	const people = consoleBucket ? 'administrators' : 'people';
 
 	/* Why a switch cannot move in the direction it would now move, or null. */
+	const passkeyOnlyReady =
+		draft.passkeyLogin &&
+		mailReady &&
+		(draft.registrationOpen || (counts?.passkeyHolders ?? 0) > 0);
 	const passwordBlock = !draft.passwordLogin
 		? null
 		: consoleBucket
 			? mayTurnPasswordsOff
 				? null
-				: "To turn it off, sign in through one of this project's identity providers first. That proves another way in works before this one closes."
-			: providers !== null && enabled.length === 0
-				? 'Enable an identity provider first, otherwise nobody could sign in.'
+				: draft.passkeyLogin
+					? !adminMailReady
+						? 'Configure mail delivery first before turning password sign-in off with passkeys.'
+						: "To turn it off, sign in with your passkey or through one of this project's identity providers first."
+					: "To turn it off, sign in through one of this project's identity providers first. That proves another way in works before this one closes."
+			: providers !== null && enabled.length === 0 && !passkeyOnlyReady
+				? !draft.passkeyLogin
+					? 'Enable an identity provider or passkeys first, otherwise nobody could sign in.'
+					: !mailReady
+						? 'Configure mail delivery first before going passwordless with passkeys.'
+						: 'Open self-service sign-up or wait until at least one user has a passkey before turning password sign-in off.'
 				: null;
 	const verificationBlock = draft.emailVerificationRequired
 		? null
@@ -449,7 +482,9 @@ export function SignInTab({
 						effect={
 							draft.passwordLogin
 								? `${consoleBucket ? 'Administrators' : 'People'} sign in with their email and a password. ${consoleBucket ? 'Password reset uses' : 'Password reset and self-service sign-up use'} this too.`
-								: `${consoleBucket ? 'Administrators' : 'People'} sign in only through an identity provider; password reset${consoleBucket ? ' is' : ' and self-service sign-up are'} unavailable.`
+								: draft.passkeyLogin
+									? `${consoleBucket ? 'Administrators' : 'People'} sign in with a passkey${enabled.length > 0 ? ' or an identity provider' : ''}; passwords and password reset are off.`
+									: `${consoleBucket ? 'Administrators' : 'People'} sign in only through an identity provider; password reset${consoleBucket ? ' is' : ' and self-service sign-up are'} unavailable.`
 						}
 					>
 						{passwordBlock && (
@@ -465,16 +500,27 @@ export function SignInTab({
 							(consoleBucket
 								? readiness &&
 									note(
-										readiness.unlinkedAdministrators.length === 0
-											? 'Every administrator has a linked identity.'
-											: `These administrators have no linked identity and could no longer sign in: ${readiness.unlinkedAdministrators.map((a) => a.email).join(', ')}.`,
+										draft.passkeyLogin
+											? (readiness.administratorsWithoutPasskey?.length ??
+													0) === 0
+												? 'Every administrator has a passkey.'
+												: `Administrators without a passkey or linked provider will not be able to sign in.`
+											: readiness.unlinkedAdministrators.length === 0
+												? 'Every administrator has a linked identity.'
+												: `These administrators have no linked identity and could no longer sign in: ${readiness.unlinkedAdministrators.map((a) => a.email).join(', ')}.`,
 										'warning'
 									)
-								: counts?.withoutEnabledLink !== undefined &&
-									note(
-										`${counts.withoutEnabledLink.toLocaleString()} of ${plural(counts.users, 'user has', 'users have')} no account at an enabled identity provider and could no longer sign in.`,
-										'warning'
-									))}
+								: draft.passkeyLogin
+									? counts?.withoutPasskey !== undefined &&
+										note(
+											`${counts.withoutPasskey.toLocaleString()} of ${plural(counts.users, 'user has', 'users have')} no working passkey. Saving shows the exact list of people left with no way in.`,
+											'warning'
+										)
+									: counts?.withoutEnabledLink !== undefined &&
+										note(
+											`${counts.withoutEnabledLink.toLocaleString()} of ${plural(counts.users, 'user has', 'users have')} no account at an enabled identity provider and could no longer sign in.`,
+											'warning'
+										))}
 						{baseline.passwordLogin &&
 							!draft.passwordLogin &&
 							countsUnavailable}
@@ -513,7 +559,10 @@ export function SignInTab({
 									(!draft.passkeyLogin && bucket.passkeysPossible === false) ||
 									(draft.passkeyLogin &&
 										consoleBucket &&
-										draft.consolePasskeyRequired)
+										draft.consolePasskeyRequired) ||
+									(draft.passkeyLogin &&
+										!consoleBucket &&
+										draft.passkeyRequired)
 								}
 								onChange={(on) => set('passkeyLogin', on)}
 							/>
@@ -552,6 +601,12 @@ export function SignInTab({
 									passkeys off.
 								</Typography.Text>
 							)}
+						{draft.passkeyLogin && !consoleBucket && draft.passkeyRequired && (
+							<Typography.Text type="secondary">
+								Turn off &ldquo;Ask everyone to create a passkey&rdquo; below
+								before turning passkeys off.
+							</Typography.Text>
+						)}
 						{/*
 						 * Who holds a passkey that signs in at this address (specs/140, specs/144), and, before anyone can,
 						 * that passkeys are tied to the instance's address for a project at its root or at a path.
@@ -696,6 +751,110 @@ export function SignInTab({
 									: 'People are not asked to create a passkey after signing in. They can still add one on their own Sign-in and security page.'
 							}
 						/>
+					)}
+					{!consoleBucket && (
+						<Setting
+							title={LABELS.passkeyRequired}
+							control={
+								<Switch
+									aria-label={LABELS.passkeyRequired}
+									checked={draft.passkeyRequired}
+									disabled={!draft.passkeyLogin}
+									onChange={(on) => set('passkeyRequired', on)}
+								/>
+							}
+							effect={
+								draft.passkeyRequired
+									? 'Every password user without a passkey is asked to create one after signing in. They may skip up to 3 times within 14 days on passkey-capable devices; unsupported devices can continue without using a skip.'
+									: 'No adoption campaign is running. People are only shown the voluntary passkey offer if enabled above.'
+							}
+						>
+							{counts?.withoutPasskey !== undefined && draft.passkeyLogin && (
+								<Typography.Text type="secondary">
+									{plural(
+										counts.withoutPasskey,
+										'active user has',
+										'active users have'
+									)}{' '}
+									no working passkey
+									{(counts.passkeyCampaignSkipped ?? 0) > 0
+										? ` · ${(counts.passkeyCampaignSkipped ?? 0).toLocaleString()} skipped at least once`
+										: ''}
+									.
+								</Typography.Text>
+							)}
+						</Setting>
+					)}
+					{!consoleBucket && (
+						<Setting
+							title={LABELS.passkeyRecovery}
+							control={
+								<Switch
+									aria-label={LABELS.passkeyRecovery}
+									checked={draft.passkeyRecovery}
+									disabled={!draft.passkeyLogin}
+									onChange={(on) => set('passkeyRecovery', on)}
+								/>
+							}
+							effect={
+								draft.passkeyRecovery
+									? 'People with a verified email can recover access via a 10-minute browser-bound email link (plus an authenticator code if enrolled). Recovered passkeys are limited to standard two-step sign-in for 72 hours unless confirmed earlier by another full passkey.'
+									: 'Off: anyone who loses all passkeys needs an administrator to send them a 24-hour setup link.'
+							}
+						>
+							{draft.passkeyRecovery && (
+								<Typography.Text type="warning">
+									Someone who controls a user&apos;s inbox (and authenticator
+									app, if enrolled) can add a passkey. Keep this off for
+									high-assurance projects.
+								</Typography.Text>
+							)}
+						</Setting>
+					)}
+					{!consoleBucket && (
+						<Setting
+							title={LABELS.passkeyForFederated}
+							control={
+								<Switch
+									aria-label={LABELS.passkeyForFederated}
+									checked={draft.passkeyForFederated}
+									disabled={
+										!draft.passkeyLogin ||
+										(!draft.passkeyForFederated &&
+											(counts?.connections ?? 0) > 0)
+									}
+									onChange={(on) => set('passkeyForFederated', on)}
+								/>
+							}
+							effect={
+								draft.passkeyForFederated
+									? 'People who sign in only through an identity provider can add a passkey on their Sign-in and security page after a fresh sign-in and emailed link.'
+									: 'Off: people who sign in only through an identity provider cannot create a passkey here, so offboarding at the provider ends their access.'
+							}
+						>
+							{!draft.passkeyForFederated && (counts?.connections ?? 0) > 0 && (
+								<Typography.Text type="warning">
+									Unavailable while a SCIM provisioning connection is
+									configured, so directory offboarding controls access.
+								</Typography.Text>
+							)}
+							{draft.passkeyForFederated && (
+								<Typography.Text type="warning">
+									Passkeys created here stay valid even if the person is removed
+									from their identity provider, until revoked here.
+								</Typography.Text>
+							)}
+							{(counts?.providerOnlyPasskeyHolders ?? 0) > 0 && (
+								<Typography.Text type="secondary">
+									{plural(
+										counts?.providerOnlyPasskeyHolders ?? 0,
+										'provider-only user holds',
+										'provider-only users hold'
+									)}{' '}
+									a passkey.
+								</Typography.Text>
+							)}
+						</Setting>
 					)}
 				</Flex>
 			</Card>

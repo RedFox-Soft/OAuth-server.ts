@@ -1,4 +1,5 @@
 import {
+	getPasskeyStore,
 	getProvisioningConnectionStore,
 	getUserStore
 } from '../adapters/index.js';
@@ -7,6 +8,7 @@ import type {
 	User,
 	UserBucket
 } from '../adapters/types.js';
+import { passkeyWorks } from '../passkeys/account.js';
 import { eventBus } from '../event_bus.js';
 import { unusablePassword } from '../helpers/unusable_password.js';
 import { canSignIn } from '../end_users/can_sign_in.js';
@@ -264,7 +266,21 @@ export async function decideFederatedAccount(
 		 * With passwords off no new link can be made at all, which the console says before they go off.
 		 */
 		const inConsole = bucket._id === ADMIN_BUCKET_ID;
-		if (inConsole || (bucket.passwordLogin && !existing.federated?.length)) {
+		/*
+		 * In a passwordless project where passkeys are enabled, an unlinked federated sign-in matching an existing
+		 * account that holds a working passkey MUST NOT auto-link silently (specs/145 S10 Attack C, FR-022): require
+		 * passkey proof first via the existing pending-link flow.
+		 */
+		const hasWorkingPasskey =
+			!bucket.passwordLogin &&
+			(await getPasskeyStore().listOf(bucket._id, existing._id)).some(
+				(passkey) => passkeyWorks(passkey, bucket)
+			);
+		if (
+			inConsole ||
+			(bucket.passwordLogin && !existing.federated?.length) ||
+			hasWorkingPasskey
+		) {
 			return { kind: 'password_required', account: existing, link: identity };
 		}
 		// Step 1 already proved this pair resolves to nobody.

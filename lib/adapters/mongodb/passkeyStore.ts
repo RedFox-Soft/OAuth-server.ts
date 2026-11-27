@@ -181,6 +181,17 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		return result.modifiedCount === 1;
 	}
 
+	async clearRecoveryCaps(
+		bucketId: string,
+		accountId: string
+	): Promise<number> {
+		const result = await this.collection.updateMany(
+			{ bucketId, accountId, recoveredUntil: { $exists: true } },
+			{ $unset: { recoveredUntil: '' } }
+		);
+		return result.modifiedCount;
+	}
+
 	async knownAnywhere(rpId: string, credentialId: string): Promise<boolean> {
 		const found = await this.collection.findOne(
 			{ credentialId, rpId },

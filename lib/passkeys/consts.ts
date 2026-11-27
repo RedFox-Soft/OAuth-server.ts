@@ -55,3 +55,39 @@ export const CREDENTIAL_FIELD_MAX = 16384;
 
 /* The longest name a person may give a passkey, in characters, after trimming. */
 export const NAME_MAX = 64;
+
+/*
+ * Pre-account passkey registration email link / 6-digit code lifetime (specs/145 Q2=A): ten minutes, matching
+ * self-service recovery.
+ */
+export const REGISTRATION_CHALLENGE_SECONDS = 10 * 60;
+
+/* Maximum wrong 6-digit code attempts during passkey registration before the challenge is exhausted. */
+export const REGISTRATION_CODE_MAX_ATTEMPTS = 5;
+
+/* Browser-bound self-service passkey recovery link lifetime (specs/145 S3): ten minutes. */
+export const RECOVERY_LINK_SECONDS = 10 * 60;
+
+/*
+ * Duration a passkey created via self-service email recovery is capped at `multi_factor` ACR rather than
+ * `phishing_resistant` (specs/145 Q1=A): 72 hours, unless confirmed earlier with another full passkey.
+ */
+export const RECOVERY_ACR_CAP_SECONDS = 72 * 60 * 60;
+
+/* Administrator-sent passkey enrollment link lifetime (specs/145 S14): 24 hours, usable in any browser. */
+export const ADMIN_LINK_SECONDS = 24 * 60 * 60;
+
+/*
+ * Minimum age of an account's current email address before an administrator may send a passkey enrollment link
+ * (specs/145): 7 days, blocking same-week email swap + passkey takeover.
+ */
+export const EMAIL_CHANGE_LINK_COOLDOWN_SECONDS = 7 * 24 * 60 * 60;
+
+/* "Ask everyone to create a passkey" campaign grace bounds (specs/145): up to 3 skips within 14 days of first shown. */
+export const CAMPAIGN_MAX_SKIPS = 3;
+export const CAMPAIGN_WINDOW_SECONDS = 14 * 24 * 60 * 60;
+
+/* Per-target throttle bounds shared by passkey registration, recovery, and admin enrollment links (1/min, 5/day). */
+export const PASSKEY_LINK_COOLDOWN_SECONDS = 60;
+export const PASSKEY_LINK_DAILY_CAP = 5;
+export const PASSKEY_LINK_WINDOW_SECONDS = 24 * 60 * 60;

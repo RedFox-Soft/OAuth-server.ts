@@ -1,10 +1,15 @@
 import {
 	LockOutlined,
 	MailOutlined,
-	ExclamationCircleOutlined
+	ExclamationCircleOutlined,
+	KeyOutlined
 } from '@ant-design/icons';
-import { Button, Card, Flex, Form, Input } from 'antd';
-import { buildUILoginPath, buildUIRegistrationPath } from './buildUIPath.js';
+import { Button, Card, Divider, Flex, Form, Input } from 'antd';
+import {
+	buildUILoginPath,
+	buildUIPath,
+	buildUIRegistrationPath
+} from './buildUIPath.js';
 import { DEFAULT_LOGO } from './logo.js';
 import { SignInMasthead, type SignInFace } from './signInMasthead.js';
 import { foxVar } from '../html/theme/palette.js';
@@ -17,6 +22,7 @@ export function RegistrationPage({
 	uid,
 	errorMessage,
 	email,
+	passkeyRegistration = false,
 	logoSrc = DEFAULT_LOGO,
 	switcher,
 	face
@@ -24,6 +30,8 @@ export function RegistrationPage({
 	uid: string;
 	errorMessage?: string;
 	email?: string;
+	/* Project accepts passkeys: offer passkey sign-up beside the password form (specs/145). */
+	passkeyRegistration?: boolean;
 	/* The logo's versioned address, from the server: see LoginPage. */
 	logoSrc?: string;
 	switcher?: SwitcherProps;
@@ -66,6 +74,36 @@ export function RegistrationPage({
 						)
 					}
 				/>
+				{passkeyRegistration && (
+					<>
+						<a
+							href={buildUIPath(uid, 'registration/passkey')}
+							style={{
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								gap: '10px',
+								width: '100%',
+								minHeight: '44px',
+								padding: '10px 12px',
+								backgroundColor: foxVar('provider-bg'),
+								border: `1px solid ${foxVar('provider-border')}`,
+								borderRadius: '6px',
+								color: foxVar('provider-text'),
+								textDecoration: 'none',
+								marginBottom: 8
+							}}
+						>
+							<KeyOutlined aria-hidden="true" />
+							<span>{T.passkeyRegister.withPasskey}</span>
+						</a>
+						<Divider plain>
+							<span style={{ color: foxVar('text-muted') }}>
+								{T.passkeyRegister.passwordInstead}
+							</span>
+						</Divider>
+					</>
+				)}
 				<Form
 					name="registration"
 					method="post"

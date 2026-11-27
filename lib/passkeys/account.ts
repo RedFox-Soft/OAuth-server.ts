@@ -2,7 +2,11 @@ import { randomBytes } from 'node:crypto';
 
 import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/server';
 
-import { getBucketStore, getPasskeyStore } from '../adapters/index.js';
+import {
+	getBucketStore,
+	getPasskeyStore,
+	getProvisioningConnectionStore
+} from '../adapters/index.js';
 import type { Passkey, User, UserBucket } from '../adapters/types.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { accountPageBase } from '../account_page/client.js';
@@ -69,7 +73,16 @@ export async function addAvailability(
 	held: number
 ): Promise<AddAvailability> {
 	if (!passkeysAccepted(bucket)) return 'not_accepted';
-	if (user.passwordSet === false && held === 0) return 'provider_only';
+	if (user.passwordSet === false && held === 0) {
+		const federatedAllowed =
+			bucket._id !== ADMIN_BUCKET_ID &&
+			bucket.passkeyForFederated === true &&
+			user.provisionedBy === undefined &&
+			(user.federated?.length ?? 0) > 0 &&
+			(await getProvisioningConnectionStore().listByBucket(bucket._id))
+				.length === 0;
+		if (!federatedAllowed) return 'provider_only';
+	}
 	if (!(await mailDeliveryConfigured())) return 'no_mail';
 	if (!user.verified) return 'unconfirmed';
 	if (held >= PASSKEYS_PER_PERSON) return 'full';

@@ -121,6 +121,7 @@ export function UserSignInTab({
 					user={user}
 					of={passkeys}
 					canManage={can.manageUsers}
+					passkeysEnabled={bucket.passkeyLogin === true}
 					actions={actions}
 					onRevoked={() => {
 						setTick((n) => n + 1);

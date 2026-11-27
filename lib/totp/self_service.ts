@@ -132,8 +132,9 @@ export function freshCode(session: Session): boolean {
  * the password it was made after, and a password alone never opens these acts without a mailed link.
  */
 export function freshPasskey(session: Session): boolean {
-	const { amr, loginTs } = session.payload;
+	const { acr, amr, loginTs } = session.payload;
 	return (
+		meets(acr, 'phishing_resistant') &&
 		Array.isArray(amr) &&
 		amr.includes('pop') &&
 		amr.includes('mfa') &&

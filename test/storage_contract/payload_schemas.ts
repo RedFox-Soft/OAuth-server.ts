@@ -38,8 +38,12 @@ import { InteractionPayload } from 'lib/models/interaction.js';
 import { LoginThrottlePayload } from 'lib/login_throttle/types.js';
 import { MailRequestTallyPayload } from 'lib/mail_limit/types.js';
 import {
+	PasskeyAdminLinkPayload,
 	PasskeyAttemptTallyPayload,
-	PasskeyCeremonyPayload
+	PasskeyCeremonyPayload,
+	PasskeyLinkThrottlePayload,
+	PasskeyRecoveryChallengePayload,
+	PasskeyRegistrationChallengePayload
 } from 'lib/passkeys/types.js';
 import { PasswordGuessingTallyPayload } from 'lib/attacker_list/types.js';
 import {
@@ -94,8 +98,12 @@ export const PAYLOAD_SCHEMAS: Readonly<
 	LoginThrottle: LoginThrottlePayload,
 	MailRequestTally: MailRequestTallyPayload,
 	NotMeLink: NotMeLinkPayload,
+	PasskeyAdminLink: PasskeyAdminLinkPayload,
 	PasskeyAttemptTally: PasskeyAttemptTallyPayload,
 	PasskeyCeremony: PasskeyCeremonyPayload,
+	PasskeyLinkThrottle: PasskeyLinkThrottlePayload,
+	PasskeyRecoveryChallenge: PasskeyRecoveryChallengePayload,
+	PasskeyRegistrationChallenge: PasskeyRegistrationChallengePayload,
 	PasswordGuessingTally: PasswordGuessingTallyPayload,
 	PasswordResetChallenge: PasswordResetChallengePayload,
 	PasswordResetThrottle: PasswordResetThrottlePayload,

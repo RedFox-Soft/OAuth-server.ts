@@ -2050,13 +2050,90 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'A passkey sign-in meets every app, API and path that asks for two-step sign-in, without a code.',
 			'A passkey works only at the host it was made at. If the project moves between a path, a subdomain and a hostname, or the server’s address changes, people add new ones.',
 			'On a person’s page you see their passkeys. After a lost or stolen device, revoke one or all of them: the person is signed out everywhere and gets an email.',
-			'Browsers offer passkeys only over HTTPS, or at localhost. Not on the administrators’ project.',
+			'Browsers offer passkeys only over HTTPS, or at localhost. Also available on the administrators’ project.',
 			'Turning it off keeps people’s passkeys, and turning it on again makes them work. It is on every plan.'
 		],
 		prompt: prompt(
 			'Turn on passkeys in my FoxAuth project and check that SMTP is set up.',
 			'project_update (passkeyLogin) and smtp_settings_get',
 			'Then add a "Sign-in and security" link to my app’s account settings that opens {issuer}/account/security, where people add a passkey.'
+		)
+	},
+	{
+		id: 'go-passwordless',
+		tab: 'product',
+		title: 'Go passwordless with passkeys',
+		sentence:
+			'Turn off password sign-in so people sign up and sign in only with passkeys, nudge existing users to create one, and recover lost devices safely.',
+		protocol: 'WebAuthn · passkeys',
+		lanes: lanes('person', 'app', 'fox', 'passkey'),
+		steps: [
+			step(
+				'person',
+				'app',
+				'Opens it',
+				'A new or returning person opens your app and is sent to sign in.'
+			),
+			step(
+				'fox',
+				'passkey',
+				'Passkey only',
+				'FoxAuth shows no password box. Returning people sign in with a passkey; new visitors prove their email first and create one.',
+				'request'
+			),
+			step(
+				'person',
+				'passkey',
+				'Fingerprint or face',
+				'The person confirms with a fingerprint, face or screen lock on their device.'
+			),
+			step(
+				'passkey',
+				'fox',
+				'Signed answer',
+				'The device signs for your project’s address only, leaving no password to steal or phish.'
+			),
+			step(
+				'fox',
+				'app',
+				'Signed in',
+				'FoxAuth signs the person in with a phishing-resistant passkey.',
+				'token'
+			)
+		],
+		problem: {
+			at: 'person',
+			mark: 'password',
+			caption:
+				'Even with passkeys on, passwords can still be phished or guessed.',
+			lanes: ['person']
+		},
+		fixCaption: 'No passwords to phish: every sign-in uses a passkey.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'A sign-in page with only “Sign in with a passkey” and passkey autofill, no password field',
+				'New visitors prove their email (link or 6-digit code) before creating their account and first passkey',
+				'Before turning passwords off, an optional campaign prompting password users to create a passkey (3 skips in 14 days)',
+				'Administrator-sent 24-hour setup links (and optional self-service email recovery) to help people regain access'
+			]
+		},
+		needs: { role: 'edit' },
+		action: {
+			kind: 'open',
+			label: 'Open Sign-in',
+			target: { area: 'sign-in' }
+		},
+		goodToKnow: [
+			'Configure mail delivery first. You can turn off Password sign-in once Passkeys are on and either self-service sign-up is open or at least one person already holds a working passkey.',
+			'Before going passwordless, switch on "Ask everyone to create a passkey" (passkeyRequired) so existing password users enroll over up to 3 skips in 14 days.',
+			'Before passwords turn off, FoxAuth previews how many active accounts have no working passkey or provider (naming up to 20) and asks you to confirm.',
+			'For someone who lost all devices, send a 24-hour setup link from their Sign-in tab (or via project_user_passkey_link_send), or opt in to self-service email recovery (passkeyRecovery, off by default, capped at multi-factor ACR for 72 hours).',
+			'You can also turn passwords off on the Administrators project once mail is configured and a super administrator who signed in with a passkey confirms.'
+		],
+		prompt: prompt(
+			'Run a passkey adoption campaign on my project first, check how many users still lack a passkey, and once ready turn off password sign-in after previewing affected accounts.',
+			'project_summary, project_update (passkeyLogin, passkeyRequired, passwordLogin, passkeyRecovery), and project_user_passkey_link_send'
 		)
 	},
 	{

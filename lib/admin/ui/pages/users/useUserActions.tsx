@@ -248,6 +248,20 @@ export function useUserActions(bucketId: string) {
 				if (!agreed || !(await send('POST', user, '/verified'))) return false;
 				feedback.done(`${user.email} marked as verified.`);
 				return true;
+			},
+
+			async sendPasskeyLink(user: EndUser) {
+				const agreed = await confirm('enduser.passkey.linkSend', {
+					target: user.email,
+					consequences: [
+						`A 24-hour single-use passkey setup link is emailed to ${user.email}.`,
+						'The link is delivered by email only and is never shown here.'
+					]
+				});
+				if (!agreed || !(await send('POST', user, '/passkey-link')))
+					return false;
+				feedback.done(`Passkey setup link sent to ${user.email}.`);
+				return true;
 			}
 		};
 	}, [bucketId, feedback, confirm]);

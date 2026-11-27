@@ -210,6 +210,12 @@ export const zhHans: AccountTexts = {
 	passkeyViaCode: '使用密码和验证码登录后添加',
 	passkeyViaMail: '使用密码登录并打开邮件链接后添加',
 	passkeyViaPassword: '使用密码登录后添加',
+	passkeyViaRegistration: '注册账户时创建',
+	passkeyViaRecovery: '通过邮件恢复添加',
+	passkeyViaAdminLink: '通过管理员设置链接添加',
+	passkeyViaFederatedMail: '通过身份提供方登录并打开邮件链接后添加',
+	passkeyRecoveryCapped:
+		'在 {date} UTC 之前仅限标准多因素登录；使用另一个通行密钥登录可提前解除限制',
 	passkeyUnconfirmed: '未确认：作用与您的密码相同',
 	passkeyConfirm: '确认',
 	passkeyConfirmNeeds: '请使用密码和验证码，或使用另一个通行密钥登录后再确认。',
@@ -232,6 +238,27 @@ export const zhHans: AccountTexts = {
 		'请查收邮件：我们已向 {email} 发送了一个链接。请在 10 分钟内用这个浏览器打开它，以删除该通行密钥。',
 	passkeyLast:
 		'这是您登录{service}的唯一方式。请先添加另一种方式：密码或另一个通行密钥。',
+	passkeyLastPasswordless:
+		'这是您登录{service}的唯一通行密钥。请先添加另一个通行密钥（例如在手机上），然后再删除此密钥。',
+	passkeySetupTitle: '设置您的通行密钥',
+	passkeySetupHeading: '为{service}设置通行密钥',
+	passkeySetupIntro: '为此设备或密码管理器上的账户 {email} 添加通行密钥。',
+	passkeySetupInvalidTitle: '此链接已失效',
+	passkeySetupInvalid:
+		'此通行密钥设置链接已过期或已被使用。请向管理员申请新的链接。',
+	passkeySetupTotpHeading: '使用身份验证器应用确认',
+	passkeySetupTotpHint:
+		'在为 {email} 添加通行密钥之前，请输入身份验证器应用中的 6 位验证码。',
+	passkeySetupTotpLost:
+		'通行密钥和身份验证器应用都丢失了？请先让管理员移除身份验证器应用。',
+	passkeySetupTotpLabel: '身份验证器应用验证码',
+	passkeySetupTotpButton: '继续',
+	passkeySetupTotpWrong: '验证码无效。请输入当前显示的验证码。',
+	passkeySetupButton: '创建通行密钥',
+	passkeySetupDoneTitle: '通行密钥已添加',
+	passkeySetupDone: '{email} 的新通行密钥已准备就绪。现在您可以使用它登录。',
+	passkeySetupSignIn: '前往登录',
+	passkeySetupConsole: '打开管理控制台',
 	passkeyDisownTitle: '要从 {email} 删除这个通行密钥吗？',
 	passkeyDisownEffect:
 		'在它之后添加的通行密钥也会一并删除，您的账号将在所有设备上退出登录。',

@@ -176,6 +176,21 @@ export const UpdateBucketBody = t.Object({
 	 */
 	passkeyOffer: t.Optional(t.Boolean()),
 	/*
+	 * Opt-in self-service passkey recovery via browser-bound email link (specs/145 Q1=A). Absent means off.
+	 * Refused on the administrators' project (422) and while `passkeyLogin` is off (409).
+	 */
+	passkeyRecovery: t.Optional(t.Boolean()),
+	/*
+	 * Project-wide adoption campaign ("Ask everyone to create a passkey", specs/145 US4). Absent means off.
+	 * Refused on the administrators' project (422) and while `passkeyLogin` is off (409).
+	 */
+	passkeyRequired: t.Optional(t.Boolean()),
+	/*
+	 * Opt-in passkey creation on `/account/security` for provider-only users (specs/145 US5). Absent means off.
+	 * Refused on the administrators' project (422), while `passkeyLogin` is off (409), and while SCIM is configured (409).
+	 */
+	passkeyForFederated: t.Optional(t.Boolean()),
+	/*
 	 * Whether signing in to the console and authorizing administrative MCP agents requires a passkey (specs/144).
 	 * Valid only on the administrators' project (422 elsewhere). Requires passkeys on and a passkey-authenticated
 	 * super administrator holding a working passkey; goes through the preview below naming administrators without one.
@@ -232,7 +247,8 @@ export const UpdateBucketBody = t.Object({
 			appsRequiringPasskey: t.Optional(PreviewCount),
 			apisRequiringPasskey: t.Optional(PreviewCount),
 			pathsRequiringPasskey: t.Optional(PreviewCount),
-			withoutPasskey: t.Optional(PreviewCount)
+			withoutPasskey: t.Optional(PreviewCount),
+			withoutWayIn: t.Optional(PreviewCount)
 		})
 	)
 });

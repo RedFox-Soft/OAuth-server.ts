@@ -771,11 +771,21 @@ export interface PasskeyRowView {
 	createdAt: Date;
 	lastUsedAt?: Date;
 	synced: boolean;
-	via: 'passkey' | 'password_code' | 'password_mail' | 'password';
+	via:
+		| 'passkey'
+		| 'password_code'
+		| 'password_mail'
+		| 'password'
+		| 'registration'
+		| 'recovery'
+		| 'admin_link'
+		| 'federated_mail';
 	/* Made for an address the project no longer has, or refused because it may have been copied: it no longer works. */
 	mark?: 'oldAddress' | 'copied';
 	/* Made after a password alone and not yet confirmed (specs/141): it signs in as the password does. */
 	unconfirmed?: true;
+	/* Created via email recovery and still within its 72-hour multi_factor ACR cap (specs/145 Q1=A). */
+	recoveredUntil?: Date;
 }
 
 /*
@@ -891,7 +901,11 @@ function passkeyRow(
 		passkey: T.passkeyViaPasskey,
 		password_code: T.passkeyViaCode,
 		password_mail: T.passkeyViaMail,
-		password: T.passkeyViaPassword
+		password: T.passkeyViaPassword,
+		registration: T.passkeyViaRegistration,
+		recovery: T.passkeyViaRecovery,
+		admin_link: T.passkeyViaAdminLink,
+		federated_mail: T.passkeyViaFederatedMail
 	}[row.via];
 	const facts = [
 		text(T.passkeyCreated, { date: day(row.createdAt) }),
@@ -907,6 +921,10 @@ function passkeyRow(
 			: row.mark === 'copied'
 				? T.passkeyCopied
 				: undefined;
+	const recoveredNotice =
+		row.recoveredUntil !== undefined && !mark
+			? `<br/><span style="color:${foxVar('notice-text')};">${html(T.passkeyRecoveryCapped, { date: formatDateTime(language, row.recoveredUntil.getTime()) })}</span>`
+			: '';
 	return [
 		`<li style="margin:0 0 12px;">`,
 		`<strong style="overflow-wrap:anywhere;">${esc(row.name)}</strong><br/>`,
@@ -914,6 +932,7 @@ function passkeyRow(
 		mark
 			? `<br/><span style="color:${foxVar('danger-text')};">${esc(mark)}</span>`
 			: '',
+		recoveredNotice,
 		row.unconfirmed && !mark ? unconfirmedLine(row, frame, view, xsrf) : '',
 		`<div>${passkeyActions(row, frame, view, xsrf)}</div>`,
 		`</li>`
@@ -1025,7 +1044,7 @@ function passkeysState(
 export function securityPage(
 	frame: PageFrame,
 	nav: AccountNav,
-	view: SecurityView,
+	view: SecurityView | undefined,
 	xsrf: string,
 	notice?: SecurityNotice,
 	passkeys?: PasskeysView
@@ -1043,8 +1062,9 @@ export function securityPage(
 		passkeys
 			? `<h2 style="font-size:20px; margin:24px 0 8px;">${esc(T.passkeysTitle)}</h2>${passkeysBody(frame, passkeys, xsrf)}`
 			: '',
-		`<h2 style="font-size:20px; margin:24px 0 8px;">${esc(T.twoStepTitle)}</h2>`,
-		securityBody(frame, view, xsrf)
+		view
+			? `<h2 style="font-size:20px; margin:24px 0 8px;">${esc(T.twoStepTitle)}</h2>${securityBody(frame, view, xsrf)}`
+			: ''
 	].join('');
 	const response = page(T.securityTitle, body, 200, {
 		wide: true,
@@ -1476,6 +1496,134 @@ export function signOutOutcomePage(
 		outcome.done ? 200 : 500,
 		{ language }
 	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+// ---------------------------------------------------------------- standalone admin-sent passkey setup (specs/145 S14)
+
+const SETUP_INPUT = `font-size:16px; min-height:36px; padding:0 10px; border:1px solid ${foxVar('field-border')}; border-radius:6px; width:100%; max-width:360px; box-sizing:border-box; margin:6px 0 12px; display:block;`;
+const SETUP_ERROR = `background:${foxVar('danger-bg')}; border:1px solid ${foxVar('danger-border')}; color:${foxVar('danger-text')}; border-radius:6px; padding:8px 12px; margin:12px 0;`;
+
+export function passkeySetupInvalidPage(
+	language: Language,
+	service: string
+): Response {
+	const T = ACCOUNT_TEXTS[language];
+	const response = page(
+		T.passkeySetupTitle,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.passkeySetupTitle)}</h1><p>${html(T.passkeySetupInvalid, { service })}</p>`,
+		400,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export function passkeySetupTotpPage(input: {
+	language: Language;
+	path: string;
+	service: string;
+	email: string;
+	token: string;
+	project?: string;
+	wrong?: boolean;
+}): Response {
+	const T = ACCOUNT_TEXTS[input.language];
+	const fields: Record<string, string> = {
+		action: 'totp',
+		token: input.token,
+		...(input.project ? { project: input.project } : {})
+	};
+	const body = [
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.passkeySetupTotpHeading)}</h1>`,
+		`<p style="overflow-wrap:anywhere;">${html(T.passkeySetupTotpHint, { service: input.service, email: input.email })}</p>`,
+		input.wrong
+			? `<p role="alert" style="${SETUP_ERROR}">${esc(T.passkeySetupTotpWrong)}</p>`
+			: '',
+		`<form method="post" action="${esc(input.path)}">`,
+		hidden(fields),
+		`<label for="pk-setup-code" style="display:block;">${esc(T.passkeySetupTotpLabel)}</label>`,
+		`<input id="pk-setup-code" name="code" inputmode="numeric" autocomplete="one-time-code" required style="${SETUP_INPUT}"/>`,
+		`<button type="submit" style="${PRIMARY}">${esc(T.passkeySetupTotpButton)}</button>`,
+		`</form>`
+	].join('');
+	const response = page(
+		T.passkeySetupTotpHeading,
+		body,
+		input.wrong ? 400 : 200,
+		{
+			language: input.language
+		}
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export function passkeySetupCreatePage(input: {
+	language: Language;
+	path: string;
+	service: string;
+	email: string;
+	token: string;
+	project?: string;
+	options: string;
+	script: string;
+	notice?: string;
+}): Response {
+	const T = ACCOUNT_TEXTS[input.language];
+	const errorText =
+		input.notice === 'exists'
+			? T.passkeyExists
+			: input.notice === 'no_uv'
+				? T.passkeyNoUserVerification
+				: input.notice === 'expired'
+					? T.passkeyTooLong
+					: input.notice === 'failed'
+						? T.passkeyAddFailed
+						: undefined;
+	const fields: Record<string, string> = {
+		action: 'create',
+		token: input.token,
+		credential: '',
+		...(input.project ? { project: input.project } : {})
+	};
+	const body = [
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.passkeySetupTitle)}</h1>`,
+		`<p style="overflow-wrap:anywhere;">${html(T.passkeySetupIntro, { service: input.service, email: input.email })}</p>`,
+		errorText
+			? `<p role="alert" style="${SETUP_ERROR}">${esc(errorText)}</p>`
+			: '',
+		`<form method="post" action="${esc(input.path)}" data-passkey-add data-options="${esc(input.options)}" data-text-exists="${esc(T.passkeyExists)}" data-text-failed="${esc(T.passkeyAddFailed)}" data-text-no-uv="${esc(T.passkeyNoUserVerification)}" style="margin-top:12px;">`,
+		hidden(fields),
+		`<button type="button" disabled style="${PRIMARY}">${esc(T.passkeySetupButton)}</button>`,
+		`<p data-passkey-status role="status" style="${MUTED}">${esc(T.passkeyNeedsScript)}</p>`,
+		`</form>`,
+		`<script src="${esc(input.script)}"></script>`
+	].join('');
+	const response = page(T.passkeySetupTitle, body, errorText ? 400 : 200, {
+		language: input.language
+	});
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
+export function passkeySetupDonePage(input: {
+	language: Language;
+	service: string;
+	email: string;
+	isAdmin: boolean;
+	href: string;
+}): Response {
+	const T = ACCOUNT_TEXTS[input.language];
+	const body = [
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(T.passkeySetupDoneTitle)}</h1>`,
+		`<p style="overflow-wrap:anywhere;">${html(T.passkeySetupDone, { service: input.service, email: input.email })}</p>`,
+		`<p><a href="${esc(input.href)}" style="${LINK}">${esc(input.isAdmin ? T.passkeySetupConsole : T.backToAccount)}</a></p>`
+	].join('');
+	const response = page(T.passkeySetupDoneTitle, body, 200, {
+		language: input.language
+	});
 	response.headers.set('cache-control', 'no-store');
 	return response;
 }

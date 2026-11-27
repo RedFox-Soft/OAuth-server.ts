@@ -41,11 +41,26 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   (`admin_passkey_list`, `admin_passkey_revoke`, `admin_passkey_revoke_all`), and a super administrator who signed in
   with a passkey can enable **Require a passkey to sign in to the console** (`consolePasskeyRequired`, with named
   preview, immediate enforcement on live console sessions and `/mcp` tokens, strict refusal page with no passkey
-  creation, and console reachability protection across all lockout paths).
-  **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then
-  `db:migrate` (four migrations: the passkeys fence, naming `phishing_resistant` in a stored `acrValues`, the
-  `2026-11-26-passkey-api-proxy-fence` fence, and the `2026-11-27-admin-passkeys-fence` fence; the server refuses to
-  start until all have run).
+  creation, and console reachability protection across all lockout paths). **Passwordless passkeys, recovery,
+  enrollment links and adoption** (spec 145): projects (including **Administrators** when a passkey-signed-in super
+  administrator confirms with mail configured) can now turn off **Password sign-in** with **Passkeys** on and no IdP
+  after a named preview of affected accounts; visitors register directly with a passkey after proving mailbox ownership
+  (honouring `verificationMethod` `link` or `code`, with identical non-enumerating screens for taken addresses).
+  Non-admin projects can opt in to self-service **Passkey recovery** (`passkeyRecovery`, off by default, browser-bound
+  10-minute email link, mandatory TOTP gate whenever enrolled, no auto-sign-in, and a 72-hour `multi_factor` ACR cap
+  lifted early by signing in with another full passkey), enable the **Ask everyone to create a passkey** adoption
+  campaign (`passkeyRequired`, up to 3 skips in 14 days on passkey-capable devices, free continue on unsupported
+  devices, Sign-in tab progress counts), or opt in to **Passkeys for provider-only users** (`passkeyForFederated`,
+  off by default, mutually exclusive with SCIM). Operators and super administrators can email 24-hour single-use
+  passkey setup links (`/account/passkey-setup`, `204` email-only with zero token leakage, 7-day email-change
+  cooldown, mandatory TOTP gate when enrolled, and `high`-consequence MCP tools `project_user_passkey_link_send` and
+  `admin_passkey_link_send`). Unlinked federated sign-ins in passwordless projects matching an existing passkey holder
+  now require passkey confirmation before linking.
+  **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the new storage areas (including `PasskeyRegistrationChallenge`,
+  `PasskeyRecoveryChallenge`, `PasskeyAdminLink`, and `PasskeyLinkThrottle`) and indexes, then `db:migrate` (five
+  migrations: the passkeys fence, naming `phishing_resistant` in a stored `acrValues`, the
+  `2026-11-26-passkey-api-proxy-fence` fence, the `2026-11-27-admin-passkeys-fence` fence, and the
+  `2026-11-27-passwordless-passkeys-fence` fence; the server refuses to start until all have run).
 
 ### Fixed
 

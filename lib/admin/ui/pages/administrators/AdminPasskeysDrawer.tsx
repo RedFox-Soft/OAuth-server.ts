@@ -173,6 +173,31 @@ function AdminPasskeysBody({
 		}
 	}
 
+	async function onSendLink() {
+		const yes = await confirm('admin.passkey.linkSend', {
+			target: target.email,
+			consequences: [
+				`A 24-hour single-use setup link is emailed to ${target.email}.`,
+				'The link is delivered by email only and is never shown here.'
+			]
+		});
+		if (!yes) return;
+		setBusy(true);
+		try {
+			const res = await request(
+				'POST',
+				`/admin/api/admins/${encodeURIComponent(target.id)}/passkey-link`
+			);
+			if (!res.ok) {
+				feedback.refused(res);
+				return;
+			}
+			feedback.done(`Passkey setup link sent to ${target.email}.`);
+		} finally {
+			setBusy(false);
+		}
+	}
+
 	if (error !== null) {
 		return (
 			<LoadFailed
@@ -198,15 +223,27 @@ function AdminPasskeysBody({
 					title="Manage your own passkeys from your email menu in the top-right header."
 				/>
 			)}
-			{!self && data.passkeys.length > 0 && (
-				<Flex justify="end">
+			{!self && (
+				<Flex
+					justify="end"
+					gap={8}
+					wrap
+				>
 					<Button
-						danger
 						loading={busy}
-						onClick={() => void onRevokeAll()}
+						onClick={() => void onSendLink()}
 					>
-						Revoke all
+						Send passkey setup link…
 					</Button>
+					{data.passkeys.length > 0 && (
+						<Button
+							danger
+							loading={busy}
+							onClick={() => void onRevokeAll()}
+						>
+							Revoke all
+						</Button>
+					)}
 				</Flex>
 			)}
 			{data.passkeys.length === 0 ? (

@@ -132,14 +132,22 @@ export async function loginServer(
 		listRefusal?: { line: string; disputeUrl: string | null };
 		/* The passkey offer of this render (specs/139), with the challenge it was written with. */
 		passkey?: PasskeyOnPage;
+		/* Self-service passkey recovery enabled on this non-admin project (specs/145 Q1=A). */
+		passkeyRecovery?: boolean;
 		/* The passkey door's own answer when it is not the error re-render's 400: its per-caller refusal is a 429. */
 		status?: number;
 		/* A refused passkey the browser may forget (specs/141 research R10). */
 		unknownPasskey?: { rpId: string; credentialId: string };
 	} = {}
 ) {
-	const { errorMessage, switcher, listRefusal, passkey, unknownPasskey } =
-		options;
+	const {
+		errorMessage,
+		switcher,
+		listRefusal,
+		passkey,
+		passkeyRecovery = false,
+		unknownPasskey
+	} = options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 	// Exclusivity is a property of this function rather than a promise made at each call site: a rejected
@@ -178,6 +186,7 @@ export async function loginServer(
 			face,
 			...(listRefusal ? { listRefusal } : {}),
 			...(passkey ? { passkey } : {}),
+			...(passkeyRecovery ? { passkeyRecovery } : {}),
 			...(unknownPasskey ? { unknownPasskey } : {})
 		},
 		<LoginPage
@@ -195,6 +204,7 @@ export async function loginServer(
 			face={face}
 			listRefusal={listRefusal}
 			passkey={passkey}
+			passkeyRecovery={passkeyRecovery}
 			unknownPasskey={unknownPasskey}
 		/>,
 		language,
@@ -213,6 +223,7 @@ export async function registrationServer(
 	options: {
 		errorMessage?: string;
 		email?: string;
+		passkeyRegistration?: boolean;
 		handOffTo?: string;
 		language?: Language;
 		switcher?: SwitcherProps;
@@ -220,7 +231,12 @@ export async function registrationServer(
 		face?: SignInFace;
 	} = {}
 ) {
-	const { errorMessage, email, switcher } = options;
+	const {
+		errorMessage,
+		email,
+		passkeyRegistration = false,
+		switcher
+	} = options;
 	const language = options.language ?? 'en';
 	const face = faceOr(options.face);
 
@@ -232,11 +248,20 @@ export async function registrationServer(
 	const html = hydratedPage(
 		await htmlTeamplate.text(),
 		SIGN_IN_TEXTS[language].titles.registration,
-		{ uid, errorMessage, email, logoSrc, switcher, face },
+		{
+			uid,
+			errorMessage,
+			email,
+			passkeyRegistration,
+			logoSrc,
+			switcher,
+			face
+		},
 		<RegistrationPage
 			uid={uid}
 			errorMessage={errorMessage}
 			email={email}
+			passkeyRegistration={passkeyRegistration}
 			logoSrc={logoSrc}
 			switcher={switcher}
 			face={face}

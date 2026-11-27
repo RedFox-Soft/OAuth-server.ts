@@ -2127,6 +2127,28 @@ const adminPasskeysFence: Migration = {
 	}
 };
 
+/*
+ * Fence migration for spec 145 (passwordless passkeys, recovery cooldowns, adoption campaign, and email-change
+ * timestamps): writes nothing, records its id in schemaMigrations so any older release that does not know
+ * `UserBucket.passkeyRecovery`, `UserBucket.passkeyRequired`, `UserBucket.passkeyForFederated`,
+ * `Passkey.recoveredUntil`, `User.passkeyPrompt`, or `User.emailChangedAt` refuses to start against a migrated
+ * database instead of silently ignoring recovery ACR caps or email-change guards.
+ */
+const passwordlessPasskeysFence: Migration = {
+	id: '2026-11-27-passwordless-passkeys-fence',
+	description:
+		'Mark the database as holding passwordless passkey policy, recovery cooldowns, campaign progress, and email-change timestamps, so an older release refuses to start against it',
+	reversible: false,
+	rerunnable:
+		'Writes nothing beyond recording this migration id; a second application is a no-op.',
+	mongodb: {
+		async apply() {}
+	},
+	postgres: {
+		async apply() {}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -2154,5 +2176,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	passkeysFence,
 	acrPhishingResistant,
 	passkeyApiProxyFence,
-	adminPasskeysFence
+	adminPasskeysFence,
+	passwordlessPasskeysFence
 ];

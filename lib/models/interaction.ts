@@ -30,7 +30,9 @@ const PendingPrompt = t.Object({
 			api: t.Optional(t.String()),
 			apiMaxAge: t.Optional(t.Number()),
 			/* The passkey offer (specs/141): whether the passkey it makes is full at once or conditional. */
-			kind: t.Optional(t.Union([t.Literal('full'), t.Literal('conditional')]))
+			kind: t.Optional(t.Union([t.Literal('full'), t.Literal('conditional')])),
+			/* Campaign mode under `passkeyRequired` vs. voluntary post-sign-in offer (specs/145). */
+			mode: t.Optional(t.Union([t.Literal('offer'), t.Literal('campaign')]))
 		},
 		{ additionalProperties: true }
 	)
@@ -163,6 +165,41 @@ export const InteractionPayload = t.Object({
 	passkeyChallenge: t.Optional(
 		t.Object({
 			value: t.String(),
+			exp: t.Number()
+		})
+	),
+	/*
+	 * Pre-account passkey registration in flight on this interaction (specs/145 Q2=A, S4): holds the challenge id,
+	 * submitted email, verification method, and once proved, the WebAuthn creation parameters.
+	 */
+	passkeyRegistration: t.Optional(
+		t.Object({
+			id: t.String(),
+			email: t.String(),
+			method: t.Union([t.Literal('link'), t.Literal('code')]),
+			verified: t.Boolean(),
+			userId: t.Optional(t.String()),
+			challenge: t.Optional(t.String()),
+			rpId: t.Optional(t.String()),
+			origin: t.Optional(t.String()),
+			exp: t.Number()
+		})
+	),
+	/*
+	 * Self-service passkey recovery in flight on this interaction (specs/145 S3): holds the challenge id, account id,
+	 * whether an enrolled authenticator code was verified, and the WebAuthn creation parameters.
+	 */
+	passkeyRecovery: t.Optional(
+		t.Object({
+			id: t.String(),
+			accountId: t.String(),
+			email: t.Optional(t.String()),
+			totpVerified: t.Optional(t.Boolean()),
+			totpAttempts: t.Optional(t.Number()),
+			userId: t.Optional(t.String()),
+			challenge: t.Optional(t.String()),
+			rpId: t.Optional(t.String()),
+			origin: t.Optional(t.String()),
 			exp: t.Number()
 		})
 	),

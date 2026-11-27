@@ -4,7 +4,13 @@ import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import epochTime from '../helpers/epoch_time.js';
 import { mailDeliveryConfigured } from '../mail/mailer.js';
 import { passkeysAccepted } from './accepted.js';
-import { OFFER_PAUSE_SECONDS, PASSKEYS_PER_PERSON } from './consts.js';
+import {
+	CAMPAIGN_MAX_SKIPS,
+	CAMPAIGN_WINDOW_SECONDS,
+	OFFER_PAUSE_SECONDS,
+	PASSKEYS_PER_PERSON
+} from './consts.js';
+import { relyingPartyOf } from './relying_party.js';
 
 /*
  * The prompt-time half of the passkey offer (specs/141 research R3, R4), apart from lib/passkeys/offer.ts so the
@@ -75,4 +81,66 @@ export async function mayCreateAfterSignIn(
 		(await getPasskeyStore().countOf(bucket._id, user._id)) <
 		PASSKEYS_PER_PERSON
 	);
+}
+
+export interface CampaignSkipState {
+	canSkip: boolean;
+	skipsUsed: number;
+	skipsLeft: number;
+	maxSkips: number;
+}
+
+/*
+ * Computes remaining skips for a user in the `passkeyRequired` campaign (specs/145): up to 3 skips within 14 days of
+ * first presentation. Once either bound is reached, skipping is no longer allowed on passkey-capable devices.
+ */
+export function campaignSkipState(
+	user: Pick<User, 'passkeyPrompt'>,
+	nowSeconds: number = epochTime()
+): CampaignSkipState {
+	const prompt = user.passkeyPrompt;
+	if (!prompt) {
+		return {
+			canSkip: true,
+			skipsUsed: 0,
+			skipsLeft: CAMPAIGN_MAX_SKIPS,
+			maxSkips: CAMPAIGN_MAX_SKIPS
+		};
+	}
+	const firstShownSeconds = Math.floor(
+		new Date(prompt.firstShownAt).getTime() / 1000
+	);
+	const withinWindow = nowSeconds - firstShownSeconds < CAMPAIGN_WINDOW_SECONDS;
+	const skipsUsed = prompt.skips;
+	const skipsLeft = withinWindow
+		? Math.max(0, CAMPAIGN_MAX_SKIPS - skipsUsed)
+		: 0;
+	return {
+		canSkip: withinWindow && skipsLeft > 0,
+		skipsUsed,
+		skipsLeft,
+		maxSkips: CAMPAIGN_MAX_SKIPS
+	};
+}
+
+/*
+ * Whether the project-wide "Ask everyone to create a passkey" campaign should prompt this user after a password
+ * sign-in (specs/145): non-admin, passkeys and `passkeyRequired` both on, mail configured, not held back by
+ * "This wasn't me", and the user holds zero working passkeys for the project's current RP ID.
+ */
+export async function campaignDue(
+	bucket: UserBucket,
+	user: User
+): Promise<boolean> {
+	if (bucket._id === ADMIN_BUCKET_ID) return false;
+	if (!passkeysAccepted(bucket) || bucket.passkeyRequired !== true)
+		return false;
+	if (user.passkeyOffer?.held === true) return false;
+	if (!(await mailDeliveryConfigured())) return false;
+	const rpId = relyingPartyOf(bucket).rpId;
+	const held = await getPasskeyStore().listOf(bucket._id, user._id);
+	const hasWorking = held.some(
+		(passkey) => passkey.copiedAt === undefined && passkey.rpId === rpId
+	);
+	return !hasWorking && held.length < PASSKEYS_PER_PERSON;
 }

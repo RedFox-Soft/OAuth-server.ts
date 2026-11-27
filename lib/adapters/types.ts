@@ -192,7 +192,24 @@ export const User = t.Object({
 			never: t.Optional(t.Literal(true)),
 			held: t.Optional(t.Literal(true))
 		})
-	)
+	),
+	/*
+	 * Progress in the project-wide "Ask everyone to create a passkey" campaign (specs/145): when first prompted and how
+	 * many skips have been used within the 14-day window (max 3). Written only by `lib/end_users/passkey_offer.ts`;
+	 * stripped from administrative reads by `presentUser`.
+	 */
+	passkeyPrompt: t.Optional(
+		t.Object({
+			firstShownAt: t.Date(),
+			skips: t.Integer({ minimum: 0 })
+		})
+	),
+	/*
+	 * When this account's login email address was last changed (specs/145): blocks administrator-sent passkey enrollment
+	 * links for seven days after a change so an email swap and passkey enrollment cannot happen in the same window.
+	 * Stripped from administrative reads by `presentUser`.
+	 */
+	emailChangedAt: t.Optional(t.Date())
 });
 export type User = Static<typeof User>;
 
@@ -291,6 +308,8 @@ export type EndUserCreateFields = Partial<
 		/* A directory may create a user already deactivated (RFC 7643 `active: false`). */
 		| 'active'
 		| 'passwordSet'
+		/* Written atomically at passkey-only registration so the handle matches the stored passkey (specs/145). */
+		| 'webauthnUserId'
 	>
 >;
 
@@ -320,6 +339,10 @@ export type EndUserPatch = Partial<
 		| 'webauthnUserId'
 		/* Only `lib/end_users/passkey_offer.ts` writes it: the passkey offer's showings and the person's answers (specs/141). */
 		| 'passkeyOffer'
+		/* Only `lib/end_users/passkey_offer.ts` writes it: campaign first-shown timestamp and skip count (specs/145). */
+		| 'passkeyPrompt'
+		/* Recorded whenever the account's email address changes (specs/145). */
+		| 'emailChangedAt'
 	>
 >;
 
@@ -2799,13 +2822,19 @@ export const Passkey = t.Object({
 	createdAt: t.Date(),
 	/*
 	 * The proof the add was made under (FR-026). `password` is the offer after a sign-in with a password alone
-	 * (specs/141), and only such a passkey is ever `conditional`.
+	 * (specs/141), and only such a passkey is ever `conditional`. Spec 145 adds passkey sign-up (`registration`),
+	 * self-service email recovery (`recovery`), administrator setup links (`admin_link`), and opt-in provider-only
+	 * enrollment (`federated_mail`).
 	 */
 	createdVia: t.Union([
 		t.Literal('passkey'),
 		t.Literal('password_code'),
 		t.Literal('password_mail'),
-		t.Literal('password')
+		t.Literal('password'),
+		t.Literal('registration'),
+		t.Literal('recovery'),
+		t.Literal('admin_link'),
+		t.Literal('federated_mail')
 	]),
 	/* The browser and system it was made on, from closed sets: the default name, and what a mail says. */
 	createdOn: t.Object({ browser: ActivityBrowser, system: ActivitySystem }),
@@ -2835,7 +2864,13 @@ export const Passkey = t.Object({
 	 */
 	confirm: t.Optional(
 		t.Object({ digest: t.String(), exp: t.Number(), holder: t.String() })
-	)
+	),
+	/*
+	 * Set to `createdAt + 72h` when created via self-service email recovery (specs/145 Q1=A): while in the future,
+	 * signing in with this passkey caps reached ACR at `multi_factor` (never `phishing_resistant`). Cleared early if the
+	 * person signs in with another full passkey.
+	 */
+	recoveredUntil: t.Optional(t.Date())
 });
 export type Passkey = Static<typeof Passkey>;
 
@@ -2907,6 +2942,11 @@ export interface PasskeyStoreInstance {
 	 * whether it did, so of two racing confirmations exactly one is told it did (specs/141).
 	 */
 	confirm(bucketId: string, id: string): Promise<boolean>;
+	/*
+	 * Lifts the 72-hour recovery ACR cooldown (`recoveredUntil`) from every recovered passkey of `(bucketId, accountId)`
+	 * once the person signs in with another full passkey (specs/145 Q1=A). Returns how many passkeys were updated.
+	 */
+	clearRecoveryCaps(bucketId: string, accountId: string): Promise<number>;
 	/*
 	 * Whether any project holds a passkey with this credential id made for this RP ID. The one read of this area across
 	 * projects, and asked only to decide whether a browser may be told a passkey is unknown (specs/141 research R10).
@@ -3334,6 +3374,21 @@ export const UserBucket = t.Object({
 	 * (specs/144). Valid only on the administrators' project; absent means off.
 	 */
 	consolePasskeyRequired: t.Optional(t.Boolean()),
+	/*
+	 * Whether people may recover a lost passkey via a browser-bound 10-minute email link (specs/145 Q1=A).
+	 * Absent means off; never valid on the administrators' project.
+	 */
+	passkeyRecovery: t.Optional(t.Boolean()),
+	/*
+	 * Whether password users without a working passkey are prompted to create one on sign-in with up to 3 skips
+	 * within 14 days (specs/145). Absent means off; never valid on the administrators' project.
+	 */
+	passkeyRequired: t.Optional(t.Boolean()),
+	/*
+	 * Opt-in passkey creation on `/account/security` for identity-provider-only users (specs/145 B3).
+	 * Absent means off; refused on the administrators' project and on any project with SCIM provisioning.
+	 */
+	passkeyForFederated: t.Optional(t.Boolean()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -3428,6 +3483,9 @@ export interface UserBucketStoreInstance {
 				| 'passkeyLogin'
 				| 'passkeyOffer'
 				| 'consolePasskeyRequired'
+				| 'passkeyRecovery'
+				| 'passkeyRequired'
+				| 'passkeyForFederated'
 			>
 		>
 	): Promise<UserBucket | null>;

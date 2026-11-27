@@ -131,6 +131,12 @@ export const provisioningRoutes = new Elysia({ name: 'admin-provisioning' })
 		async ({ admin, params, body, set }) => {
 			const ctx = assertAuth(admin);
 			const bucket = await loadBucketForEdit(ctx, params.id);
+			if (bucket.passkeyForFederated === true) {
+				throw new AdminError(
+					409,
+					'Turn off passkeys for identity-provider users before adding a SCIM provisioning connection.'
+				);
+			}
 			const created = await asAdmin(
 				createConnection(bucket, body, async (connectionId) => {
 					/*

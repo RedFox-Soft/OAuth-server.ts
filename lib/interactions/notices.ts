@@ -32,6 +32,8 @@ export const NOTICE_FEDERATION_ABORTED = 'federation_aborted';
  * linked once this interaction's sign-in completes as that account, so the page asks for exactly that.
  */
 export const NOTICE_FEDERATION_LINK = 'federation_link';
+/* Same as above when password sign-in is off and the existing account holds a working passkey (specs/145 S10). */
+export const NOTICE_FEDERATION_LINK_PASSKEY = 'federation_link_passkey';
 
 /*
  * The answers to "send the link again" (`POST /ui/:uid/verification/resend`). That route redirects here
@@ -58,6 +60,7 @@ const NOTICES: Record<string, keyof SignInTexts['notices']> = {
 	[NOTICE_VERIFY_RECENT]: 'verifyRecent',
 	[NOTICE_VERIFY_UNSENT]: 'verifyUnsent',
 	[NOTICE_FEDERATION_LINK]: 'federationLink',
+	[NOTICE_FEDERATION_LINK_PASSKEY]: 'federationLinkPasskey',
 	[NOTICE_MAIL_LIMITED]: 'mailLimited',
 	[NOTICE_PASSKEY]: 'passkey'
 };

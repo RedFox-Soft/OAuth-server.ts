@@ -61,6 +61,7 @@ import { federationBackChannelLogout } from './upstream_signals/back_channel_log
 import { accountPageRoutes } from './account_page/routes.js';
 import { accountServicesRoutes } from './account_page/services_routes.js';
 import { accountSecurityRoutes } from './account_page/security_routes.js';
+import { passkeySetupRoutes } from './account_page/passkey_setup_routes.js';
 import { accountNotMeRoutes } from './account_page/not_me_routes.js';
 import { accountSignInsRoutes } from './account_page/sign_ins_routes.js';
 import { accountLinkRoutes } from './account_page/link_routes.js';
@@ -284,6 +285,11 @@ elysia.group('/:bucket', (bucketScoped) =>
 elysia.use(accountSecurityRoutes);
 elysia.group('/:bucket', (bucketScoped) =>
 	bucketScoped.use(accountSecurityRoutes)
+);
+// Standalone administrator-sent passkey setup links (specs/145 S14), bare and beneath a bucket's segment.
+elysia.use(passkeySetupRoutes);
+elysia.group('/:bucket', (bucketScoped) =>
+	bucketScoped.use(passkeySetupRoutes)
 );
 // The person's own recent sign-ins and "Sign out everywhere" (specs/135), the same way.
 elysia.use(accountSignInsRoutes);

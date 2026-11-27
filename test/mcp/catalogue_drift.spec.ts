@@ -189,6 +189,8 @@ describe('MCP tool catalogue', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
+			/* Sends a 24-hour single-use passkey enrollment link by email only (specs/145). */
+			'admin_passkey_link_send',
 			/* Takes away a colleague's passkey and signs them out everywhere (specs/144). */
 			'admin_passkey_revoke',
 			'admin_passkey_revoke_all',
@@ -244,6 +246,8 @@ describe('MCP tool catalogue', () => {
 			'project_user_delete',
 			/* Hands the account's recovery to whoever holds the new mailbox. */
 			'project_user_email_change',
+			/* Sends a 24-hour single-use passkey enrollment link by email only (specs/145). */
+			'project_user_passkey_link_send',
 			/* Takes away a way in the person relies on, and signs them out everywhere (specs/140). */
 			'project_user_passkey_revoke',
 			'project_user_passkey_revoke_all',

@@ -48,6 +48,7 @@ export const en = {
 		 * off; the line after the person closed the browser's prompt without choosing one.
 		 */
 		passkey: 'Sign in with a passkey',
+		forgotPasskey: 'Forgot your passkey?',
 		passkeyNoScript: 'Signing in with a passkey needs JavaScript.',
 		passkeyCancelled: 'No passkey on this device? Sign in another way below.',
 		/*
@@ -118,6 +119,8 @@ export const en = {
 			'We could not send the verification message. Try again later.',
 		federationLink:
 			'An account with this email address already exists here. Sign in with its password once to link it to your identity provider.',
+		federationLinkPasskey:
+			'An account with this email address already exists with a passkey. Sign in with your passkey to link it to your identity provider.',
 		mailLimited:
 			'Too many emails were requested from your network in the last hour. Please try again later.',
 		/* An app behind a proxy that asks for a recent sign-in (specs/124 FR-022). */
@@ -213,7 +216,77 @@ export const en = {
 		createdConditional:
 			'We sent an email to {email}. Open it in this browser and choose “Yes, this was me” to finish setting it up.',
 		continueApp: 'Continue to {app}',
-		continueAny: 'Continue'
+		continueAny: 'Continue',
+		/* Campaign mode under `passkeyRequired` (specs/145). */
+		campaignHeading: 'Create a passkey for {service}',
+		campaignExplain:
+			'{service} asks everyone to set up a passkey for {email}. Your password keeps working until passwords are turned off.',
+		campaignSkip: 'Skip for now ({left} of {total} left)',
+		campaignMandatory:
+			'You have used your skips. Create a passkey now to continue.',
+		campaignUnsupported:
+			'This device can’t create a passkey. Next time, sign in from your phone or another device that supports passkeys.',
+		campaignContinueThisTime: 'Continue this time',
+		campaignUnverified:
+			'Verify your email address ({email}) before creating a passkey.'
+	},
+
+	passkeyRegister: {
+		title: 'Create account with a passkey',
+		heading: 'Create your {service} account with a passkey',
+		withPasskey: 'Create account with a passkey',
+		passwordInstead: 'Set a password instead',
+		emailLabel: 'Email address',
+		continueButton: 'Continue with a passkey',
+		sentHeading: 'Check your email',
+		sentLink:
+			'We sent a sign-up link to {email}. Open it in this browser within 10 minutes to create your passkey.',
+		sentCode:
+			'We sent a 6-digit code to {email}. Enter it below within 10 minutes to create your passkey.',
+		codeLabel: '6-digit code',
+		codeVerify: 'Continue',
+		codeInvalid: 'That code is not valid. Check the email and try again.',
+		codeTooMany: 'Too many wrong codes. Start registration again.',
+		createHeading: 'Create your passkey',
+		createHint:
+			'Your email ({email}) is confirmed. Save a passkey on this device or in your password manager to finish creating your account.',
+		createButton: 'Create passkey',
+		unsupported:
+			'This device can’t create a passkey. Open this page on your phone or another device that supports passkeys.',
+		unavailable:
+			'Passkey registration is temporarily unavailable because email delivery is not configured.',
+		duplicate:
+			'This email address is already registered. Return to sign-in to access your account.',
+		invalidLink:
+			'This sign-up link is no longer valid. Start registration again in this browser.',
+		backToSignIn: 'Back to sign in'
+	},
+
+	passkeyRecovery: {
+		title: 'Recover your passkey',
+		heading: 'Forgot your passkey?',
+		intro:
+			'Enter your email address. If your account is eligible, we will send a recovery link that works in this browser for 10 minutes.',
+		submit: 'Send recovery link',
+		sentHeading: 'Check your email',
+		sentHint:
+			'If an eligible account exists for {email}, we sent a recovery link. Open it in this browser within 10 minutes.',
+		invalidLink:
+			'This recovery link is no longer valid. Request a new link in this browser.',
+		totpHeading: 'Confirm with your authenticator app',
+		totpHint:
+			'Enter the 6-digit code from your authenticator app before adding a new passkey.',
+		totpLost:
+			'Lost both your passkey and your authenticator app? Contact an administrator for help.',
+		totpButton: 'Continue',
+		createHeading: 'Add a new passkey',
+		createHint:
+			'Create a new passkey for {email}. Your existing passkeys stay on your account.',
+		createButton: 'Create new passkey',
+		doneHeading: 'Your new passkey is ready',
+		doneHint:
+			'Your new passkey has been added. For security, sign in with your passkey to continue.',
+		signInButton: 'Sign in with your passkey'
 	},
 
 	/*

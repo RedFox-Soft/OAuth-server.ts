@@ -218,6 +218,13 @@ export const statedRightRoutes: readonly StatedRightRoute[] = [
 		method: 'DELETE',
 		path: `${BUCKET}/users/:uid/passkeys`
 	},
+	/* Administrator-sent passkey setup link (specs/145): the people right, as revoking passkeys is. */
+	{
+		on: 'bucket',
+		flag: 'manageUsers',
+		method: 'POST',
+		path: `${BUCKET}/users/:uid/passkey-link`
+	},
 	{
 		on: 'bucket',
 		flag: 'manageUsers',

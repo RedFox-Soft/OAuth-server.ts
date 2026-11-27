@@ -24,7 +24,12 @@ import {
 import { canSignIn } from '../../end_users/can_sign_in.js';
 import { meets } from '../../helpers/acr_satisfaction.ts';
 import { passkeyWorks } from '../../passkeys/account.js';
+import {
+	checkAdminPasskeyLinkEligibility,
+	issueAdminPasskeyLink
+} from '../../passkeys/admin_link.js';
 import { notifyPasskey } from '../../passkeys/notify.js';
+import { mailDeliveryConfigured } from '../../mail/mailer.js';
 import { rpIdFor } from '../../passkeys/relying_party.js';
 import { passkeysOfPerson } from '../../passkeys/ways_in.js';
 import { signOutAdministrator } from './sign_out.js';
@@ -201,6 +206,7 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			passwordLogin: state.passwordLogin,
 			passkeyLogin: state.passkeyLogin,
 			consolePasskeyRequired: state.consolePasskeyRequired,
+			mailDeliveryConfigured: await mailDeliveryConfigured(),
 			signedInWith: ctx.signedInWith,
 			signedInWithPasskey: meets(ctx.signInAcr, 'phishing_resistant'),
 			callerHasPasskey: holderSet.has(ctx.userId),
@@ -268,8 +274,10 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			try {
 				updated = await store().update(
 					params.id,
-					// A new address is unproven, whoever typed it.
-					body.email !== undefined ? { ...body, verified: false } : body
+					// A new address is unproven, whoever typed it, and starts the 7-day passkey-link cooldown (specs/145).
+					body.email !== undefined
+						? { ...body, verified: false, emailChangedAt: new Date() }
+						: body
 				);
 			} catch (err) {
 				if (err instanceof DuplicateEndUserError) {
@@ -478,6 +486,40 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 			count: revoked
 		});
 		return { revoked, sessions, mailed };
+	})
+	/*
+	 * Send a 24-hour single-use passkey setup link to another administrator (specs/145 US3, S14): super-admin only,
+	 * never self, mailed ONLY (204 No Content — never returned in API/MCP or written to the audit trail).
+	 */
+	.post('/admin/api/admins/:id/passkey-link', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const target = await recoveryTarget(
+			ctx.userId,
+			params.id,
+			'you cannot send a passkey setup link to yourself — add a passkey from your account menu, or ask another super administrator'
+		);
+		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+		if (!bucket)
+			throw new AdminError(500, "the administrators' project is missing");
+		const eligible = await checkAdminPasskeyLinkEligibility(bucket, target);
+		if (!eligible.ok) {
+			throw new AdminError(eligible.status, eligible.message, {
+				...(eligible.retryAfter !== undefined
+					? { retryAfter: eligible.retryAfter }
+					: {}),
+				...(eligible.code === 'email_changed_recently' ||
+				eligible.code === 'passkeys_not_accepted'
+					? { code: eligible.code }
+					: {})
+			});
+		}
+		await recordAdminAudit(ctx, 'admin.passkey.link.send', target._id);
+		const issued = await issueAdminPasskeyLink(bucket, target, ctx.userId);
+		if (!issued.ok) {
+			throw new AdminError(502, 'Could not deliver the passkey setup email.');
+		}
+		return new Response(null, { status: 204 });
 	})
 	/*
 	 * Every administrator's sign-ins on one page (specs/137), for the super administrator who does not yet know whose

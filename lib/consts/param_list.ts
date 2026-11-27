@@ -215,6 +215,8 @@ export const routeNames = {
 	account_passkey_disown: '/account/security/passkey-disown',
 	/* "Yes, this was me" from the mail about a conditional passkey (specs/141). */
 	account_passkey_confirm: '/account/security/passkey-confirm',
+	/* Standalone administrator-sent passkey enrollment link page (specs/145 S14). */
+	account_passkey_setup: '/account/passkey-setup',
 	/* The person's own recent sign-ins, and the one act beside them: signing out everywhere (specs/135). */
 	account_sign_ins: '/account/sign-ins',
 	/* "This wasn't me" about a sign-in from a new network or browser (specs/138), for people and administrators. */

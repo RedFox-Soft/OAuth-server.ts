@@ -202,6 +202,13 @@ describe('route classification', () => {
 			'POST /ui/:uid/totp/enroll',
 			// The passkey door (specs/139): verifies a signature.
 			'POST /ui/:uid/passkey',
+			// Pre-account passkey registration & self-service recovery (specs/145): unauthenticated mail/code/WebAuthn writes.
+			'POST /ui/:uid/registration/passkey',
+			'POST /ui/:uid/registration/passkey/code',
+			'POST /ui/:uid/registration/passkey/create',
+			'POST /ui/:uid/passkey-recovery',
+			'POST /ui/:uid/passkey-recovery/totp',
+			'POST /ui/:uid/passkey-recovery/create',
 			'POST /verify-email/code',
 			'POST /verify-email/resend',
 			'POST /reset-password',
@@ -211,6 +218,8 @@ describe('route classification', () => {
 			'POST /account/security/disown',
 			// "This wasn't me" about an added passkey (specs/139): removes passkeys and sweeps the account without a session.
 			'POST /account/security/passkey-disown',
+			// Standalone administrator-sent passkey enrollment link (specs/145): unauthenticated TOTP/WebAuthn write.
+			'POST /account/passkey-setup',
 			// Signing out everywhere from Recent sign-ins (specs/135): it sweeps the account and may mail a reset.
 			'POST /account/sign-ins',
 			// "This wasn't me" from an email about a new sign-in (specs/138): it sweeps the account without a session.

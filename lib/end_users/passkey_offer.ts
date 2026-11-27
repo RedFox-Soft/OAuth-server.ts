@@ -96,3 +96,36 @@ export async function conditionalPasskeysOf(
 	const held = await getPasskeyStore().listOf(bucketId, accountId);
 	return held.filter((passkey) => passkey.conditional === true).length;
 }
+
+/*
+ * Records the first showing of the "Ask everyone to create a passkey" campaign (specs/145): initializes `firstShownAt`
+ * once so the 14-day grace window is anchored to the first prompt and never slides forward on reloads.
+ */
+export async function noteCampaignShown(
+	bucketId: string,
+	accountId: string,
+	at: Date = new Date()
+): Promise<void> {
+	const user = await getUserStore(bucketId).find(accountId);
+	if (!user || user.passkeyPrompt !== undefined) return;
+	await getUserStore(bucketId).update(accountId, {
+		passkeyPrompt: { firstShownAt: at, skips: 0 }
+	});
+}
+
+/* Records one skip consumed on a passkey-capable device during the `passkeyRequired` campaign (specs/145). */
+export async function noteCampaignSkip(
+	bucketId: string,
+	accountId: string,
+	at: Date = new Date()
+): Promise<void> {
+	const user = await getUserStore(bucketId).find(accountId);
+	if (!user) return;
+	const current = user.passkeyPrompt ?? { firstShownAt: at, skips: 0 };
+	await getUserStore(bucketId).update(accountId, {
+		passkeyPrompt: {
+			firstShownAt: current.firstShownAt,
+			skips: current.skips + 1
+		}
+	});
+}

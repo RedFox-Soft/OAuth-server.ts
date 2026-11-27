@@ -120,8 +120,12 @@ export const MODEL_AREAS = [
 	'LoginThrottle',
 	'MailRequestTally',
 	'NotMeLink',
+	'PasskeyAdminLink',
 	'PasskeyAttemptTally',
 	'PasskeyCeremony',
+	'PasskeyLinkThrottle',
+	'PasskeyRecoveryChallenge',
+	'PasskeyRegistrationChallenge',
 	'PasswordGuessingTally',
 	'PasswordResetChallenge',
 	'PasswordResetThrottle',
@@ -564,6 +568,38 @@ export const STORAGE_INVENTORY: readonly StorageArea[] = [
 	 * point-read by id and expiring five minutes after its write.
 	 */
 	modelArea('PasskeyCeremony', EXPIRES_AT, byAccount),
+	/*
+	 * Pre-account passkey registration email challenges (specs/145 Q2=A, S4): keyed by digest or random id, expiring
+	 * after ten minutes. Unowned because no account exists until the passkey attestation succeeds.
+	 */
+	modelArea(
+		'PasskeyRegistrationChallenge',
+		EXPIRES_AT,
+		unowned(
+			'pre-account passkey registration challenge; no account exists yet; expires after ten minutes'
+		)
+	),
+	/*
+	 * Self-service passkey recovery links (specs/145 S3): browser-bound, keyed by digest, expiring after ten minutes.
+	 * Account-owned so deletion, lock, or deactivation invalidates any outstanding recovery link immediately.
+	 */
+	modelArea('PasskeyRecoveryChallenge', EXPIRES_AT, byAccount),
+	/*
+	 * Administrator-sent passkey enrollment links (specs/145 S14): any-browser, keyed by digest, expiring after
+	 * twenty-four hours. Account-owned so deletion, lock, deactivation, or sign-out everywhere ends them.
+	 */
+	modelArea('PasskeyAdminLink', EXPIRES_AT, byAccount),
+	/*
+	 * Rate-limit windows and latest-link pointers for passkey registration, recovery, and admin setup links (specs/145),
+	 * addressed by `${purpose}:${bucketId}:${emailOrAccountId}` so account deletion removes them by computed id.
+	 */
+	modelArea(
+		'PasskeyLinkThrottle',
+		EXPIRES_AT,
+		unowned(
+			'addressed by the computed id `${purpose}:${bucketId}:${emailOrAccountId}`, never swept; holds rate window and latest challenge pointer'
+		)
+	),
 	modelArea(
 		'PasswordGuessingTally',
 		EXPIRES_AT,

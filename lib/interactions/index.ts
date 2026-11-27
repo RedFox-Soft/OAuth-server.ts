@@ -178,6 +178,7 @@ import { isLoopbackRedirect } from 'lib/client_metadata_document/identifier.js';
 import {
 	NOTICE_FEDERATION_ABORTED,
 	NOTICE_FEDERATION_LINK,
+	NOTICE_FEDERATION_LINK_PASSKEY,
 	NOTICE_VERIFY,
 	NOTICE_VERIFY_RECENT,
 	NOTICE_VERIFY_RESENT,
@@ -271,14 +272,51 @@ import { passkeysAccepted } from '../passkeys/accepted.js';
 import { CREDENTIAL_FIELD_MAX } from '../passkeys/consts.js';
 import { completeOffer, prepareOffer } from '../passkeys/offer.js';
 import {
+	campaignDue,
+	campaignSkipState,
 	mayCreateAfterSignIn,
 	offerable,
 	type OfferKind
 } from '../passkeys/offerable.js';
-import { declineOffers, noteOfferShown } from '../end_users/service.js';
+import { isRecoveryCapped } from '../passkeys/recovery_cap.js';
+import {
+	completePasskeyRegistration,
+	loadRegistrationLink,
+	prepareRegistrationCeremony,
+	startPasskeyRegistration,
+	verifyRegistrationCode
+} from '../passkeys/registration.js';
+import {
+	completePasskeyRecovery,
+	loadRecoveryLink,
+	prepareRecoveryCeremony,
+	requestPasskeyRecovery,
+	selfServicePasskeyRecoveryAllowed
+} from '../passkeys/recovery.js';
+import {
+	declineOffers,
+	noteCampaignShown,
+	noteCampaignSkip,
+	noteOfferShown
+} from '../end_users/passkey_offer.js';
+import { recordEndUserAudit } from '../admin/audit/record.js';
+import { mailDeliveryConfigured } from '../mail/mailer.js';
 import { holderOfSession } from '../totp/self_service.js';
 import { relyingPartyOf } from '../passkeys/relying_party.js';
 import { admitMailRequest, mailLimitedResponse } from '../mail_limit/tally.js';
+import {
+	passkeyRecoveryCreatePage,
+	passkeyRecoveryDonePage,
+	passkeyRecoveryInvalidPage,
+	passkeyRecoveryRequestPage,
+	passkeyRecoverySentPage,
+	passkeyRecoveryTotpPage,
+	passkeyRegisterCodePage,
+	passkeyRegisterCreatePage,
+	passkeyRegisterEmailPage,
+	passkeyRegisterErrorPage,
+	passkeyRegisterSentPage
+} from './passkeyFlowsPages.js';
 
 /*
  * Returns an error that ended a resumed authorization request to the client that made it.
@@ -1290,20 +1328,20 @@ async function afterKnowledge(
 }
 
 /*
- * Whether a password sign-in may lead to the passkey offer (specs/141 research R3): the page found a device that can
- * make a passkey, the person asked to be remembered on it, and the sign-in is not the account page's own, which has its
- * own "Add a passkey". Whether it does is the policy's last prompt.
+ * Whether a password sign-in may lead to the passkey offer or campaign prompt (specs/141 research R3, specs/145 US4):
+ * under the `passkeyRequired` campaign every password sign-in (even on an unsupported device, so the person sees the
+ * unsupported-device message without burning a skip) reaches the prompt; under the voluntary offer only a remembered
+ * sign-in on a passkey-capable device does. Never on the account page's own sign-in, which has its own "Add a passkey".
  */
 function offersPasskey(
 	interaction: Interaction,
 	bucketId: string,
-	body: { remember?: string; passkeyDevice?: string }
+	body: { remember?: string; passkeyDevice?: string },
+	passkeyRequired = false
 ): boolean {
-	return (
-		body.passkeyDevice === '1' &&
-		body.remember === 'on' &&
-		clientIdOf(interaction) !== accountPageClientId(bucketId)
-	);
+	if (clientIdOf(interaction) === accountPageClientId(bucketId)) return false;
+	if (passkeyRequired) return true;
+	return body.passkeyDevice === '1' && body.remember === 'on';
 }
 
 async function accountGates(input: {
@@ -1417,6 +1455,7 @@ function proxyHostOf(interaction: Interaction): string | undefined {
 async function offerAt(interaction: Interaction): Promise<
 	| {
 			kind: OfferKind;
+			mode: 'offer' | 'campaign';
 			bucket: UserBucket;
 			user: User;
 			holder: string;
@@ -1425,6 +1464,7 @@ async function offerAt(interaction: Interaction): Promise<
 > {
 	const prompt = interaction.payload.prompt;
 	const kind = prompt?.details.kind;
+	const mode = prompt?.details.mode === 'campaign' ? 'campaign' : 'offer';
 	const session = interaction.payload.session;
 	if (
 		prompt?.name !== 'passkey-offer' ||
@@ -1443,7 +1483,7 @@ async function offerAt(interaction: Interaction): Promise<
 		? await getUserStore(bucketId).find(session.accountId)
 		: null;
 	if (!bucket || !user) return undefined;
-	return { kind, bucket, user, holder: holderOfSession(session.uid) };
+	return { kind, mode, bucket, user, holder: holderOfSession(session.uid) };
 }
 
 async function offerPage(
@@ -1472,13 +1512,28 @@ async function offerPage(
 			common
 		);
 	}
-	const options = await prepareOffer(
-		offer.bucket,
-		offer.user,
-		offer.holder,
-		offer.kind,
-		interaction.uid
-	);
+	const campaign =
+		offer.mode === 'campaign'
+			? (() => {
+					const skips = campaignSkipState(offer.user);
+					return {
+						canSkip: skips.canSkip,
+						skipsLeft: skips.skipsLeft,
+						maxSkips: skips.maxSkips,
+						...(offer.user.verified ? {} : { unverified: true })
+					};
+				})()
+			: undefined;
+	const options =
+		campaign?.unverified === true
+			? undefined
+			: await prepareOffer(
+					offer.bucket,
+					offer.user,
+					offer.holder,
+					offer.kind,
+					interaction.uid
+				);
 	return passkeyOfferServer(
 		{
 			uid: interaction.uid,
@@ -1486,7 +1541,8 @@ async function offerPage(
 			email: offer.user.email,
 			...(options ? { options } : {}),
 			silent: offer.kind === 'full',
-			askNever: shown.askNever === true,
+			askNever: offer.mode === 'offer' && shown.askNever === true,
+			...(campaign ? { campaign } : {}),
 			...(shown.refused ? { refused: shown.refused } : {})
 		},
 		{ ...common, ...(shown.refused ? { status: 400 } : {}) }
@@ -1574,7 +1630,11 @@ async function passkeyRefusalVariant(
 	const held = (await getPasskeyStore().listOf(bucket._id, user._id)).filter(
 		(passkey) => passkey.rpId === rpId && passkey.copiedAt === undefined
 	);
-	if (held.some((passkey) => passkey.conditional !== true)) {
+	if (
+		held.some(
+			(passkey) => passkey.conditional !== true && !isRecoveryCapped(passkey)
+		)
+	) {
 		return 'passkeySignIn';
 	}
 	if (held.length > 0) return 'passkeyConfirm';
@@ -2200,13 +2260,19 @@ export const ui = new Elysia()
 				refuse
 			});
 			if (gated) return gated;
+			const loginBucket = await getBucketStore().find(bucketId);
 			return afterKnowledge(interaction, {
 				user,
 				bucketId,
 				totpRequired: loginOptions.totpRequired,
 				remember: body.remember === 'on',
 				method: 'password',
-				offer: offersPasskey(interaction, bucketId, body),
+				offer: offersPasskey(
+					interaction,
+					bucketId,
+					body,
+					loginBucket?.passkeyRequired === true
+				),
 				cookie,
 				route,
 				request
@@ -2316,14 +2382,38 @@ export const ui = new Elysia()
 					request
 				});
 			}
+			const recoveryCapped = isRecoveryCapped(attempt.passkey);
 			interaction.payload.result = {
 				login: {
 					accountId: user._id,
 					transient: body.remember !== 'on',
 					amr: [...AMR_FOR_METHOD.passkey],
-					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.passkey]
+					acr: recoveryCapped
+						? configuration.acrMap.multi_factor
+						: configuration.acrMap[DISTINCTION_FOR_METHOD.passkey]
 				}
 			};
+			if (!recoveryCapped) {
+				/* Signing in with another full passkey confirms any recently recovered passkey early (specs/145 Q1=A). */
+				const lifted = await getPasskeyStore().clearRecoveryCaps(
+					signsInto,
+					user._id
+				);
+				if (lifted > 0) {
+					const bucket = await getBucketStore().find(signsInto);
+					if (bucket) {
+						await recordEndUserAudit(
+							bucket._id,
+							user._id,
+							'enduser.passkey.confirm',
+							{
+								targetScope: bucket._id,
+								ownerGroupId: bucket.ownerGroupId
+							}
+						);
+					}
+				}
+			}
 			await settlePendingLink(interaction.payload, signsInto);
 			return resume(interaction, cookie, { route, request });
 		},
@@ -2863,6 +2953,23 @@ export const ui = new Elysia()
 			if (!offer) return Response.redirect(buildUILoginPath(uid), 303);
 			/* A condition changed since the prompt: on to the app, as if the offer had never been due. */
 			const counted = interaction.payload.passkeyOfferCounted === true;
+			if (offer.mode === 'campaign') {
+				if (!(await campaignDue(offer.bucket, offer.user))) {
+					interaction.payload.result = { passkeyOffer: 'skipped' };
+					return resume(interaction, cookie, { route, request });
+				}
+				if (!counted) {
+					await noteCampaignShown(offer.bucket._id, offer.user._id);
+					interaction.payload.passkeyOfferCounted = true;
+					await interaction.persist();
+				}
+				const fresh = await getUserStore(offer.bucket._id).find(offer.user._id);
+				return offerPage(
+					interaction,
+					fresh ? { ...offer, user: fresh } : offer,
+					{}
+				);
+			}
 			if (
 				!(await offerable(offer.bucket, offer.user, { thisShowing: counted }))
 			) {
@@ -2894,9 +3001,32 @@ export const ui = new Elysia()
 				case 'continue':
 					return finish('created');
 				case 'not_now':
+					if (offer.mode === 'campaign') {
+						return offerPage(interaction, offer, {});
+					}
 					return finish('declined');
 				case 'never':
+					if (offer.mode === 'campaign') {
+						return offerPage(interaction, offer, {});
+					}
 					await declineOffers(offer.bucket._id, offer.user._id);
+					return finish('declined');
+				case 'skip': {
+					if (offer.mode !== 'campaign') {
+						return finish('declined');
+					}
+					const skips = campaignSkipState(offer.user);
+					if (!skips.canSkip) {
+						return offerPage(interaction, offer, {});
+					}
+					await noteCampaignSkip(offer.bucket._id, offer.user._id);
+					return finish('declined');
+				}
+				case 'unsupported':
+					if (offer.mode !== 'campaign') {
+						return finish('declined');
+					}
+					// Unsupported devices continue without burning a skip (specs/145 FR-019).
 					return finish('declined');
 				case 'create': {
 					const made = await completeOffer(
@@ -2915,7 +3045,9 @@ export const ui = new Elysia()
 					}
 					/* A new ceremony on the same showing: a refused create is not a second showing. */
 					return offerPage(interaction, offer, {
-						askNever: (offer.user.passkeyOffer?.shown ?? 0) >= 2,
+						askNever:
+							offer.mode === 'offer' &&
+							(offer.user.passkeyOffer?.shown ?? 0) >= 2,
 						refused: made.reason === 'exists' ? 'exists' : 'failed'
 					});
 				}
@@ -2927,6 +3059,8 @@ export const ui = new Elysia()
 					t.Literal('create'),
 					t.Literal('not_now'),
 					t.Literal('never'),
+					t.Literal('skip'),
+					t.Literal('unsupported'),
 					t.Literal('continue')
 				]),
 				credential: t.Optional(t.String({ maxLength: CREDENTIAL_FIELD_MAX })),
@@ -3075,8 +3209,14 @@ export const ui = new Elysia()
 					...handoff.link
 				};
 				await interaction.persist();
+				const linkBucket = await getBucketStore().find(bucketId);
 				return Response.redirect(
-					buildUILoginPath(uid, NOTICE_FEDERATION_LINK),
+					buildUILoginPath(
+						uid,
+						linkBucket?.passwordLogin === false
+							? NOTICE_FEDERATION_LINK_PASSKEY
+							: NOTICE_FEDERATION_LINK
+					),
 					303
 				);
 			}
@@ -3251,6 +3391,7 @@ export const ui = new Elysia()
 			const signUpsClosed =
 				bucket !== null &&
 				(!bucket.registrationOpen || (await signUpsPaused(bucket)));
+			const passkeySignUp = bucket !== null && passkeysAccepted(bucket);
 			/*
 			 * An application that asked for `prompt=create` was sent here without knowing whether this project
 			 * takes sign-ups, and the specification leaves a refusal undefined. Its user is offered the sign-in
@@ -3258,21 +3399,710 @@ export const ui = new Elysia()
 			 */
 			if (
 				createRequested(interaction) &&
-				(signUpsClosed || bucket?.passwordLogin === false)
+				(signUpsClosed || (bucket?.passwordLogin === false && !passkeySignUp))
 			) {
 				return Response.redirect(`/ui/${uid}/login`, 303);
 			}
-			const closed = await passwordDoorClosed(interaction, uid);
-			if (closed) return closed;
 			if (signUpsClosed) {
 				return registrationClosedPage(languageOf(interaction));
+			}
+			if (bucket?.passwordLogin === false) {
+				if (passkeySignUp) {
+					return Response.redirect(
+						buildUIPath(uid, 'registration/passkey'),
+						303
+					);
+				}
+				return passwordLoginClosedPage(uid, languageOf(interaction));
 			}
 			return registrationServer(uid, {
 				handOffTo: redirectUriOf(interaction),
 				language: languageOf(interaction),
 				switcher: switcherOf(interaction, 'registration'),
+				passkeyRegistration: passkeySignUp && (await mailDeliveryConfigured()),
 				...(await signInLook(interaction, signsInto))
 			});
+		}
+	)
+	/*
+	 * Pre-account passkey registration (specs/145 Q2=A, S4): proves mailbox ownership via the project's
+	 * `verificationMethod` (`link` or `code`) before creating any account, then runs WebAuthn creation and signs in.
+	 */
+	.get(
+		'ui/:uid/registration/passkey',
+		async ({ params: { uid }, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const bucket = await getBucketStore().find(signsInto);
+			if (
+				!bucket ||
+				!bucket.registrationOpen ||
+				(await signUpsPaused(bucket))
+			) {
+				return registrationClosedPage(language);
+			}
+			if (!passkeysAccepted(bucket)) {
+				return Response.redirect(
+					bucket.passwordLogin
+						? buildUIPath(uid, 'registration')
+						: buildUILoginPath(uid),
+					303
+				);
+			}
+			const service = shownNameOf(bucket);
+			const unavailable = !(await mailDeliveryConfigured());
+			return passkeyRegisterEmailPage({
+				language,
+				service,
+				action: buildUIPath(uid, 'registration/passkey'),
+				loginHref: buildUILoginPath(uid),
+				...(bucket.passwordLogin
+					? { passwordHref: buildUIPath(uid, 'registration') }
+					: {}),
+				unavailable
+			});
+		}
+	)
+	.post(
+		'ui/:uid/registration/passkey',
+		async ({ body, params: { uid }, interaction, signsInto, request }) => {
+			const language = languageOf(interaction);
+			const bucket = await getBucketStore().find(signsInto);
+			if (!bucket) return registrationClosedPage(language);
+			const service = shownNameOf(bucket);
+			const origin = new URL(request.url).origin;
+			const started = await startPasskeyRegistration({
+				bucket,
+				email: body.email,
+				holder: uid,
+				language,
+				request,
+				linkUrlFor: (token) =>
+					`${origin}${buildUIPath(uid, 'registration/passkey/verify')}?token=${encodeURIComponent(token)}`
+			});
+			const common = {
+				language,
+				service,
+				action: buildUIPath(uid, 'registration/passkey'),
+				loginHref: buildUILoginPath(uid),
+				...(bucket.passwordLogin
+					? { passwordHref: buildUIPath(uid, 'registration') }
+					: {})
+			};
+			if (!started.ok) {
+				if (started.reason === 'mail_limited') {
+					return mailLimitedResponse(
+						passkeyRegisterEmailPage({
+							...common,
+							email: body.email,
+							error: SIGN_IN_TEXTS[language].errors.mailLimited
+						}),
+						started.retryAfter
+					);
+				}
+				if (started.reason === 'closed') {
+					return registrationClosedPage(language);
+				}
+				if (started.reason === 'unavailable') {
+					return passkeyRegisterEmailPage({
+						...common,
+						unavailable: true,
+						status: 400
+					});
+				}
+				return passkeyRegisterEmailPage({
+					...common,
+					email: body.email,
+					error: SIGN_IN_TEXTS[language].passkeyRegister.invalidLink,
+					status: 400
+				});
+			}
+			if (started.method === 'code') {
+				interaction.payload.passkeyRegistration = {
+					id: started.id,
+					email: started.email,
+					method: 'code',
+					verified: false,
+					exp: started.exp
+				};
+				await interaction.persist();
+				return passkeyRegisterCodePage({
+					language,
+					email: started.email,
+					action: buildUIPath(uid, 'registration/passkey/code'),
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			return passkeyRegisterSentPage({
+				language,
+				email: started.email,
+				loginHref: buildUILoginPath(uid)
+			});
+		},
+		{ body: t.Object({ email: t.String() }) }
+	)
+	.get(
+		'ui/:uid/registration/passkey/verify',
+		async ({ params: { uid }, query, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const bucket = await getBucketStore().find(signsInto);
+			if (
+				!bucket ||
+				!bucket.registrationOpen ||
+				(await signUpsPaused(bucket))
+			) {
+				return registrationClosedPage(language);
+			}
+			const loaded = await loadRegistrationLink(
+				query.token ?? '',
+				signsInto,
+				uid
+			);
+			if (!loaded) {
+				return passkeyRegisterErrorPage({
+					language,
+					message: SIGN_IN_TEXTS[language].passkeyRegister.invalidLink,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const ceremony = await prepareRegistrationCeremony(
+				bucket,
+				loaded.challenge.email
+			);
+			interaction.payload.passkeyRegistration = {
+				id: loaded.id,
+				email: loaded.challenge.email,
+				method: 'link',
+				verified: true,
+				userId: ceremony.userId,
+				challenge: ceremony.challenge,
+				rpId: ceremony.rpId,
+				origin: ceremony.origin,
+				exp: loaded.challenge.exp
+			};
+			await interaction.persist();
+			return passkeyRegisterCreatePage({
+				language,
+				email: loaded.challenge.email,
+				action: buildUIPath(uid, 'registration/passkey/create'),
+				options: JSON.stringify(ceremony.options),
+				script: versionedAsset('passkeyButton.js'),
+				loginHref: buildUILoginPath(uid),
+				...(bucket.passwordLogin
+					? { passwordHref: buildUIPath(uid, 'registration') }
+					: {})
+			});
+		},
+		{ query: t.Object({ token: t.Optional(t.String()) }) }
+	)
+	.post(
+		'ui/:uid/registration/passkey/code',
+		async ({ body, params: { uid }, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const T = SIGN_IN_TEXTS[language].passkeyRegister;
+			const pending = interaction.payload.passkeyRegistration;
+			if (!pending) {
+				return passkeyRegisterErrorPage({
+					language,
+					message: T.invalidLink,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const verified = await verifyRegistrationCode(
+				pending.id,
+				body.code,
+				signsInto,
+				uid
+			);
+			if (!verified.ok) {
+				if (verified.reason === 'wrong') {
+					return passkeyRegisterCodePage({
+						language,
+						email: pending.email,
+						action: buildUIPath(uid, 'registration/passkey/code'),
+						loginHref: buildUILoginPath(uid),
+						error: T.codeInvalid
+					});
+				}
+				delete interaction.payload.passkeyRegistration;
+				await interaction.persist();
+				return passkeyRegisterErrorPage({
+					language,
+					message:
+						verified.reason === 'too_many' ? T.codeTooMany : T.invalidLink,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const bucket = await getBucketStore().find(signsInto);
+			if (
+				!bucket ||
+				!bucket.registrationOpen ||
+				(await signUpsPaused(bucket))
+			) {
+				return registrationClosedPage(language);
+			}
+			const ceremony = await prepareRegistrationCeremony(
+				bucket,
+				verified.challenge.email
+			);
+			interaction.payload.passkeyRegistration = {
+				id: pending.id,
+				email: verified.challenge.email,
+				method: 'code',
+				verified: true,
+				userId: ceremony.userId,
+				challenge: ceremony.challenge,
+				rpId: ceremony.rpId,
+				origin: ceremony.origin,
+				exp: pending.exp
+			};
+			await interaction.persist();
+			return Response.redirect(
+				buildUIPath(uid, 'registration/passkey/create'),
+				303
+			);
+		},
+		{ body: t.Object({ code: t.String() }) }
+	)
+	.get(
+		'ui/:uid/registration/passkey/create',
+		async ({ params: { uid }, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const pending = interaction.payload.passkeyRegistration;
+			if (!pending?.verified) {
+				return Response.redirect(buildUIPath(uid, 'registration/passkey'), 303);
+			}
+			const bucket = await getBucketStore().find(signsInto);
+			if (
+				!bucket ||
+				!bucket.registrationOpen ||
+				(await signUpsPaused(bucket)) ||
+				!passkeysAccepted(bucket)
+			) {
+				return registrationClosedPage(language);
+			}
+			const ceremony = await prepareRegistrationCeremony(bucket, pending.email);
+			interaction.payload.passkeyRegistration = {
+				...pending,
+				userId: ceremony.userId,
+				challenge: ceremony.challenge,
+				rpId: ceremony.rpId,
+				origin: ceremony.origin
+			};
+			await interaction.persist();
+			return passkeyRegisterCreatePage({
+				language,
+				email: pending.email,
+				action: buildUIPath(uid, 'registration/passkey/create'),
+				options: JSON.stringify(ceremony.options),
+				script: versionedAsset('passkeyButton.js'),
+				loginHref: buildUILoginPath(uid),
+				...(bucket.passwordLogin
+					? { passwordHref: buildUIPath(uid, 'registration') }
+					: {})
+			});
+		}
+	)
+	.post(
+		'ui/:uid/registration/passkey/create',
+		async ({
+			body,
+			params: { uid },
+			interaction,
+			signsInto,
+			cookie,
+			route,
+			request
+		}) => {
+			const language = languageOf(interaction);
+			const T = SIGN_IN_TEXTS[language].passkeyRegister;
+			const pending = interaction.payload.passkeyRegistration;
+			if (
+				!pending?.verified ||
+				!pending.userId ||
+				!pending.challenge ||
+				!pending.rpId ||
+				!pending.origin
+			) {
+				return passkeyRegisterErrorPage({
+					language,
+					message: T.invalidLink,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const bucket = await getBucketStore().find(signsInto);
+			if (!bucket) return registrationClosedPage(language);
+			const done = await completePasskeyRegistration({
+				bucket,
+				challengeId: pending.id,
+				holder: uid,
+				ceremony: {
+					userId: pending.userId,
+					challenge: pending.challenge,
+					rpId: pending.rpId,
+					origin: pending.origin
+				},
+				credential: body.credential,
+				request
+			});
+			if (!done.ok) {
+				if (
+					done.reason === 'expired' ||
+					done.reason === 'closed' ||
+					done.reason === 'duplicate'
+				) {
+					delete interaction.payload.passkeyRegistration;
+					await interaction.persist();
+					if (done.reason === 'closed') {
+						return registrationClosedPage(language);
+					}
+					return passkeyRegisterErrorPage({
+						language,
+						message: T.invalidLink,
+						loginHref: buildUILoginPath(uid)
+					});
+				}
+				const ceremony = await prepareRegistrationCeremony(
+					bucket,
+					pending.email
+				);
+				interaction.payload.passkeyRegistration = {
+					...pending,
+					userId: ceremony.userId,
+					challenge: ceremony.challenge,
+					rpId: ceremony.rpId,
+					origin: ceremony.origin
+				};
+				await interaction.persist();
+				return passkeyRegisterCreatePage({
+					language,
+					email: pending.email,
+					action: buildUIPath(uid, 'registration/passkey/create'),
+					options: JSON.stringify(ceremony.options),
+					script: versionedAsset('passkeyButton.js'),
+					loginHref: buildUILoginPath(uid),
+					...(bucket.passwordLogin
+						? { passwordHref: buildUIPath(uid, 'registration') }
+						: {}),
+					error: SIGN_IN_TEXTS[language].passkeyOffer.failed
+				});
+			}
+			delete interaction.payload.passkeyRegistration;
+			if (signsInto === ADMIN_BUCKET_ID) {
+				await registeredAdministrator(done.user);
+			}
+			interaction.payload.result = {
+				login: {
+					accountId: done.user._id,
+					transient: false,
+					amr: [...AMR_FOR_METHOD.passkey],
+					acr: configuration.acrMap[DISTINCTION_FOR_METHOD.passkey]
+				}
+			};
+			await settlePendingLink(interaction.payload, signsInto);
+			return resume(interaction, cookie, { route, request });
+		},
+		{
+			body: t.Object({
+				credential: t.String({ maxLength: CREDENTIAL_FIELD_MAX })
+			})
+		}
+	)
+	/*
+	 * Self-service passkey recovery (specs/145 Q1=A, S3): opt-in on non-admin projects, browser-bound 10-minute email
+	 * link, mandatory TOTP gate whenever enrolled, no auto-sign-in, and 72-hour `multi_factor` ACR cap.
+	 */
+	.get(
+		'ui/:uid/passkey-recovery',
+		async ({ params: { uid }, interaction, signsInto }) => {
+			const bucket = await getBucketStore().find(signsInto);
+			if (!selfServicePasskeyRecoveryAllowed(bucket)) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			return passkeyRecoveryRequestPage({
+				language: languageOf(interaction),
+				action: buildUIPath(uid, 'passkey-recovery'),
+				loginHref: buildUILoginPath(uid)
+			});
+		}
+	)
+	.post(
+		'ui/:uid/passkey-recovery',
+		async ({ body, params: { uid }, interaction, signsInto, request }) => {
+			const language = languageOf(interaction);
+			const bucket = await getBucketStore().find(signsInto);
+			const origin = new URL(request.url).origin;
+			const sent = await requestPasskeyRecovery({
+				bucket,
+				email: body.email,
+				holder: uid,
+				language,
+				request,
+				urlFor: (token) =>
+					`${origin}${buildUIPath(uid, 'passkey-recovery/verify')}?token=${encodeURIComponent(token)}`
+			});
+			if (!sent.ok) {
+				return mailLimitedResponse(
+					passkeyRecoveryRequestPage({
+						language,
+						action: buildUIPath(uid, 'passkey-recovery'),
+						loginHref: buildUILoginPath(uid),
+						email: body.email,
+						error: SIGN_IN_TEXTS[language].errors.mailLimited
+					}),
+					sent.retryAfter
+				);
+			}
+			return passkeyRecoverySentPage({
+				language,
+				email: body.email.trim(),
+				loginHref: buildUILoginPath(uid)
+			});
+		},
+		{ body: t.Object({ email: t.String() }) }
+	)
+	.get(
+		'ui/:uid/passkey-recovery/verify',
+		async ({ params: { uid }, query, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const bucket = await getBucketStore().find(signsInto);
+			const loaded = await loadRecoveryLink(query.token ?? '', bucket, uid);
+			if (!loaded || !bucket) {
+				return passkeyRecoveryInvalidPage({
+					language,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			if (loaded.user.totp !== undefined) {
+				interaction.payload.passkeyRecovery = {
+					id: loaded.id,
+					accountId: loaded.user._id,
+					email: loaded.user.email,
+					totpVerified: false,
+					totpAttempts: 0,
+					exp: loaded.record.exp
+				};
+				await interaction.persist();
+				return passkeyRecoveryTotpPage({
+					language,
+					action: buildUIPath(uid, 'passkey-recovery/totp'),
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const ceremony = await prepareRecoveryCeremony(bucket, loaded.user);
+			interaction.payload.passkeyRecovery = {
+				id: loaded.id,
+				accountId: loaded.user._id,
+				email: loaded.user.email,
+				totpVerified: true,
+				totpAttempts: 0,
+				userId: ceremony.userId,
+				challenge: ceremony.challenge,
+				rpId: ceremony.rpId,
+				origin: ceremony.origin,
+				exp: loaded.record.exp
+			};
+			await interaction.persist();
+			return passkeyRecoveryCreatePage({
+				language,
+				email: loaded.user.email,
+				action: buildUIPath(uid, 'passkey-recovery/create'),
+				options: JSON.stringify(ceremony.options),
+				script: versionedAsset('passkeyButton.js'),
+				loginHref: buildUILoginPath(uid)
+			});
+		},
+		{ query: t.Object({ token: t.Optional(t.String()) }) }
+	)
+	.post(
+		'ui/:uid/passkey-recovery/totp',
+		async ({ body, params: { uid }, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const pending = interaction.payload.passkeyRecovery;
+			if (!pending || pending.totpVerified) {
+				return passkeyRecoveryInvalidPage({
+					language,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const attempts = pending.totpAttempts ?? 0;
+			if (attempts >= MAX_ATTEMPTS_PER_INTERACTION) {
+				delete interaction.payload.passkeyRecovery;
+				await interaction.persist();
+				return passkeyRecoveryInvalidPage({
+					language,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const outcome = await verifyForAccount(
+				signsInto,
+				pending.accountId,
+				body.code
+			);
+			if (!outcome.ok) {
+				interaction.payload.passkeyRecovery = {
+					...pending,
+					totpAttempts: attempts + 1
+				};
+				await interaction.persist();
+				return passkeyRecoveryTotpPage({
+					language,
+					action: buildUIPath(uid, 'passkey-recovery/totp'),
+					loginHref: buildUILoginPath(uid),
+					error: invalidCode(interaction)
+				});
+			}
+			const bucket = await getBucketStore().find(signsInto);
+			const user = bucket
+				? await getUserStore(signsInto).find(pending.accountId)
+				: null;
+			if (!bucket || !user || !selfServicePasskeyRecoveryAllowed(bucket)) {
+				return passkeyRecoveryInvalidPage({
+					language,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const ceremony = await prepareRecoveryCeremony(bucket, user);
+			interaction.payload.passkeyRecovery = {
+				...pending,
+				totpVerified: true,
+				userId: ceremony.userId,
+				challenge: ceremony.challenge,
+				rpId: ceremony.rpId,
+				origin: ceremony.origin
+			};
+			await interaction.persist();
+			return Response.redirect(
+				buildUIPath(uid, 'passkey-recovery/create'),
+				303
+			);
+		},
+		{ body: t.Object({ code: t.String() }) }
+	)
+	.get(
+		'ui/:uid/passkey-recovery/create',
+		async ({ params: { uid }, interaction, signsInto }) => {
+			const language = languageOf(interaction);
+			const pending = interaction.payload.passkeyRecovery;
+			if (!pending?.totpVerified) {
+				return Response.redirect(buildUILoginPath(uid), 303);
+			}
+			const bucket = await getBucketStore().find(signsInto);
+			const user = bucket
+				? await getUserStore(signsInto).find(pending.accountId)
+				: null;
+			if (!bucket || !user || !selfServicePasskeyRecoveryAllowed(bucket)) {
+				return passkeyRecoveryInvalidPage({
+					language,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const ceremony = await prepareRecoveryCeremony(bucket, user);
+			interaction.payload.passkeyRecovery = {
+				...pending,
+				userId: ceremony.userId,
+				challenge: ceremony.challenge,
+				rpId: ceremony.rpId,
+				origin: ceremony.origin
+			};
+			await interaction.persist();
+			return passkeyRecoveryCreatePage({
+				language,
+				email: user.email,
+				action: buildUIPath(uid, 'passkey-recovery/create'),
+				options: JSON.stringify(ceremony.options),
+				script: versionedAsset('passkeyButton.js'),
+				loginHref: buildUILoginPath(uid)
+			});
+		}
+	)
+	.post(
+		'ui/:uid/passkey-recovery/create',
+		async ({ body, params: { uid }, interaction, signsInto, request }) => {
+			const language = languageOf(interaction);
+			const pending = interaction.payload.passkeyRecovery;
+			if (
+				!pending?.totpVerified ||
+				!pending.userId ||
+				!pending.challenge ||
+				!pending.rpId ||
+				!pending.origin
+			) {
+				return passkeyRecoveryInvalidPage({
+					language,
+					loginHref: buildUILoginPath(uid)
+				});
+			}
+			const bucket = await getBucketStore().find(signsInto);
+			const done = await completePasskeyRecovery({
+				bucket,
+				challengeId: pending.id,
+				holder: uid,
+				totpVerified: pending.totpVerified,
+				ceremony: {
+					userId: pending.userId,
+					challenge: pending.challenge,
+					rpId: pending.rpId,
+					origin: pending.origin
+				},
+				credential: body.credential,
+				request
+			});
+			if (!done.ok) {
+				if (
+					done.reason === 'expired' ||
+					done.reason === 'full' ||
+					done.reason === 'totp_required'
+				) {
+					delete interaction.payload.passkeyRecovery;
+					await interaction.persist();
+					return passkeyRecoveryInvalidPage({
+						language,
+						loginHref: buildUILoginPath(uid)
+					});
+				}
+				const user = bucket
+					? await getUserStore(signsInto).find(pending.accountId)
+					: null;
+				if (!bucket || !user) {
+					return passkeyRecoveryInvalidPage({
+						language,
+						loginHref: buildUILoginPath(uid)
+					});
+				}
+				const ceremony = await prepareRecoveryCeremony(bucket, user);
+				interaction.payload.passkeyRecovery = {
+					...pending,
+					userId: ceremony.userId,
+					challenge: ceremony.challenge,
+					rpId: ceremony.rpId,
+					origin: ceremony.origin
+				};
+				await interaction.persist();
+				return passkeyRecoveryCreatePage({
+					language,
+					email: user.email,
+					action: buildUIPath(uid, 'passkey-recovery/create'),
+					options: JSON.stringify(ceremony.options),
+					script: versionedAsset('passkeyButton.js'),
+					loginHref: buildUILoginPath(uid),
+					error:
+						done.reason === 'exists'
+							? SIGN_IN_TEXTS[language].passkeyOffer.exists
+							: SIGN_IN_TEXTS[language].passkeyOffer.failed
+				});
+			}
+			delete interaction.payload.passkeyRecovery;
+			await interaction.persist();
+			// Recovery never auto-signs-in (specs/145 FR-012): the person signs in explicitly with their new passkey.
+			return passkeyRecoveryDonePage({
+				language,
+				loginHref: buildUILoginPath(uid)
+			});
+		},
+		{
+			body: t.Object({
+				credential: t.String({ maxLength: CREDENTIAL_FIELD_MAX })
+			})
 		}
 	)
 	.post(

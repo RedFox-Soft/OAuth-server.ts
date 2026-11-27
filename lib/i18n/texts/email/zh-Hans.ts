@@ -148,6 +148,31 @@ export const zhHans: EmailTexts = {
 		revokedAllIntro:
 			'{service}的运营人员删除了您的账户 {email} 的所有通行密钥，共 {count} 个。',
 		signedOutEverywhere: '您已在所有设备上退出登录。',
-		revokedTell: '如果您没有提出此请求，请告知他们。'
+		revokedTell: '如果您没有提出此请求，请告知他们。',
+		registerLinkSubject: '确认您的邮箱以创建{service}通行密钥',
+		registerLinkHeading: '完成账户创建',
+		registerLinkIntro:
+			'请在 10 分钟内，在您发起注册的同一浏览器中打开此链接，为您的{service}账户（{email}）创建通行密钥。',
+		registerLinkButton: '使用通行密钥继续',
+		registerCodeSubject: '您的{service}注册验证码',
+		registerCodeHeading: '确认您的电子邮件地址',
+		registerCodeIntro:
+			'请在 10 分钟内，在您发起注册的同一浏览器中输入此 6 位验证码，以创建{service}通行密钥：',
+		registerExistsSubject: '您已有{service}账户',
+		registerExistsHeading: '账户已存在',
+		registerExistsIntro:
+			'有人尝试使用 {email} 创建新的{service}账户，但该邮箱已注册。您的账户未作任何更改。请使用现有方式登录或在需要时恢复访问。',
+		recoverySubject: '恢复您的{service}通行密钥',
+		recoveryHeading: '添加新的通行密钥',
+		recoveryIntro:
+			'请在 10 分钟内，在您发起请求的同一浏览器中打开此链接，为您的{service}账户（{email}）添加新的通行密钥。',
+		recoveryButton: '添加新的通行密钥',
+		adminLinkSubject: '为您的{service}账户设置通行密钥',
+		adminLinkHeading: '设置您的通行密钥',
+		adminLinkIntro:
+			'管理员向您发送了一个一次性链接，用于为您的{service}账户（{email}）添加通行密钥。请在 24 小时内在您要保存通行密钥的设备上打开它。',
+		adminLinkButton: '设置通行密钥',
+		adminLinkNote:
+			'如果您的账户启用了身份验证器应用，还需要输入其中的验证码。如果您未预期收到此链接，请忽略此邮件。'
 	}
 };

@@ -39,6 +39,13 @@ export interface PasskeyOfferPageProps {
 	conditional?: boolean;
 	/* A refused create, as a sentence key. */
 	refused?: 'failed' | 'exists';
+	/* Campaign mode under `passkeyRequired` (specs/145): 3 skips within 14 days, unsupported-device bypass. */
+	campaign?: {
+		canSkip: boolean;
+		skipsLeft: number;
+		maxSkips: number;
+		unverified?: boolean;
+	};
 	logoSrc?: string;
 	switcher?: SwitcherProps;
 	face: SignInFace;
@@ -61,6 +68,7 @@ export function PasskeyOfferPage({
 	askNever = false,
 	conditional = false,
 	refused,
+	campaign,
 	logoSrc = DEFAULT_LOGO,
 	switcher,
 	face
@@ -75,7 +83,30 @@ export function PasskeyOfferPage({
 		browserSupportsWebAuthn,
 		notOnTheServer
 	);
-	const ready = state === 'offer' && options !== undefined && webAuthn;
+	const [deviceCapable, setDeviceCapable] = useState<boolean | null>(null);
+	useEffect(() => {
+		if (!campaign || state !== 'offer') return;
+		let current = true;
+		const probe =
+			typeof PublicKeyCredential === 'undefined'
+				? Promise.resolve(false)
+				: PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+		void probe
+			.then((able) => {
+				if (current) setDeviceCapable(able);
+			})
+			.catch(() => {
+				if (current) setDeviceCapable(false);
+			});
+		return () => {
+			current = false;
+		};
+	}, [campaign, state]);
+	const ready =
+		state === 'offer' &&
+		options !== undefined &&
+		webAuthn &&
+		campaign?.unverified !== true;
 	const [note, setNote] = useState<
 		'cancelled' | 'exists' | 'failed' | undefined
 	>(refused);
@@ -150,7 +181,18 @@ export function PasskeyOfferPage({
 				<SignInMasthead
 					face={face}
 					logoSrc={logoSrc}
-					heading={state === 'created' ? T.createdHeading : T.heading}
+					heading={
+						state === 'created' ? (
+							T.createdHeading
+						) : campaign ? (
+							<Message
+								t={T.campaignHeading}
+								values={{ service }}
+							/>
+						) : (
+							T.heading
+						)
+					}
 				/>
 				{state === 'created' ? (
 					<>
@@ -178,17 +220,50 @@ export function PasskeyOfferPage({
 							</Button>
 						</form>
 					</>
+				) : campaign?.unverified ? (
+					<>
+						<Typography.Paragraph>
+							<Message
+								t={T.campaignUnverified}
+								values={{ email }}
+							/>
+						</Typography.Paragraph>
+						<form
+							method="post"
+							action={action}
+						>
+							<input
+								type="hidden"
+								name="action"
+								value="unsupported"
+							/>
+							<Button
+								type="primary"
+								htmlType="submit"
+								block
+							>
+								{T.campaignContinueThisTime}
+							</Button>
+						</form>
+					</>
 				) : (
 					<>
 						<Typography.Paragraph>
 							<Message
-								t={T.explain}
+								t={campaign ? T.campaignExplain : T.explain}
 								values={{ service, email }}
 							/>
 						</Typography.Paragraph>
-						<Typography.Paragraph type="secondary">
-							{T.where}
-						</Typography.Paragraph>
+						{!campaign && (
+							<Typography.Paragraph type="secondary">
+								{T.where}
+							</Typography.Paragraph>
+						)}
+						{campaign && !campaign.canSkip && deviceCapable !== false && (
+							<Typography.Paragraph strong>
+								{T.campaignMandatory}
+							</Typography.Paragraph>
+						)}
 						<form
 							ref={form}
 							method="post"
@@ -215,7 +290,7 @@ export function PasskeyOfferPage({
 							style={{ width: '100%' }}
 							size={12}
 						>
-							{note !== 'exists' && (
+							{note !== 'exists' && deviceCapable !== false && (
 								<Button
 									type="primary"
 									block
@@ -238,41 +313,100 @@ export function PasskeyOfferPage({
 									{T[note]}
 								</Typography.Text>
 							)}
-							<form
-								method="post"
-								action={action}
-							>
-								<input
-									type="hidden"
-									name="action"
-									value="not_now"
-								/>
-								<Button
-									type={note === 'exists' ? 'primary' : 'default'}
-									htmlType="submit"
-									block
-								>
-									{note === 'exists' ? continueLabel : T.notNow}
-								</Button>
-							</form>
-							{askNever && (
-								<form
-									method="post"
-									action={action}
-									style={{ textAlign: 'center' }}
-								>
-									<input
-										type="hidden"
-										name="action"
-										value="never"
-									/>
-									<Button
-										type="link"
-										htmlType="submit"
+							{campaign ? (
+								<>
+									{deviceCapable === false ? (
+										<>
+											<Typography.Paragraph type="secondary">
+												{T.campaignUnsupported}
+											</Typography.Paragraph>
+											<form
+												method="post"
+												action={action}
+											>
+												<input
+													type="hidden"
+													name="action"
+													value="unsupported"
+												/>
+												<Button
+													type="primary"
+													htmlType="submit"
+													block
+												>
+													{T.campaignContinueThisTime}
+												</Button>
+											</form>
+										</>
+									) : campaign.canSkip || note === 'exists' ? (
+										<form
+											method="post"
+											action={action}
+										>
+											<input
+												type="hidden"
+												name="action"
+												value={note === 'exists' ? 'continue' : 'skip'}
+											/>
+											<Button
+												type={note === 'exists' ? 'primary' : 'default'}
+												htmlType="submit"
+												block
+											>
+												{note === 'exists' ? (
+													continueLabel
+												) : (
+													<Message
+														t={T.campaignSkip}
+														values={{
+															left: String(campaign.skipsLeft),
+															total: String(campaign.maxSkips)
+														}}
+													/>
+												)}
+											</Button>
+										</form>
+									) : null}
+								</>
+							) : (
+								<>
+									<form
+										method="post"
+										action={action}
 									>
-										{T.never}
-									</Button>
-								</form>
+										<input
+											type="hidden"
+											name="action"
+											value="not_now"
+										/>
+										<Button
+											type={note === 'exists' ? 'primary' : 'default'}
+											htmlType="submit"
+											block
+										>
+											{note === 'exists' ? continueLabel : T.notNow}
+										</Button>
+									</form>
+									{askNever && (
+										<form
+											method="post"
+											action={action}
+											style={{ textAlign: 'center' }}
+										>
+											<input
+												type="hidden"
+												name="action"
+												value="never"
+											/>
+											<Button
+												type="link"
+												htmlType="submit"
+											>
+												{T.never}
+											</Button>
+										</form>
+									)}
+								</>
 							)}
 						</Space>
 					</>

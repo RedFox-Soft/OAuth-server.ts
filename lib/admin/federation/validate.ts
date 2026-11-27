@@ -2,6 +2,9 @@ import { AdminError } from '../auth/rbac.js';
 import type { UserBucket } from '../../adapters/types.js';
 import type { FederationProvider } from '../../federation/types.js';
 import { MICROSOFT_SHARED_TENANTS } from '../../consts/known_providers.js';
+import { getPasskeyStore } from '../../adapters/index.js';
+import { mailDeliveryConfigured } from '../../mail/mailer.js';
+import { rpIdFor } from '../../passkeys/relying_party.js';
 
 /*
  * Every rule a provider configuration has to satisfy, and the one rule about the bucket as a whole.
@@ -295,26 +298,97 @@ export function assertEmailDomains(domains: string[]): void {
 export function assertSomeWayToSignIn(next: {
 	passwordLogin: boolean;
 	federation: FederationProvider[];
+	passkeyLogin?: boolean;
+	registrationOpen?: boolean;
+	mailConfigured?: boolean;
+	hasPasskeyHolder?: boolean;
 }): void {
 	if (next.passwordLogin) return;
 	if (next.federation.some((provider) => provider.enabled)) return;
+	if (next.passkeyLogin === true) {
+		if (!next.mailConfigured) {
+			throw new AdminError(
+				409,
+				'configure mail delivery first before turning password sign-in off on a passkey-only project'
+			);
+		}
+		if (!next.registrationOpen && !next.hasPasskeyHolder) {
+			throw new AdminError(
+				409,
+				'at least one user must hold a passkey, or registration must be open, before turning password sign-in off without an identity provider'
+			);
+		}
+		return;
+	}
 
 	throw new AdminError(
 		409,
-		'that would leave this project with no way to sign in: enable a provider first, or turn password sign-in back on'
+		'that would leave this project with no way to sign in: enable a provider or passkeys first, or turn password sign-in back on'
 	);
 }
 
 /* The bucket as it would be after `patch` is applied — the input `assertSomeWayToSignIn` needs. */
 export function prospectiveBucket(
-	bucket: Pick<UserBucket, 'passwordLogin' | 'federation'>,
+	bucket: Pick<
+		UserBucket,
+		'passwordLogin' | 'federation' | 'passkeyLogin' | 'registrationOpen'
+	>,
 	patch: {
 		passwordLogin?: boolean;
 		federation?: FederationProvider[];
+		passkeyLogin?: boolean;
+		registrationOpen?: boolean;
 	}
-): { passwordLogin: boolean; federation: FederationProvider[] } {
+): {
+	passwordLogin: boolean;
+	federation: FederationProvider[];
+	passkeyLogin: boolean;
+	registrationOpen: boolean;
+} {
 	return {
 		passwordLogin: patch.passwordLogin ?? bucket.passwordLogin,
-		federation: patch.federation ?? bucket.federation
+		federation: patch.federation ?? bucket.federation,
+		passkeyLogin: patch.passkeyLogin ?? bucket.passkeyLogin === true,
+		registrationOpen: patch.registrationOpen ?? bucket.registrationOpen
 	};
+}
+
+/*
+ * Async bucket-level check that resolves mail delivery and passkey holders only when a change leaves neither
+ * password sign-in nor an enabled identity provider open (specs/145 US1).
+ */
+export async function assertBucketHasWayToSignIn(
+	bucket: Pick<
+		UserBucket,
+		| '_id'
+		| 'slug'
+		| 'host'
+		| 'subdomain'
+		| 'passwordLogin'
+		| 'federation'
+		| 'passkeyLogin'
+		| 'registrationOpen'
+	>,
+	patch: {
+		passwordLogin?: boolean;
+		federation?: FederationProvider[];
+		passkeyLogin?: boolean;
+		registrationOpen?: boolean;
+	}
+): Promise<void> {
+	const next = prospectiveBucket(bucket, patch);
+	if (next.passwordLogin || next.federation.some((p) => p.enabled)) return;
+	if (!next.passkeyLogin) {
+		assertSomeWayToSignIn(next);
+		return;
+	}
+	const [mailConfigured, holders] = await Promise.all([
+		mailDeliveryConfigured(),
+		getPasskeyStore().holdingIn(bucket._id, rpIdFor(bucket))
+	]);
+	assertSomeWayToSignIn({
+		...next,
+		mailConfigured,
+		hasPasskeyHolder: holders.length > 0
+	});
 }

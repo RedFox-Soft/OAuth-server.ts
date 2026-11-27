@@ -45,8 +45,11 @@ Someone who learned the password must not be able to add their own passkey. So a
 - a sign-in with the password in the last 15 minutes, and a link mailed to the account's address, opened in the same
   browser within 10 minutes. A link opened in another browser does nothing.
 
-A person whose address is not confirmed yet, or who signs in only through a provider such as Google, cannot add a
-passkey yet. The page says why.
+A person whose address is not confirmed yet cannot add a passkey. By default, someone who signs in only through a
+provider such as Google cannot add one either unless you turn on **Let people who sign in through a provider add a
+passkey** (see [Going passwordless, recovery and adoption](#passwordless) below). The page says why.
+On a passwordless account that has no password and no authenticator app, **Sign-in and security** shows only the
+**Passkeys** section and hides **Two-step verification**.
 
 ## Signing in {#sign-in}
 
@@ -216,7 +219,47 @@ can enable **Require a passkey to sign in to the console** (`consolePasskeyRequi
   account, or withdrawing super-administrator status) that would leave no super administrator able to sign in with a
   passkey.
 
+## Going passwordless, recovery and adoption {#passwordless}
+
+Once **Passkeys** are on and mail delivery is configured, a project can move beyond optional passkeys:
+
+- **Turn off passwords (`passwordLogin: false`).** A project can run with **Passkeys** alone, without an outside
+  provider, when either self-service sign-up is open or at least one active account holds a working passkey. Before it
+  saves, the console shows how many active accounts have no working passkey and no enabled provider (listing up to 20
+  addresses) and asks you to confirm. On the **Administrators** project, a super administrator who holds a working
+  passkey and signed in with one can also turn passwords off when mail delivery is configured, after confirming the list
+  of administrators without a passkey.
+- **Passkey-only sign-up.** In a passwordless project with open registration, new visitors enter their email address
+  and prove they control the mailbox first (using the project's **Verification method**, either a 10-minute
+  browser-bound email link or a 6-digit email code) before FoxAuth creates the account and their first passkey. No
+  account is created until WebAuthn finishes. Existing addresses see the identical screen and receive an informational
+  email without modifying the existing account.
+- **Ask everyone to create a passkey (`passkeyRequired`).** On non-admin projects with passkeys on, switch this on to
+  run a rollout campaign for people who still sign in with a password. They can skip up to 3 times within 14 days on a
+  passkey-capable device; after that, creating a passkey is required to continue. Devices that cannot create a passkey
+  can choose **Continue this time** without spending a skip. People who sign in through an outside provider are not
+  prompted. The **Sign-in** tab tracks how many active people still have no passkey and how many have skipped.
+- **Self-service passkey recovery (`passkeyRecovery`, off by default).** On non-admin projects, you can opt in to
+  **Allow passkey recovery by email**. Because anyone who controls a person's mailbox could use email recovery, the
+  console warns before you enable it. On the sign-in page, **Forgot your passkey?** sends a 10-minute link bound to the
+  same browser; if the account has an authenticator app, its code is always required even when the project does not
+  require one. Recovery never signs the person in automatically, and the newly created passkey is capped at multi-factor
+  `acr` (never `phr`) for 72 hours unless the person signs in earlier with another full passkey. Not available on the
+  **Administrators** project.
+- **Administrator-sent passkey setup links.** On any end-user's **Sign-in** tab (or in a colleague administrator's
+  **Passkeys** drawer under **Administrators -> Accounts**), choose **Send passkey setup link** (agents use
+  `project_user_passkey_link_send` or `admin_passkey_link_send`, both high-consequence tools). FoxAuth emails a
+  single-use 24-hour link directly to the person's verified address and never returns or logs the URL. Links are refused
+  when the email address is unverified or changed within the last 7 days, and administrators cannot send one to
+  themselves. The standalone `/account/passkey-setup` page works in any browser, requires the account's authenticator
+  app if enrolled, and creates a full passkey.
+- **Passkeys for provider-only people (`passkeyForFederated`, off by default).** On non-admin projects without SCIM
+  provisioning, you can opt in to let people who sign in only through an outside provider add a passkey on
+  `/account/security` after a fresh sign-in and a browser-bound email link. Turning on SCIM provisioning and turning on
+  `passkeyForFederated` are mutually exclusive.
+
 ## Upgrading {#upgrading}
 
-Run `bun run db:setup` (or `bun run db:setup:pg`) after upgrading, so the server has its places to store passkeys and
-their indexes, then `bun run db:migrate`. After that, an older release refuses to start against the database.
+Run `bun run db:setup` (or `bun run db:setup:pg`) after upgrading, so the server has its places to store passkeys,
+recovery and registration challenges, setup links, and their indexes, then `bun run db:migrate`. After that, an older
+release refuses to start against the database.

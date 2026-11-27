@@ -228,7 +228,20 @@ Each rule is the part that is easy to break. Read the named page before changing
   (`/admin/api/me/passkeys*`, no `/account/security`, `passkeyOffer` always 422 on `admin`, never `signalUnknownCredential`
   at the root host); `consolePasskeyRequired` needs a super administrator holding a working passkey who signed in with
   one, immediately refuses non-passkey console sessions and `/mcp` tokens, never offers passkey creation on the refusal
-  page, and is guarded against console lockout in `lib/admin/federation/reachability.ts`.
+  page, and is guarded against console lockout in `lib/admin/federation/reachability.ts`. A passwordless passkey project
+  (`passwordLogin: false`, `passkeyLogin: true` without an IdP) requires mail configured and either open registration or
+  ≥1 working passkey holder (and on `admin`, a passkey-signed-in super admin plus `consoleStaysReachable`); passkey-only
+  sign-up proves mailbox control (`verificationMethod` `link` or `code`) before creating any user record and never
+  reveals existing emails. Self-service passkey recovery (`passkeyRecovery`, off by default, 422 on `admin`) uses a
+  browser-bound 10-minute email link, enforces TOTP whenever enrolled, never auto-signs-in, and caps the recovered
+  passkey at `multi_factor` ACR for 72 hours (`recoveredUntil`, lifted early via `clearRecoveryCaps` on signing in with
+  another full passkey). Administrator-sent setup links (`/account/passkey-setup`, `project_user_passkey_link_send` and
+  `admin_passkey_link_send` MCP `high`) are emailed only (`204`, never in API/MCP/audit), refused for unverified emails
+  or `emailChangedAt < 7` days (`email_changed_recently`), and enforce TOTP when enrolled. The adoption campaign
+  (`passkeyRequired`, 422 on `admin`) prompts password users without a working passkey (3 skips in 14 days; free
+  `action=unsupported` on unsupported devices). Opt-in `passkeyForFederated` (off by default, 422 on `admin`, 409
+  bidirectional guard against SCIM) lets provider-only users add a passkey via fresh sign-in + email link; unlinked
+  federated sign-ins matching a passwordless passkey holder route through `pendingLink` (`lib/federation/resolve.ts`).
   → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`, `acr-satisfaction.md`, `admin-console-signin.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion

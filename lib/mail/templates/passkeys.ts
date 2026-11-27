@@ -79,6 +79,101 @@ export function passkeyLinkEmail(
 	};
 }
 
+export function passkeyRegistrationLinkEmail(
+	who: Who,
+	url: string,
+	language: Language = 'en'
+): RenderedEmail {
+	const t = EMAIL_TEXTS[language].passkeys;
+	return {
+		subject: text(t.registerLinkSubject, who),
+		html: frame(language, [
+			`<h2 style="font-size: 20px;">${html(t.registerLinkHeading)}</h2>`,
+			`<p>${html(t.registerLinkIntro, who)}</p>`,
+			button(url, t.registerLinkButton),
+			`<p>${html(t.linkIgnore)}</p>`,
+			bareLink(url, language)
+		]),
+		text: `${text(t.registerLinkIntro, who)}\n\n${url}\n\n${text(t.linkIgnore)}`,
+		language
+	};
+}
+
+export function passkeyRegistrationCodeEmail(
+	who: Who,
+	code: string,
+	language: Language = 'en'
+): RenderedEmail {
+	const t = EMAIL_TEXTS[language].passkeys;
+	return {
+		subject: text(t.registerCodeSubject, who),
+		html: frame(language, [
+			`<h2 style="font-size: 20px;">${html(t.registerCodeHeading)}</h2>`,
+			`<p>${html(t.registerCodeIntro, who)}</p>`,
+			`<p style="font-size: 28px; font-weight: bold; letter-spacing: 6px; text-align: center; margin: 24px 0;">${esc(code)}</p>`,
+			`<p>${html(t.linkIgnore)}</p>`
+		]),
+		text: `${text(t.registerCodeIntro, who)}\n\n${code}\n\n${text(t.linkIgnore)}`,
+		language
+	};
+}
+
+export function passkeyRegistrationExistsEmail(
+	who: Who,
+	language: Language = 'en'
+): RenderedEmail {
+	const t = EMAIL_TEXTS[language].passkeys;
+	return {
+		subject: text(t.registerExistsSubject, who),
+		html: frame(language, [
+			`<h2 style="font-size: 20px;">${html(t.registerExistsHeading)}</h2>`,
+			`<p>${html(t.registerExistsIntro, who)}</p>`
+		]),
+		text: text(t.registerExistsIntro, who),
+		language
+	};
+}
+
+export function passkeyRecoveryEmail(
+	who: Who,
+	url: string,
+	language: Language = 'en'
+): RenderedEmail {
+	const t = EMAIL_TEXTS[language].passkeys;
+	return {
+		subject: text(t.recoverySubject, who),
+		html: frame(language, [
+			`<h2 style="font-size: 20px;">${html(t.recoveryHeading)}</h2>`,
+			`<p>${html(t.recoveryIntro, who)}</p>`,
+			button(url, t.recoveryButton),
+			`<p>${html(t.linkIgnore)}</p>`,
+			bareLink(url, language)
+		]),
+		text: `${text(t.recoveryIntro, who)}\n\n${url}\n\n${text(t.linkIgnore)}`,
+		language
+	};
+}
+
+export function passkeyAdminSetupEmail(
+	who: Who,
+	url: string,
+	language: Language = 'en'
+): RenderedEmail {
+	const t = EMAIL_TEXTS[language].passkeys;
+	return {
+		subject: text(t.adminLinkSubject, who),
+		html: frame(language, [
+			`<h2 style="font-size: 20px;">${html(t.adminLinkHeading)}</h2>`,
+			`<p>${html(t.adminLinkIntro, who)}</p>`,
+			button(url, t.adminLinkButton),
+			`<p>${html(t.adminLinkNote)}</p>`,
+			bareLink(url, language)
+		]),
+		text: `${text(t.adminLinkIntro, who)}\n\n${url}\n\n${text(t.adminLinkNote)}`,
+		language
+	};
+}
+
 export type PasskeyNotice =
 	| { kind: 'added'; madeOn: MadeOn; at: number; disownUrl: string }
 	/*

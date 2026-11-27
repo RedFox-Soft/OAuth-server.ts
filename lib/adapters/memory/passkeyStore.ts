@@ -154,6 +154,23 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		return true;
 	}
 
+	async clearRecoveryCaps(
+		bucketId: string,
+		accountId: string
+	): Promise<number> {
+		let cleared = 0;
+		for (const held of this.matching(
+			(record) =>
+				record.bucketId === bucketId &&
+				record.accountId === accountId &&
+				record.recoveredUntil !== undefined
+		)) {
+			delete held.recoveredUntil;
+			cleared += 1;
+		}
+		return cleared;
+	}
+
 	async knownAnywhere(rpId: string, credentialId: string): Promise<boolean> {
 		return [...this.records.values()].some(
 			(held) => held.rpId === rpId && held.credentialId === credentialId

@@ -110,6 +110,10 @@ export interface BucketSummary {
 	 * project and from a server that predates it.
 	 */
 	passkeyHolders?: number;
+	/* Active users without a working passkey, campaign skips, and provider-only passkey holders (specs/145). */
+	withoutPasskey?: number;
+	passkeyCampaignSkipped?: number;
+	providerOnlyPasskeyHolders?: number;
 	/* The instance's `federation.enabled`: the preview's one input the console cannot read elsewhere (specs/091). */
 	federationEnabled: boolean;
 	/*

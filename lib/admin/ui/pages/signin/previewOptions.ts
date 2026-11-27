@@ -11,6 +11,7 @@ export interface PreviewDraft {
 	totpRequired: boolean;
 	/* Passkeys on draws the passkey offer; the preview never starts a prompt (specs/139 FR-012). */
 	passkeyLogin: boolean;
+	passkeyRecovery?: boolean;
 }
 
 /*

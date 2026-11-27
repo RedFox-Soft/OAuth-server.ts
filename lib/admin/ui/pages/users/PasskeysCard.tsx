@@ -14,7 +14,11 @@ const VIA: Record<PasskeyView['createdVia'], string> = {
 	passkey: 'after a passkey sign-in',
 	password_code: 'after a password and a code',
 	password_mail: 'after a password and an emailed link',
-	password: 'after a password alone'
+	password: 'after a password alone',
+	registration: 'at sign-up',
+	recovery: 'via passkey recovery',
+	admin_link: 'via an administrator setup link',
+	federated_mail: 'after a provider sign-in and an emailed link'
 };
 
 const NOT_WORKING: Record<Exclude<PasskeyView['state'], 'works'>, string> = {
@@ -37,18 +41,21 @@ function madeOn(passkey: PasskeyView): string {
 
 /*
  * A person's passkeys on their "Sign-in methods" tab (specs/140 contracts/console-and-mail.md): what each is, whether it
- * signs in here and why not, and for those who manage the project's people, revoking one or all of them.
+ * signs in here and why not, and for those who manage the project's people, revoking one or all of them, or sending a
+ * 24-hour setup link (specs/145 US3).
  */
 export function PasskeysCard({
 	user,
 	of,
 	canManage,
+	passkeysEnabled = false,
 	actions,
 	onRevoked
 }: {
 	user: EndUser;
 	of: PasskeysOfPerson;
 	canManage: boolean;
+	passkeysEnabled?: boolean;
 	actions: UserActions;
 	onRevoked: () => void;
 }) {
@@ -59,13 +66,27 @@ export function PasskeysCard({
 		<Card
 			title="Passkeys"
 			extra={
-				canManage && of.passkeys.length > 0 ? (
-					<Button
-						danger
-						onClick={() => void actions.revokeAllPasskeys(user, of).then(after)}
+				canManage && (passkeysEnabled || of.passkeys.length > 0) ? (
+					<Flex
+						gap={8}
+						wrap
 					>
-						Revoke all…
-					</Button>
+						{passkeysEnabled && (
+							<Button onClick={() => void actions.sendPasskeyLink(user)}>
+								Send passkey setup link…
+							</Button>
+						)}
+						{of.passkeys.length > 0 && (
+							<Button
+								danger
+								onClick={() =>
+									void actions.revokeAllPasskeys(user, of).then(after)
+								}
+							>
+								Revoke all…
+							</Button>
+						)}
+					</Flex>
 				) : undefined
 			}
 		>
@@ -99,6 +120,13 @@ export function PasskeysCard({
 									{passkey.state === 'works' && !passkey.confirmed && (
 										<Tooltip title="Works like their password until they confirm it">
 											<Tag color="gold">Not confirmed</Tag>
+										</Tooltip>
+									)}
+									{passkey.state === 'works' && passkey.recoveredUntil && (
+										<Tooltip
+											title={`Recovered via email: limited to standard two-step sign-in until ${new Date(passkey.recoveredUntil).toLocaleString()}`}
+										>
+											<Tag color="gold">Recovery cooldown</Tag>
 										</Tooltip>
 									)}
 								</Typography.Text>

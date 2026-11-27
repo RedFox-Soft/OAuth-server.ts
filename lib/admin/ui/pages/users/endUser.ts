@@ -75,11 +75,21 @@ export interface PasskeyView {
 	createdOn: { browser: string; system: string };
 	synced: boolean;
 	createdAt: string;
-	createdVia: 'passkey' | 'password_code' | 'password_mail' | 'password';
+	createdVia:
+		| 'passkey'
+		| 'password_code'
+		| 'password_mail'
+		| 'password'
+		| 'registration'
+		| 'recovery'
+		| 'admin_link'
+		| 'federated_mail';
 	lastUsedAt?: string;
 	state: 'works' | 'off' | 'old_address' | 'copied';
 	/* False while a passkey made after a password alone is unconfirmed (specs/141). */
 	confirmed: boolean;
+	/* Present while a recovered passkey is capped at multi_factor (specs/145 Q1=A). */
+	recoveredUntil?: string;
 }
 
 export interface PasskeysOfPerson {

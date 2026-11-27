@@ -74,9 +74,10 @@ import {
 	signInPreview
 } from './sign_in_preview.js';
 import {
-	assertSomeWayToSignIn,
-	prospectiveBucket
+	assertBucketHasWayToSignIn,
+	assertSomeWayToSignIn
 } from '../federation/validate.js';
+import { canSignIn } from '../../end_users/can_sign_in.js';
 import {
 	ChangeBucketAddressBody,
 	CreateBucketBody,
@@ -921,6 +922,9 @@ async function bucketDetail(ctx: AdminContext, bucket: UserBucket) {
 		passkeyLogin: bucket.passkeyLogin === true,
 		/* The offer of a passkey after a password sign-in (specs/141): true when absent. */
 		passkeyOffer: bucket.passkeyOffer !== false,
+		passkeyRecovery: bucket.passkeyRecovery === true,
+		passkeyRequired: bucket.passkeyRequired === true,
+		passkeyForFederated: bucket.passkeyForFederated === true,
 		passkeysPossible: passkeysPossible(ISSUER),
 		passkeysNeedHttps: passkeysNeedHttps(ISSUER),
 		/* What a change to this bucket's sign-in reaches: its applications and the APIs they call. */
@@ -1269,6 +1273,22 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			getPasskeyStore().holdingIn(bucket._id, rpIdFor(bucket))
 		]);
 		const enabled = bucket.federation.filter((provider) => provider.enabled);
+		const holderSet = new Set(holders.map((holder) => holder.accountId));
+		const activeUsers = (await getUserStore(bucket._id).list()).filter((u) =>
+			canSignIn(u)
+		);
+		let withoutPasskey = 0;
+		let passkeyCampaignSkipped = 0;
+		let providerOnlyPasskeyHolders = 0;
+		for (const u of activeUsers) {
+			const hasPasskey = holderSet.has(u._id);
+			if (!hasPasskey) {
+				withoutPasskey += 1;
+				if ((u.passkeyPrompt?.skips ?? 0) >= 1) passkeyCampaignSkipped += 1;
+			} else if (u.passwordSet === false && (u.federated?.length ?? 0) > 0) {
+				providerOnlyPasskeyHolders += 1;
+			}
+		}
 		/* The project's plan, its use and its warnings (specs/102); null for a System project, which has none. */
 		const plan = plansShownTo(ctx)
 			? { plan: await planViewOf(bucket, figure?.total ?? null) }
@@ -1287,6 +1307,9 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			withoutEnabledLink: counts.withoutEnabledLink,
 			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
 			passkeyHolders: holders.length,
+			withoutPasskey,
+			passkeyCampaignSkipped,
+			providerOnlyPasskeyHolders,
 			applications: applications.length,
 			apis: apis.length,
 			groups: groups.totalResults,
@@ -1346,7 +1369,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 * state that an operator closed a bucket's password door when they did not. The provider routes
 			 * enforce the same rule from the other direction, through the same function.
 			 */
-			assertSomeWayToSignIn(prospectiveBucket(bucket, changes));
+			await assertBucketHasWayToSignIn(bucket, changes);
 			/*
 			 * Requiring verification sends a message to everyone unverified at their next sign-in, and refuses
 			 * them until they follow it. Without mail nobody can, so on any bucket the requirement would be a
@@ -1378,6 +1401,27 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 						{ field: 'passkeyOffer' }
 					);
 				}
+				if (changes.passkeyRecovery !== undefined) {
+					throw new AdminError(
+						422,
+						'Self-service passkey recovery is never available for administrators; ask another super administrator to send a setup link.',
+						{ field: 'passkeyRecovery' }
+					);
+				}
+				if (changes.passkeyRequired !== undefined) {
+					throw new AdminError(
+						422,
+						"The passkey adoption campaign does not apply to the administrators' project; use consolePasskeyRequired instead.",
+						{ field: 'passkeyRequired' }
+					);
+				}
+				if (changes.passkeyForFederated !== undefined) {
+					throw new AdminError(
+						422,
+						"passkeyForFederated does not apply to the administrators' project.",
+						{ field: 'passkeyForFederated' }
+					);
+				}
 			} else if (changes.consolePasskeyRequired !== undefined) {
 				throw new AdminError(
 					422,
@@ -1395,6 +1439,54 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 					422,
 					`Passkeys need this instance to be served at a domain name; its address is ${ISSUER}.`,
 					{ field: 'passkeyLogin' }
+				);
+			}
+			const passkeysAfter =
+				changes.passkeyLogin ?? bucket.passkeyLogin === true;
+			const requiredAfter =
+				changes.passkeyRequired ?? bucket.passkeyRequired === true;
+			if (changes.passkeyRecovery === true && !passkeysAfter) {
+				throw new AdminError(
+					409,
+					'Turn on Passkeys before enabling self-service passkey recovery.',
+					{ code: 'passkeys_not_accepted', field: 'passkeyRecovery' }
+				);
+			}
+			if (changes.passkeyRequired === true && !passkeysAfter) {
+				throw new AdminError(
+					409,
+					'Turn on Passkeys before asking everyone to create a passkey.',
+					{ code: 'passkeys_not_accepted', field: 'passkeyRequired' }
+				);
+			}
+			if (changes.passkeyForFederated === true && !passkeysAfter) {
+				throw new AdminError(
+					409,
+					'Turn on Passkeys before allowing identity-provider users to create passkeys.',
+					{ code: 'passkeys_not_accepted', field: 'passkeyForFederated' }
+				);
+			}
+			if (
+				changes.passkeyLogin === false &&
+				bucket.passkeyLogin === true &&
+				requiredAfter
+			) {
+				throw new AdminError(
+					409,
+					'Turn off "Ask everyone to create a passkey" first, or in the same change, before turning passkeys off.',
+					{ field: 'passkeyLogin' }
+				);
+			}
+			if (
+				changes.passkeyForFederated === true &&
+				bucket.passkeyForFederated !== true &&
+				(await getProvisioningConnectionStore().listByBucket(bucket._id))
+					.length > 0
+			) {
+				throw new AdminError(
+					409,
+					'Passkeys for identity-provider users cannot be turned on while a SCIM provisioning connection is configured, so offboarding remains governed by the directory.',
+					{ field: 'passkeyForFederated' }
 				);
 			}
 			if (changes.passwordGuessing) {

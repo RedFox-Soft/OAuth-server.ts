@@ -83,6 +83,7 @@ import {
 	type RemoveRefused
 } from '../passkeys/account.js';
 import { confirmByLink, confirmOnPage } from '../passkeys/offer.js';
+import { isRecoveryCapped } from '../passkeys/recovery_cap.js';
 import { passkeyName } from '../passkeys/names.js';
 import { relyingPartyOf } from '../passkeys/relying_party.js';
 import type { Session } from '../models/session.js';
@@ -264,7 +265,12 @@ function noticeFor(
 		case 'passkey_last':
 			return {
 				kind: 'error',
-				text: text(T.passkeyLast, { service: shownNameOf(person.bucket) })
+				text: text(
+					!person.bucket.passwordLogin
+						? T.passkeyLastPasswordless
+						: T.passkeyLast,
+					{ service: shownNameOf(person.bucket) }
+				)
 			};
 	}
 	return undefined;
@@ -368,6 +374,9 @@ async function passkeysView(
 		synced: passkey.backedUp,
 		via: passkey.createdVia,
 		...(passkey.conditional ? { unconfirmed: true as const } : {}),
+		...(isRecoveryCapped(passkey) && passkey.recoveredUntil
+			? { recoveredUntil: new Date(passkey.recoveredUntil) }
+			: {}),
 		...(passkey.copiedAt
 			? { mark: 'copied' as const }
 			: passkey.rpId !== rpId
@@ -495,7 +504,8 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				};
 			};
 
-			let view: SecurityView;
+			const passkeys = await passkeysView(person, language, query);
+			let view: SecurityView | undefined;
 			if (user.totp) {
 				// A replacement under way shows its new code; otherwise the factor in place.
 				view =
@@ -515,7 +525,11 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				// Without password sign-in nobody here is asked for a code, so it is not theirs to set up either (specs/127).
 				(await selfServiceState(bucket)) === 'no_password_login'
 			) {
-				view = { state: 'noPassword' };
+				// Passwordless passkey-only accounts need no irrelevant Two-step verification section (specs/145 FR-023).
+				view =
+					(passkeys?.rows.length ?? 0) > 0
+						? undefined
+						: { state: 'noPassword' };
 			} else if ((await selfServiceState(bucket)) !== 'on') {
 				view = { state: 'unavailable' };
 			} else if (waiting) {
@@ -529,14 +543,7 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 						!freshPassword(session) && !session.payload.amr?.includes('pwd')
 				};
 			}
-			return securityPage(
-				frame,
-				navOf(person),
-				view,
-				xsrf,
-				notice,
-				await passkeysView(person, language, query)
-			);
+			return securityPage(frame, navOf(person), view, xsrf, notice, passkeys);
 		},
 		{ query: PageQuery }
 	)
@@ -709,15 +716,20 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				}
 				case 'passkey_start': {
 					/*
-					 * Adding a passkey (specs/139 contracts/account-page.md): a strong recent sign-in opens the page's add
-					 * button at once; a fresh password alone mails a link that works only in this browser; anything else
-					 * signs in again, returning to this page and never to the act.
+					 * Adding a passkey (specs/139 contracts/account-page.md, specs/145 US5): a strong recent sign-in opens
+					 * the page's add button at once; a fresh password alone — or for an eligible provider-only user under
+					 * `passkeyForFederated`, any fresh sign-in — mails a link bound to this browser; anything else signs in
+					 * again, returning to this page and never to the act.
 					 */
 					const held = await passkeysOf(bucket, user);
 					if ((await addAvailability(bucket, user, held.length)) !== 'ready')
 						return seeOther(pagePath);
 					if (strongProof(session)) return seeOther(pagePath);
-					if (!freshPassword(session))
+					const providerOnlyFirst = !hasPassword(person) && held.length === 0;
+					const freshEnough = providerOnlyFirst
+						? freshSignIn(session)
+						: freshPassword(session);
+					if (!freshEnough)
 						return reauthenticate(cookie, person, 'passkey_add');
 					const sent = await sendLink(bucket, user, 'passkey_add', holder, {
 						request,
@@ -854,7 +866,11 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				const held = await passkeysOf(bucket, user);
 				if ((await addAvailability(bucket, user, held.length)) !== 'ready')
 					return seeOther(path);
-				await prepareAdd(bucket, user, pageSession(session), 'password_mail');
+				const proof =
+					!hasPassword(person) && held.length === 0
+						? 'federated_mail'
+						: 'password_mail';
+				await prepareAdd(bucket, user, pageSession(session), proof);
 				return seeOther(`${path}?notice=passkey_ready`);
 			}
 			if (link.purpose === 'passkey_remove') {

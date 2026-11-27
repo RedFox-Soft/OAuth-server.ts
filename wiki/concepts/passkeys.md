@@ -39,7 +39,11 @@ same release) adds the operator's view and revocation, the agent's passkey tools
 a passkey block in the address change preview: see "Operator and agent" below. Spec 141 (B) adds the offer after a
 password sign-in, the conditional passkey, the browser's signals and the passkey endpoints: see the section below. Spec
 144 (D3) adds administrator personal passkeys in the console header drawer, super-admin revocation with MCP parity, and
-the `consolePasskeyRequired` policy with reachability protection: see "Administrators and the console" below.
+the `consolePasskeyRequired` policy with reachability protection: see "Administrators and the console" below. Spec 145
+(C) adds passwordless projects (including `Administrators`), pre-account passkey registration, opt-in self-service
+recovery with a 72-hour ACR cap, administrator-sent setup links, the `passkeyRequired` adoption campaign, opt-in
+provider-only passkeys (`passkeyForFederated`), and S10 Attack C protection: see "Passwordless, recovery, enrollment
+links and adoption (spec 145)" below.
 
 ## One RP ID and one origin, both from the issuer
 
@@ -307,6 +311,62 @@ it**, `revokeAccountAccess`, then a password-reset mail where the person has a p
   site, and an app's own "Sign in" button is never on one; the sign-in page already offers passkeys in its suggestions
   and with a button.
 
+## Passwordless, recovery, enrollment links and adoption (spec 145)
+
+- **Passwordless projects (`passwordLogin: false`, `passkeyLogin: true` without IdP)**:
+  - `assertSomeWayToSignIn` (`lib/admin/federation/validate.ts`) admits passkey-only projects once mail delivery is
+    configured and either `registrationOpen` is true or ≥1 active user holds a working passkey (`holdingIn`).
+  - Turning `passwordLogin` off on `ADMIN_BUCKET_ID` without an IdP (`lib/admin/buckets/admin_bucket.ts`, Q3=A) is
+    allowed when `passkeyLogin` is on, mail delivery is configured, the acting super administrator holds a working
+    passkey and signed in with `phishing_resistant`, and `consoleStaysReachable` holds.
+  - `signInPreview` (`lib/admin/buckets/sign_in_preview.ts`) counts active accounts lacking both a working passkey and
+    an enabled provider (`expect.withoutWayIn`), naming up to 20 addresses on regular projects (all on `admin`) and
+    advising about recovery when `passkeyRecovery` is off.
+- **Pre-account passkey registration (`lib/passkeys/registration.ts`, Q2=A, S4)**:
+  - When `passwordLogin === false` and `passkeyLogin === true`, `/ui/:uid/registration` redirects to
+    `/ui/:uid/registration/passkey`. Visitors prove mailbox control **before** any user row is created, honouring
+    `UserBucket.verificationMethod` (`link`: 10-minute browser-bound link; `code`: 6-digit email code with 5-attempt
+    cap).
+  - Existing addresses show the identical post-submit screen and receive an informational "already registered" email
+    without mutating the existing account. `PasskeyRegistrationChallenge` is consumed atomically via `ReplayDetection`,
+    creating the account (`verified: true`, `passwordSet: false`) and passkey (`createdVia: 'registration'`) together
+    and completing sign-in with `phishing_resistant` ACR.
+- **Self-service passkey recovery (`lib/passkeys/recovery.ts`, Q1=A, S3)**:
+  - Controlled by `UserBucket.passkeyRecovery` (default `false`, 422 on `admin`). Sends a 10-minute browser-bound link
+    (`PasskeyRecoveryChallenge`) throttled by `PasskeyLinkThrottle` (after `admitMailRequest`).
+  - Enforces the account's TOTP whenever enrolled regardless of `bucket.totpRequired`, never auto-signs-in (links back
+    to `/ui/:uid/login`), and stamps `Passkey.recoveredUntil = now + 72h` (`createdVia: 'recovery'`).
+  - During the 72-hour window, `isRecoveryCapped` (`lib/passkeys/recovery_cap.ts`) caps sign-ins with that passkey at
+    `multi_factor` ACR (so `freshPasskey`, which requires `meets(acr, 'phishing_resistant')`, blocks silent passkey
+    removal on `/account/security`, and `requirePasskey` refuses it). Signing in with another uncapped full passkey
+    calls `clearRecoveryCaps` across all three stores and records `enduser.passkey.confirm`.
+- **Administrator-sent setup links (`lib/passkeys/admin_link.ts`, `lib/account_page/passkey_setup_routes.ts`, S14)**:
+  - `POST /admin/api/projects/:id/users/:uid/passkey-link` (operator, audit `enduser.passkey.link.send`) and
+    `POST /admin/api/admins/:id/passkey-link` (super-admin only, refuses self-send, audit `admin.passkey.link.send`),
+    published to MCP as high-consequence `project_user_passkey_link_send` and `admin_passkey_link_send`.
+  - Returns `204 No Content` with empty body — the link is delivered by email only and never returned in HTTP/MCP
+    responses or audit details. Refused when email is unverified or `User.emailChangedAt` is within 7 days (`409` with
+    `code: 'email_changed_recently'`).
+  - Standalone `/account/passkey-setup` (mounted bare and under `/:bucket`) is scanner-safe on GET, uses an HttpOnly
+    `_pk_setup` cookie for ceremony/TOTP state, enforces TOTP when enrolled, creates a full passkey
+    (`createdVia: 'admin_link'`, no recovery cap), and consumes the 24-hour `PasskeyAdminLink` atomically.
+- **Adoption campaign (`UserBucket.passkeyRequired`, `User.passkeyPrompt`)**:
+  - Non-admin projects with `passkeyLogin: true` (422 on `admin`; 409 turning on while `passkeyLogin` is off or turning
+    `passkeyLogin` off while on). Prompts every password user without a working passkey via `passkey-offer` in campaign
+    mode (`noteCampaignShown` / `noteCampaignSkip` in `lib/end_users/passkey_offer.ts`): up to 3 skips within 14 days on
+    passkey-capable devices, free `action=unsupported` on unsupported devices without burning a skip, provider sign-ins
+    unaffected. `GET /admin/api/projects/:id/summary` reports `withoutPasskey`, `passkeyCampaignSkipped`, and
+    `providerOnlyPasskeyHolders`.
+- **Opt-in provider-only passkeys & S10 Attack C (`UserBucket.passkeyForFederated`)**:
+  - Off by default, 422 on `admin`, mutually exclusive (409 in both directions) with SCIM provisioning connections
+    (`lib/admin/buckets/routes.ts` & `lib/admin/provisioning/routes.ts`). Eligible provider-only users add a passkey on
+    `/account/security` via `freshSignIn` + browser-bound email link (`createdVia: 'federated_mail'`).
+  - On `/account/security`, passwordless passkey-only accounts (`!user.passwordSet && user.totp === undefined`) omit the
+    Two-step verification section (FR-023).
+  - In `lib/federation/resolve.ts`, an unlinked federated sign-in matching an existing account in a passwordless project
+    holding a working passkey routes through `password_required` (`pendingLink`) rather than auto-linking (closing S10
+    Attack C).
+
 ## Storage: an unowned area, removed by hand
 
 `passkeys` (`lib/consts/storage_inventory.ts:191`, `:825-837`) is **unowned**, unique on `(bucketId, credentialId)`,
@@ -319,10 +379,14 @@ project removes them itself, each with a why-comment:
 - completing a reset of an **unconfirmed** account (`lib/password_reset/challenge.ts:385`), beside `unprovenFactor`;
 - an invitation reclaiming an account whose address was never proven (`lib/admin/groups/accept.ts:166`).
 
-`PasskeyCeremony` is account-owned; `PasskeyAttemptTally` is unowned (keyed by caller and UTC hour). Nothing is
-sealed: a public key grants nothing (`DECLARED_PLAINTEXT`). A no-op migration fence `2026-11-19-passkeys-fence` marks
-the schema version; `db:setup` / `db:setup:pg` provision the areas. `database/verify_passkeys.ts` checks the unique
-index and the conditional writes on a real backend.
+`PasskeyCeremony` is account-owned; `PasskeyAttemptTally` is unowned (keyed by caller and UTC hour). Spec 145 adds four
+more areas: `PasskeyRegistrationChallenge` (unowned, 10-minute TTL), `PasskeyRecoveryChallenge` (account-owned,
+10-minute TTL), `PasskeyAdminLink` (account-owned, 24-hour TTL), and `PasskeyLinkThrottle` (unowned, cleaned on
+`removeEndUser`). Nothing is sealed: a public key grants nothing (`DECLARED_PLAINTEXT`). No-op migration fences
+(`2026-11-19-passkeys-fence`, `2026-11-26-passkey-api-proxy-fence`, `2026-11-27-admin-passkeys-fence`,
+`2026-11-27-passwordless-passkeys-fence`) mark the schema versions; `db:setup` / `db:setup:pg` provision the areas.
+`database/verify_passkeys.ts` checks the unique index, conditional writes, `clearRecoveryCaps`, and new model areas on a
+real backend.
 
 ## Related
 

@@ -86,6 +86,8 @@ export interface PasskeyView {
 	state: PasskeyState;
 	/* False for a passkey made after a password alone and not yet confirmed: it signs in as that password (specs/141). */
 	confirmed: boolean;
+	/* ISO timestamp until which a recovered passkey is capped at multi_factor ACR (specs/145 Q1=A). */
+	recoveredUntil?: string;
 }
 
 function isoOf(value: Date | string): string {
@@ -107,7 +109,10 @@ export function passkeyView(passkey: Passkey, bucket: UserBucket): PasskeyView {
 			? {}
 			: { lastUsedAt: isoOf(passkey.lastUsedAt) }),
 		state: passkeyState(passkey, bucket),
-		confirmed: passkey.conditional !== true
+		confirmed: passkey.conditional !== true,
+		...(passkey.recoveredUntil === undefined
+			? {}
+			: { recoveredUntil: isoOf(passkey.recoveredUntil) })
 	};
 }
 

@@ -102,7 +102,14 @@ const OfferProps = Type.Object({
 	silent: Type.Optional(Type.Boolean()),
 	askNever: Type.Optional(Type.Boolean()),
 	conditional: Type.Optional(Type.Boolean()),
-	refused: Type.Optional(Type.String())
+	refused: Type.Optional(Type.String()),
+	campaign: Type.Optional(
+		Type.Object({
+			canSkip: Type.Boolean(),
+			skipsLeft: Type.Number(),
+			maxSkips: Type.Number()
+		})
+	)
 });
 
 /* What the offer page carries for its script. */

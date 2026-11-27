@@ -24,7 +24,10 @@ function wire(form: HTMLFormElement): void {
 	const status = form.querySelector<HTMLElement>('[data-passkey-status]');
 	const options = form.dataset.options;
 	if (!button || !credential || options === undefined) return;
-	if (!browserSupportsWebAuthn()) return;
+	if (!browserSupportsWebAuthn()) {
+		if (form.dataset.textUnsupported) say(status, form.dataset.textUnsupported);
+		return;
+	}
 	// Parsed from the server's own attribute: the creation options, as lib/passkeys/ceremony.ts made them.
 	const optionsJSON = JSON.parse(
 		options

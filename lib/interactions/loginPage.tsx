@@ -124,6 +124,7 @@ export function LoginPage({
 	face,
 	listRefusal,
 	passkey,
+	passkeyRecovery = false,
 	unknownPasskey
 }: {
 	uid: string;
@@ -134,6 +135,8 @@ export function LoginPage({
 	unknownPasskey?: { rpId: string; credentialId: string };
 	/* Signing in with a passkey, offered in every form of this page where the project accepts passkeys (specs/139). */
 	passkey?: PasskeyOnPage;
+	/* Self-service passkey recovery enabled on this non-admin project (specs/145 Q1=A). */
+	passkeyRecovery?: boolean;
 	errorMessage?: string;
 	notice?: string;
 	/*
@@ -279,6 +282,13 @@ export function LoginPage({
 					{T.login.passkeyCancelled}
 				</span>
 			)}
+			{passkeyRecovery && (
+				<div style={{ textAlign: 'center', marginTop: 4 }}>
+					<a href={buildUIPath(uid, 'passkey-recovery')}>
+						{T.login.forgotPasskey}
+					</a>
+				</div>
+			)}
 		</Flex>
 	);
 	/*
@@ -299,6 +309,11 @@ export function LoginPage({
 				inputMode="email"
 			/>
 			{passkeyButton}
+			{!passwordLogin && registrationOpen && (
+				<div style={{ textAlign: 'center', marginTop: 4 }}>
+					<a href={buildUIRegistrationPath(uid)}>{T.login.register}</a>
+				</div>
+			)}
 		</Flex>
 	);
 	const link = (provider: OfferedProvider) => (

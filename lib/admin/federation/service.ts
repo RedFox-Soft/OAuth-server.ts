@@ -55,7 +55,7 @@ import {
 	assertIssuer,
 	assertProviderId,
 	assertScopes,
-	assertSomeWayToSignIn,
+	assertBucketHasWayToSignIn,
 	assertSuppliedValues,
 	assertTenant
 } from './validate.js';
@@ -698,10 +698,7 @@ export async function updateProvider(
 	);
 	// Disabling the last enabled provider on a bucket with no password door is a lockout, checked by the
 	// same function the bucket PATCH uses.
-	assertSomeWayToSignIn({
-		passwordLogin: bucket.passwordLogin,
-		federation
-	});
+	await assertBucketHasWayToSignIn(bucket, { federation });
 	await assertConsoleKeepsADoor(
 		bucket,
 		federation,
@@ -744,10 +741,7 @@ export async function deleteProvider(
 	find(bucket, providerId);
 	await assertNotBound(bucket, providerId, 'deleted');
 	const federation = providersOf(bucket).filter((p) => p.id !== providerId);
-	assertSomeWayToSignIn({
-		passwordLogin: bucket.passwordLogin,
-		federation
-	});
+	await assertBucketHasWayToSignIn(bucket, { federation });
 	await assertConsoleKeepsADoor(
 		bucket,
 		federation,

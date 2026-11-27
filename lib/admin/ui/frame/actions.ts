@@ -522,6 +522,16 @@ export const ACTIONS = {
 		title: (t) => `Revoke all passkeys of ${t}?`,
 		okText: 'Revoke all'
 	},
+	'admin.passkey.linkSend': {
+		class: 'C1',
+		title: (t) => `Send a passkey setup link to ${t}?`,
+		okText: 'Send link'
+	},
+	'enduser.passkey.linkSend': {
+		class: 'C1',
+		title: (t) => `Send a passkey setup link to ${t}?`,
+		okText: 'Send link'
+	},
 	'me.passkey.remove': {
 		class: 'C2',
 		title: () => 'Remove this passkey?',

@@ -38,11 +38,19 @@ if (!THROWAWAY.test(database)) {
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
 const {
 	adminSessionStore,
+	checkedAdapter,
 	getBehindProxyAppStore,
 	getBucketStore,
 	getPasskeyStore,
-	getProtectedResourceStore
+	getProtectedResourceStore,
+	getUserStore
 } = await import('../lib/adapters/index.js');
+const {
+	PasskeyAdminLinkPayload,
+	PasskeyLinkThrottlePayload,
+	PasskeyRecoveryChallengePayload,
+	PasskeyRegistrationChallengePayload
+} = await import('../lib/passkeys/types.js');
 type Passkey = import('../lib/adapters/types.js').Passkey;
 
 let failures = 0;
@@ -498,6 +506,171 @@ await store.removeAllIn(other);
 		})
 	);
 	await adminSessionStore.destroy(session._id);
+}
+
+/* ---------------------------------------------------------- Passwordless passkeys, recovery & links (specs/145) */
+{
+	const capBucket = `verify-passkeys-145-${String(stamp)}`;
+	const capEnd = new Date(Date.now() + 72 * 60 * 60 * 1000);
+	const recKey = passkey({
+		bucketId: capBucket,
+		accountId: 'maya',
+		createdVia: 'recovery',
+		recoveredUntil: capEnd
+	});
+	await store.create(recKey);
+	const loadedRec = await store.find(capBucket, recKey._id);
+	check(
+		'Passkey.recoveredUntil persists on create (specs/145)',
+		loadedRec?.createdVia === 'recovery' &&
+			loadedRec.recoveredUntil?.getTime() === capEnd.getTime()
+	);
+	const lifted = await store.clearRecoveryCaps(capBucket, 'maya');
+	const afterLift = await store.find(capBucket, recKey._id);
+	check(
+		'clearRecoveryCaps lifts recoveredUntil on real backend (specs/145)',
+		lifted === 1 && afterLift?.recoveredUntil === undefined,
+		`lifted=${String(lifted)}, recoveredUntil=${String(afterLift?.recoveredUntil)}`
+	);
+	await store.removeAllIn(capBucket);
+
+	const exp = Math.floor(Date.now() / 1000) + 600;
+	const regAdapter = checkedAdapter(
+		'PasskeyRegistrationChallenge',
+		PasskeyRegistrationChallengePayload
+	);
+	const regId = `reg-${String(stamp)}`;
+	await regAdapter.upsert(
+		regId,
+		{
+			bucketId: capBucket,
+			email: 'maya@example.test',
+			holder: 'h-1',
+			method: 'link',
+			language: 'en',
+			attempts: 0,
+			exists: false,
+			exp
+		},
+		600
+	);
+	const loadedReg = await regAdapter.find(regId);
+	await regAdapter.destroy(regId);
+	check(
+		'PasskeyRegistrationChallenge upserts, reads, and destroys (specs/145)',
+		loadedReg?.email === 'maya@example.test' && loadedReg.method === 'link'
+	);
+
+	const recAdapter = checkedAdapter(
+		'PasskeyRecoveryChallenge',
+		PasskeyRecoveryChallengePayload
+	);
+	const recId = `rec-${String(stamp)}`;
+	await recAdapter.upsert(
+		recId,
+		{
+			bucketId: capBucket,
+			accountId: 'maya',
+			email: 'maya@example.test',
+			holder: 'h-2',
+			language: 'en',
+			exp
+		},
+		600
+	);
+	const loadedRecCh = await recAdapter.find(recId);
+	await recAdapter.destroy(recId);
+	check(
+		'PasskeyRecoveryChallenge upserts, reads, and destroys (specs/145)',
+		loadedRecCh?.accountId === 'maya' && loadedRecCh.holder === 'h-2'
+	);
+
+	const linkAdapter = checkedAdapter(
+		'PasskeyAdminLink',
+		PasskeyAdminLinkPayload
+	);
+	const linkId = `adm-${String(stamp)}`;
+	await linkAdapter.upsert(
+		linkId,
+		{
+			bucketId: capBucket,
+			accountId: 'maya',
+			email: 'maya@example.test',
+			sentBy: 'super-1',
+			language: 'en',
+			exp
+		},
+		600
+	);
+	const loadedLink = await linkAdapter.find(linkId);
+	await linkAdapter.destroy(linkId);
+	check(
+		'PasskeyAdminLink upserts, reads, and destroys (specs/145)',
+		loadedLink?.sentBy === 'super-1' && loadedLink.email === 'maya@example.test'
+	);
+
+	const thrAdapter = checkedAdapter(
+		'PasskeyLinkThrottle',
+		PasskeyLinkThrottlePayload
+	);
+	const thrId = `adm:${capBucket}:maya`;
+	const nowSec = Math.floor(Date.now() / 1000);
+	await thrAdapter.upsert(
+		thrId,
+		{
+			lastSentAt: nowSec,
+			windowStart: nowSec,
+			dayCount: 1,
+			challengeId: linkId,
+			exp
+		},
+		600
+	);
+	const loadedThr = await thrAdapter.find(thrId);
+	await thrAdapter.destroy(thrId);
+	check(
+		'PasskeyLinkThrottle upserts, reads, and destroys (specs/145)',
+		loadedThr?.dayCount === 1 && loadedThr.challengeId === linkId
+	);
+
+	const buckets = getBucketStore();
+	const createdBucket = await buckets.create({
+		ownerGroupId: 'unassigned',
+		name: `Spec145 ${String(stamp)}`,
+		slug: `spec145-${String(stamp)}`
+	});
+	await buckets.update(createdBucket._id, {
+		passkeyLogin: true,
+		passkeyRecovery: true,
+		passkeyRequired: true,
+		passkeyForFederated: true
+	});
+	const loadedBucket = await buckets.find(createdBucket._id);
+	check(
+		'UserBucket persists passkeyRecovery, passkeyRequired, and passkeyForFederated (specs/145)',
+		loadedBucket?.passkeyRecovery === true &&
+			loadedBucket.passkeyRequired === true &&
+			loadedBucket.passkeyForFederated === true
+	);
+
+	const userStore = getUserStore(createdBucket._id);
+	const emailAt = new Date();
+	const createdUser = await userStore.create('maya145@example.test', 'hash');
+	await userStore.update(createdUser._id, {
+		emailChangedAt: emailAt,
+		passkeyPrompt: {
+			firstShownAt: emailAt,
+			skips: 2
+		}
+	});
+	const loadedUser = await userStore.find(createdUser._id);
+	check(
+		'User persists emailChangedAt and passkeyPrompt (specs/145)',
+		loadedUser?.emailChangedAt?.getTime() === emailAt.getTime() &&
+			loadedUser.passkeyPrompt?.skips === 2
+	);
+	await userStore.destroy(createdUser._id);
+	await buckets.destroy(createdBucket._id);
 }
 
 console.log(

@@ -226,6 +226,12 @@ const routes = [
 		path: '/admin/api/admins/:id/passkeys',
 		targetType: 'AdminUser'
 	},
+	{
+		action: 'admin.passkey.link.send',
+		method: 'POST',
+		path: '/admin/api/admins/:id/passkey-link',
+		targetType: 'AdminUser'
+	},
 	/*
 	 * A read, audited (specs/137): an administrator's sign-ins hold their network addresses, so which super
 	 * administrator read them is kept, once per reader, administrator and day, never what was read.
@@ -464,6 +470,12 @@ const routes = [
 		action: 'enduser.passkey.revoke.all',
 		method: 'DELETE',
 		path: '/admin/api/projects/:id/users/:uid/passkeys',
+		targetType: 'EndUser'
+	},
+	{
+		action: 'enduser.passkey.link.send',
+		method: 'POST',
+		path: '/admin/api/projects/:id/users/:uid/passkey-link',
 		targetType: 'EndUser'
 	},
 	/*

@@ -59,6 +59,7 @@ interface SignInPatch {
 	totpRequired?: boolean;
 	passwordGuessing?: Pick<PasswordGuessingSetting, 'mode'>;
 	passkeyLogin?: boolean;
+	passkeyRecovery?: boolean;
 	consolePasskeyRequired?: boolean;
 }
 
@@ -166,6 +167,45 @@ export async function signInPreview(
 	for (const change of changes) {
 		switch (change) {
 			case 'passwordsOff': {
+				const passkeysAfter =
+					patch.passkeyLogin ?? bucket.passkeyLogin === true;
+				const recoveryAfter =
+					patch.passkeyRecovery ?? bucket.passkeyRecovery === true;
+				if (passkeysAfter) {
+					const holders = new Set(
+						(
+							await getPasskeyStore().holdingIn(bucket._id, rpIdFor(bucket))
+						).map((holder) => holder.accountId)
+					);
+					const accounts = (await getUserStore(bucket._id).list()).filter(
+						(user) => canSignIn(user)
+					);
+					const providers = consoleBucket
+						? (await loadReachabilityState()).providers
+						: bucket.federation;
+					const without = accounts.filter(
+						(user) =>
+							!holders.has(user._id) &&
+							!reachableThroughProvider(user, providers)
+					);
+					expect.withoutWayIn = without.length;
+					const shown = consoleBucket ? without : without.slice(0, 20);
+					const more = without.length - shown.length;
+					const names =
+						shown.length > 0
+							? `: ${shown.map((user) => user.email).join(', ')}${more > 0 ? `, and ${String(more)} more` : ''}.`
+							: '.';
+					const noun = consoleBucket ? 'administrator' : 'user';
+					consequences.push(
+						`${without.length} of ${plural(accounts.length, noun)} ${without.length === 1 ? 'has' : 'have'} neither a working passkey nor a linked identity provider and will not be able to sign in${names}`
+					);
+					if (!consoleBucket && !recoveryAfter) {
+						consequences.push(
+							'Self-service passkey recovery is off: anyone who loses their passkeys will need an administrator to send them a setup link.'
+						);
+					}
+					break;
+				}
 				if (consoleBucket) {
 					/*
 					 * Named, not only counted: these are colleagues, few, and the person turning passwords off has

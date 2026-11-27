@@ -97,6 +97,7 @@ export function SignInPreview({
 						passwordLogin={options.passwordLogin}
 						registrationOpen={options.registrationOpen}
 						passwordReset={options.passwordReset}
+						passkeyRecovery={options.passkeyRecovery}
 						providers={options.providers}
 						providersOpen
 						face={{ service }}

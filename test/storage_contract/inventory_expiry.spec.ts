@@ -81,6 +81,14 @@ const REAPED_ON_EXPIRES_AT = [
 	'PasskeyAttemptTally',
 	'PasskeyCeremony',
 	/*
+	 * Pre-account passkey registration, self-service recovery, admin setup links, and their throttles (specs/145):
+	 * expiry enforces each link's 10m/24h lifetime and throttle window.
+	 */
+	'PasskeyRegistrationChallenge',
+	'PasskeyRecoveryChallenge',
+	'PasskeyAdminLink',
+	'PasskeyLinkThrottle',
+	/*
 	 * Attacker-list sign-in counts (specs/125). Expiry is the control: the figure an administrator decides with is
 	 * the last 7 days, and records that never expired would keep a project's old weeks in it.
 	 */

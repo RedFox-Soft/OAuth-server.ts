@@ -188,6 +188,31 @@ export const en = {
 		revokedAllIntro:
 			'The people who run {service} removed every passkey from your account, {email} ({count} in all).',
 		signedOutEverywhere: 'You were signed out everywhere.',
-		revokedTell: 'If you did not ask for this, tell them.'
+		revokedTell: 'If you did not ask for this, tell them.',
+		registerLinkSubject: 'Confirm your email to create your {service} passkey',
+		registerLinkHeading: 'Finish creating your account',
+		registerLinkIntro:
+			'Open this link in the browser where you started, within 10 minutes, to create a passkey for your {service} account ({email}).',
+		registerLinkButton: 'Continue with a passkey',
+		registerCodeSubject: 'Your {service} sign-up code',
+		registerCodeHeading: 'Confirm your email address',
+		registerCodeIntro:
+			'Enter this 6-digit code in the browser where you started, within 10 minutes, to create a passkey for {service}:',
+		registerExistsSubject: 'You already have a {service} account',
+		registerExistsHeading: 'Account already exists',
+		registerExistsIntro:
+			'Someone tried to create a new {service} account with {email}, which is already registered. Nothing was changed. Sign in with your existing method or recover your account if needed.',
+		recoverySubject: 'Recover your {service} passkey',
+		recoveryHeading: 'Add a new passkey',
+		recoveryIntro:
+			'Open this link in the browser where you requested it, within 10 minutes, to add a new passkey to your {service} account ({email}).',
+		recoveryButton: 'Add a new passkey',
+		adminLinkSubject: 'Set up a passkey for your {service} account',
+		adminLinkHeading: 'Set up your passkey',
+		adminLinkIntro:
+			'An administrator sent you a one-time link to add a passkey to your {service} account ({email}). Open it on the device where you want to save your passkey within 24 hours.',
+		adminLinkButton: 'Set up passkey',
+		adminLinkNote:
+			'If you have an authenticator app on your account, you will also need a code from it. If you did not expect this link, ignore this email.'
 	}
 } as const;

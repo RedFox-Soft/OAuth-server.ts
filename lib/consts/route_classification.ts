@@ -101,6 +101,7 @@ export const bucketScopedPaths: readonly string[] = [
 	routeNames.account_security_disown,
 	routeNames.account_passkey_disown,
 	routeNames.account_passkey_confirm,
+	routeNames.account_passkey_setup,
 	routeNames.account_sign_ins,
 	routeNames.account_not_me,
 	BEHIND_PROXY_CHECK_BASE
@@ -344,6 +345,9 @@ const bareAlwaysAvailableRoutes: readonly AlwaysAvailableRoute[] = [
 	/* "Yes, this was me" about a passkey made after a password alone (specs/141), unconditional for the same reason. */
 	{ method: 'GET', path: routeNames.account_passkey_confirm },
 	{ method: 'POST', path: routeNames.account_passkey_confirm },
+	/* Standalone administrator-sent passkey setup link (specs/145), unconditional so locked-out people can enroll. */
+	{ method: 'GET', path: routeNames.account_passkey_setup },
+	{ method: 'POST', path: routeNames.account_passkey_setup },
 	/*
 	 * Where a password manager manages a host's passkeys (specs/141). A file the browser and its password manager read
 	 * about this host, unconditional as discovery is; it names a page and changes nothing.
@@ -581,7 +585,21 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'POST', path: '/ui/:uid/login', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/verification/resend', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/registration', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/registration/passkey', rate: 'strict' },
+	{
+		method: 'POST',
+		path: '/ui/:uid/registration/passkey/code',
+		rate: 'strict'
+	},
+	{
+		method: 'POST',
+		path: '/ui/:uid/registration/passkey/create',
+		rate: 'strict'
+	},
 	{ method: 'POST', path: '/ui/:uid/forgot-password', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/passkey-recovery', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/passkey-recovery/totp', rate: 'strict' },
+	{ method: 'POST', path: '/ui/:uid/passkey-recovery/create', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp', rate: 'strict' },
 	{ method: 'POST', path: '/ui/:uid/totp/enroll', rate: 'strict' },
 	// The passkey door (specs/139): it verifies a signature, and has its own per-caller bound of failures behind this.
@@ -591,6 +609,8 @@ const bareRateRoutes: readonly RateRoute[] = [
 	{ method: 'POST', path: routeNames.account_security_disown, rate: 'strict' },
 	// The passkey "This wasn't me" removes passkeys, signs the account out everywhere and may send a reset mail.
 	{ method: 'POST', path: routeNames.account_passkey_disown, rate: 'strict' },
+	// Standalone administrator-sent passkey setup link checks TOTP and verifies attestation (specs/145).
+	{ method: 'POST', path: routeNames.account_passkey_setup, rate: 'strict' },
 	// Signing out everywhere sweeps every record of the account and may send a reset mail (specs/135).
 	{ method: 'POST', path: routeNames.account_sign_ins, rate: 'strict' },
 	// "This wasn't me" sweeps every record of the account like it (specs/138).

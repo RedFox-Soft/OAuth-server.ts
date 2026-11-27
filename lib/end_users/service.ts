@@ -1,6 +1,7 @@
 import { randomBytes } from 'node:crypto';
 
 import {
+	adapter,
 	getBucketGroupStore,
 	getPasskeyStore,
 	getUserStore
@@ -261,12 +262,11 @@ export async function updateEndUser(
 	 * A new login address is not verified by having been typed. Left as it was, a changed address would
 	 * inherit the old one's verification — and the password-reset door mails whatever address is on file.
 	 */
-	if (
-		input.email !== undefined &&
-		input.email.toLowerCase() !== user.email &&
-		patch.verified === undefined
-	) {
-		patch.verified = false;
+	if (input.email !== undefined && input.email.toLowerCase() !== user.email) {
+		patch.emailChangedAt = new Date();
+		if (patch.verified === undefined) {
+			patch.verified = false;
+		}
 	}
 
 	await record({
@@ -360,6 +360,14 @@ export async function removeEndUser(
 	await getPasskeyStore().removeAllOf(bucket._id, id);
 	/* And the "This wasn't me" links mailed to them: unowned so a sign-out everywhere keeps them. */
 	await forgetNotMeLinksOf(id);
+	/* Clean up passkey link throttle records addressed by computed id (specs/145). */
+	const passkeyThrottles = adapter('PasskeyLinkThrottle');
+	await passkeyThrottles.destroy(`adm:${bucket._id}:${id}`);
+	if (user.email) {
+		const lower = user.email.toLowerCase();
+		await passkeyThrottles.destroy(`reg:${bucket._id}:${lower}`);
+		await passkeyThrottles.destroy(`rec:${bucket._id}:${lower}`);
+	}
 	return cascadeForAccount(id, scopedId);
 }
 

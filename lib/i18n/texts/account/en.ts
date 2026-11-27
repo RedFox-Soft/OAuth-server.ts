@@ -253,6 +253,12 @@ export const en = {
 		'Added after signing in with your password and an emailed link',
 	/* A conditional passkey (specs/141): made at the offer after a password alone, and not yet confirmed. */
 	passkeyViaPassword: 'Added after signing in with your password',
+	passkeyViaRegistration: 'Created when you signed up',
+	passkeyViaRecovery: 'Added via email passkey recovery',
+	passkeyViaAdminLink: 'Added using an administrator setup link',
+	passkeyViaFederatedMail: 'Added after provider sign-in and an emailed link',
+	passkeyRecoveryCapped:
+		'Limited to standard sign-in until {date} UTC; sign in with another passkey to lift early',
 	passkeyUnconfirmed: 'Not confirmed: works like your password',
 	passkeyConfirm: 'Confirm',
 	passkeyConfirmNeeds:
@@ -277,6 +283,29 @@ export const en = {
 		'Check your email: we sent a link to {email}. Open it in this browser within 10 minutes to remove the passkey.',
 	passkeyLast:
 		'This is your only way to sign in to {service}. Add another way first: a password or another passkey.',
+	passkeyLastPasswordless:
+		'This is your only passkey for {service}. Add another passkey first, for example on your phone, then you can remove this one.',
+	passkeySetupTitle: 'Set up your passkey',
+	passkeySetupHeading: 'Set up a passkey for {service}',
+	passkeySetupIntro:
+		'Add a passkey to your account, {email}, on this device or in your password manager.',
+	passkeySetupInvalidTitle: 'This link is no longer valid',
+	passkeySetupInvalid:
+		'This passkey setup link has expired or has already been used. Ask an administrator for a new one.',
+	passkeySetupTotpHeading: 'Confirm with your authenticator app',
+	passkeySetupTotpHint:
+		'Enter the 6-digit code from your authenticator app before adding a passkey to {email}.',
+	passkeySetupTotpLost:
+		'Lost both your passkey and your authenticator app? Ask an administrator to remove the authenticator app first.',
+	passkeySetupTotpLabel: 'Code from your authenticator app',
+	passkeySetupTotpButton: 'Continue',
+	passkeySetupTotpWrong: 'That code did not work. Try the code shown now.',
+	passkeySetupButton: 'Create passkey',
+	passkeySetupDoneTitle: 'Passkey added',
+	passkeySetupDone:
+		'Your new passkey is ready for {email}. You can now sign in with it.',
+	passkeySetupSignIn: 'Go to sign-in',
+	passkeySetupConsole: 'Open the admin console',
 	/* "This wasn't me" from the email about an added passkey (specs/139 research R16). */
 	passkeyDisownTitle: 'Remove this passkey from {email}?',
 	passkeyDisownEffect:

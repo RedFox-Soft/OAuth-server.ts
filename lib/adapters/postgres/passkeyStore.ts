@@ -226,6 +226,21 @@ export class PasskeyStore implements PasskeyStoreInstance {
 		return rows.length === 1;
 	}
 
+	async clearRecoveryCaps(
+		bucketId: string,
+		accountId: string
+	): Promise<number> {
+		const handle = sql();
+		const rows = await handle`
+			UPDATE ${handle(this.area)} SET doc = doc - 'recoveredUntil'
+			WHERE doc->>'bucketId' = ${bucketId}
+				AND doc->>'accountId' = ${accountId}
+				AND doc ? 'recoveredUntil'
+			RETURNING id
+		`;
+		return rows.length;
+	}
+
 	async knownAnywhere(rpId: string, credentialId: string): Promise<boolean> {
 		const handle = sql();
 		const rows = await handle`

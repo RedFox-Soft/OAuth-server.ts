@@ -65,6 +65,10 @@ import {
 } from '../../totp/self_service.js';
 import { applicationSessions } from '../../end_users/sessions.js';
 import { notifyPasskey } from '../../passkeys/notify.js';
+import {
+	checkAdminPasskeyLinkEligibility,
+	issueAdminPasskeyLink
+} from '../../passkeys/admin_link.js';
 import { passkeysOfPerson } from '../../passkeys/ways_in.js';
 import { activityPage, activitySummary } from '../../person_activity/read.js';
 import { recordActivityRead } from '../../person_activity/audit.js';
@@ -117,6 +121,8 @@ export const presentUser = <
 		connectionsDeclined?: unknown;
 		webauthnUserId?: string;
 		passkeyOffer?: unknown;
+		passkeyPrompt?: unknown;
+		emailChangedAt?: unknown;
 	}
 >(
 	user: T
@@ -125,7 +131,8 @@ export const presentUser = <
 	 * The derived keys are index material, not facts about the person; they stay with the store. So does the list of
 	 * accounts the person disconnected themselves (specs/120): their choice, which no administrator acts on. And so does
 	 * the person's passkey identity (specs/139): the user handle their devices hand back, which nothing an
-	 * administrator does needs. Nor how the person answered the passkey offer (specs/141): theirs alone.
+	 * administrator does needs. Nor how the person answered the passkey offer or campaign prompt (specs/141, specs/145),
+	 * or the internal email-change cooldown timestamp.
 	 */
 	const {
 		password: _password,
@@ -135,6 +142,8 @@ export const presentUser = <
 		connectionsDeclined: _connectionsDeclined,
 		webauthnUserId: _webauthnUserId,
 		passkeyOffer: _passkeyOffer,
+		passkeyPrompt: _passkeyPrompt,
+		emailChangedAt: _emailChangedAt,
 		...safe
 	} = user;
 	return {
@@ -920,6 +929,40 @@ export const endUserRoutes = new Elysia({ name: 'admin-users-end' })
 				);
 			}
 			return { removed, mailed };
+		}
+	)
+	/*
+	 * Administrator-sent passkey setup link (specs/145 US3, S14): mailed ONLY (204 No Content), never returned in the
+	 * response or recorded in the audit trail. Refused on unverified addresses, recent email changes (< 7 days),
+	 * inactive accounts, missing mail, full passkey slots, or per-account rate limits.
+	 */
+	.post(
+		'/admin/api/projects/:id/users/:uid/passkey-link',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			const bucket = await loadBucketForUsers(ctx, params.id);
+			const user = await getUserStore(bucket._id).find(params.uid);
+			if (!user) throw new AdminError(404, 'user not found');
+			const eligible = await checkAdminPasskeyLinkEligibility(bucket, user);
+			if (!eligible.ok) {
+				throw new AdminError(eligible.status, eligible.message, {
+					...(eligible.retryAfter !== undefined
+						? { retryAfter: eligible.retryAfter }
+						: {}),
+					...(eligible.code === 'email_changed_recently' ||
+					eligible.code === 'passkeys_not_accepted'
+						? { code: eligible.code }
+						: {})
+				});
+			}
+			await recordAdminAudit(ctx, 'enduser.passkey.link.send', user._id, {
+				...scope(bucket)
+			});
+			const issued = await issueAdminPasskeyLink(bucket, user, ctx.userId);
+			if (!issued.ok) {
+				throw new AdminError(502, 'Could not deliver the passkey setup email.');
+			}
+			return new Response(null, { status: 204 });
 		}
 	)
 	/*

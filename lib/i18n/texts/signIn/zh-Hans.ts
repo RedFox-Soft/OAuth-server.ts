@@ -33,6 +33,7 @@ export const zhHans: SignInTexts = {
 		moreProviders: '更多登录方式',
 		signInWith: '使用{provider}登录',
 		passkey: '使用通行密钥登录',
+		forgotPasskey: '丢失了通行密钥？',
 		passkeyNoScript: '使用通行密钥登录需要启用 JavaScript。',
 		passkeyCancelled: '此设备上没有通行密钥？请使用下方的其他方式登录。',
 		listRefusal: {
@@ -90,6 +91,8 @@ export const zhHans: SignInTexts = {
 		verifyUnsent: '我们无法发送验证邮件。请稍后重试。',
 		federationLink:
 			'此电子邮件地址在此处已有账户。请使用该账户的密码登录一次，以将其关联到您的身份提供商。',
+		federationLinkPasskey:
+			'此电子邮件地址在此处已有使用通行密钥的账户。请使用您的通行密钥登录以将其关联到您的身份提供商。',
 		mailLimited: '您的网络在过去一小时内请求的邮件过多。请稍后再试。',
 		freshSignIn: '{host} 要求您重新登录以打开此页面。',
 		freshSignInCode:
@@ -153,7 +156,67 @@ export const zhHans: SignInTexts = {
 		createdConditional:
 			'我们已向 {email} 发送一封邮件。请在此浏览器中打开它，并选择“是的，是我本人”以完成设置。',
 		continueApp: '继续前往 {app}',
-		continueAny: '继续'
+		continueAny: '继续',
+		campaignHeading: '为{service}创建通行密钥',
+		campaignExplain:
+			'{service}希望所有人为 {email} 设置通行密钥。在关闭密码登录之前，您的密码仍可使用。',
+		campaignSkip: '暂时跳过（剩余 {left}/{total} 次）',
+		campaignMandatory: '跳过次数已用完。请立即创建通行密钥以继续。',
+		campaignUnsupported:
+			'此设备无法创建通行密钥。下次请使用手机或其他支持通行密钥的设备登录。',
+		campaignContinueThisTime: '本次继续',
+		campaignUnverified:
+			'创建通行密钥之前，请先验证您的电子邮件地址（{email}）。'
+	},
+
+	passkeyRegister: {
+		title: '使用通行密钥注册',
+		heading: '使用通行密钥创建您的{service}账户',
+		withPasskey: '使用通行密钥注册',
+		passwordInstead: '改为设置密码',
+		emailLabel: '电子邮件地址',
+		continueButton: '使用通行密钥继续',
+		sentHeading: '请查看您的邮箱',
+		sentLink:
+			'我们已向 {email} 发送了注册链接。请在 10 分钟内在此浏览器中打开它以创建通行密钥。',
+		sentCode:
+			'我们已向 {email} 发送了 6 位验证码。请在 10 分钟内在下方输入以创建通行密钥。',
+		codeLabel: '6 位验证码',
+		codeVerify: '继续',
+		codeInvalid: '验证码无效。请查看邮件后重试。',
+		codeTooMany: '错误次数过多。请重新开始注册。',
+		createHeading: '创建您的通行密钥',
+		createHint:
+			'您的邮箱（{email}）已确认。请在此设备或密码管理器中保存通行密钥以完成注册。',
+		createButton: '创建通行密钥',
+		unsupported:
+			'此设备无法创建通行密钥。请在手机或其他支持通行密钥的设备上打开此页面。',
+		unavailable: '由于未配置邮件发送，通行密钥注册暂时不可用。',
+		duplicate: '该电子邮件地址已注册。请返回登录页面访问您的账户。',
+		invalidLink: '此注册链接已失效。请在此浏览器中重新开始注册。',
+		backToSignIn: '返回登录'
+	},
+
+	passkeyRecovery: {
+		title: '恢复您的通行密钥',
+		heading: '丢失了通行密钥？',
+		intro:
+			'输入您的电子邮件地址。如果您的账户符合条件，我们将发送一个 10 分钟内仅在此浏览器有效的恢复链接。',
+		submit: '发送恢复链接',
+		sentHeading: '请查看您的邮箱',
+		sentHint:
+			'如果 {email} 存在符合条件的账户，我们已发送恢复链接。请在 10 分钟内在此浏览器中打开它。',
+		invalidLink: '此恢复链接已失效。请在此浏览器中重新申请。',
+		totpHeading: '使用身份验证器应用确认',
+		totpHint: '添加新的通行密钥之前，请输入身份验证器应用中的 6 位验证码。',
+		totpLost: '通行密钥和身份验证器应用都丢失了？请联系管理员获取帮助。',
+		totpButton: '继续',
+		createHeading: '添加新的通行密钥',
+		createHint: '为 {email} 创建新的通行密钥。您原有的通行密钥会保留。',
+		createButton: '创建新通行密钥',
+		doneHeading: '您的新通行密钥已就绪',
+		doneHint: '新的通行密钥已添加。出于安全考虑，请使用通行密钥登录以继续。',
+		signInButton: '使用通行密钥登录'
 	},
 
 	passkeyRequired: {
