@@ -7,7 +7,7 @@ import {
 	it
 } from 'bun:test';
 
-import bootstrap from '../test_helper.ts';
+import bootstrap, { bindClientToBucket } from '../test_helper.ts';
 import { Browser } from '../connected_apps/helpers.ts';
 import { mailOn } from '../two_step_page/helpers.ts';
 import {
@@ -35,6 +35,7 @@ import {
 	getPersonActivityStore,
 	getUserStore
 } from 'lib/adapters/index.ts';
+import { ACCOUNT_TEXTS } from 'lib/i18n/texts/account/index.ts';
 import { flushPersonActivityNow } from 'lib/person_activity/flush.ts';
 import { issueNotMeLink } from 'lib/sign_in_alerts/link.ts';
 
@@ -142,6 +143,30 @@ describe('a person signing in from somewhere new', () => {
 		);
 		expect(newSignInMailsTo(anna.email)).toEqual([]);
 		expect(rows.map((row) => row.alerted)).toEqual([undefined, undefined]);
+	});
+
+	it('names an unnamed web client by its redirect host, never as a deleted app', async () => {
+		bucketId = await alertedProject(true);
+		await bindClientToBucket('unnamed-web', bucketId);
+		anna = await person(bucketId);
+		await signInFrom(anna.email, 'unnamed-web', HOME);
+		await signInFrom(anna.email, 'unnamed-web', HOSTING);
+
+		const [mail] = newSignInMailsTo(anna.email);
+		expect(mail.text).toContain('Signed in to: portal.acme.test');
+		expect(mail.text).not.toContain(ACCOUNT_TEXTS.en.deletedApp);
+	});
+
+	it('names an unnamed native client by its client_id, never as a deleted app', async () => {
+		bucketId = await alertedProject(true);
+		await bindClientToBucket('unnamed-native', bucketId);
+		anna = await person(bucketId);
+		await signInFrom(anna.email, 'unnamed-native', HOME);
+		await signInFrom(anna.email, 'unnamed-native', HOSTING);
+
+		const [mail] = newSignInMailsTo(anna.email);
+		expect(mail.text).toContain('Signed in to: unnamed-native');
+		expect(mail.text).not.toContain(ACCOUNT_TEXTS.en.deletedApp);
 	});
 });
 

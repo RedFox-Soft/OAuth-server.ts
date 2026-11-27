@@ -30,6 +30,24 @@ export const clients = [
 		redirectUris: ['http://e.ly/billing/callback'],
 		'consent.require': false
 	},
+	/* Existing clients with no client_name: must never be reported as deleted applications. */
+	{
+		clientId: 'unnamed-web',
+		token_endpoint_auth_method: 'none',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
+		redirectUris: ['https://portal.acme.test/callback'],
+		'consent.require': false
+	},
+	{
+		clientId: 'unnamed-native',
+		application_type: 'native',
+		token_endpoint_auth_method: 'none',
+		grantTypes: ['authorization_code'],
+		responseTypes: ['code'],
+		redirectUris: ['http://127.0.0.1:4321/callback'],
+		'consent.require': false
+	},
 	/* The console's own client, which signs administrators in to the administrators' project. */
 	{
 		clientId: 'admin-panel',

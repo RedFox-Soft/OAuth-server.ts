@@ -22,6 +22,15 @@ export const clients = [
 		grantTypes: ['authorization_code', 'refresh_token'],
 		redirectUris: ['https://time.acme.test/cb'],
 		scope: 'openid profile email offline_access'
+	},
+	{
+		clientId: 'unnamed-app',
+		token_endpoint_auth_method: 'none',
+		'consent.require': false,
+		responseTypes: ['code'],
+		grantTypes: ['authorization_code'],
+		redirectUris: ['https://unnamed.acme.test/cb'],
+		scope: 'openid'
 	}
 ];
 

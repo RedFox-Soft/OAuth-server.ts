@@ -81,6 +81,20 @@ describe('a person reading their recent sign-ins', () => {
 		expect(item).toContain(T.deletedApp);
 	});
 
+	it('names an existing client with no client_name by its redirect host instead of deleted', async () => {
+		const { browser, accountId } = await signedIn();
+		await seed([
+			signInRow(accountId, minutesAgo(30), {
+				place: { clientId: 'unnamed-app' }
+			})
+		]);
+
+		const [item] = itemsOf((await openPage(browser)).html);
+
+		expect(item).toContain('unnamed.acme.test');
+		expect(item).not.toContain(T.deletedApp);
+	});
+
 	it('names the app behind the proxy a sign-in went through', async () => {
 		const { browser, accountId } = await signedIn();
 		await appBehindProxy('Acme wiki', 'https://wiki.acme.test');

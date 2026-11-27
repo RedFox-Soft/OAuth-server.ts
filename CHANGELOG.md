@@ -69,6 +69,11 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   everywhere, so whoever had just turned the factor on or signed in could take away the owner's way back. The links
   now have their own storage area (`NotMeLink`; run `db:setup`) and go only with the person or the project; links
   mailed before the upgrade no longer work.
+- **Unnamed applications in sign-in alerts and recent sign-ins.** An existing OAuth client with no `client_name` (or
+  one that sanitises to empty) was reported as "An application that no longer exists" in new sign-in alert emails, on
+  a person's Recent sign-ins page and in an administrator's own sign-ins. It now falls back to its first web redirect
+  host, else its `client_id` (with a URL metadata-document `client_id` reduced to its host so emails never gain a
+  second link), matching the consent screen and Connected apps; only a deleted client reads as gone.
 
 ## [2.1.0] - 2026-11-18
 

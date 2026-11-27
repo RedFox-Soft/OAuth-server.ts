@@ -27,6 +27,8 @@ import { knownProviderByIssuer } from '../consts/known_providers.js';
 import { ApplicationConfig } from '../configs/application.js';
 import { newestFirst } from '../adapters/person_activity_rows.js';
 import { Client } from '../models/client.js';
+import { sanitiseClientName } from '../interactions/clientName.js';
+import { redirectKind } from '../interactions/consentView.js';
 import { namespaceOf } from '../resources/namespace.js';
 import {
 	checksWords,
@@ -159,6 +161,30 @@ function decodeCursor(
 }
 
 /* Today's names for what the rows name, read once per page; the person's own page reads them too (own.ts). */
+/*
+ * What an existing client is called in activity and sign-in alert emails: the same fallback chain the consent screen
+ * and Connected apps use (sanitised `client_name`, else the first web redirect host, else `client_id`), with a
+ * URL `client_id` (metadata document) reduced to its host so an email never gains a second link. Returns `null`
+ * only when the client no longer exists.
+ */
+function clientDisplayName(client: Client): string {
+	const named = sanitiseClientName(client.clientName);
+	if (named) return named;
+	for (const uri of client.redirectUris) {
+		const where = redirectKind(uri);
+		if (where.kind === 'web' && where.host) return where.host;
+	}
+	const parsed = URL.parse(client.clientId);
+	if (
+		parsed &&
+		(parsed.protocol === 'https:' || parsed.protocol === 'http:') &&
+		parsed.hostname
+	) {
+		return parsed.hostname;
+	}
+	return client.clientId;
+}
+
 export class Names {
 	private apps = new Map<string, Promise<BehindProxyApp | null>>();
 	private appsByOrigin: Promise<BehindProxyApp[]> | null = null;
@@ -214,7 +240,9 @@ export class Names {
 		if (reserved !== undefined) return Promise.resolve(reserved);
 		let found = this.clients.get(id);
 		if (!found) {
-			found = Client.tryFind(id).then((client) => client?.clientName ?? null);
+			found = Client.tryFind(id).then((client) =>
+				client ? clientDisplayName(client) : null
+			);
 			this.clients.set(id, found);
 		}
 		return found;
