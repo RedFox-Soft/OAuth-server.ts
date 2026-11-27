@@ -2107,6 +2107,26 @@ const passkeyApiProxyFence: Migration = {
 	}
 };
 
+/*
+ * Fence migration for spec 144 (administrators' passkeys and console passkey requirement): writes nothing,
+ * records its id in schemaMigrations so any older release that does not know `UserBucket.consolePasskeyRequired`
+ * refuses to start against a migrated database instead of silently letting non-passkey sign-ins into the console.
+ */
+const adminPasskeysFence: Migration = {
+	id: '2026-11-27-admin-passkeys-fence',
+	description:
+		'Mark the database as holding administrators passkey policy, so an older release refuses to start against it',
+	reversible: false,
+	rerunnable:
+		'Writes nothing beyond recording this migration id; a second application is a no-op.',
+	mongodb: {
+		async apply() {}
+	},
+	postgres: {
+		async apply() {}
+	}
+};
+
 export const MIGRATIONS: readonly Migration[] = [
 	namespacedProtectedResources,
 	rootKeysLifecycle,
@@ -2133,5 +2153,6 @@ export const MIGRATIONS: readonly Migration[] = [
 	newSignInAlertsFence,
 	passkeysFence,
 	acrPhishingResistant,
-	passkeyApiProxyFence
+	passkeyApiProxyFence,
+	adminPasskeysFence
 ];

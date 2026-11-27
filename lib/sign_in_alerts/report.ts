@@ -59,3 +59,44 @@ export async function reportToSuperAdministrators(
 		console.error('a reported sign-in was not mailed', { error });
 	}
 }
+
+/*
+ * An administrator clicked "This wasn't me" on a passkey-added email (specs/144 FR-009): every other active super
+ * administrator with an address is told who disowned a passkey and when, so they can investigate and help recover.
+ */
+export async function reportPasskeyDisownToSuperAdministrators(
+	administrator: User,
+	removedCount: number
+): Promise<void> {
+	try {
+		const ids = (await superAdminIds()).filter(
+			(id) => id !== administrator._id
+		);
+		if (ids.length === 0) return;
+		const recipients = (
+			await getUserStore(ADMIN_BUCKET_ID).findMany(ids)
+		).filter((user) => user.active && !!user.email);
+		const url = `${ISSUER}/admin/administrators/sign-ins/${encodeURIComponent(administrator._id)}`;
+		const subject = `${administrator.email} reported an unrecognised passkey`;
+		const text = [
+			`${administrator.email} reported that a passkey added to their administrator account was not theirs.`,
+			`${String(removedCount)} passkey${removedCount === 1 ? '' : 's'} ${removedCount === 1 ? 'was' : 'were'} removed and they were signed out everywhere.`,
+			`Review their sign-ins: ${url}`
+		].join('\n\n');
+		for (const recipient of recipients) {
+			await deliver({
+				to: recipient.email,
+				subject,
+				text,
+				html: `<p>${administrator.email} reported that a passkey added to their administrator account was not theirs.</p><p>${String(removedCount)} passkey${removedCount === 1 ? '' : 's'} ${removedCount === 1 ? 'was' : 'were'} removed and they were signed out everywhere.</p><p><a href="${url}">Review their sign-ins</a></p>`
+			}).catch((error: unknown) => {
+				console.error(
+					'a reported administrator passkey was not mailed to a super administrator',
+					{ error }
+				);
+			});
+		}
+	} catch (error) {
+		console.error('a reported administrator passkey was not mailed', { error });
+	}
+}

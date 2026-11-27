@@ -1263,12 +1263,10 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			bucketClients(bucket._id),
 			getProtectedResourceStore().listByBucket(bucket._id),
 			/*
-			 * People holding a passkey that signs in at the project's address (specs/140): what the Sign-in tab shows next
-			 * to the switch. Never for the administrators' project, which holds none.
+			 * People holding a passkey that signs in at the project's address (specs/140, specs/144): what the Sign-in
+			 * tab shows next to the switch.
 			 */
-			bucket._id === ADMIN_BUCKET_ID
-				? null
-				: getPasskeyStore().holdingIn(bucket._id, rpIdFor(bucket))
+			getPasskeyStore().holdingIn(bucket._id, rpIdFor(bucket))
 		]);
 		const enabled = bucket.federation.filter((provider) => provider.enabled);
 		/* The project's plan, its use and its warnings (specs/102); null for a System project, which has none. */
@@ -1288,7 +1286,7 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 			 */
 			withoutEnabledLink: counts.withoutEnabledLink,
 			passwordWithoutAuthenticator: counts.passwordWithoutAuthenticator,
-			...(holders === null ? {} : { passkeyHolders: holders.length }),
+			passkeyHolders: holders.length,
 			applications: applications.length,
 			apis: apis.length,
 			groups: groups.totalResults,
@@ -1373,20 +1371,19 @@ export const bucketRoutes = new Elysia({ name: 'admin-buckets' })
 						{ field: 'totpSelfService' }
 					);
 				}
-				if (changes.passkeyLogin !== undefined) {
-					throw new AdminError(
-						422,
-						"Administrators can't use passkeys yet; they have no account page to add one on.",
-						{ field: 'passkeyLogin' }
-					);
-				}
 				if (changes.passkeyOffer !== undefined) {
 					throw new AdminError(
 						422,
-						"Administrators can't use passkeys yet, so they are never offered one.",
+						'Administrators are never offered a passkey after a password sign-in; they add passkeys from the console.',
 						{ field: 'passkeyOffer' }
 					);
 				}
+			} else if (changes.consolePasskeyRequired !== undefined) {
+				throw new AdminError(
+					422,
+					"consolePasskeyRequired applies only to the administrators' project; require a passkey on each application, API, or proxy path instead.",
+					{ field: 'consolePasskeyRequired' }
+				);
 			}
 			/*
 			 * A passkey belongs to a site named by a host name (specs/139 research R4); an address is never one, so

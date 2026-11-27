@@ -170,6 +170,13 @@ describe('MCP tool catalogue', () => {
 			'GET /admin/api/settings/client-address',
 			'POST /admin/api/logout',
 			'POST /admin/api/me/verification',
+			'GET /admin/api/me/passkeys',
+			'POST /admin/api/me/passkeys/add-link',
+			'POST /admin/api/me/passkeys/add/options',
+			'POST /admin/api/me/passkeys/add',
+			'PATCH /admin/api/me/passkeys/:passkeyId',
+			'POST /admin/api/me/passkeys/:passkeyId/remove-link',
+			'DELETE /admin/api/me/passkeys/:passkeyId',
 			'PUT /admin/api/scope',
 			'POST /admin/api/projects/:id/federation/:providerId/try',
 			'GET /admin/api/projects/:id/federation/:providerId/try/:tryRef'
@@ -182,6 +189,9 @@ describe('MCP tool catalogue', () => {
 		const high = mcpCatalogue.filter((t) => t.consequence === 'high');
 		expect(high.map((t) => t.tool).sort()).toEqual([
 			'admin_deactivate',
+			/* Takes away a colleague's passkey and signs them out everywhere (specs/144). */
+			'admin_passkey_revoke',
+			'admin_passkey_revoke_all',
 			/* Ends a colleague's console sessions and every token issued to them, agents' included. */
 			'admin_sign_out',
 			'admin_super_grant',

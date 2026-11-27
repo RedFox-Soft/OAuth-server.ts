@@ -1,3 +1,5 @@
+import { getBucketStore } from '../adapters/index.js';
+import { ADMIN_BUCKET_ID, ADMIN_CLIENT_ID } from '../admin/consts.js';
 import { configuration } from '../configs/application.ts';
 import { meets } from '../helpers/acr_satisfaction.ts';
 
@@ -16,6 +18,21 @@ export function passkeyRequiredAndMissing(
 ): boolean {
 	if (client?.['signIn.requirePasskey'] !== true) return false;
 	return !meets(acr, 'phishing_resistant');
+}
+
+/*
+ * Whether the admin console (`admin-panel`) is being reached while the administrators' project requires a passkey for
+ * console sign-in (specs/144) and this sign-in did not reach the phishing-resistant context. Only reads storage for
+ * `ADMIN_CLIENT_ID`, so ordinary applications incur zero extra reads.
+ */
+export async function consolePasskeyRequiredAndMissing(
+	client: { readonly clientId?: string } | undefined,
+	acr: string | undefined
+): Promise<boolean> {
+	if (client?.clientId !== ADMIN_CLIENT_ID) return false;
+	if (meets(acr, 'phishing_resistant')) return false;
+	const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+	return adminBucket?.consolePasskeyRequired === true;
 }
 
 /*

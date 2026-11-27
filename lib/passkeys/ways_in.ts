@@ -1,5 +1,6 @@
 import { getPasskeyStore, getUserStore } from '../adapters/index.js';
 import type { Passkey, User, UserBucket } from '../adapters/types.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { mailDeliveryConfigured } from '../mail/mailer.js';
 import { selfServiceResetAllowed } from '../password_reset/eligibility.js';
 import { passkeysAccepted } from './accepted.js';
@@ -130,13 +131,16 @@ export async function passkeysOfPerson(
 	user: User,
 	held: readonly Passkey[]
 ): Promise<PasskeysOfPerson> {
-	const passwordsOpen = bucket.passwordLogin;
+	const onlyPasskeyReaches =
+		bucket._id === ADMIN_BUCKET_ID && bucket.consolePasskeyRequired === true;
+	const passwordsOpen = !onlyPasskeyReaches && bucket.passwordLogin;
 	// As notifyPasskey decides it: a proven, non-empty address.
 	const mailable = user.verified && user.email !== '';
-	const restore: Restore =
-		selfServiceResetAllowed(bucket._id, bucket) &&
-		mailable &&
-		(await mailDeliveryConfigured())
+	const restore: Restore = onlyPasskeyReaches
+		? 'none'
+		: selfServiceResetAllowed(bucket._id, bucket) &&
+			  mailable &&
+			  (await mailDeliveryConfigured())
 			? 'self'
 			: user.provisionedBy === undefined && passwordsOpen
 				? 'admin'
@@ -150,7 +154,7 @@ export async function passkeysOfPerson(
 			.map((passkey) => passkeyView(passkey, bucket)),
 		ways: {
 			password: passwordsOpen && user.passwordSet !== false,
-			providers: linkedProviders(bucket, user)
+			providers: onlyPasskeyReaches ? [] : linkedProviders(bucket, user)
 		},
 		restore,
 		mailable

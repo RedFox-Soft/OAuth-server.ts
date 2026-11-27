@@ -263,7 +263,7 @@ describe('passkeys and a project’s address', () => {
 			expect(shaped(Summary, summary.body).passkeyHolders).toBe(2);
 		});
 
-		it('counts nothing for the administrators’ project', async () => {
+		it('counts passkey holders for the administrators’ project', async () => {
 			const summary = await call(
 				'GET',
 				`/admin/api/projects/${ADMIN_BUCKET_ID}/summary`,
@@ -271,7 +271,7 @@ describe('passkeys and a project’s address', () => {
 			);
 
 			expect(summary.status).toBe(200);
-			expect(shaped(Summary, summary.body).passkeyHolders).toBeUndefined();
+			expect(shaped(Summary, summary.body).passkeyHolders).toBe(0);
 		});
 	});
 });

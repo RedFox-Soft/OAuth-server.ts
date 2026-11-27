@@ -31,7 +31,15 @@ export type IdTokenRejectionReason =
 	| 'issued_in_future'
 	| 'subject'
 	| 'nonce'
+	| 'acr'
 	| 'unverifiable';
+
+export interface VerifiedAdminIdToken {
+	readonly sub: string;
+	readonly acr: string | null;
+	readonly amr: string[];
+	readonly authTime: number | null;
+}
 
 export class IdTokenRejected extends Error {
 	readonly reason: IdTokenRejectionReason;
@@ -114,7 +122,7 @@ async function expectedAlgorithm(): Promise<string> {
 export async function verifyAdminIdToken(
 	idToken: string | undefined,
 	expected: { nonce: string }
-): Promise<string> {
+): Promise<VerifiedAdminIdToken> {
 	if (typeof idToken !== 'string' || idToken.length === 0) {
 		throw new IdTokenRejected('missing');
 	}
@@ -180,5 +188,11 @@ export async function verifyAdminIdToken(
 	if (typeof payload.sub !== 'string' || payload.sub.length === 0) {
 		throw new IdTokenRejected('subject');
 	}
-	return payload.sub;
+	const acr = typeof payload.acr === 'string' ? payload.acr : null;
+	const amr = Array.isArray(payload.amr)
+		? payload.amr.filter((m): m is string => typeof m === 'string')
+		: [];
+	const authTime =
+		typeof payload.auth_time === 'number' ? payload.auth_time : null;
+	return { sub: payload.sub, acr, amr, authTime };
 }

@@ -512,6 +512,21 @@ export const ACTIONS = {
 		title: (t) => `Reset the authenticator of ${t}?`,
 		okText: 'Reset authenticator'
 	},
+	'admin.passkey.revoke': {
+		class: 'C2',
+		title: () => 'Revoke this passkey?',
+		okText: 'Revoke'
+	},
+	'admin.passkey.revokeAll': {
+		class: 'C2',
+		title: (t) => `Revoke all passkeys of ${t}?`,
+		okText: 'Revoke all'
+	},
+	'me.passkey.remove': {
+		class: 'C2',
+		title: () => 'Remove this passkey?',
+		okText: 'Remove'
+	},
 	'admin.email.change': {
 		class: 'C2',
 		title: (t) => `Change the sign-in email of ${t}?`,

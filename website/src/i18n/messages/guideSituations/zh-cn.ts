@@ -1,6 +1,6 @@
 import type { GuideTexts } from '../../guide-texts.ts';
 
-export const source = 'c715ab3a6ebd';
+export const source = '2eeff23f9a17';
 
 export default {
 	questions: {
@@ -1804,6 +1804,46 @@ export default {
 				'管理员可以查看自己的登录记录，不含地址：点击控制台顶部自己的电子邮件。'
 			],
 			actionLabel: '打开管理员账户'
+		},
+		adminpasskey: {
+			title: '要求控制台管理员使用通行密钥',
+			sentence:
+				'在管理员项目中开启通行密钥，让每位管理员在账号抽屉中添加自己的通行密钥，然后要求登录控制台和管理用 MCP 时必须使用通行密钥。FoxAuth 会确保始终有超级管理员能够进入。',
+			protocol: 'WebAuthn · OpenID Connect acr · phr',
+			problemCaption:
+				'被钓鱼窃取的管理员密码和一次性验证码就能打开整台服务器。',
+			fixCaption: '只有通行密钥可以打开控制台和管理用 MCP。',
+			lanes: { admin: '管理员', passkey: '通行密钥', fox: 'FoxAuth' },
+			steps: [
+				{
+					label: '打开控制台',
+					text: '管理员打开控制台，或连接管理用 MCP 智能体。'
+				},
+				{
+					label: '指纹或面容',
+					text: '管理员使用通行密钥登录，它只在你的 FoxAuth 地址上有效。'
+				},
+				{
+					label: '签名应答',
+					text: '设备只为你的 FoxAuth 主机签名，仿冒页面无法窃取会话。'
+				},
+				{
+					label: '进入控制台',
+					text: 'FoxAuth 放行管理员，并拒绝所有仅用密码或身份提供方建立的控制台会话。'
+				}
+			],
+			sees: [
+				'带有通行密钥登录按钮的管理员登录页面',
+				'在控制台顶部点击邮箱打开抽屉管理个人通行密钥',
+				'没有通行密钥的管理员会被拒绝，并被提示联系超级管理员'
+			],
+			goodToKnow: [
+				'只有持有有效通行密钥、且在当前会话中使用通行密钥登录的超级管理员，才能开启 “Require a passkey to sign in to the console”。',
+				'保存前控制台会列出尚未设置通行密钥的管理员。现有的非通行密钥控制台会话和 /mcp 令牌会立即失效。',
+				'管理员在控制台顶部自己邮箱下的 Passkeys 标签页添加、重命名和删除个人通行密钥；超级管理员可在 Administrators → Accounts 查看和撤销同事的通行密钥（或使用 admin_passkey_list 与 admin_passkey_revoke）。',
+				'FoxAuth 会拒绝任何会导致没有超级管理员能用通行密钥登录的操作。'
+			],
+			actionLabel: '打开管理员项目的登录设置'
 		}
 	}
 } satisfies GuideTexts;

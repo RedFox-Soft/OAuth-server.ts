@@ -190,6 +190,7 @@ export class UserBucketStore implements UserBucketStoreInstance {
 				| 'newSignInAlerts'
 				| 'passkeyLogin'
 				| 'passkeyOffer'
+				| 'consolePasskeyRequired'
 			>
 		>
 	): Promise<UserBucket | null> {

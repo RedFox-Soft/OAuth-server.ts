@@ -199,6 +199,34 @@ const routes = [
 		targetType: 'AdminUser'
 	},
 	/*
+	 * Administrator passkeys (specs/144): personal add/remove from the console header, and super-administrator
+	 * revocation of a colleague's passkey(s). Renaming a passkey is not audited (it is the person's own label).
+	 */
+	{
+		action: 'admin.passkey.add',
+		method: 'POST',
+		path: '/admin/api/me/passkeys/add',
+		targetType: 'AdminUser'
+	},
+	{
+		action: 'admin.passkey.remove',
+		method: 'DELETE',
+		path: '/admin/api/me/passkeys/:passkeyId',
+		targetType: 'AdminUser'
+	},
+	{
+		action: 'admin.passkey.revoke',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/passkeys/:passkeyId',
+		targetType: 'AdminUser'
+	},
+	{
+		action: 'admin.passkey.revoke.all',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/passkeys',
+		targetType: 'AdminUser'
+	},
+	/*
 	 * A read, audited (specs/137): an administrator's sign-ins hold their network addresses, so which super
 	 * administrator read them is kept, once per reader, administrator and day, never what was read.
 	 */
@@ -972,7 +1000,9 @@ const nonRouteActions = [
 	{ action: 'enduser.passkey.remove', targetType: 'EndUser' },
 	{ action: 'enduser.passkey.disown', targetType: 'EndUser' },
 	/* Confirming a passkey made after a password alone (specs/141), by its mailed link or after a strong sign-in. */
-	{ action: 'enduser.passkey.confirm', targetType: 'EndUser' }
+	{ action: 'enduser.passkey.confirm', targetType: 'EndUser' },
+	/* An administrator disowning a passkey via the "This wasn't me" email link (specs/144); public endpoint. */
+	{ action: 'admin.passkey.disown', targetType: 'AdminUser' }
 ] as const satisfies readonly { action: string; targetType: string }[];
 
 export const nonRouteAuditActions: readonly {
@@ -1022,6 +1052,10 @@ export type AuditTargetType =
  * `POST /admin/api/me/verification` mails the caller a verification message for their own address. It
  * changes nothing; the account becomes verified at the public verification endpoint, where whoever holds
  * the mailbox completes it, so there is no administrative change here to attribute.
+ *
+ * Personal passkey ceremony preparation, email confirmation links, and label renames (specs/144): preparing
+ * WebAuthn options or mailing a confirmation link changes no credential; renaming one's own passkey is a
+ * personal label, matching end-user passkey renames. Actual additions and removals ARE audited above.
  */
 export const excludedAdminRoutes: readonly {
 	readonly method: AuditedMethod;
@@ -1029,7 +1063,11 @@ export const excludedAdminRoutes: readonly {
 }[] = [
 	{ method: 'POST', path: '/admin/api/logout' },
 	{ method: 'PUT', path: '/admin/api/scope' },
-	{ method: 'POST', path: '/admin/api/me/verification' }
+	{ method: 'POST', path: '/admin/api/me/verification' },
+	{ method: 'POST', path: '/admin/api/me/passkeys/add-link' },
+	{ method: 'POST', path: '/admin/api/me/passkeys/add/options' },
+	{ method: 'PATCH', path: '/admin/api/me/passkeys/:passkeyId' },
+	{ method: 'POST', path: '/admin/api/me/passkeys/:passkeyId/remove-link' }
 ];
 
 /*

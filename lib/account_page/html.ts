@@ -1182,6 +1182,21 @@ export function passkeyDisownGonePage(
  * The outcome: the passkeys are gone; whether every session ended; and, where the person has a password, that it must
  * change now, with whether the reset mail went.
  */
+export function passkeyDisownRefusedPage(
+	language: Language,
+	reason: string
+): Response {
+	const title = 'Passkey could not be removed';
+	const response = page(
+		title,
+		`<h1 style="font-size:20px; margin:0 0 8px;">${esc(title)}</h1><p>${esc(reason)}</p>`,
+		409,
+		{ language }
+	);
+	response.headers.set('cache-control', 'no-store');
+	return response;
+}
+
 export function passkeyDisownDonePage(
 	language: Language,
 	outcome: {

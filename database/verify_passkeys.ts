@@ -36,8 +36,13 @@ if (!THROWAWAY.test(database)) {
 }
 
 /* After the guard, for the reason verify_postgres.ts gives: importing the adapters connects. */
-const { getBehindProxyAppStore, getPasskeyStore, getProtectedResourceStore } =
-	await import('../lib/adapters/index.js');
+const {
+	adminSessionStore,
+	getBehindProxyAppStore,
+	getBucketStore,
+	getPasskeyStore,
+	getProtectedResourceStore
+} = await import('../lib/adapters/index.js');
 type Passkey = import('../lib/adapters/types.js').Passkey;
 
 let failures = 0;
@@ -425,6 +430,74 @@ await store.removeAllIn(other);
 			netCond.facts.outcome.withPasskey === true
 	);
 	await apps.delete(appId);
+}
+
+/* ---------------------------------------------------------- Administrators' passkeys & console requirement (specs/144) */
+{
+	const buckets = getBucketStore();
+	const adminBucket = await buckets.find('admin');
+	const priorPasskey = adminBucket?.passkeyLogin;
+	const priorReq = adminBucket?.consolePasskeyRequired;
+	if (adminBucket) {
+		await buckets.update('admin', {
+			passkeyLogin: true,
+			consolePasskeyRequired: true
+		});
+		const enabled = await buckets.find('admin');
+		check(
+			'UserBucket.consolePasskeyRequired persists on Administrators (specs/144)',
+			enabled?.passkeyLogin === true && enabled.consolePasskeyRequired === true,
+			JSON.stringify({
+				passkeyLogin: enabled?.passkeyLogin,
+				consolePasskeyRequired: enabled?.consolePasskeyRequired
+			})
+		);
+		await buckets.update('admin', {
+			consolePasskeyRequired: false
+		});
+		const disabled = await buckets.find('admin');
+		check(
+			'UserBucket.consolePasskeyRequired clears cleanly on update (specs/144)',
+			disabled?.consolePasskeyRequired !== true,
+			JSON.stringify({
+				consolePasskeyRequired: disabled?.consolePasskeyRequired
+			})
+		);
+		await buckets.update('admin', {
+			passkeyLogin: priorPasskey ?? false,
+			consolePasskeyRequired: priorReq ?? false
+		});
+	} else {
+		check('Administrators bucket seeded before verify_passkeys', false);
+	}
+
+	const signInAt = Math.floor(Date.now() / 1000);
+	const session = await adminSessionStore.create({
+		userId: `verify-admin-${String(stamp)}`,
+		bucketId: 'admin',
+		activeGroupId: '',
+		signedInWith: null,
+		signInAcr: 'phr',
+		signInAmr: ['pop', 'user', 'mfa'],
+		signInAt,
+		tokens: { accessToken: 'verify-token' },
+		ttlSeconds: 300,
+		absoluteTtlSeconds: 600
+	});
+	const loaded = await adminSessionStore.find(session._id);
+	check(
+		'AdminSession persists signInAcr, signInAmr, and signInAt (specs/144)',
+		loaded?.signInAcr === 'phr' &&
+			JSON.stringify(loaded.signInAmr) ===
+				JSON.stringify(['pop', 'user', 'mfa']) &&
+			loaded.signInAt === signInAt,
+		JSON.stringify({
+			signInAcr: loaded?.signInAcr,
+			signInAmr: loaded?.signInAmr,
+			signInAt: loaded?.signInAt
+		})
+	);
+	await adminSessionStore.destroy(session._id);
 }
 
 console.log(

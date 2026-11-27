@@ -7,6 +7,13 @@ import {
 } from '../adapters/index.js';
 import { requestBucketFor } from '../admin/auth/bucketAddress.js';
 import { recordEndUserAudit } from '../admin/audit/record.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import {
+	consoleStaysReachable,
+	loadReachabilityState
+} from '../admin/federation/reachability.js';
+import { signOutAdministrator } from '../admin/users/sign_out.js';
+import { reportPasskeyDisownToSuperAdministrators } from '../sign_in_alerts/report.js';
 import { AuthorizationCookies, routeNames } from '../consts/param_list.js';
 import { hostOfRequest } from '../consts/request_host.js';
 import { shownNameOf, type RequestBucket } from '../configs/issuer.js';
@@ -83,12 +90,14 @@ import { accountPageBase } from './client.js';
 import {
 	disownConfirmPage,
 	disownOutcomePage,
+	notMeAdministratorDonePage,
 	outcomePage,
 	passkeyConfirmOutcomePage,
 	passkeyConfirmPage,
 	passkeyDisownConfirmPage,
 	passkeyDisownDonePage,
 	passkeyDisownGonePage,
+	passkeyDisownRefusedPage,
 	securityPage,
 	type AccountNav,
 	type PasskeysView,
@@ -1096,10 +1105,81 @@ export const accountSecurityRoutes = new Elysia({ name: 'account-security' })
 				request,
 				owner ? [storedLocaleRanges(owner)] : []
 			).language;
+			if (!hit || !bucket || !owner) {
+				return passkeyDisownGonePage(language, await serviceAt(addressed));
+			}
+			/*
+			 * An administrator disowning a passkey (specs/144 FR-009, FR-018): refuse before spending the link if
+			 * removing this passkey and any added at or after it would leave zero active super administrators able to
+			 * reach the console; otherwise spend, audit `admin.passkey.disown`, remove, sign out everywhere (console
+			 * sessions included), alert super administrators, and never send a self-service password reset.
+			 */
+			if (bucket._id === ADMIN_BUCKET_ID) {
+				const since = new Date(hit.passkey.createdAt);
+				const held = await getPasskeyStore().listOf(bucket._id, owner._id);
+				const removedWorking = held.filter(
+					(p) =>
+						new Date(p.createdAt).getTime() >= since.getTime() &&
+						p.rpId === relyingPartyOf(bucket).rpId &&
+						p.copiedAt === undefined &&
+						p.conditional !== true
+				).length;
+				const state = await loadReachabilityState();
+				if (state.superAdministrators.some((s) => s._id === owner._id)) {
+					const nextCounts = new Map(state.superAdminPasskeyCounts);
+					nextCounts.set(
+						owner._id,
+						Math.max(0, (nextCounts.get(owner._id) ?? 0) - removedWorking)
+					);
+					if (
+						!consoleStaysReachable({
+							...state,
+							superAdminPasskeyCounts: nextCounts
+						})
+					) {
+						return passkeyDisownRefusedPage(
+							language,
+							'Removing this passkey would leave no super administrator able to sign in to the console. Add another passkey or have another super administrator add one first.'
+						);
+					}
+				}
+				if (
+					!(await getPasskeyStore().spendNotMe(
+						bucket._id,
+						hit.passkey._id,
+						hit.digest,
+						epochTime()
+					))
+				) {
+					return passkeyDisownGonePage(language, await serviceAt(addressed));
+				}
+				await recordEndUserAudit(
+					bucket._id,
+					owner._id,
+					'admin.passkey.disown',
+					{
+						targetScope: bucket._id
+					}
+				);
+				const removed = await getPasskeyStore().removeAddedSince(
+					bucket._id,
+					owner._id,
+					since
+				);
+				let done = true;
+				try {
+					await signOutAdministrator(owner._id);
+				} catch (error) {
+					console.error(
+						'This wasn’t me about an administrator passkey left access behind',
+						{ error }
+					);
+					done = false;
+				}
+				await reportPasskeyDisownToSuperAdministrators(owner, removed);
+				return notMeAdministratorDonePage(language, done);
+			}
 			if (
-				!hit ||
-				!bucket ||
-				!owner ||
 				!(await getPasskeyStore().spendNotMe(
 					bucket._id,
 					hit.passkey._id,

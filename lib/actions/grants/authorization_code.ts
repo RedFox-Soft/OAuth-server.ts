@@ -1,4 +1,5 @@
 import {
+	consolePasskeyRequiredAndMissing,
 	passkeyRequiredAndMissing,
 	REQUIRE_PASSKEY_DESCRIPTION
 } from '../../client_policy/require_passkey.ts';
@@ -160,7 +161,13 @@ export const handler = async function authorizationCodeHandler(
 	 * The sign-in check stops this before a code is issued (specs/127); this holds for one issued in the moment before
 	 * the application was made to require a code.
 	 */
-	if (passkeyRequiredAndMissing(oidc.client, reachedAcr(code.payload))) {
+	if (
+		passkeyRequiredAndMissing(oidc.client, reachedAcr(code.payload)) ||
+		(await consolePasskeyRequiredAndMissing(
+			oidc.client,
+			reachedAcr(code.payload)
+		))
+	) {
 		throw new InvalidGrant(REQUIRE_PASSKEY_DESCRIPTION);
 	}
 	if (codeRequiredAndMissing(oidc.client, reachedAcr(code.payload))) {

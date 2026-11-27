@@ -1,3 +1,5 @@
+import { getBucketStore } from '../adapters/index.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
@@ -106,6 +108,13 @@ export async function getResourceServerInfo(
 	}
 
 	if (isMcpResource(resourceIndicator)) {
+		const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+		if (adminBucket?.consolePasskeyRequired === true) {
+			return {
+				...MCP_RESOURCE_SERVER,
+				signIn: { passkey: true, code: true }
+			};
+		}
 		return MCP_RESOURCE_SERVER;
 	}
 

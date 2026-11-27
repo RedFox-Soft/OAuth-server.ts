@@ -1,13 +1,24 @@
 import { Elysia, t } from 'elysia';
 import crypto from 'node:crypto';
+import { configuration } from '../../configs/application.js';
 import { ISSUER } from '../../configs/env.js';
-import { getUserStore, adminSessionStore } from '../../adapters/index.js';
+import {
+	getBucketStore,
+	getUserStore,
+	adminSessionStore
+} from '../../adapters/index.js';
 import {
 	createAdminSession,
 	sessionCookieAttributes,
 	expiredSessionCookieAttributes
 } from './session.js';
-import { IdTokenRejected, verifyAdminIdToken } from './verifyIdToken.js';
+import {
+	IdTokenRejected,
+	verifyAdminIdToken,
+	type VerifiedAdminIdToken
+} from './verifyIdToken.js';
+import { meets } from '../../helpers/acr_satisfaction.ts';
+import epochTime from '../../helpers/epoch_time.js';
 import { errorForCode } from '../../helpers/errors.js';
 import { eventBus } from '../../event_bus.js';
 import { routeNames, sessionCookieName } from '../../consts/param_list.js';
@@ -23,6 +34,9 @@ import {
 import { safeNext } from './next.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
 import { CREATE_PROMPT } from '../../consts/prompt_create.js';
+import { followLink } from '../../totp/self_service.js';
+import { prepareAdd, prepareRemove } from '../../passkeys/account.js';
+import { adminConsoleHolder } from '../me_passkeys.js';
 
 const REDIRECT_URI = `${ISSUER}/admin/callback`;
 
@@ -31,19 +45,36 @@ function base64url(buf: Buffer) {
 }
 
 /*
- * Which of the administrators' bucket's providers this sign-in came through, read off the provider session
- * the authorization just used (specs/080). That session records the upstream of its latest real sign-in and
- * clears it on a password sign-in (lib/models/session.ts), which is the codebase's one reading of "came in
- * through a provider" (lib/activity/kinds.ts). A console session re-established silently from it inherits
- * that answer, which is still a sign-in through that provider in this browser.
+ * What the provider session the authorization just used records about the sign-in (specs/080, specs/144): which
+ * provider it came through (or null for a password/passkey sign-in), the reached authentication context, the methods,
+ * and the sign-in timestamp. Reading from the provider session captures `phishing_resistant` even when the console did
+ * not ask for `phr` yet (Spec 142 Rule B), so a super administrator who signs in with a passkey can then turn on the
+ * console passkey requirement in that very session.
  */
-async function providerSignedInWith(
+async function providerSignInInfo(
 	cookie: Record<string, { value: unknown }>
-) {
+): Promise<{
+	signedInWith: string | null;
+	signInAcr: string | null;
+	signInAmr: string[] | undefined;
+	signInAt: number | undefined;
+} | null> {
 	const id = cookie[sessionCookieName(ADMIN_REQUEST_BUCKET)].value;
 	if (typeof id !== 'string' || !id) return null;
 	const session = await Session.tryFind(id);
-	return session?.payload.upstream?.providerId ?? null;
+	if (!session) return null;
+	return {
+		signedInWith: session.payload.upstream?.providerId ?? null,
+		signInAcr:
+			typeof session.payload.acr === 'string' ? session.payload.acr : null,
+		signInAmr: Array.isArray(session.payload.amr)
+			? [...session.payload.amr]
+			: undefined,
+		signInAt:
+			typeof session.payload.loginTs === 'number'
+				? session.payload.loginTs
+				: undefined
+	};
 }
 
 type StartContext = {
@@ -51,19 +82,21 @@ type StartContext = {
 		string,
 		{ set: (attributes: Record<string, unknown>) => void }
 	>;
-	query: { next?: string };
+	query: { next?: string; reauth?: string };
 	redirect: (url: string, status: 302) => Response;
 };
 
 /*
  * Starts the console's sign-in leg. `create` asks the sign-in page to open on account creation
  * (`prompt=create`): the address a "create an account" link points at, so a newcomer is not shown a
- * password form for an account they do not have. Everything after the authorization request is shared.
+ * password form for an account they do not have. When the administrators' project requires a passkey for
+ * console sign-in (specs/144), `acr_values` requests the phishing-resistant context so the sign-in runs
+ * the passkey ceremony and the ID token reports it; `reauth=1` forces a fresh sign-in (`prompt=login`).
  */
-function startSignIn(
+async function startSignIn(
 	{ cookie, query, redirect }: StartContext,
 	create: boolean
-): Response {
+): Promise<Response> {
 	const verifier = base64url(crypto.randomBytes(32));
 	const challenge = base64url(
 		crypto.createHash('sha256').update(verifier).digest()
@@ -88,6 +121,10 @@ function startSignIn(
 		path: '/admin',
 		maxAge: 600
 	});
+	const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+	const requirePasskey = adminBucket?.consolePasskeyRequired === true;
+	const reauth = query.reauth === '1' || query.reauth === 'true';
+	const prompt = create ? CREATE_PROMPT : reauth ? 'login' : undefined;
 	const url = new URL(`${ISSUER}${routeNames.authorization}`);
 	url.search = new URLSearchParams({
 		client_id: ADMIN_CLIENT_ID,
@@ -98,7 +135,10 @@ function startSignIn(
 		nonce,
 		code_challenge: challenge,
 		code_challenge_method: 'S256',
-		...(create ? { prompt: CREATE_PROMPT } : {})
+		...(prompt ? { prompt } : {}),
+		...(requirePasskey
+			? { acr_values: configuration.acrMap.phishing_resistant }
+			: {})
 	}).toString();
 	return redirect(url.toString(), 302);
 }
@@ -106,6 +146,65 @@ function startSignIn(
 export const adminLogin = new Elysia({ name: 'admin-login' })
 	.get('/admin/login', (context) => startSignIn(context, false))
 	.get('/admin/signup', (context) => startSignIn(context, true))
+	/*
+	 * Follows the emailed confirmation link for adding or removing an administrator's own passkey after a fresh
+	 * password sign-in (specs/144 contracts/admin-api.md §1). Bound to this browser's `_admin_session`, so a mail
+	 * scanner prefetching the URL has no matching session and never consumes the single-use link.
+	 */
+	.get(
+		'/admin/me/passkeys/confirm',
+		async ({ query, cookie, redirect }) => {
+			const sessionId = cookie[ADMIN_SESSION_COOKIE].value as
+				string | undefined;
+			if (!sessionId) {
+				return redirect('/admin?account=passkeys&linkError=expired', 302);
+			}
+			const session = await adminSessionStore.find(sessionId);
+			if (!session) {
+				return redirect('/admin?account=passkeys&linkError=expired', 302);
+			}
+			const [user, bucket] = await Promise.all([
+				getUserStore(ADMIN_BUCKET_ID).find(session.userId),
+				getBucketStore().find(ADMIN_BUCKET_ID)
+			]);
+			if (!user || !canSignIn(user) || !bucket) {
+				return redirect('/admin?account=passkeys&linkError=expired', 302);
+			}
+			const holder = adminConsoleHolder(session._id);
+			const link = await followLink(
+				query.token ?? '',
+				holder,
+				user._id,
+				ADMIN_BUCKET_ID
+			);
+			if (!link) {
+				return redirect('/admin?account=passkeys&linkError=expired', 302);
+			}
+			if (link.purpose === 'passkey_add') {
+				await prepareAdd(
+					bucket,
+					user,
+					{ uid: session._id, holder },
+					'password_mail'
+				);
+				return redirect('/admin?account=passkeys&confirmed=add', 302);
+			}
+			if (link.purpose === 'passkey_remove' && link.passkeyId) {
+				await prepareRemove(
+					bucket,
+					user,
+					{ uid: session._id, holder },
+					link.passkeyId
+				);
+				return redirect(
+					`/admin?account=passkeys&confirmed=remove&passkey=${encodeURIComponent(link.passkeyId)}`,
+					302
+				);
+			}
+			return redirect('/admin?account=passkeys&linkError=expired', 302);
+		},
+		{ query: t.Object({ token: t.Optional(t.String()) }) }
+	)
 	.get(
 		'/admin/callback',
 		async ({ query, cookie, redirect, set }) => {
@@ -162,9 +261,9 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 				refresh_token?: string;
 			};
 
-			let sub: string;
+			let verified: VerifiedAdminIdToken;
 			try {
-				sub = await verifyAdminIdToken(tokens.id_token, {
+				verified = await verifyAdminIdToken(tokens.id_token, {
 					nonce: saved.nonce
 				});
 			} catch (err) {
@@ -180,16 +279,34 @@ export const adminLogin = new Elysia({ name: 'admin-login' })
 				return { error: 'invalid_id_token', message: 'login failed' };
 			}
 
-			const user = await getUserStore(ADMIN_BUCKET_ID).find(sub);
+			/*
+			 * Defense in depth (specs/144 FR-017): even if `acr_values` were stripped from the authorization request,
+			 * the callback checks the verified ID token's `acr` directly and refuses with the same constant-shape 401.
+			 */
+			const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+			if (
+				adminBucket?.consolePasskeyRequired === true &&
+				!meets(verified.acr, 'phishing_resistant')
+			) {
+				eventBus.emit('admin.login.error', { reason: 'acr' });
+				set.status = 401;
+				return { error: 'invalid_id_token', message: 'login failed' };
+			}
+
+			const user = await getUserStore(ADMIN_BUCKET_ID).find(verified.sub);
 			// The same predicate as every sign-in door, so a locally locked administrator is refused here too.
 			if (!user || !canSignIn(user)) {
 				set.status = 403;
 				return { error: 'not_admin', message: 'no admin account' };
 			}
+			const providerInfo = await providerSignInInfo(cookie);
 			const session = await createAdminSession({
 				userId: user._id,
 				bucketId: ADMIN_BUCKET_ID,
-				signedInWith: await providerSignedInWith(cookie),
+				signedInWith: providerInfo?.signedInWith ?? null,
+				signInAcr: providerInfo?.signInAcr ?? verified.acr,
+				signInAmr: providerInfo?.signInAmr ?? verified.amr,
+				signInAt: providerInfo?.signInAt ?? verified.authTime ?? epochTime(),
 				tokens: {
 					accessToken: tokens.access_token,
 					idToken: tokens.id_token,

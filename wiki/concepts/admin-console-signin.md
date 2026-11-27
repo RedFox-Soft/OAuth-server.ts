@@ -4,7 +4,7 @@ title: 'Admin console sign-in'
 tags: [architecture, contract, gotcha, oidc]
 sources: [oauth-server-codebase]
 created: 2026-08-04
-updated: 2026-11-18
+updated: 2026-11-27
 graph:
   node_type: concept
 ---
@@ -38,7 +38,29 @@ rewrite settings, mint clients and read every project. RBAC, the audit trail and
 guard all rest on the identity this one step establishes, so they were all defeated at the front door.
 
 Verification now happens in `lib/admin/auth/verifyIdToken.ts` before any claim is read, and returns
-only `sub` — the caller has no reason for another claim, so it cannot start using one.
+only `{ sub, acr, amr, authTime }` — verified claims needed to record console sign-in strength and enforce
+`consolePasskeyRequired`.
+
+## Console passkey requirement and session context (spec 144)
+
+Since spec 144, `AdminSession` persists `signInAcr`, `signInAmr`, and `signInAt` alongside `signedInWith`. Because
+`admin-panel` ID tokens report `acr = multi_factor` when `consolePasskeyRequired` is off (per [[acr-satisfaction]] Rule
+B), `/admin/callback` reads the reached context from the live provider `Session` (falling back to the verified ID token
+when no provider cookie is present).
+
+When `UserBucket.consolePasskeyRequired` is true on `ADMIN_BUCKET_ID`:
+
+- `GET /admin/login` includes `acr_values=<phr>` (and `prompt=login` when `?reauth=1` is passed from the account drawer).
+- `GET /admin/callback` enforces `meets(verified.acr, 'phishing_resistant')`, returning the same opaque `401
+  invalid_id_token` and emitting `admin.login.error { reason: 'acr' }` if it falls short.
+- `resolveAdmin` (`lib/admin/auth/rbac.ts`) re-checks `consolePasskeyRequired` against `session.signInAcr` on every
+  request, so enabling the policy immediately invalidates already-open non-passkey console sessions (401 on API, 302 to
+  `/admin/login` on console pages) without waiting for idle expiry.
+- `/mcp` (`lib/mcp/principal.ts`) likewise checks `consolePasskeyRequired` live on every request (401 + `mcp.auth.error
+  { reason: 'passkey_required' }`), and `isMcpResource` declares `signIn: { passkey: true, code: true }` so `/auth`,
+  `/token`, and refresh-token rotation enforce it before spending a refresh token.
+- Adding a personal passkey in the header drawer never mutates `AdminSession.signInAcr`; the administrator must sign in
+  with that passkey before enabling `consolePasskeyRequired`.
 
 ## Verify with the client's registered algorithm, not the advertised list
 

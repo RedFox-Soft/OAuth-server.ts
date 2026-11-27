@@ -4,6 +4,7 @@ import type { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/ser
 
 import { getBucketStore, getPasskeyStore } from '../adapters/index.js';
 import type { Passkey, User, UserBucket } from '../adapters/types.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { accountPageBase } from '../account_page/client.js';
 import { recordEndUserAudit } from '../admin/audit/record.js';
 import { isScheduledForDeletion } from '../consts/bucket_deletion.js';
@@ -194,15 +195,18 @@ export async function completeAdd(
 	user: User,
 	session: PageSession,
 	credential: string,
-	request: Request
-): Promise<{ ok: true } | { ok: false; reason: AddRefused }> {
+	request: Request,
+	options: {
+		name?: string;
+		audit?: () => Promise<unknown>;
+	} = {}
+): Promise<{ ok: true; passkey: Passkey } | { ok: false; reason: AddRefused }> {
 	const ceremony = await takeCeremony(
 		ceremonyId('add', session.uid),
 		session.holder
 	);
 	if (ceremony?.purpose !== 'add') return { ok: false, reason: 'expired' };
-	const stored = await storeAdd(bucket, user, ceremony, credential, request);
-	return stored.ok ? { ok: true } : stored;
+	return storeAdd(bucket, user, ceremony, credential, request, options);
 }
 
 /*
@@ -222,7 +226,11 @@ export async function storeAdd(
 	ceremony: PasskeyCeremonyPayload,
 	credential: string,
 	request: Request,
-	options: { silent?: boolean } = {}
+	options: {
+		silent?: boolean;
+		name?: string;
+		audit?: () => Promise<unknown>;
+	} = {}
 ): Promise<{ ok: true; passkey: Passkey } | { ok: false; reason: AddRefused }> {
 	if (
 		ceremony.accountId !== user._id ||
@@ -301,6 +309,7 @@ export async function storeAdd(
 		backedUp: made.backedUp,
 		transports: made.transports,
 		aaguid: made.aaguid,
+		...(options.name === undefined ? {} : { name: options.name }),
 		createdAt: new Date(),
 		createdVia: ceremony.proof,
 		createdOn,
@@ -317,10 +326,14 @@ export async function storeAdd(
 				})
 	};
 	/* Recorded before the write, as the person's other acts on this page are; the entry names no credential. */
-	await recordEndUserAudit(bucket._id, user._id, 'enduser.passkey.add', {
-		targetScope: bucket._id,
-		ownerGroupId: bucket.ownerGroupId
-	});
+	if (options.audit) {
+		await options.audit();
+	} else {
+		await recordEndUserAudit(bucket._id, user._id, 'enduser.passkey.add', {
+			targetScope: bucket._id,
+			ownerGroupId: bucket.ownerGroupId
+		});
+	}
 	if ((await store.create(record)) === 'exists') {
 		return { ok: false, reason: 'exists' };
 	}
@@ -370,9 +383,11 @@ export function passkeyWorks(passkey: Passkey, bucket: UserBucket): boolean {
 }
 
 /*
- * The last-way-in rule (data-model.md, FR-029): removing a working passkey is refused when the person would be left
- * with no way into the project. A way is a password while the project's password sign-in is open, a link to a provider
- * the project offers, or another passkey that works. Removing a passkey that does not work removes no way in.
+ * The last-way-in rule (data-model.md, FR-029, specs/144): removing a working passkey is refused when the person would
+ * be left with no way into the project (or into the console, when `consolePasskeyRequired` is on). A way is a password
+ * while the project's password sign-in is open, a link to a provider the project offers, or another passkey that works.
+ * When `consolePasskeyRequired` is on for the administrators' project, only another working passkey reaches the console.
+ * Removing a passkey that does not work removes no way in.
  */
 export async function isLastWayIn(
 	bucket: UserBucket,
@@ -380,8 +395,14 @@ export async function isLastWayIn(
 	passkey: Passkey
 ): Promise<boolean> {
 	if (!passkeyWorks(passkey, bucket)) return false;
-	if (otherWayIn(bucket, user, { passwordsOpen: bucket.passwordLogin }))
+	const onlyPasskeyReaches =
+		bucket._id === ADMIN_BUCKET_ID && bucket.consolePasskeyRequired === true;
+	if (
+		!onlyPasskeyReaches &&
+		otherWayIn(bucket, user, { passwordsOpen: bucket.passwordLogin })
+	) {
 		return false;
+	}
 	const others = await getPasskeyStore().listOf(bucket._id, user._id);
 	return !others.some(
 		(other) => other._id !== passkey._id && passkeyWorks(other, bucket)
@@ -470,7 +491,8 @@ export async function completeRemove(
 	user: User,
 	session: PageSession,
 	passkeyId: string | undefined,
-	strong: boolean
+	strong: boolean,
+	options: { audit?: () => Promise<unknown> } = {}
 ): Promise<{ ok: true } | { ok: false; reason: RemoveRefused }> {
 	const passkey = await ownPasskey(bucket, user, passkeyId);
 	if (!passkey) return { ok: false, reason: 'gone' };
@@ -486,10 +508,14 @@ export async function completeRemove(
 		if (spent?.passkeyId !== passkey._id)
 			return { ok: false, reason: 'expired' };
 	}
-	await recordEndUserAudit(bucket._id, user._id, 'enduser.passkey.remove', {
-		targetScope: bucket._id,
-		ownerGroupId: bucket.ownerGroupId
-	});
+	if (options.audit) {
+		await options.audit();
+	} else {
+		await recordEndUserAudit(bucket._id, user._id, 'enduser.passkey.remove', {
+			targetScope: bucket._id,
+			ownerGroupId: bucket.ownerGroupId
+		});
+	}
 	if (!(await getPasskeyStore().remove(bucket._id, user._id, passkey._id))) {
 		return { ok: false, reason: 'gone' };
 	}
@@ -502,19 +528,21 @@ export async function completeRemove(
 }
 
 /*
- * A project with no address of its own serves its page at the root, which the default project's address names, so its
- * "This wasn't me" link names the project as well; every other project's link is named by its address alone.
+ * A project with no address of its own, or the administrators' project (specs/144), shares the root page address with
+ * the default project, so its "This wasn't me" link names the project as well; every other project's link is named by
+ * its address alone.
  */
 export function notMeProject(bucket: RequestBucket): string {
-	return addressOf(bucket).kind === 'unaddressed'
+	return addressOf(bucket).kind === 'unaddressed' ||
+		bucket._id === ADMIN_BUCKET_ID
 		? `&project=${encodeURIComponent(bucket._id)}`
 		: '';
 }
 
 /*
- * The project a "This wasn't me" link acts in: the one its address names, or one the link names that has no address of
- * its own and so shares that page address (the root's). Never a project with an address of its own named from another
- * address, never the administrators' (served at the root, not unaddressed), never one being deleted.
+ * The project a "This wasn't me" link acts in: the one its address names, or one the link names that shares the root
+ * page address (an unaddressed project, or the administrators' project since specs/144). Never a project with an
+ * address of its own named from another address, never one being deleted.
  */
 export async function notMeBucketId(
 	addressed: RequestBucket,
@@ -525,7 +553,8 @@ export async function notMeBucketId(
 	if (
 		!named ||
 		isScheduledForDeletion(named) ||
-		addressOf(named).kind !== 'unaddressed' ||
+		(addressOf(named).kind !== 'unaddressed' &&
+			named._id !== ADMIN_BUCKET_ID) ||
 		accountPageBase(named) !== accountPageBase(addressed)
 	) {
 		return undefined;

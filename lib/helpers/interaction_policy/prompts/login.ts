@@ -10,6 +10,7 @@ import {
 	REQUIRE_CODE_DESCRIPTION
 } from '../../../client_policy/require_code.ts';
 import {
+	consolePasskeyRequiredAndMissing,
 	passkeyRequiredAndMissing,
 	proxyAsksForPasskey,
 	REQUIRE_PASSKEY_DESCRIPTION
@@ -301,13 +302,14 @@ class LoginPromt extends Prompt {
 			 * shows why instead.
 			 */
 			error: 'unmet_authentication_requirements',
-			check: (oidc) =>
+			check: async (oidc) =>
 				passkeyRequiredAndMissing(oidc.client, judgedAcr(oidc)) ||
 				proxyAsksForPasskey(
 					oidc.client,
 					oidc.params.acr_values,
 					judgedAcr(oidc)
-				),
+				) ||
+				(await consolePasskeyRequiredAndMissing(oidc.client, judgedAcr(oidc))),
 			details: () => ({ requirePasskey: true })
 		},
 		{

@@ -43,7 +43,8 @@ export type SignInChange =
 	| 'passkeysOff'
 	| 'passkeyAppsOff'
 	| 'passkeyApisOff'
-	| 'passkeyPathsOff';
+	| 'passkeyPathsOff'
+	| 'consolePasskeyOn';
 
 export interface SignInPreview {
 	consequences: string[];
@@ -58,6 +59,7 @@ interface SignInPatch {
 	totpRequired?: boolean;
 	passwordGuessing?: Pick<PasswordGuessingSetting, 'mode'>;
 	passkeyLogin?: boolean;
+	consolePasskeyRequired?: boolean;
 }
 
 export interface SignInCounts extends EndUserTally {
@@ -147,6 +149,13 @@ export async function signInPreview(
 	if (requiringPasskey.length > 0) changes.push('passkeyAppsOff');
 	if (requiringPasskeyApis.length > 0) changes.push('passkeyApisOff');
 	if (requiringPasskeyPaths.length > 0) changes.push('passkeyPathsOff');
+	if (
+		consoleBucket &&
+		patch.consolePasskeyRequired === true &&
+		bucket.consolePasskeyRequired !== true
+	) {
+		changes.push('consolePasskeyOn');
+	}
 	if (changes.length === 0) return null;
 
 	const counts = await signInCounts(bucket);
@@ -210,9 +219,28 @@ export async function signInPreview(
 			case 'passkeysOff':
 				expect.passkeyOnly = passkeyOnly;
 				consequences.push(
-					`${plural(passkeyOnly, 'person', 'people')} can only sign in with a passkey; they will not be able to sign in.`
+					`${plural(passkeyOnly, consoleBucket ? 'administrator' : 'person', consoleBucket ? 'administrators' : 'people')} can only sign in with a passkey; they will not be able to sign in.`
 				);
 				break;
+			case 'consolePasskeyOn': {
+				const accounts = (await getUserStore(ADMIN_BUCKET_ID).list()).filter(
+					(user) => canSignIn(user)
+				);
+				const holders = new Set(
+					(
+						await getPasskeyStore().holdingIn(ADMIN_BUCKET_ID, rpIdFor(bucket))
+					).map((holder) => holder.accountId)
+				);
+				const without = accounts.filter((user) => !holders.has(user._id));
+				expect.withoutPasskey = without.length;
+				consequences.push(
+					`${without.length} of ${plural(accounts.length, 'administrator')} ${without.length === 1 ? 'has' : 'have'} no passkey and won't be able to sign in to the console or connect an agent` +
+						(without.length > 0
+							? `: ${without.map((user) => user.email).join(', ')}.`
+							: '.')
+				);
+				break;
+			}
 			case 'passkeyAppsOff':
 				expect.appsRequiringPasskey = requiringPasskey.length;
 				consequences.push(

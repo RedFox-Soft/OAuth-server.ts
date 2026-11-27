@@ -12,7 +12,7 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 ### Added
 
 - **Sign in with a passkey** (spec 139). A project can turn on **Passkeys** in its Sign-in tab (or `project_update`
-  with `passkeyLogin`; off by default, never on the administrators' project, refused at an IP-address `ISSUER`). People
+  with `passkeyLogin`; off by default, refused at an IP-address `ISSUER`). People
   then sign in with a fingerprint, face or screen lock from the sign-in page's button or autofill, and add, rename and
   remove up to 20 passkeys on their account page, now named **Sign-in and security**; each new passkey is mailed with
   a "This wasn't me" link. A passkey works only at the host it was made for. **Changed:** a passkey sign-in reports
@@ -35,9 +35,17 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
   such an API always reports `acr = phr` even when the client did not ask for it), and apps behind your proxy can
   require a fresh passkey on **Ask to sign in again** and **From where** network-facts conditions (`withPasskey`).
   Turning passkeys off or moving a project to a new RP ID previews how many APIs and proxy paths require a passkey.
+  **Administrators and the console** (spec 144): **Passkeys** can now be enabled on the **Administrators** project
+  (`passkeyOffer` remains off); administrators manage their own passkeys from the console header account drawer, super
+  administrators inspect and revoke colleagues' passkeys in **Administrators -> Accounts** and via MCP
+  (`admin_passkey_list`, `admin_passkey_revoke`, `admin_passkey_revoke_all`), and a super administrator who signed in
+  with a passkey can enable **Require a passkey to sign in to the console** (`consolePasskeyRequired`, with named
+  preview, immediate enforcement on live console sessions and `/mcp` tokens, strict refusal page with no passkey
+  creation, and console reachability protection across all lockout paths).
   **Upgrade note:** run `db:setup` (or `db:setup:pg`) for the three new storage areas and the new passkey index, then
-  `db:migrate` (three migrations: the passkeys fence, naming `phishing_resistant` in a stored `acrValues`, and the
-  `2026-11-26-passkey-api-proxy-fence` fence; the server refuses to start until all have run).
+  `db:migrate` (four migrations: the passkeys fence, naming `phishing_resistant` in a stored `acrValues`, the
+  `2026-11-26-passkey-api-proxy-fence` fence, and the `2026-11-27-admin-passkeys-fence` fence; the server refuses to
+  start until all have run).
 
 ### Fixed
 

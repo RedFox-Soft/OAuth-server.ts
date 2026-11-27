@@ -1,5 +1,6 @@
 import { getPasskeyStore } from '../adapters/index.js';
 import type { User, UserBucket } from '../adapters/types.js';
+import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import epochTime from '../helpers/epoch_time.js';
 import { mailDeliveryConfigured } from '../mail/mailer.js';
 import { passkeysAccepted } from './accepted.js';
@@ -18,6 +19,9 @@ export type OfferKind = 'full' | 'conditional';
  * accepts passkeys and offers them, mail works (every passkey is mailed about), the address is confirmed, the person
  * holds fewer than twenty, and they neither declined for good, nor are held back by "This wasn't me", nor saw the offer
  * in the last thirty days.
+ *
+ * Never on the administrators' project (specs/144 FR-002): administrators add passkeys deliberately from the console
+ * after strong verification or a mailed link, and never hold conditional passkeys.
  */
 export async function offerable(
 	bucket: UserBucket,
@@ -31,6 +35,7 @@ export async function offerable(
 		thisShowing?: boolean;
 	} = {}
 ): Promise<boolean> {
+	if (bucket._id === ADMIN_BUCKET_ID) return false;
 	if (!passkeysAccepted(bucket) || bucket.passkeyOffer === false) return false;
 	if (!user.verified) return false;
 	const state = user.passkeyOffer;
@@ -55,11 +60,14 @@ export async function offerable(
  * research R8): the safety half of the offer's conditions — the project accepts passkeys, the address is confirmed, mail
  * works, they hold fewer than twenty, and "This wasn't me" is not holding them back. The offer's own opt-outs (the
  * project's setting, "Don't ask again", the 30-day pause) do not apply: this is the person's own step, as on their page.
+ *
+ * Never on the administrators' project (specs/144 FR-017): console passkey refusal never creates a passkey on the spot.
  */
 export async function mayCreateAfterSignIn(
 	bucket: UserBucket,
 	user: User
 ): Promise<boolean> {
+	if (bucket._id === ADMIN_BUCKET_ID) return false;
 	if (!passkeysAccepted(bucket) || !user.verified) return false;
 	if (user.passkeyOffer?.held === true) return false;
 	if (!(await mailDeliveryConfigured())) return false;

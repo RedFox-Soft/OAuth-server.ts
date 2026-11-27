@@ -9,8 +9,9 @@ import {
 	InvalidDpopProof,
 	UseDpopNonce
 } from '../helpers/validate_dpop.js';
-import { getUserStore } from '../adapters/index.js';
+import { getBucketStore, getUserStore } from '../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import { meets, reachedAcr } from '../helpers/acr_satisfaction.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
 import { ISSUER } from '../configs/env.js';
 import { Client } from '../models/client.js';
@@ -27,6 +28,8 @@ export interface McpPrincipal {
 	/* The agent's OAuth client. Becomes `viaClientId` on every audit entry it produces. */
 	readonly clientId: string;
 	readonly scopes: ReadonlySet<string>;
+	/* The reached authentication context of the sign-in that authorized this agent (specs/144). */
+	readonly signInAcr: string | null;
 }
 
 /*
@@ -49,6 +52,8 @@ export type RejectionReason =
 	| 'no_account'
 	| 'not_an_admin'
 	| 'inactive'
+	/* The administrators' project requires a passkey for console and agent access, and this token's sign-in was not one. */
+	| 'passkey_required'
 	/* The client's identity is not one an operator permitted at this surface. */
 	| 'client_not_permitted'
 	/* Permitted, but the entry requires the client to prove possession of a published key. */
@@ -191,13 +196,23 @@ export async function resolveMcpPrincipal(
 	if (!user) throw new McpUnauthorized('not_an_admin');
 	if (!user.active) throw new McpUnauthorized('inactive');
 
+	const signInAcr = reachedAcr(accessToken.payload) ?? null;
+	const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+	if (
+		adminBucket?.consolePasskeyRequired === true &&
+		!meets(signInAcr, 'phishing_resistant')
+	) {
+		throw new McpUnauthorized('passkey_required');
+	}
+
 	await assertClientPermitted(accessToken.payload.clientId);
 
 	return {
 		accessTokenId,
 		accountId,
 		clientId: accessToken.payload.clientId,
-		scopes: new Set(accessToken.payload.scope?.split(' ').filter(Boolean))
+		scopes: new Set(accessToken.payload.scope?.split(' ').filter(Boolean)),
+		signInAcr
 	};
 }
 

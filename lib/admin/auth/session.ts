@@ -20,6 +20,10 @@ export async function createAdminSession(data: {
 	bucketId: string;
 	/* The provider the sign-in came through, or null for a password sign-in. */
 	signedInWith?: string | null;
+	/* Reached authentication context, methods, and sign-in time (specs/144). */
+	signInAcr?: string | null;
+	signInAmr?: string[];
+	signInAt?: number;
 	tokens: AdminSession['tokens'];
 }) {
 	const personal = await getGroupStore().findPersonalFor(data.userId);

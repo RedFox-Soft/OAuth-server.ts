@@ -33,10 +33,13 @@ graph:
 Since spec 139 (2026-11-19, uncommitted at the time of writing) a person signs in to a project with a passkey
 (WebAuthn), and adds, renames and removes their own on **Sign-in and security** (`/account/security`, the page that was
 "Two-step verification"). A project accepts passkeys only when an operator turns **Passkeys** on (`passkeyLogin`, off by
-default) and never on the administrators' project (`passkeysAccepted`, `lib/passkeys/accepted.ts:12`). Spec 140 (A2,
+default); since spec 144 (D3, same release), the administrators' project also accepts passkeys (`passkeysAccepted`,
+`lib/passkeys/accepted.ts`) while keeping `passkeyOffer` refused (`offerable`, `mayCreateAfterSignIn`). Spec 140 (A2,
 same release) adds the operator's view and revocation, the agent's passkey tools, a holder count on the Sign-in tab and
 a passkey block in the address change preview: see "Operator and agent" below. Spec 141 (B) adds the offer after a
-password sign-in, the conditional passkey, the browser's signals and the passkey endpoints: see the section below.
+password sign-in, the conditional passkey, the browser's signals and the passkey endpoints: see the section below. Spec
+144 (D3) adds administrator personal passkeys in the console header drawer, super-admin revocation with MCP parity, and
+the `consolePasskeyRequired` policy with reachability protection: see "Administrators and the console" below.
 
 ## One RP ID and one origin, both from the issuer
 
@@ -208,9 +211,46 @@ it**, `revokeAccountAccess`, then a password-reset mail where the person has a p
   - `expect` gains `passkeyPeople` and `passkeyOnly`, and `sameCounts` compares them with absent read as 0 (`:576`).
   - The move deletes no passkey; the old ones list as `old_address`.
   - Root to path and path to path keep the RP ID, so they say nothing about passkeys.
-- **Sign-in tab**: the summary's `passkeyHolders` (`routes.ts:1247`; absent for the administrators' project) drives "N
-  of M people have a passkey", "N people have passkeys, which don't work while passkeys are off", or, before anyone
-  holds one at the root or a path, the advice to give the project its own address first.
+- **Sign-in tab**: the summary's `passkeyHolders` (`routes.ts:1247`; also included for the administrators' project
+  since spec 144) drives "N of M people have a passkey", "N people have passkeys, which don't work while passkeys are
+  off", or, before anyone holds one at the root or a path, the advice to give the project its own address first.
+
+## Administrators and the console (spec 144)
+
+- **Unlocked on `admin`, no offer**: `passkeysAccepted` (`lib/passkeys/accepted.ts`) now treats `ADMIN_BUCKET_ID` like
+  any other bucket (`passkeyLogin === true`). `passkeyOffer` stays refused (422) and `offerable` / `mayCreateAfterSignIn`
+  always return `false` for `ADMIN_BUCKET_ID`, because administrators have no `/account/security` page and never hold
+  conditional passkeys.
+- **Personal management in the console header**: `lib/admin/me_passkeys.ts` mounts 7 routes under
+  `/admin/api/me/passkeys*` (and `GET /admin/me/passkeys/confirm` in `lib/admin/auth/login.ts`), rendered inside
+  `OwnAccountDrawer.tsx`. Adding/removing requires either a fresh strong console sign-in (`signInAcr` meeting
+  `multi_factor` within 15 minutes) or a fresh password sign-in plus a session-bound email link (never consumed without
+  the `_admin_session` cookie). Adding a passkey never upgrades `signInAcr`. All 7 `/admin/api/me/passkeys*` routes are
+  excluded from MCP as `inapplicable`; `admin.passkey.add` and `admin.passkey.remove` are audited.
+- **Disown**: the "This wasn't me" link on an administrator's "passkey added" email carries `&project=admin` (accepted
+  at root alongside `unaddressed` buckets). `POST /account/security/passkey-disown` checks `consoleStaysReachable`
+  before spending the link (refusing with `passkeyDisownRefusedPage` if it would remove the last reachable passkey
+  super administrator), audits `admin.passkey.disown`, removes passkeys added at or after the disowned one, signs the
+  administrator out everywhere (`signOutAdministrator`), alerts other super administrators
+  (`reportPasskeyDisownToSuperAdministrators`), and sends no password reset.
+- **Super-admin view, revocation & MCP parity**: `GET /admin/api/admins` includes `passkeys` count; super administrators
+  view (`GET /admin/api/admins/:id/passkeys`) and revoke (`DELETE …/:passkeyId`, `DELETE …/passkeys`) colleagues'
+  passkeys (refusing self-revocation with 409, signing the target out everywhere, auditing `admin.passkey.revoke` /
+  `admin.passkey.revoke.all` as counts without names, emailing the target). Published to MCP as `admin_passkey_list`,
+  `admin_passkey_revoke` (`high`), and `admin_passkey_revoke_all` (`high`).
+- **Browser signals**: `OwnAccountDrawer` sends `signalAllAcceptedCredentials` and `signalCurrentUserDetails`;
+  `signalUnknownCredential` is NEVER sent at the root host (`ADMIN_BUCKET_ID` shares it with root/path projects).
+- **Console passkey requirement & reachability**: `UserBucket.consolePasskeyRequired` (422 on non-admin buckets) can be
+  enabled only when `passkeyLogin` is on, the acting super administrator holds a working passkey, and their current
+  session/MCP token reached `phishing_resistant` (`assertAdminBucketChange`). Before saving, the preview names
+  administrators lacking a working passkey (`consolePasskeyOn`). Enforced live on `/admin/login` (`acr_values=phr`),
+  `/admin/callback` (401 + `admin.login.error { reason: 'acr' }`), `resolveAdmin` cookie arm (live refusal of existing
+  non-passkey sessions), `/mcp` tokens (`401` + `mcp.auth.error { reason: 'passkey_required' }`), `/auth` & `/token`
+  (`consolePasskeyRequiredAndMissing` and `isMcpResource` `signIn: { passkey: true, code: true }`), and `/mcp` refresh
+  before rotation. On `ADMIN_BUCKET_ID`, the refusal page (`PasskeyRequiredPage`) NEVER offers passkey creation (only
+  `passkeySignIn` or `passkeyAsk`). `lib/admin/federation/reachability.ts` guards all six lockout paths (turning
+  `passkeyLogin` off while `consolePasskeyRequired` is on, personal remove, super-admin revoke, disown, deactivate, and
+  super-admin withdraw). Migration fence: `2026-11-27-admin-passkeys-fence`.
 
 ## The offer, the conditional passkey and the browser (spec 141)
 

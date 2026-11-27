@@ -242,6 +242,19 @@ const catalogue = [
 			"The last ten sign-ins of the administrator this agent is acting as, refused ones included, newest first: as `{ state: 'list', rows }`, each row with `at`, `outcome` (`let_in` or `refused`), `place` (the console, an application of the administrators' project, or the agent's client), `method` or `reason`, `device` (browser and system family) and `country`; never a network address, network category, owner or location. `{ state: 'off' }` when this server keeps no sign-ins, `{ state: 'empty', since }` when none since then. A super administrator reads another administrator's, with addresses, with admin_activity_list."
 	},
 	{
+		tool: 'admin_passkey_list',
+		method: 'GET',
+		path: '/admin/api/admins/:id/passkeys',
+		action: null,
+		consequence: 'read',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			"An administrator's passkeys: `{ passkeys, ways, restore, mailable }`, with each passkey's id, name, device, synced flag, createdAt, createdVia, lastUsedAt, state (`works`, `off`, `old_address`, `copied`), and confirmed flag — never credential ids, public keys, counters or transports. Super administrators only."
+	},
+	{
 		tool: 'resource_list',
 		method: 'GET',
 		path: '/admin/api/projects/:id/resources',
@@ -1386,6 +1399,32 @@ const catalogue = [
 		summary:
 			"Reset an administrator's authenticator, for a lost device: the enrolment is cleared along with any failed attempts, and they are signed out everywhere as admin_sign_out does; they set a new one up at their next sign-in. Answers `sessions`. Refused on your own account, and when the administrator has no authenticator."
 	},
+	{
+		tool: 'admin_passkey_revoke',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/passkeys/:passkeyId',
+		action: 'admin.passkey.revoke',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id', 'passkeyId'],
+		summary:
+			'Revoke one passkey of another administrator, for a lost or stolen device: removes the passkey, signs the administrator out everywhere (console sessions and agent tokens), and emails them if their address is verified and mail is configured. Answers `{ revoked, sessions, mailed }`. Refused on your own account, when the passkey does not exist, or when revoking it would leave no active super administrator able to sign in to the console.'
+	},
+	{
+		tool: 'admin_passkey_revoke_all',
+		method: 'DELETE',
+		path: '/admin/api/admins/:id/passkeys',
+		action: 'admin.passkey.revoke.all',
+		consequence: 'high',
+		superAdminOnly: true,
+		bodySchema: null,
+		querySchema: null,
+		pathParams: ['id'],
+		summary:
+			'Revoke every passkey of another administrator: removes all their passkeys, signs them out everywhere, and emails them if their address is verified and mail is configured. Answers `{ revoked, sessions, mailed }`. Refused on your own account, when they hold no passkeys, or when revoking them would leave no active super administrator able to sign in to the console.'
+	},
 
 	/* ------------------------------------------------- writes: teams and projects (12) */
 	{
@@ -1563,7 +1602,7 @@ const catalogue = [
 		querySchema: null,
 		pathParams: ['id'],
 		summary:
-			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. A person who set up an authenticator app is asked for its code at every password sign-in whatever `totpRequired` says. `totpSelfService` (absent means true) lets people turn two-step verification on themselves, on their own account page after a link mailed to them; an agent cannot set up a code for anyone. It has no effect while password sign-in is off or mail is not configured (project_summary_get reports `twoStepSelfService`: on, off, no_password_login or no_mail), and it is refused on the administrators' project. `newSignInAlerts` emails an account, at a proven address, when it signs in from a network or a browser it has not used in 90 days, with where, how and which browser (never the address) and a link that signs it out everywhere; absent means false, and true on the administrators' project; it needs mail configured and people's activity recording on. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy. `passwordGuessing` sets what a password sign-in from an address on FoxTrust's list of addresses seen guessing passwords meets — `mode` nothing, count (the default) or refuse, and `exempt` networks never checked (each a single address or range, optionally `until` a date-time, at most 100). Choosing refuse previews like the tightenings above, with the last 7 days' numbers (`listedAttempts`, `listedRightPassword`) as `expect`, and is refused on the administrators' project. `passkeyLogin` (absent means false) lets people sign in with a passkey and add passkeys on their own account page; a passkey sign-in is two-step sign-in, so it meets every requirement of a code. It is refused when the instance is served at an IP address, warned about over plain http (project_get carries `passkeysNeedHttps`), and is refused on the administrators' project. Turning it off deletes no passkey; when someone could then no longer sign in, or when applications, APIs or proxy paths require a passkey, it previews like the other tightenings, with `passkeyOnly`, `appsRequiringPasskey`, `apisRequiringPasskey`, and `pathsRequiringPasskey` as `expect` (each present when non-zero). `passkeyOffer` (absent means true, no effect while passkeys are off, refused on the administrators' project): after a sign-in with a password, people are offered a passkey; one made after a password alone works like that password until the person confirms it from the email about it, and one made after a password and a code counts as two-step sign-in at once."
+			"Change a project's name, the name shown to its people (`displayName`; null removes it), or its registration, verification and second-factor settings. Editing the project itself needs membership of the project's team — project_get states it as `can.editSettings`. `totpRequired` governs password sign-in only — it is accepted but inert while `passwordLogin` is off, and it never gates a federated sign-in, so it is not a way to secure a project that signs in through an upstream provider. A person who set up an authenticator app is asked for its code at every password sign-in whatever `totpRequired` says. `totpSelfService` (absent means true) lets people turn two-step verification on themselves, on their own account page after a link mailed to them; an agent cannot set up a code for anyone. It has no effect while password sign-in is off or mail is not configured (project_summary_get reports `twoStepSelfService`: on, off, no_password_login or no_mail), and it is refused on the administrators' project. `newSignInAlerts` emails an account, at a proven address, when it signs in from a network or a browser it has not used in 90 days, with where, how and which browser (never the address) and a link that signs it out everywhere; absent means false, and true on the administrators' project; it needs mail configured and people's activity recording on. Requiring verification is refused on every project until mail delivery is configured. A change that tightens who can get in — `passwordLogin` off, `emailVerificationRequired` or `totpRequired` (while passwords are on) turned on, or `registrationOpen` turned on for the default or the administrators' project — changes nothing when called alone: it answers with a preview, `consequences` (one sentence per change, counted), `expect` (the counts) and `changes`; call again with the same settings, `confirm: true` and that `expect` to apply it. If the counts changed since, it is refused with 409 and the fresh preview. Other changes apply at once. A super-administrator configures the administrators' own project here too: opening its registration lets anyone register a console account (the answer carries an advisory while verification is off); requiring verification is also refused until the acting administrator has verified their own address; turning password sign-in off is refused unless the caller's console session signed in through one of its identity providers and a super administrator stays reachable — so an agent, having no console session, is always refused it; with `emailVerificationRequired` off people sign in unverified and applications are told `email_verified: false` until each address is proven; on the administrators' project, sign-up (`registrationOpen`) may be open only while `emailVerificationRequired` is on, so open both in one change and close sign-up before turning verification off. Each refusal names its remedy. `passwordGuessing` sets what a password sign-in from an address on FoxTrust's list of addresses seen guessing passwords meets — `mode` nothing, count (the default) or refuse, and `exempt` networks never checked (each a single address or range, optionally `until` a date-time, at most 100). Choosing refuse previews like the tightenings above, with the last 7 days' numbers (`listedAttempts`, `listedRightPassword`) as `expect`, and is refused on the administrators' project. `passkeyLogin` (absent means false) lets people sign in with a passkey and add passkeys (on their account page, or in the console header for administrators); a passkey sign-in is two-step sign-in, so it meets every requirement of a code. It is refused when the instance is served at an IP address, and warned about over plain http (project_get carries `passkeysNeedHttps`). Turning it off deletes no passkey; when someone could then no longer sign in, or when applications, APIs or proxy paths require a passkey, it previews like the other tightenings, with `passkeyOnly`, `appsRequiringPasskey`, `apisRequiringPasskey`, and `pathsRequiringPasskey` as `expect` (each present when non-zero); on the administrators' project it is refused while `consolePasskeyRequired` stays on or if no active super administrator would remain able to reach the console. `passkeyOffer` (absent means true, no effect while passkeys are off, refused on the administrators' project): after a sign-in with a password, people are offered a passkey; one made after a password alone works like that password until the person confirms it from the email about it, and one made after a password and a code counts as two-step sign-in at once. `consolePasskeyRequired` (valid only on the administrators' project; 422 elsewhere): requires a passkey for console sign-in and administrative MCP access; requires `passkeyLogin` on and a caller who holds a working passkey and authenticated with a passkey; previews with `expect.withoutPasskey` naming active administrators without a working passkey."
 	},
 
 	/* ----------------------------------------------- writes: end-users (12) */
@@ -2693,6 +2732,55 @@ export const excludedConsoleOperations: readonly ExcludedConsoleOperation[] = [
 		absence: 'inapplicable',
 		reason:
 			'Mails the signed-in administrator a message that proves their own address. Only the person holding the mailbox can complete it, so an agent has nothing to do with the result. The administrator presses it in the console.'
+	},
+	{
+		method: 'GET',
+		path: '/admin/api/me/passkeys',
+		absence: 'inapplicable',
+		reason:
+			"Lists the signed-in administrator's own passkeys and WebAuthn Signal API hints for their browser session. An agent has no console session or browser authenticator; manage personal passkeys from the console header."
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/me/passkeys/add-link',
+		absence: 'inapplicable',
+		reason:
+			"Mails a confirmation link bound to the caller's browser console session before adding a personal passkey. Only an interactive browser session can complete it; use the console header."
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/me/passkeys/add/options',
+		absence: 'inapplicable',
+		reason:
+			'Prepares a WebAuthn registration ceremony bound to an interactive console session. Only a browser with a platform or roaming authenticator can run it; use the console header.'
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/me/passkeys/add',
+		absence: 'inapplicable',
+		reason:
+			'Completes a WebAuthn passkey registration ceremony from the browser. An agent has no browser authenticator or console session; add personal passkeys in the console header.'
+	},
+	{
+		method: 'PATCH',
+		path: '/admin/api/me/passkeys/:passkeyId',
+		absence: 'inapplicable',
+		reason:
+			"Renames one of the caller's own passkeys from their recent console sign-in. Manage personal passkeys in the console header."
+	},
+	{
+		method: 'POST',
+		path: '/admin/api/me/passkeys/:passkeyId/remove-link',
+		absence: 'inapplicable',
+		reason:
+			"Mails a confirmation link bound to the caller's browser console session before removing a personal passkey. Manage personal passkeys in the console header."
+	},
+	{
+		method: 'DELETE',
+		path: '/admin/api/me/passkeys/:passkeyId',
+		absence: 'inapplicable',
+		reason:
+			"Removes one of the caller's own passkeys from their console session. An agent uses admin_passkey_revoke on another administrator's passkey instead; manage personal passkeys in the console header."
 	},
 	{
 		method: 'PUT',

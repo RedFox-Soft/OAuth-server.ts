@@ -3329,6 +3329,11 @@ export const UserBucket = t.Object({
 	 * while the project does not accept passkeys.
 	 */
 	passkeyOffer: t.Optional(t.Boolean()),
+	/*
+	 * Whether signing in to the administrative console and authorizing administrative MCP agents requires a passkey
+	 * (specs/144). Valid only on the administrators' project; absent means off.
+	 */
+	consolePasskeyRequired: t.Optional(t.Boolean()),
 	createdAt: t.Date(),
 	updatedAt: t.Date()
 });
@@ -3422,6 +3427,7 @@ export interface UserBucketStoreInstance {
 				| 'newSignInAlerts'
 				| 'passkeyLogin'
 				| 'passkeyOffer'
+				| 'consolePasskeyRequired'
 			>
 		>
 	): Promise<UserBucket | null>;
@@ -3518,6 +3524,14 @@ export const AdminSession = t.Object({
 	 * created before it was recorded, which read as null.
 	 */
 	signedInWith: t.Optional(t.Union([t.String(), t.Null()])),
+	/*
+	 * The sign-in that established this console session (specs/144): the reached authentication context, the
+	 * authentication methods, and the Unix timestamp (seconds) of the sign-in. Absent on sessions created before
+	 * spec 144, which fail closed when `consolePasskeyRequired` is turned on.
+	 */
+	signInAcr: t.Optional(t.Union([t.String(), t.Null()])),
+	signInAmr: t.Optional(t.Array(t.String())),
+	signInAt: t.Optional(t.Number()),
 	tokens: t.Object({
 		accessToken: t.Optional(t.String()),
 		idToken: t.Optional(t.String()),
@@ -3535,6 +3549,9 @@ export interface AdminSessionStoreInstance {
 		bucketId: string;
 		activeGroupId: string;
 		signedInWith?: string | null;
+		signInAcr?: string | null;
+		signInAmr?: string[];
+		signInAt?: number;
 		tokens: AdminSession['tokens'];
 		ttlSeconds: number;
 		absoluteTtlSeconds: number;

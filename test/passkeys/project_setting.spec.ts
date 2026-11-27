@@ -380,16 +380,24 @@ describe('the project setting "Passkeys"', () => {
 		}
 	});
 
-	it('is refused on the administrators’ project, naming the field', async () => {
-		const refused = await request(
+	it('can be turned on and off on the administrators’ project by a super administrator', async () => {
+		const on = await request(
 			'PATCH',
 			`/admin/api/projects/${ADMIN_BUCKET_ID}`,
 			cookie,
 			{ passkeyLogin: true }
 		);
+		expect(on.status).toBe(200);
+		expect(on.body.passkeyLogin).toBe(true);
 
-		expect(refused.status).toBe(422);
-		expect(refused.body.field).toBe('passkeyLogin');
+		const off = await request(
+			'PATCH',
+			`/admin/api/projects/${ADMIN_BUCKET_ID}`,
+			cookie,
+			{ passkeyLogin: false }
+		);
+		expect(off.status).toBe(200);
+		expect(off.body.passkeyLogin).toBe(false);
 	});
 });
 

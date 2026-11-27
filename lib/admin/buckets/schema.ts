@@ -164,17 +164,23 @@ export const UpdateBucketBody = t.Object({
 	 */
 	totpSelfService: t.Optional(t.Boolean()),
 	/*
-	 * Whether people may sign in with a passkey and add passkeys on their own account page (specs/139). Absent means
-	 * off. Refused on the administrators' project, and turning it on is refused while the instance is served at an IP
-	 * address, which can never be a passkey's site. Turning it off deletes no passkey, and goes through the preview
-	 * below when someone could then sign in only with one.
+	 * Whether people may sign in with a passkey and add passkeys (specs/139, specs/144). Absent means off.
+	 * Turning it on is refused while the instance is served at an IP address, which can never be a passkey's
+	 * site. Turning it off deletes no passkey, and goes through the preview below when someone could then
+	 * sign in only with one.
 	 */
 	passkeyLogin: t.Optional(t.Boolean()),
 	/*
 	 * Whether people are offered a passkey after a sign-in with a password (specs/141). Absent means on; it has no
-	 * effect while `passkeyLogin` is off, and is refused on the administrators' project as `passkeyLogin` is.
+	 * effect while `passkeyLogin` is off, and is refused on the administrators' project.
 	 */
 	passkeyOffer: t.Optional(t.Boolean()),
+	/*
+	 * Whether signing in to the console and authorizing administrative MCP agents requires a passkey (specs/144).
+	 * Valid only on the administrators' project (422 elsewhere). Requires passkeys on and a passkey-authenticated
+	 * super administrator holding a working passkey; goes through the preview below naming administrators without one.
+	 */
+	consolePasskeyRequired: t.Optional(t.Boolean()),
 	/*
 	 * Whether the project's people are emailed about a sign-in from a new network or browser, with a link that signs
 	 * them out everywhere (specs/138). Absent means off, and on for the administrators' project.
@@ -225,7 +231,8 @@ export const UpdateBucketBody = t.Object({
 			passkeyOnly: t.Optional(PreviewCount),
 			appsRequiringPasskey: t.Optional(PreviewCount),
 			apisRequiringPasskey: t.Optional(PreviewCount),
-			pathsRequiringPasskey: t.Optional(PreviewCount)
+			pathsRequiringPasskey: t.Optional(PreviewCount),
+			withoutPasskey: t.Optional(PreviewCount)
 		})
 	)
 });

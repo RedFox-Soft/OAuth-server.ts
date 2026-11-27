@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import {
 	getBucketStore,
 	getGroupStore,
+	getPasskeyStore,
 	getUserStore
 } from '../../adapters/index.js';
 import { DuplicateEndUserError } from '../../adapters/types.js';
@@ -16,10 +17,16 @@ import { ADMIN_BUCKET_ID } from '../consts.js';
 import {
 	assertConsoleStaysReachable,
 	loadReachabilityState,
+	reachablePasskeySuperAdministrators,
 	reachableSuperAdministrators,
 	reachableThroughProvider
 } from '../federation/reachability.js';
 import { canSignIn } from '../../end_users/can_sign_in.js';
+import { meets } from '../../helpers/acr_satisfaction.ts';
+import { passkeyWorks } from '../../passkeys/account.js';
+import { notifyPasskey } from '../../passkeys/notify.js';
+import { rpIdFor } from '../../passkeys/relying_party.js';
+import { passkeysOfPerson } from '../../passkeys/ways_in.js';
 import { signOutAdministrator } from './sign_out.js';
 import { clearAttempts } from '../../totp/verify.js';
 import { CreateAdminBody, UpdateAdminBody } from './schema.js';
@@ -152,10 +159,18 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 		const names = bucket ? new Names(bucket) : null;
 		const now = new Date();
+		const passkeyCounts = new Map(
+			bucket
+				? (
+						await getPasskeyStore().holdingIn(ADMIN_BUCKET_ID, rpIdFor(bucket))
+					).map((holder) => [holder.accountId, holder.passkeys])
+				: []
+		);
 		return Promise.all(
 			accounts.map(async (u) => ({
 				...presentUser(u),
 				superAdmin: supers.has(u._id),
+				passkeys: passkeyCounts.get(u._id) ?? 0,
 				signIns:
 					bucket && names
 						? await signInSummary(bucket, u._id, now, names)
@@ -164,28 +179,45 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		);
 	})
 	/*
-	 * What turning password sign-in off would do to the console (specs/080): how this session signed in,
-	 * where the caller is linked, how many super administrators could still get in, and who could not.
-	 * Read before the change so the console can say it, not after.
+	 * What turning password sign-in off or requiring a passkey for console sign-in would do (specs/080, specs/144):
+	 * how this session signed in, where the caller is linked, whether they hold a working passkey, how many super
+	 * administrators could still get in, and who could not. Read before the change so the console can say it, not after.
 	 */
 	.get('/admin/api/admins/sign-in-readiness', async ({ admin }) => {
 		const ctx = assertAuth(admin);
 		assertSuperAdmin(ctx);
 		const state = await loadReachabilityState();
+		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 		const accounts = await store().list();
 		const caller = accounts.find((u) => u._id === ctx.userId);
+		const holderSet = new Set(
+			bucket
+				? (
+						await getPasskeyStore().holdingIn(ADMIN_BUCKET_ID, rpIdFor(bucket))
+					).map((holder) => holder.accountId)
+				: []
+		);
 		return {
 			passwordLogin: state.passwordLogin,
+			passkeyLogin: state.passkeyLogin,
+			consolePasskeyRequired: state.consolePasskeyRequired,
 			signedInWith: ctx.signedInWith,
+			signedInWithPasskey: meets(ctx.signInAcr, 'phishing_resistant'),
+			callerHasPasskey: holderSet.has(ctx.userId),
 			callerLinkedAt: (caller?.federated ?? [])
 				.map((link) => link.providerId)
 				.filter((id) => state.providers.some((p) => p.id === id && p.enabled)),
 			reachableSuperAdministrators: reachableSuperAdministrators(state).length,
+			reachablePasskeySuperAdministrators:
+				reachablePasskeySuperAdministrators(state).length,
 			unlinkedAdministrators: accounts
 				.filter(
 					(user) =>
 						canSignIn(user) && !reachableThroughProvider(user, state.providers)
 				)
+				.map((user) => ({ id: user._id, email: user.email })),
+			administratorsWithoutPasskey: accounts
+				.filter((user) => canSignIn(user) && !holderSet.has(user._id))
 				.map((user) => ({ id: user._id, email: user.email }))
 		};
 	})
@@ -335,6 +367,117 @@ export const adminUserRoutes = new Elysia({ name: 'admin-users' })
 		// So a re-enrolment does not begin inside a lockout the lost device earned.
 		await clearAttempts(ADMIN_BUCKET_ID, target._id);
 		return { sessions: await signOutAdministrator(target._id) };
+	})
+	/*
+	 * An administrator's passkeys (specs/144 contracts/admin-api.md §2): super administrators only, safe projection
+	 * (no credential id, public key, counter, transports, AAGUID or disown state), not audited because it is a read.
+	 */
+	.get('/admin/api/admins/:id/passkeys', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const target = await store().find(params.id);
+		if (!target) throw new AdminError(404, 'admin not found');
+		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+		if (!bucket)
+			throw new AdminError(500, "the administrators' project is missing");
+		const held = await getPasskeyStore().listOf(ADMIN_BUCKET_ID, target._id);
+		return passkeysOfPerson(bucket, target, held);
+	})
+	/*
+	 * Revoke one passkey of another administrator (specs/144): refused on oneself, checks console reachability
+	 * before auditing, writes audit-first with count only, removes, signs out everywhere, and emails the administrator.
+	 */
+	.delete(
+		'/admin/api/admins/:id/passkeys/:passkeyId',
+		async ({ admin, params }) => {
+			const ctx = assertAuth(admin);
+			assertSuperAdmin(ctx);
+			const target = await recoveryTarget(
+				ctx.userId,
+				params.id,
+				'you cannot revoke your own passkeys from here — remove them from your account menu, or ask another super administrator'
+			);
+			const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+			if (!bucket)
+				throw new AdminError(500, "the administrators' project is missing");
+			const passkeyStore = getPasskeyStore();
+			const passkey = await passkeyStore.find(
+				ADMIN_BUCKET_ID,
+				params.passkeyId
+			);
+			if (!passkey || passkey.accountId !== target._id) {
+				throw new AdminError(404, 'passkey not found');
+			}
+			if (passkeyWorks(passkey, bucket)) {
+				const state = await loadReachabilityState();
+				if (state.superAdministrators.some((s) => s._id === target._id)) {
+					const nextCounts = new Map(state.superAdminPasskeyCounts);
+					nextCounts.set(
+						target._id,
+						Math.max(0, (nextCounts.get(target._id) ?? 0) - 1)
+					);
+					assertConsoleStaysReachable(
+						{ ...state, superAdminPasskeyCounts: nextCounts },
+						"Revoking this super administrator's passkey"
+					);
+				}
+			}
+			await recordAdminAudit(ctx, 'admin.passkey.revoke', target._id, {
+				cascade: { passkeys: 1 }
+			});
+			const removed = await passkeyStore.remove(
+				ADMIN_BUCKET_ID,
+				target._id,
+				passkey._id
+			);
+			if (!removed) throw new AdminError(404, 'passkey not found');
+			const sessions = await signOutAdministrator(target._id);
+			const mailed = await notifyPasskey(bucket, target, {
+				kind: 'revoked',
+				madeOn: passkey.createdOn,
+				createdAt: new Date(passkey.createdAt).getTime()
+			});
+			return { revoked: 1, sessions, mailed };
+		}
+	)
+	/* Revoke every passkey of another administrator (specs/144). */
+	.delete('/admin/api/admins/:id/passkeys', async ({ admin, params }) => {
+		const ctx = assertAuth(admin);
+		assertSuperAdmin(ctx);
+		const target = await recoveryTarget(
+			ctx.userId,
+			params.id,
+			'you cannot revoke your own passkeys from here — remove them from your account menu, or ask another super administrator'
+		);
+		const bucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+		if (!bucket)
+			throw new AdminError(500, "the administrators' project is missing");
+		const passkeyStore = getPasskeyStore();
+		const held = await passkeyStore.listOf(ADMIN_BUCKET_ID, target._id);
+		if (held.length === 0) {
+			throw new AdminError(409, 'no passkeys to revoke');
+		}
+		if (held.some((p) => passkeyWorks(p, bucket))) {
+			const state = await loadReachabilityState();
+			if (state.superAdministrators.some((s) => s._id === target._id)) {
+				const nextCounts = new Map(state.superAdminPasskeyCounts);
+				nextCounts.set(target._id, 0);
+				assertConsoleStaysReachable(
+					{ ...state, superAdminPasskeyCounts: nextCounts },
+					"Revoking this super administrator's passkeys"
+				);
+			}
+		}
+		await recordAdminAudit(ctx, 'admin.passkey.revoke.all', target._id, {
+			cascade: { passkeys: held.length }
+		});
+		const revoked = await passkeyStore.removeAllOf(ADMIN_BUCKET_ID, target._id);
+		const sessions = await signOutAdministrator(target._id);
+		const mailed = await notifyPasskey(bucket, target, {
+			kind: 'revoked_all',
+			count: revoked
+		});
+		return { revoked, sessions, mailed };
 	})
 	/*
 	 * Every administrator's sign-ins on one page (specs/137), for the super administrator who does not yet know whose

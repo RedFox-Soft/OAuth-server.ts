@@ -37,10 +37,12 @@ interface Policy {
 	totpSelfService: boolean;
 	/* Whether people are emailed about a sign-in from a new network or browser (specs/138); absent: on only here for administrators. */
 	newSignInAlerts: boolean;
-	/* Whether people may sign in with a passkey and add their own (specs/139); absent means off. */
+	/* Whether people may sign in with a passkey and add their own (specs/139, specs/144); absent means off. */
 	passkeyLogin: boolean;
 	/* Whether people are offered a passkey after a password sign-in (specs/141); absent means on. */
 	passkeyOffer: boolean;
+	/* Whether signing in to the console and MCP requires a passkey (specs/144); administrators' project only. */
+	consolePasskeyRequired: boolean;
 	registrationOpen: boolean;
 	emailVerificationRequired: boolean;
 	verificationMethod: 'link' | 'code';
@@ -53,6 +55,7 @@ const LABELS: Record<keyof Policy, string> = {
 	newSignInAlerts: 'Email about sign-ins from a new network or browser',
 	passkeyLogin: 'Passkeys',
 	passkeyOffer: 'Offer a passkey after a password sign-in',
+	consolePasskeyRequired: 'Require a passkey to sign in to the console',
 	registrationOpen: 'Self-service sign-up',
 	emailVerificationRequired: 'Require a verified email address',
 	verificationMethod: 'Verification method'
@@ -66,6 +69,7 @@ export function policyOf(bucket: BucketView): Policy {
 		newSignInAlerts: bucket.newSignInAlerts ?? bucket._id === ADMIN_BUCKET_ID,
 		passkeyLogin: bucket.passkeyLogin === true,
 		passkeyOffer: bucket.passkeyOffer !== false,
+		consolePasskeyRequired: bucket.consolePasskeyRequired === true,
 		registrationOpen: bucket.registrationOpen,
 		emailVerificationRequired: bucket.emailVerificationRequired,
 		verificationMethod: bucket.verificationMethod
@@ -77,12 +81,16 @@ export function signInKey(bucket: BucketView): string {
 	return JSON.stringify(policyOf(bucket));
 }
 
-/* What turning password sign-in to the console off would do (GET /admin/api/admins/sign-in-readiness). */
+/* What turning password sign-in off or requiring passkeys for the console would do (GET /admin/api/admins/sign-in-readiness). */
 interface SignInReadiness {
 	signedInWith: string | null;
+	signedInWithPasskey?: boolean;
+	callerHasPasskey?: boolean;
 	callerLinkedAt: string[];
 	reachableSuperAdministrators: number;
+	reachablePasskeySuperAdministrators?: number;
 	unlinkedAdministrators: { id: string; email: string }[];
+	administratorsWithoutPasskey?: { id: string; email: string }[];
 }
 
 function plural(n: number, one: string, many: string): string {
@@ -491,77 +499,180 @@ export function SignInTab({
 						<Link href={providersHref}>Manage →</Link>
 					</Flex>
 					{/*
-					 * Passkeys (specs/139): not on the administrators' project, whose people have no account page to add
-					 * one on. Turning them on is refused at an IP address and only warned about over plain http, as the
-					 * server decides; the project read says which.
+					 * Passkeys (specs/139, specs/144): available on ordinary projects and on the administrators' project.
+					 * Turning them on is refused at an IP address and only warned about over plain http, as the server
+					 * decides; the project read says which.
 					 */}
-					{!consoleBucket && (
+					<Setting
+						title={LABELS.passkeyLogin}
+						control={
+							<Switch
+								aria-label={LABELS.passkeyLogin}
+								checked={draft.passkeyLogin}
+								disabled={
+									(!draft.passkeyLogin && bucket.passkeysPossible === false) ||
+									(draft.passkeyLogin &&
+										consoleBucket &&
+										draft.consolePasskeyRequired)
+								}
+								onChange={(on) => set('passkeyLogin', on)}
+							/>
+						}
+						effect={
+							draft.passkeyLogin
+								? consoleBucket
+									? 'Administrators can sign in with a passkey, and add passkeys from their email menu in the console header. A passkey checks a fingerprint, face or screen lock, so it counts as two-step sign-in.'
+									: 'People can sign in with a passkey, and add passkeys on their own Sign-in and security page. A passkey checks a fingerprint, face or screen lock, so it counts as two-step sign-in.'
+								: `Passkeys are not offered or accepted. Passkeys ${people} already have are kept.`
+						}
+					>
+						{!draft.passkeyLogin && bucket.passkeysPossible === false && (
+							<Typography.Text type="warning">
+								Passkeys need this instance at a domain name over HTTPS (its
+								address is {bucket.issuer ?? 'not a domain name'}).
+							</Typography.Text>
+						)}
+						{draft.passkeyLogin && bucket.passkeysNeedHttps === true && (
+							<Typography.Text type="warning">
+								Browsers won&apos;t offer passkeys until this instance is served
+								over HTTPS.
+							</Typography.Text>
+						)}
+						{draft.passkeyLogin && !mailReady && (
+							<Typography.Text type="warning">
+								{consoleBucket ? 'Administrators' : 'People'} can&apos;t add
+								passkeys until email is set up.
+							</Typography.Text>
+						)}
+						{draft.passkeyLogin &&
+							consoleBucket &&
+							draft.consolePasskeyRequired && (
+								<Typography.Text type="secondary">
+									Turn off the console passkey requirement below before turning
+									passkeys off.
+								</Typography.Text>
+							)}
+						{/*
+						 * Who holds a passkey that signs in at this address (specs/140, specs/144), and, before anyone can,
+						 * that passkeys are tied to the instance's address for a project at its root or at a path.
+						 */}
+						{counts?.passkeyHolders !== undefined &&
+							(bucket.passkeyLogin ? (
+								<Typography.Text type="secondary">
+									{counts.passkeyHolders.toLocaleString()} of{' '}
+									{plural(
+										counts.users,
+										consoleBucket ? 'administrator has' : 'person has',
+										consoleBucket ? 'administrators have' : 'people have'
+									)}{' '}
+									a passkey.
+								</Typography.Text>
+							) : counts.passkeyHolders > 0 ? (
+								<Typography.Text type="secondary">
+									{plural(
+										counts.passkeyHolders,
+										consoleBucket
+											? 'administrator has passkeys'
+											: 'person has passkeys',
+										consoleBucket
+											? 'administrators have passkeys'
+											: 'people have passkeys'
+									)}
+									, which don&apos;t work while passkeys are off.
+								</Typography.Text>
+							) : !consoleBucket &&
+							  (bucket.addressForm === 'root' ||
+									bucket.addressForm === 'path' ||
+									bucket.addressForm === 'unaddressed') &&
+							  bucket.issuer ? (
+								<Typography.Text type="secondary">
+									Passkeys are tied to this project&apos;s address,{' '}
+									{new URL(bucket.issuer).hostname}. If you plan to give the
+									project an address of its own, do it before people create
+									passkeys.
+								</Typography.Text>
+							) : null)}
+					</Setting>
+					{consoleBucket && (
 						<Setting
-							title={LABELS.passkeyLogin}
+							title={LABELS.consolePasskeyRequired}
 							control={
 								<Switch
-									aria-label={LABELS.passkeyLogin}
-									checked={draft.passkeyLogin}
+									aria-label={LABELS.consolePasskeyRequired}
+									checked={draft.consolePasskeyRequired}
 									disabled={
-										!draft.passkeyLogin && bucket.passkeysPossible === false
+										!draft.consolePasskeyRequired &&
+										(!draft.passkeyLogin ||
+											readiness?.callerHasPasskey !== true ||
+											!readiness.signedInWithPasskey)
 									}
-									onChange={(on) => set('passkeyLogin', on)}
+									onChange={(on) => set('consolePasskeyRequired', on)}
 								/>
 							}
 							effect={
-								draft.passkeyLogin
-									? 'People can sign in with a passkey, and add passkeys on their own Sign-in and security page. A passkey checks a fingerprint, face or screen lock, so it counts as two-step sign-in.'
-									: 'Passkeys are not offered or accepted. Passkeys people already have are kept.'
+								draft.consolePasskeyRequired
+									? 'Administrators can sign in to the console and authorize agents only with a passkey. Passwords and identity providers are refused.'
+									: 'Administrators can sign in with any enabled method above.'
 							}
 						>
-							{!draft.passkeyLogin && bucket.passkeysPossible === false && (
-								<Typography.Text type="warning">
-									Passkeys need this instance at a domain name over HTTPS (its
-									address is {bucket.issuer ?? 'not a domain name'}).
+							{!draft.consolePasskeyRequired && !draft.passkeyLogin && (
+								<Typography.Text type="secondary">
+									Turn Passkeys on above first.
 								</Typography.Text>
 							)}
-							{draft.passkeyLogin && bucket.passkeysNeedHttps === true && (
-								<Typography.Text type="warning">
-									Browsers won&apos;t offer passkeys until this instance is
-									served over HTTPS.
-								</Typography.Text>
-							)}
-							{draft.passkeyLogin && !mailReady && (
-								<Typography.Text type="warning">
-									People can&apos;t add passkeys until email is set up.
-								</Typography.Text>
-							)}
-							{/*
-							 * Who holds a passkey that signs in at this address (specs/140), and, before anyone can, that
-							 * passkeys are tied to the instance's address for a project at its root or at a path.
-							 */}
-							{counts?.passkeyHolders !== undefined &&
-								(bucket.passkeyLogin ? (
-									<Typography.Text type="secondary">
-										{counts.passkeyHolders.toLocaleString()} of{' '}
-										{plural(counts.users, 'person has', 'people have')} a
-										passkey.
-									</Typography.Text>
-								) : counts.passkeyHolders > 0 ? (
-									<Typography.Text type="secondary">
-										{plural(
-											counts.passkeyHolders,
-											'person has passkeys',
-											'people have passkeys'
-										)}
-										, which don&apos;t work while passkeys are off.
-									</Typography.Text>
-								) : (bucket.addressForm === 'root' ||
-										bucket.addressForm === 'path' ||
-										bucket.addressForm === 'unaddressed') &&
-								  bucket.issuer ? (
-									<Typography.Text type="secondary">
-										Passkeys are tied to this project&apos;s address,{' '}
-										{new URL(bucket.issuer).hostname}. If you plan to give the
-										project an address of its own, do it before people create
-										passkeys.
-									</Typography.Text>
-								) : null)}
+							{!draft.consolePasskeyRequired &&
+								draft.passkeyLogin &&
+								readiness !== null &&
+								!readiness.callerHasPasskey && (
+									<Flex
+										gap={8}
+										align="center"
+										wrap
+									>
+										<Typography.Text type="warning">
+											Add a passkey to your own account first, then sign in with
+											it before turning this on.
+										</Typography.Text>
+										<Link href="/admin?account=passkeys">Add a passkey →</Link>
+									</Flex>
+								)}
+							{!draft.consolePasskeyRequired &&
+								draft.passkeyLogin &&
+								readiness?.callerHasPasskey === true &&
+								readiness.signedInWithPasskey !== true && (
+									<Flex
+										gap={8}
+										align="center"
+										wrap
+									>
+										<Typography.Text type="warning">
+											Sign in with your passkey first, then turn this on. That
+											proves your passkey works before passwords and providers
+											stop reaching the console.
+										</Typography.Text>
+										<Button
+											size="small"
+											href={`/admin/login?reauth=1&next=${encodeURIComponent('/admin/administrators/sign-in')}`}
+										>
+											Sign in again with a passkey
+										</Button>
+									</Flex>
+								)}
+							{!baseline.consolePasskeyRequired &&
+								draft.consolePasskeyRequired &&
+								(readiness?.administratorsWithoutPasskey?.length ?? 0) > 0 &&
+								note(
+									`${plural(
+										readiness?.administratorsWithoutPasskey?.length ?? 0,
+										'administrator has',
+										'administrators have'
+									)} no passkey yet and will be unable to sign in to the console: ${(
+										readiness?.administratorsWithoutPasskey ?? []
+									)
+										.map((a) => a.email)
+										.join(', ')}.`,
+									'warning'
+								)}
 						</Setting>
 					)}
 					{/*

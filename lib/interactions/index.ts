@@ -2804,6 +2804,7 @@ export const ui = new Elysia()
 				const holder = interaction.payload.session?.uid;
 				if (
 					!refused?.bucket ||
+					bucketId === ADMIN_BUCKET_ID ||
 					!holder ||
 					!requiresPasskey(interaction) ||
 					(await passkeyRefusalVariant(interaction, refused)) !==

@@ -3676,6 +3676,74 @@ export const GUIDE_SITUATIONS: readonly GuideSituation[] = [
 			'Show me where each of our administrators signed in from in the last week, and any refused sign-ins.',
 			'admin_list and admin_activity_list'
 		)
+	},
+	{
+		id: 'adminpasskey',
+		tab: 'enterprise',
+		title: 'Require a passkey for console administrators',
+		sentence:
+			'Turn on Passkeys for the administrators’ project so every administrator can add a passkey from their account drawer, then require a passkey to sign in to the console and administrative MCP while FoxAuth ensures a super administrator can always get in.',
+		protocol: 'WebAuthn · OpenID Connect acr · phr',
+		lanes: lanes('admin', 'passkey', 'fox'),
+		steps: [
+			step(
+				'admin',
+				'fox',
+				'Opens the console',
+				'An administrator opens the console or connects an administrative MCP agent.'
+			),
+			step(
+				'admin',
+				'passkey',
+				'Fingerprint or face',
+				'The administrator signs in with their passkey, which works only at your FoxAuth address.'
+			),
+			step(
+				'passkey',
+				'fox',
+				'Signed answer',
+				'The device signs for your FoxAuth host only, so a fake sign-in page cannot steal the session.',
+				'request'
+			),
+			step(
+				'fox',
+				'admin',
+				'In the console',
+				'FoxAuth lets the administrator in and turns away any password-only or provider-only console session.',
+				'token'
+			)
+		],
+		problem: {
+			at: 'admin',
+			mark: 'password',
+			caption:
+				'A phished administrator password and one-time code open the whole server.'
+		},
+		fixCaption: 'Only a passkey opens the console and admin MCP.',
+		sees: {
+			kind: 'signIn',
+			lines: [
+				'The administrators’ sign-in page with Sign in with a passkey',
+				'Personal passkeys managed from the email drawer in the console header',
+				'An administrator without a passkey is turned away and told to ask a super administrator'
+			]
+		},
+		needs: { role: 'super' },
+		action: {
+			kind: 'open',
+			label: 'Open the administrators’ sign-in settings',
+			target: { instance: 'administrators', area: 'sign-in' }
+		},
+		goodToKnow: [
+			'Only a super administrator who holds a working passkey and signed in with one in this session can switch on "Require a passkey to sign in to the console".',
+			'Before it saves, the console names every administrator who does not have a passkey yet. Existing non-passkey console sessions and /mcp tokens stop working at once.',
+			'Administrators add, rename and remove their own passkeys from the Passkeys tab under their email in the console header; super administrators can view and revoke colleagues’ passkeys under Administrators → Accounts (or via admin_passkey_list and admin_passkey_revoke).',
+			'FoxAuth refuses any action that would leave no super administrator able to sign in with a passkey.'
+		],
+		prompt: prompt(
+			'Check which administrators already have a passkey, enable Passkeys on the administrators’ project, and once every super administrator has signed in with a passkey, turn on consolePasskeyRequired.',
+			'admin_list and project_update (id: admin, passkeyLogin, consolePasskeyRequired)'
+		)
 	}
 ];
 

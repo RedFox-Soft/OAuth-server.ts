@@ -1,5 +1,7 @@
-import { getUserStore } from '../../adapters/index.js';
+import { getPasskeyStore, getUserStore } from '../../adapters/index.js';
 import type { UserBucket } from '../../adapters/types.js';
+import { meets } from '../../helpers/acr_satisfaction.ts';
+import { rpIdFor } from '../../passkeys/relying_party.js';
 import { AdminError, type AdminContext } from '../auth/rbac.js';
 import { ADMIN_BUCKET_ID } from '../consts.js';
 import {
@@ -18,6 +20,12 @@ import {
  * the result must leave some super administrator a way in (lib/admin/federation/reachability.ts), so passwords
  * cannot go off while every remaining door leads nowhere. An agent has no console session and never qualifies.
  *
+ * Turning the console passkey requirement on (specs/144) follows the same self-proof principle: passkeys must
+ * be on (already or in the same change), and the acting super administrator must hold a working passkey and
+ * have authenticated the current session (or authorizing agent grant) with a passkey — proving a passkey works
+ * before passwords and providers stop reaching the console. Turning passkeys off is refused while the console
+ * passkey requirement remains on, or whenever it would leave no super administrator able to reach the console.
+ *
  * Requiring verification is the one that needed a guard of its own. It refuses every unverified
  * administrator at the door, so it may be turned on only when the message can actually be sent — the route
  * refuses that on every bucket (specs/083) — and only by someone the requirement cannot lock out: the person
@@ -31,11 +39,54 @@ export async function assertAdminBucketChange(
 		emailVerificationRequired?: boolean;
 		passwordLogin?: boolean;
 		registrationOpen?: boolean;
+		passkeyLogin?: boolean;
+		consolePasskeyRequired?: boolean;
 	}
 ): Promise<void> {
 	assertSignUpNeedsVerification({ ...bucket, ...patch });
+	const passkeysAfter = patch.passkeyLogin ?? bucket.passkeyLogin === true;
+	const requirePasskeyAfter =
+		patch.consolePasskeyRequired ?? bucket.consolePasskeyRequired === true;
+
+	if (
+		patch.consolePasskeyRequired === true &&
+		bucket.consolePasskeyRequired !== true
+	) {
+		if (!passkeysAfter) {
+			throw new AdminError(
+				409,
+				'Turn on Passkeys for administrators before requiring a passkey to sign in to the console.',
+				{ code: 'passkeys_not_accepted', field: 'consolePasskeyRequired' }
+			);
+		}
+		await assertMayRequireConsolePasskey(ctx, bucket);
+	}
+
+	if (patch.passkeyLogin === false && bucket.passkeyLogin === true) {
+		if (requirePasskeyAfter) {
+			throw new AdminError(
+				409,
+				'Turn off the console passkey requirement first, or in the same change, before turning passkeys off.',
+				{ field: 'passkeyLogin' }
+			);
+		}
+		const state = await loadReachabilityState();
+		assertConsoleStaysReachable(
+			{
+				...state,
+				passwordLogin: patch.passwordLogin ?? state.passwordLogin,
+				passkeyLogin: false,
+				consolePasskeyRequired: false
+			},
+			'Turning passkeys off'
+		);
+	}
+
 	if (patch.passwordLogin === false && bucket.passwordLogin) {
-		await assertMayTurnPasswordsOff(ctx, bucket);
+		await assertMayTurnPasswordsOff(ctx, bucket, {
+			passkeyLogin: passkeysAfter,
+			consolePasskeyRequired: requirePasskeyAfter
+		});
 	}
 	if (patch.emailVerificationRequired !== true) return;
 	const acting = await getUserStore(ADMIN_BUCKET_ID).find(ctx.userId);
@@ -45,6 +96,37 @@ export async function assertAdminBucketChange(
 			'verify your own address before requiring verification of administrators'
 		);
 	}
+}
+
+async function assertMayRequireConsolePasskey(
+	ctx: AdminContext,
+	bucket: UserBucket
+): Promise<void> {
+	const rpId = rpIdFor(bucket);
+	const held = await getPasskeyStore().listOf(ADMIN_BUCKET_ID, ctx.userId);
+	const hasWorking = held.some(
+		(passkey) =>
+			passkey.rpId === rpId &&
+			passkey.copiedAt === undefined &&
+			passkey.conditional !== true
+	);
+	if (!hasWorking) {
+		throw new AdminError(
+			409,
+			'Add a passkey to your own account first, then sign in with it before requiring a passkey for console sign-in.'
+		);
+	}
+	if (!meets(ctx.signInAcr, 'phishing_resistant')) {
+		throw new AdminError(
+			409,
+			'Sign in with a passkey first, then require a passkey for console sign-in.'
+		);
+	}
+	const state = await loadReachabilityState();
+	assertConsoleStaysReachable(
+		{ ...state, passkeyLogin: true, consolePasskeyRequired: true },
+		'Requiring a passkey for console sign-in'
+	);
 }
 
 /*
@@ -70,7 +152,8 @@ function assertSignUpNeedsVerification(
 
 async function assertMayTurnPasswordsOff(
 	ctx: AdminContext,
-	bucket: UserBucket
+	bucket: UserBucket,
+	after: { passkeyLogin: boolean; consolePasskeyRequired: boolean }
 ): Promise<void> {
 	const provider = bucket.federation.find(
 		(p) => p.id === ctx.signedInWith && p.enabled
@@ -87,7 +170,12 @@ async function assertMayTurnPasswordsOff(
 	}
 	const state = await loadReachabilityState();
 	assertConsoleStaysReachable(
-		{ ...state, passwordLogin: false },
+		{
+			...state,
+			passwordLogin: false,
+			passkeyLogin: after.passkeyLogin,
+			consolePasskeyRequired: after.consolePasskeyRequired
+		},
 		'Turning password sign-in off'
 	);
 }

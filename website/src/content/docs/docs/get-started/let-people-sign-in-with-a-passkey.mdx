@@ -20,8 +20,8 @@ page cannot use it. This page shows how to turn passkeys on in a project and wha
      for trying it on your own machine.
    - Adding a passkey needs email, so the console says so when no mail server is set up.
 
-Passkeys are off in every project until you turn them on. The setting is free on every plan. The administrators'
-project has no such switch: administrators have no account page to add a passkey on.
+Passkeys are off in every project until you turn them on. The setting is free on every plan, and it is also available
+on the **Administrators** project (see [Administrators and the console](#administrators) below).
 
 An agent turns it on with `project_update` (`passkeyLogin`). Nobody can add a passkey for someone else: only the
 person can.
@@ -188,6 +188,33 @@ To ask for a passkey only on some pages of your own app, send `acr_values=phr` (
 the `claims` parameter, it turns people without a passkey away with `unmet_authentication_requirements`. When your app
 names values, it is told the strongest of them the sign-in met, so an app that asks for the multi-factor value keeps
 receiving it after a passkey.
+
+## Administrators and the console {#administrators}
+
+A super administrator can switch **Passkeys** on for the **Administrators** project on its **Sign-in** tab (or with
+`project_update` on `admin`). Every administrator then sees a **Passkeys** tab in their account drawer, reached by
+clicking their email in the console header, where they can add, rename and remove their own passkeys under the same
+proof rules as end users. Because administrators have no `/account/security` page, there is no post-password passkey
+offer on the Administrators project.
+
+Super administrators see how many passkeys each administrator holds under **Administrators -> Accounts**, can open a
+colleague's **Passkeys** drawer to inspect metadata (never raw credentials), and can revoke one or all of a colleague's
+passkeys (which signs the colleague out everywhere and emails them). Agents have matching tools: `admin_passkey_list`,
+`admin_passkey_revoke`, and `admin_passkey_revoke_all`. If an administrator clicks **This wasn't me** on a passkey email,
+FoxAuth removes the passkey and any added after it, signs them out everywhere, and alerts the other super administrators.
+
+Once passkeys are on, a super administrator who holds a working passkey and signed in with one in their current session
+can enable **Require a passkey to sign in to the console** (`consolePasskeyRequired`):
+
+- Before it saves, the console names every administrator who does not yet hold a working passkey.
+- Once enabled, existing non-passkey console sessions and `/mcp` access tokens stop working immediately, `/admin/login`
+  requests `phr`, `/admin/callback` refuses any non-passkey sign-in, and non-passkey `/mcp` refresh tokens are refused
+  before rotation.
+- An administrator without a passkey who tries to sign in to the console is turned away and told to ask a super
+  administrator; the refusal page never offers to create a passkey on the spot.
+- FoxAuth refuses any change (turning passkeys off, removing or revoking a passkey, disowning one, deactivating an
+  account, or withdrawing super-administrator status) that would leave no super administrator able to sign in with a
+  passkey.
 
 ## Upgrading {#upgrading}
 

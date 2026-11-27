@@ -22,12 +22,14 @@ import { LoadFailed, NoMatch } from '../frame/states.js';
 import { useMe } from '../frame/me.js';
 import { useHydrated } from '../frame/hydrated.js';
 import { useNavigate } from '../frame/router.js';
+import { AdminPasskeysDrawer } from './administrators/AdminPasskeysDrawer.js';
 
 /* What the list answers: the account without its password or secret, and whether it holds the instance privilege. */
 type AdminUser = Pick<User, '_id' | 'email' | 'active' | 'verified'> & {
 	superAdmin: boolean;
 	totpEnrolled: boolean;
 	totpEnrolledAt: string | null;
+	passkeys?: number;
 	/* The last sign-in and the refusals after it (specs/137): never where from, which only Sign-ins shows. */
 	signIns: {
 		lastSignIn: {
@@ -125,6 +127,10 @@ export function Admins({
 	const [form] = Form.useForm<CreateAdminValues>();
 	const [editingEmail, setEditingEmail] = useState<AdminUser | null>(null);
 	const [emailForm] = Form.useForm<{ email: string }>();
+	const [passkeysOf, setPasskeysOf] = useState<{
+		id: string;
+		email: string;
+	} | null>(null);
 	const hydrated = useHydrated();
 
 	// Every state write follows an await, so the mount effect calls this without setting
@@ -330,6 +336,12 @@ export function Admins({
 					)
 			},
 			{
+				key: 'passkeys',
+				label: 'Passkeys',
+				group: 'edit',
+				onClick: () => setPasskeysOf({ id: row._id, email: row.email })
+			},
+			{
 				key: 'email',
 				label: 'Change email…',
 				group: 'edit',
@@ -492,6 +504,24 @@ export function Admins({
 							)
 					},
 					{
+						title: 'Passkeys',
+						key: 'passkeys',
+						render: (_: unknown, row: AdminUser) =>
+							(row.passkeys ?? 0) > 0 ? (
+								<Tag
+									color="green"
+									style={{ cursor: 'pointer' }}
+									onClick={() =>
+										setPasskeysOf({ id: row._id, email: row.email })
+									}
+								>
+									{row.passkeys}
+								</Tag>
+							) : (
+								<Typography.Text type="secondary">—</Typography.Text>
+							)
+					},
+					{
 						title: 'Last sign-in',
 						key: 'signIns',
 						render: (_: unknown, row: AdminUser) => (
@@ -586,6 +616,12 @@ export function Admins({
 					</Form.Item>
 				</Form>
 			</Modal>
+			<AdminPasskeysDrawer
+				target={passkeysOf}
+				self={passkeysOf !== null && passkeysOf.id === me?.userId}
+				onClose={() => setPasskeysOf(null)}
+				onChanged={() => void load()}
+			/>
 		</>
 	);
 }

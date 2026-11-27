@@ -23,7 +23,7 @@ import { AdminGroupPage } from './groups/AdminGroupPage.js';
 import { UserPage, type UserTab } from './users/UserPage.js';
 import { ProviderPage } from './providers/ProviderPage.js';
 import { AdminSignInsPage } from './administrators/AdminSignInsPage.js';
-import { OwnSignInsDrawer } from './OwnSignInsDrawer.js';
+import { OwnAccountDrawer, type OwnAccountTab } from './OwnAccountDrawer.js';
 import {
 	ConnectionPage,
 	type ConnectionTab
@@ -258,7 +258,43 @@ export function Layout() {
 				]
 			: [])
 	];
-	const [ownSignIns, setOwnSignIns] = useState(false);
+	const searchParams = new URLSearchParams(location.search);
+	const queryAccount = searchParams.get('account');
+	const queryConfirmed = searchParams.get('confirmed');
+	const queryLinkError = searchParams.get('linkError');
+	const [accountDrawer, setAccountDrawer] = useState<{
+		open: boolean;
+		tab: OwnAccountTab;
+		banner: { type: 'success' | 'warning'; text: string } | null;
+	}>(() => ({
+		open: queryAccount === 'passkeys',
+		tab: queryAccount === 'passkeys' ? 'passkeys' : 'signIns',
+		banner:
+			queryConfirmed === 'add'
+				? {
+						type: 'success',
+						text: 'Email confirmed. Click Add a passkey below to finish.'
+					}
+				: queryConfirmed === 'remove'
+					? {
+							type: 'success',
+							text: 'Email confirmed. Click Remove on that passkey to finish.'
+						}
+					: queryLinkError
+						? {
+								type: 'warning',
+								text: 'That confirmation link expired or was opened in a different browser. Request a new link below.'
+							}
+						: null
+	}));
+
+	const [dismissedQuery, setDismissedQuery] = useState<string | null>(null);
+	const queryOpensPasskeys =
+		queryAccount === 'passkeys' && dismissedQuery !== location.search;
+	const drawerOpen = accountDrawer.open || queryOpensPasskeys;
+	const drawerTab: OwnAccountTab = queryOpensPasskeys
+		? 'passkeys'
+		: accountDrawer.tab;
 
 	async function logout() {
 		// Navigate even if the request failed. Leaving the operator on a panel they believe they
@@ -455,15 +491,32 @@ export function Layout() {
 					{me && (
 						<Button
 							type="link"
-							title="Your recent sign-ins"
-							onClick={() => setOwnSignIns(true)}
+							title="Your account: passkeys and recent sign-ins"
+							onClick={() =>
+								setAccountDrawer({
+									open: true,
+									tab: 'passkeys',
+									banner: null
+								})
+							}
 						>
 							{me.email}
 						</Button>
 					)}
-					<OwnSignInsDrawer
-						open={ownSignIns}
-						onClose={() => setOwnSignIns(false)}
+					<OwnAccountDrawer
+						open={drawerOpen}
+						initialTab={drawerTab}
+						banner={accountDrawer.banner}
+						onClose={() => {
+							if (queryAccount === 'passkeys') {
+								setDismissedQuery(location.search);
+							}
+							setAccountDrawer((prev) => ({
+								...prev,
+								open: false,
+								banner: null
+							}));
+						}}
 					/>
 					<Button
 						type="link"

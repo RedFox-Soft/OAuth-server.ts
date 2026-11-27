@@ -5,6 +5,7 @@ import { getFirstError } from '../shared/first_validation_error.js';
 import { adminSetup } from './auth/setup.js';
 import { adminLogin } from './auth/login.js';
 import { meRoutes } from './me.js';
+import { mePasskeyRoutes } from './me_passkeys.js';
 import { groupRoutes } from './groups/routes.js';
 import { invitationAcceptRoutes } from './groups/accept.js';
 import { scopeRoutes } from './scope/routes.js';
@@ -164,3 +165,5 @@ adminApiRoutes.use(behindProxyRoutes);
 // A project's proxy keys (specs/124), for the same reason.
 adminApiRoutes.use(proxyKeyRoutes);
 adminApiRoutes.use(passwordGuessingRoutes);
+// Personal passkeys for console administrators (specs/144), for the same reason.
+adminApiRoutes.use(mePasskeyRoutes);

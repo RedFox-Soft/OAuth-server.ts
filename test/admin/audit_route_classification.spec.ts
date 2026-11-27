@@ -64,7 +64,11 @@ describe('admin audit route classification', () => {
 		expect(excludedAdminRoutes.map(key)).toEqual([
 			'POST /admin/api/logout',
 			'PUT /admin/api/scope',
-			'POST /admin/api/me/verification'
+			'POST /admin/api/me/verification',
+			'POST /admin/api/me/passkeys/add-link',
+			'POST /admin/api/me/passkeys/add/options',
+			'PATCH /admin/api/me/passkeys/:passkeyId',
+			'POST /admin/api/me/passkeys/:passkeyId/remove-link'
 		]);
 
 		/*
@@ -94,17 +98,18 @@ describe('admin audit route classification', () => {
 		 * changes nothing and is recorded as the SMTP test is (specs/129) + reading who an app behind the proxy or an API
 		 * refused, audited reads like a person's activity (specs/134) + reading one administrator's sign-ins and every
 		 * administrator's at once, the same audited read over the administrators' project (specs/137) + revoking one of a
-		 * person's passkeys and revoking all of them (specs/140). A count that drifted
+		 * person's passkeys and revoking all of them (specs/140) + an administrator adding/removing their own passkeys
+		 * and a super administrator revoking a colleague's passkeys (specs/144). A count that drifted
 		 * upward silently would let an audited route be swapped for an unaudited one without either
 		 * total changing.
 		 *
-		 * `mounted` stays exactly three ahead, and always the same three: the deliberate exclusions named
-		 * above, `POST /admin/api/logout`, `PUT /admin/api/scope` and `POST /admin/api/me/verification`,
-		 * each of which touches only the caller's own standing and no managed entity. It filters to MUTATING methods, so no read appears in either
+		 * `mounted` stays exactly seven ahead, and always the same seven: the deliberate exclusions named
+		 * above (`logout`, `scope`, `me/verification`, and the four personal passkey preparation/rename routes),
+		 * each of which touches only the caller's own standing or personal label and no managed entity. It filters to MUTATING methods, so no read appears in either
 		 * total.
 		 */
-		expect(auditedAdminRoutes).toHaveLength(117);
-		expect(mounted).toHaveLength(120);
+		expect(auditedAdminRoutes).toHaveLength(121);
+		expect(mounted).toHaveLength(128);
 	});
 
 	it('declares each route pattern only once', () => {

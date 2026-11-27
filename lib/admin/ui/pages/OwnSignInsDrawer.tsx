@@ -69,7 +69,7 @@ export function OwnSignInsDrawer({
 }
 
 /* Mounted each time the drawer opens, so every opening reads afresh. */
-function OwnSignInsList() {
+export function OwnSignInsList() {
 	const [view, setView] = useState<OwnView | null>(null);
 	const [error, setError] = useState<string | null>(null);
 	const [loading, setLoading] = useState(true);

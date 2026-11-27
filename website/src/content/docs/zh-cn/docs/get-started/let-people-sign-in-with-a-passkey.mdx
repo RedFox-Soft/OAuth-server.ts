@@ -1,7 +1,7 @@
 ---
 title: 使用通行密钥登录
 description: '用户用指纹、面容或屏幕锁登录，无需密码，通行密钥登录算作两步登录。'
-source: 4265967a49b8
+source: 221c4c0a1abf
 sidebar:
   order: 13
 ---
@@ -18,7 +18,7 @@ import { Aside } from '@astrojs/starlight/components';
    - 使用普通 `http` 时，浏览器不会提供通行密钥，控制台会给出提醒。唯一的例外是 `localhost`，便于在自己的电脑上试用。
    - 添加通行密钥需要邮件，因此在没有设置邮件服务器时，控制台会给出提醒。
 
-在你开启之前，所有项目中的通行密钥都是关闭的。所有套餐均可免费使用此设置。管理员项目中没有这个开关：管理员没有可以添加通行密钥的账号页面。
+在你开启之前，所有项目中的通行密钥都是关闭的。所有套餐均可免费使用此设置，在 **Administrators** 项目中同样可用（请参阅下方的[管理员与控制台](#administrators)）。
 
 智能体可以通过 `project_update`（`passkeyLogin`）开启它。任何人都不能替别人添加通行密钥：只有用户本人可以。
 
@@ -124,6 +124,19 @@ import { Aside } from '@astrojs/starlight/components';
 在项目的 **Sign-in** 选项卡中关闭 **Passkeys** 或更改会更换 RP ID 的项目地址之前，控制台和智能体都会列出有多少 API 和代理路径要求通行密钥，并请你确认。
 
 如果只想在某些页面要求通行密钥，请发送 `acr_values=phr`（这是 OpenID 中抵御网络钓鱼登录的值，**Connect** 标签页会显示你服务器的值）。只有使用通行密钥登录后，ID 令牌才会带有 `phr`。如果在 `claims` 参数中把它设为必需（essential），没有通行密钥的人会收到 `unmet_authentication_requirements`。当应用列出多个值时，它会收到登录满足的最强的那个值，所以请求多因素值的应用在通行密钥登录后仍然收到多因素值。
+
+## 管理员与控制台 {#administrators}
+
+超级管理员可以在 **Administrators** 项目的 **Sign-in** 选项卡中打开 **Passkeys**（或对 `admin` 调用 `project_update`）。随后，每位管理员点击控制台顶部的邮箱打开账号抽屉时，都会看到 **Passkeys** 选项卡，可以按与普通用户相同的验证规则添加、重命名和删除个人通行密钥。由于管理员没有 `/account/security` 页面，Administrators 项目不会在密码登录后弹出创建通行密钥的提示。
+
+超级管理员可以在 **Administrators -> Accounts** 查看每位管理员持有的通行密钥数量，打开同事的 **Passkeys** 抽屉查看元数据（绝不包含原始凭据），并可撤销其单个或全部通行密钥（撤销会让同事在所有设备上退出登录并发送邮件通知）。智能体拥有对应的工具：`admin_passkey_list`、`admin_passkey_revoke` 和 `admin_passkey_revoke_all`。如果管理员在新通行密钥通知邮件中点击 **这不是我**，FoxAuth 会删除该通行密钥及其之后添加的所有通行密钥，让该管理员在所有设备上退出登录，并通知其他超级管理员。
+
+开启通行密钥后，持有有效通行密钥且当前会话是通过通行密钥登录的超级管理员可以启用 **Require a passkey to sign in to the console**（`consolePasskeyRequired`）：
+
+- 保存前，控制台会列出所有尚未拥有有效通行密钥的管理员。
+- 启用后，现有的非通行密钥控制台会话和 `/mcp` 访问令牌会立即失效，`/admin/login` 会请求 `phr`，`/admin/callback` 会拒绝所有非通行密钥登录，非通行密钥的 `/mcp` 刷新令牌会在轮换前被拒绝。
+- 没有通行密钥的管理员尝试登录控制台时会被拒绝，并被提示联系超级管理员；拒绝页面绝不会提供当场创建通行密钥的选项。
+- 任何会导致没有超级管理员能够用通行密钥登录的操作（关闭通行密钥、删除或撤销通行密钥、通过 “这不是我” 移除、停用账户或撤销超级管理员权限）都会被 FoxAuth 拒绝。
 
 ## 升级 {#upgrading}
 

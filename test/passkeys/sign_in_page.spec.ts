@@ -161,7 +161,7 @@ describe('the passkey offer on the sign-in page', () => {
 		expect(textOf(html)).not.toContain('passkey');
 	});
 
-	it('shows nothing about passkeys at the administrators’ project, even with the setting written on it', async () => {
+	it('offers passkeys at the administrators’ project when passkeyLogin is on', async () => {
 		await getBucketStore().update(ADMIN_BUCKET_ID, { passkeyLogin: true });
 		await bindClientToBucket(BETA.clientId, ADMIN_BUCKET_ID);
 		const admins: Project = {
@@ -173,8 +173,9 @@ describe('the passkey offer on the sign-in page', () => {
 
 		const { html } = await signInPage(new Browser(admins.origin), admins);
 
-		expect(passkeyOfferIn(html)).toBeUndefined();
-		expect(html).not.toContain('webauthn');
+		expect(passkeyOfferIn(html)).toBeDefined();
+		expect(html).toContain('webauthn');
+		await getBucketStore().update(ADMIN_BUCKET_ID, { passkeyLogin: false });
 	});
 
 	it('draws the passkey button in the console’s preview of a draft with passkeys on', () => {

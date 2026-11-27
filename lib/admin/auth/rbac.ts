@@ -1,12 +1,14 @@
 import { Elysia } from 'elysia';
 import {
 	adminSessionStore,
+	getBucketStore,
 	getUserStore,
 	getGroupStore
 } from '../../adapters/index.js';
 import type { Group, UserBucket } from '../../adapters/types.js';
 import type { PlanLimitDetail } from '../../consts/plans.js';
 import { ApplicationConfig } from '../../configs/application.js';
+import { meets } from '../../helpers/acr_satisfaction.ts';
 import { isDispatched } from '../../mcp/channel.js';
 import {
 	ADMIN_BUCKET_ID,
@@ -58,6 +60,20 @@ export interface AdminContext {
 	 * password sign-in off (specs/080), never by a right: `can` stays independent of the channel.
 	 */
 	signedInWith: string | null;
+	/*
+	 * The console session id, present only on console cookie sessions (specs/144). Used to bind personal
+	 * passkey ceremonies and emailed confirmation links to this browser session.
+	 */
+	sessionId?: string;
+	/*
+	 * Reached authentication context of the sign-in behind this request (specs/144): read from the console
+	 * session or from the MCP access token's reached context.
+	 */
+	signInAcr: string | null;
+	/* Authentication methods of the console sign-in, empty for an agent (specs/144). */
+	signInAmr: readonly string[];
+	/* Unix timestamp (seconds) of the console sign-in, null for an agent (specs/144). */
+	signInAt: number | null;
 }
 
 /*
@@ -272,7 +288,13 @@ async function contextFor(
 	bucketId: string,
 	viaClientId?: string,
 	sessionGroupId?: string,
-	signedInWith: string | null = null
+	signedInWith: string | null = null,
+	signIn: {
+		sessionId?: string;
+		signInAcr?: string | null;
+		signInAmr?: readonly string[];
+		signInAt?: number | null;
+	} = {}
 ): Promise<AdminContext | null> {
 	const user = await getUserStore(bucketId).find(userId);
 	if (!user || !user.active) return null;
@@ -297,7 +319,11 @@ async function contextFor(
 			sessionGroupId
 		),
 		...(viaClientId ? { viaClientId } : {}),
-		signedInWith
+		signedInWith,
+		...(signIn.sessionId ? { sessionId: signIn.sessionId } : {}),
+		signInAcr: signIn.signInAcr ?? null,
+		signInAmr: signIn.signInAmr ?? [],
+		signInAt: signIn.signInAt ?? null
 	};
 }
 
@@ -356,12 +382,30 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 		if (sessionId) {
 			const session = await adminSessionStore.find(sessionId);
 			if (!session) return { admin: null };
+			/*
+			 * Live enforcement of the console passkey requirement (specs/144 FR-017): an already-open console
+			 * session that did not authenticate with a passkey is refused on its very next request once the
+			 * requirement is turned on.
+			 */
+			const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
+			if (
+				adminBucket?.consolePasskeyRequired === true &&
+				!meets(session.signInAcr, 'phishing_resistant')
+			) {
+				return { admin: null };
+			}
 			const admin = await contextFor(
 				session.userId,
 				session.bucketId,
 				undefined,
 				session.activeGroupId,
-				session.signedInWith ?? null
+				session.signedInWith ?? null,
+				{
+					sessionId: session._id,
+					signInAcr: session.signInAcr ?? null,
+					signInAmr: session.signInAmr ?? [],
+					signInAt: session.signInAt ?? null
+				}
 			);
 			if (!admin) return { admin: null };
 			await adminSessionStore.touch(sessionId, ADMIN_SESSION_TTL_SECONDS);
@@ -432,7 +476,10 @@ export const resolveAdmin = new Elysia({ name: 'admin-resolve' }).derive(
 				admin: await contextFor(
 					principal.accountId,
 					ADMIN_BUCKET_ID,
-					principal.clientId
+					principal.clientId,
+					undefined,
+					null,
+					{ signInAcr: principal.signInAcr }
 				)
 			};
 		} catch (err) {

@@ -224,8 +224,12 @@ Each rule is the part that is easy to break. Read the named page before changing
   any reset or "This wasn't me" removes it, and only its mailed confirmation in the session that made it, or a strong
   sign-in, makes it full. Only a full passkey reaches the phishing-resistant `acr`; contexts are compared only through
   `lib/helpers/acr_satisfaction.ts`, never by list order, and every requirement reads what the sign-in reached
-  (`reachedAcr`), never the `acr` a token reports.
-  → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`, `acr-satisfaction.md`
+  (`reachedAcr`), never the `acr` a token reports. Administrators manage their own passkeys in the console header drawer
+  (`/admin/api/me/passkeys*`, no `/account/security`, `passkeyOffer` always 422 on `admin`, never `signalUnknownCredential`
+  at the root host); `consolePasskeyRequired` needs a super administrator holding a working passkey who signed in with
+  one, immediately refuses non-passkey console sessions and `/mcp` tokens, never offers passkey creation on the refusal
+  page, and is guarded against console lockout in `lib/admin/federation/reachability.ts`.
+  → `end-user-lifecycle.md`, `totp-second-factor.md`, `passkeys.md`, `acr-satisfaction.md`, `admin-console-signin.md`
 - **Enterprise-managed authorization (ID-JAG)** — trust in another issuer's assertions lives on the sign-in
   provider (`acceptsIdentityAssertions`, `plainAssertions`), never a separate store; a presented assertion
   resolves the person through the browser sign-in's ladder, never a copy; an ID-JAG may be re-submitted, a
