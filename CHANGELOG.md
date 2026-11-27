@@ -9,6 +9,13 @@ the retired `TASKS.md` and in the knowledge base at `wiki/`.
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-27
+
+Passkeys end to end: projects, applications, APIs, proxy paths and the administrators' console can sign in with and
+require passkeys, including passwordless projects, recovery, enrollment links and adoption campaigns. Eight new storage
+areas and five migrations (one adds `phishing_resistant` to a stored `acrValues` setting if present, four are fences):
+run the usual setup and migrate steps.
+
 ### Added
 
 - **Sign in with a passkey** (spec 139). A project can turn on **Passkeys** in its Sign-in tab (or `project_update`
@@ -676,7 +683,8 @@ The first tagged release: everything the server accumulated before a version num
 - **Admin id_token** (spec 017). The console verifies its signature, `nonce`, expiry and audience.
 - **DPoP nonce secret** (spec 014). Provisioned at startup, so `requireNonce` can no longer answer 500.
 
-[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.1.0...v2.2.0
 [2.1.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.1...v2.1.0
 [2.0.1]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v2.0.0...v2.0.1
 [2.0.0]: https://github.com/RedFox-Soft/OAuth-server.ts/compare/v1.7.0...v2.0.0

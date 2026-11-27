@@ -835,6 +835,23 @@ database, because it would stop recording administrators' sign-ins and stop send
   people's activity recording on. For a project's people it stays off until an administrator turns on "Email people
   about sign-ins from a new network or browser" in the project's Sign-in tab.
 
+### Then 2.2.0
+
+2.2.0 adds eight storage areas, which `db:setup` (or `db:setup:pg`) provisions, and five migrations, which `db:migrate`
+applies. One migration adds `phishing_resistant` (`phr`, or `urn:foxauth:acr:phr` if `phr` is already in use) to a
+stored `acrValues` setting if one was saved; the other four are fence migrations that change no data. Once they are
+recorded, an older release refuses to start against the database.
+
+- **Passkeys are off by default for every project, including Administrators.** No existing sign-in changes until an
+  administrator turns **Passkeys** on in a project's Sign-in tab. See
+  [Let people sign in with a passkey](/docs/get-started/let-people-sign-in-with-a-passkey/).
+- **Existing two-step requirements now accept a full passkey.** Apps, APIs and proxy paths that previously required a
+  code from an authenticator app now accept a full passkey too, and the console calls them "two-step sign-in". Apps,
+  APIs, proxy paths and the administrators' console can also require a passkey directly (`phr`).
+- **Previously mailed "This wasn't me" links stop working after the upgrade.** Those links moved to their own storage
+  area (`NotMeLink`) so a sign-out everywhere no longer kills the owner's way back. Links mailed after the upgrade work
+  as expected.
+
 ## Check readiness and the issuer after the restart {#after-the-restart}
 
 ```bash
