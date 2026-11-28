@@ -158,12 +158,15 @@ describe('issuing tokens for a declared protected resource', () => {
 	});
 
 	/*
-	 * The built-in administrative audience keeps its own descriptor. A declaration must never be able
-	 * to take it over — that arm resolves first, and this is what says so.
+	 * The built-in administrative audience keeps its own gate ahead of the declared-resource store:
+	 * even if a record for `${ISSUER}/mcp` somehow existed in storage, an ordinary or machine client
+	 * is refused with `invalid_target` rather than handed a token from the store.
 	 */
-	it('leaves the administrative MCP audience to the built-in descriptor', async () => {
+	it('leaves the administrative MCP audience to the built-in gate', async () => {
+		await declare('http://e.ly/mcp', { scopes: ['openid'] });
 		const res = await tokenFor('http://e.ly/mcp', 'openid');
 
-		expect(res.status).toBe(200);
+		expect(res.status).toBe(400);
+		expect(shaped(OAuthError, res.error?.value).error).toBe('invalid_target');
 	});
 });

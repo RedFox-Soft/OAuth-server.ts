@@ -13,6 +13,7 @@ import { storedBucketOf } from '../../admin/auth/resolveBucket.js';
 import { member } from '../../helpers/_/object.js';
 import { configuration } from 'lib/configs/application.js';
 import checkResource from '../../shared/check_resource.ts';
+import { isMcpResource } from '../../mcp/resource_server.js';
 import { machineTokenPermitted } from '../../resources/registry.js';
 import { API_MACHINE_DESCRIPTION } from '../../resources/sign_in_requirement.js';
 import { namespaceOf } from '../../resources/namespace.js';
@@ -116,6 +117,10 @@ export async function clientCredentials(
 			);
 		}
 		const [indicator] = Object.keys(oidc.resourceServers);
+		if (isMcpResource(indicator)) {
+			// The administrative control plane has no notion of an actor that is not a person.
+			throw new InvalidTarget();
+		}
 		// This token acts for nobody, so no end user's consent stands behind it — only who the client is.
 		if (
 			!(await machineTokenPermitted(

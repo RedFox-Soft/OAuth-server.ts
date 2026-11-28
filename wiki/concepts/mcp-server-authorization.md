@@ -290,10 +290,14 @@ identity is minted on demand by whoever asked, so there is nothing an operator c
 allowlist. A document identifier can, once a super administrator names it — a stable URL is
 allowlistable, which is precisely the operator decision D6 found missing.
 
-Enforced in **two** places, and both are needed. The project-resolution rule lets the administrator sign in;
-`lib/mcp/principal.ts` re-checks on every call, which is what makes a withdrawal land on the agent's
-next request rather than when its token expires. That is the remedy an operator needs when a permitted
-host is taken over.
+Enforced in **three** places, all reading one check (`mcpClientRefusal` in `lib/mcp/admission.ts`):
+`getResourceServerInfo` (`lib/addon/resources.ts`) refuses `MCP_RESOURCE` with `invalid_target` before
+sign-in or token issuance whenever `mcp.enabled` is off, the request is not at the root issuer, another
+resource was requested beside it, or the client is not admitted (so an unpermitted agent never reaches the
+default project's login form or mints a token); `resolveBucketForRequest` routes admitted identities to
+the administrators' project; and `lib/mcp/principal.ts` re-checks on every call, which is what makes a
+withdrawal land on the agent's next request rather than when its token expires. That is the remedy an
+operator needs when a permitted host is taken over.
 
 The loopback interlock is the sharp edge. A document offering only loopback redirect targets proves
 control of a domain but cannot prove *which local process* will receive the code — the specification

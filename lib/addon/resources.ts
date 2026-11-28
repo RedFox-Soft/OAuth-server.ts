@@ -1,10 +1,12 @@
 import { getBucketStore } from '../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
+import { ApplicationConfig } from '../configs/application.js';
 import { mustChange } from './_warn.ts';
 import * as errors from '../helpers/errors.ts';
 import { MCP_RESOURCE_SERVER, isMcpResource } from '../mcp/resource_server.js';
+import { mcpClientRefusal } from '../mcp/admission.js';
 import { resolveDeclaredResource } from '../resources/registry.js';
-import { namespaceOf } from '../resources/namespace.js';
+import { namespaceOf, ROOT_NAMESPACE } from '../resources/namespace.js';
 import { scimBaseUrl } from '../provisioning/addresses.js';
 import { isAdministratorsApplication } from '../admin/administrators_application.js';
 import {
@@ -108,6 +110,29 @@ export async function getResourceServerInfo(
 	}
 
 	if (isMcpResource(resourceIndicator)) {
+		/*
+		 * Refused here — before sign-in, consent or token issuance — whenever the administrative MCP
+		 * surface is off, the request arrived at a tenant issuer rather than the root, another resource
+		 * was requested alongside it, or the client is not admitted to the administrative plane
+		 * (RFC 8707 §2, specs/039 FR-018/FR-019b/FR-020). Every cause throws the same bare InvalidTarget
+		 * an unknown resource gets, so the refusal neither routes an unpermitted agent into `redfox`'s
+		 * login form nor discloses whether `mcp.enabled` is on or which clients are on the allowlist.
+		 */
+		const requested = (oidc.params as { resource?: unknown } | undefined)
+			?.resource;
+		/*
+		 * `namespaceOf` rather than `oidc.bucket._id === DEFAULT_BUCKET_ID`: during interaction resumption
+		 * `oidc.bucket` is the derived `issuingBucket(ADMIN_BUCKET_ID)`, which is still served at the root
+		 * and maps to `ROOT_NAMESPACE`, while any tenant-addressed issuer maps to its own bucket id.
+		 */
+		if (
+			!ApplicationConfig['mcp.enabled'] ||
+			namespaceOf(oidc.bucket) !== ROOT_NAMESPACE ||
+			(Array.isArray(requested) && requested.length > 1) ||
+			(await mcpClientRefusal(client)) !== null
+		) {
+			throw new errors.InvalidTarget();
+		}
 		const adminBucket = await getBucketStore().find(ADMIN_BUCKET_ID);
 		if (adminBucket?.consolePasskeyRequired === true) {
 			return {

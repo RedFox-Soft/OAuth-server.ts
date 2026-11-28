@@ -13,9 +13,9 @@ import { getBucketStore, getUserStore } from '../adapters/index.js';
 import { ADMIN_BUCKET_ID } from '../admin/consts.js';
 import { meets, reachedAcr } from '../helpers/acr_satisfaction.ts';
 import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE, MCP_ROUTE } from './consts.js';
+import { mcpClientRefusal } from './admission.js';
 import { ISSUER } from '../configs/env.js';
 import { Client } from '../models/client.js';
-import { mcpClientPermissionStore } from '../adapters/index.js';
 
 /*
  * The identity behind an MCP request: which administrator authorized the agent, and which agent is
@@ -234,23 +234,7 @@ async function assertClientPermitted(clientId: string | undefined) {
 
 	const client = await Client.tryFind(clientId);
 	if (!client) throw new McpUnauthorized('client_not_permitted');
-	if (client.registeredDynamically) {
-		throw new McpUnauthorized('client_not_permitted');
-	}
 
-	const permission = await mcpClientPermissionStore.findFor(clientId);
-	if (!permission) throw new McpUnauthorized('client_not_permitted');
-
-	/*
-	 * Key proof is read off the client's declared authentication method rather than from the token,
-	 * which records none. That is sufficient rather than approximate: a client declaring `none` could
-	 * not have presented a key-proof assertion at the token endpoint, so its method is exactly the
-	 * question being asked.
-	 */
-	if (
-		permission.requireKeyProof &&
-		client.tokenEndpointAuthMethod !== 'private_key_jwt'
-	) {
-		throw new McpUnauthorized('key_proof_required');
-	}
+	const refusal = await mcpClientRefusal(client);
+	if (refusal) throw new McpUnauthorized(refusal);
 }

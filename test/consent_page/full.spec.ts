@@ -3,10 +3,10 @@ import { describe, it, expect, beforeAll, afterAll } from 'bun:test';
 import bootstrap, { type Setup } from '../test_helper.js';
 import { ensureAdminSeed } from 'lib/admin/seed.ts';
 import { getProtectedResourceStore } from 'lib/adapters/index.ts';
-import { DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
+import { ADMIN_BUCKET_ID, DEFAULT_BUCKET_ID } from 'lib/admin/consts.ts';
 import { ROOT_NAMESPACE } from 'lib/resources/namespace.js';
 import { ApplicationConfig } from 'lib/configs/application.js';
-import { MCP_RESOURCE } from 'lib/mcp/consts.js';
+import { ADMIN_MCP_CLIENT_ID, MCP_RESOURCE } from 'lib/mcp/consts.js';
 import { CONSENT_TEXTS } from 'lib/i18n/texts/consent/index.ts';
 import { text as fill } from 'lib/i18n/message.tsx';
 
@@ -158,12 +158,18 @@ describe('the consent page for the administrative MCP', () => {
 	beforeAll(async () => {
 		setup = await bootstrap(import.meta.url, { config: 'consent_page' });
 		await ensureAdminSeed();
+		ApplicationConfig['mcp.enabled'] = true;
+	});
+
+	afterAll(() => {
+		ApplicationConfig['mcp.enabled'] = false;
 	});
 
 	function toAdmin(cookie: string) {
 		return openConsent(
 			{
-				client_id: 'own-app',
+				client_id: ADMIN_MCP_CLIENT_ID,
+				redirect_uri: 'http://127.0.0.1:33418/callback',
 				scope: 'openid',
 				resource: [MCP_RESOURCE],
 				prompt: 'consent'
@@ -173,7 +179,10 @@ describe('the consent page for the administrative MCP', () => {
 	}
 
 	it('shows the administrator-rights block when the request is for the administrative MCP', async () => {
-		const cookie = await setup.login({ scope: 'openid' });
+		const cookie = await setup.login({
+			bucketId: ADMIN_BUCKET_ID,
+			scope: 'openid'
+		});
 
 		const page = await toAdmin(cookie);
 
@@ -182,7 +191,10 @@ describe('the consent page for the administrative MCP', () => {
 	});
 
 	it('still shows it on a repeat consent after the agent was granted it once', async () => {
-		const cookie = await setup.login({ scope: 'openid' });
+		const cookie = await setup.login({
+			bucketId: ADMIN_BUCKET_ID,
+			scope: 'openid'
+		});
 		const first = await toAdmin(cookie);
 		const allowed = await decide(first, 'allow');
 		expect(allowed.status).toBe(303);
